@@ -1,0 +1,165 @@
+import 'package:flutter/material.dart';
+
+import '../../../models/bootstrap/twitch_api_bootstrap.dart';
+import '../../../services/playback/twitch_playlist_player_runtime.dart';
+
+class TwitchRuntimePlayerPreview extends StatelessWidget {
+  final TwitchPlaylistPlayerRuntime playerRuntime;
+  final TwitchApiBootstrapSnapshot? snapshot;
+
+  const TwitchRuntimePlayerPreview({
+    super.key,
+    required this.playerRuntime,
+    required this.snapshot,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: playerRuntime,
+      builder: (context, _) {
+        final stream = snapshot?.stream;
+        final user = snapshot?.user;
+        final title = stream?['title']?.toString() ?? '尚未載入直播';
+        final gameName = stream?['gameName']?.toString() ?? '';
+        final viewerCount = stream?['viewerCount']?.toString() ?? '';
+        final displayName = user?['displayName']?.toString() ?? '';
+
+        return Container(
+          color: Colors.black,
+          child: Stack(
+            children: [
+              const Center(
+                child: Icon(
+                  Icons.play_circle_outline,
+                  size: 96,
+                  color: Colors.white24,
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                top: 16,
+                child: _InfoCard(
+                  displayName: displayName,
+                  title: title,
+                  gameName: gameName,
+                  viewerCount: viewerCount,
+                  loading: playerRuntime.loading,
+                  playlistPreview: playerRuntime.playlistUri?.toString().replaceFirst(
+                            RegExp(r'token=[^&]+'),
+                            'token=<hidden>',
+                          ) ??
+                      '',
+                ),
+              ),
+              if (playerRuntime.error != null)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.16),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.35)),
+                    ),
+                    child: SelectableText(
+                      playerRuntime.error.toString(),
+                      style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _InfoCard extends StatelessWidget {
+  final String displayName;
+  final String title;
+  final String gameName;
+  final String viewerCount;
+  final bool loading;
+  final String playlistPreview;
+
+  const _InfoCard({
+    required this.displayName,
+    required this.title,
+    required this.gameName,
+    required this.viewerCount,
+    required this.loading,
+    required this.playlistPreview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xCC18181B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (loading)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                const Icon(Icons.live_tv, size: 16, color: Color(0xFF9146FF)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  displayName.isEmpty ? 'Runtime Player Preview' : displayName,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              if (viewerCount.isNotEmpty)
+                Text(
+                  '$viewerCount viewers',
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 13),
+          ),
+          if (gameName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              gameName,
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+          ],
+          if (playlistPreview.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SelectableText(
+              playlistPreview,
+              maxLines: 2,
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
