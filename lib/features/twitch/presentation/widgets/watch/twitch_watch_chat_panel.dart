@@ -131,6 +131,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
               keyboardVisible;
           final ultraVerticalCompact = constraints.maxHeight < 410;
           final compactWidth = constraints.maxWidth < 300;
+          final predictionHasData = prediction != null && prediction.hasPrediction;
           final predictionBannerAllowed = !_shouldHidePredictionBanner(prediction);
           final effectiveShowPinned = showPinned && !hideOptionalEngagement;
           final effectiveShowPrediction =
@@ -146,16 +147,22 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
               _ChatHeader(
                 connected: currentRuntime?.connected ?? false,
                 showPinned: effectiveShowPinned,
-                showPrediction: effectiveShowPrediction,
+                showPrediction: showPrediction,
+                predictionVisible: effectiveShowPrediction,
                 hasPinned: pinned.isNotEmpty && !hideOptionalEngagement,
-                hasPrediction: predictionBannerAllowed && !hideOptionalEngagement,
+                hasPrediction: predictionHasData,
                 loading: widget.loadingEngagement,
                 compact: verticalCompact,
                 onTogglePinned: () {
                   setState(() => showPinned = !showPinned);
                 },
                 onTogglePrediction: () {
-                  setState(() => showPrediction = !showPrediction);
+                  if (predictionBannerAllowed && !hideOptionalEngagement) {
+                    setState(() => showPrediction = !showPrediction);
+                    return;
+                  }
+
+                  widget.onOpenPrediction();
                 },
                 onRefresh: widget.onRefreshEngagement,
                 onOpenAppearance: () => showTwitchChatAppearanceSheet(
@@ -250,6 +257,7 @@ class _ChatHeader extends StatelessWidget {
   final bool connected;
   final bool showPinned;
   final bool showPrediction;
+  final bool predictionVisible;
   final bool hasPinned;
   final bool hasPrediction;
   final bool loading;
@@ -263,6 +271,7 @@ class _ChatHeader extends StatelessWidget {
     required this.connected,
     required this.showPinned,
     required this.showPrediction,
+    required this.predictionVisible,
     required this.hasPinned,
     required this.hasPrediction,
     required this.loading,
@@ -312,9 +321,13 @@ class _ChatHeader extends StatelessWidget {
           ),
           const SizedBox(width: 5),
           _HeaderToggleButton(
-            tooltip: showPrediction ? '隱藏賭盤' : '顯示賭盤',
+            tooltip: predictionVisible
+                ? '隱藏賭盤通知'
+                : hasPrediction
+                    ? '打開賭盤'
+                    : '沒有賭盤',
             icon: Icons.how_to_vote_rounded,
-            active: showPrediction && hasPrediction,
+            active: predictionVisible,
             enabled: hasPrediction,
             onTap: onTogglePrediction,
           ),
@@ -396,6 +409,7 @@ class _ChatUtilityBar extends StatelessWidget {
   final bool compact;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
+
   const _ChatUtilityBar({
     required this.channelPoints,
     required this.loadingEmotes,
@@ -575,4 +589,3 @@ class _UtilityButton extends StatelessWidget {
     );
   }
 }
-
