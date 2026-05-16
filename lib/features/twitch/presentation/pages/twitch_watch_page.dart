@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_canonical_stage121
+// PATCH VERSION: twitch_watch_page_stage127_open_or_resume
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -320,7 +320,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       unawaited(volumeSubscriptionCancel);
     }
 
-    unawaited(_player.stop().catchError((_) {}));
+    unawaited(_playerSession.pauseCurrent().catchError((_) {}));
     _playerSession.release();
 
     if (_fullscreenMode || _mobileImmersiveEntered) {
@@ -600,7 +600,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       final uri = await _playerRuntime.loadLivePlaylist(channelLogin: channel);
       if (uri == null) throw StateError('播放清單載入失敗，沒有 playlist uri。');
       await _applyPlayerVolume();
-      await _player.open(Media(uri.toString()), play: true);
+      await _playerSession.openOrResume(uri: uri.toString(), play: true);
       await _applyPlayerVolume();
       await _waitForInitialPlaybackSettle();
     } catch (error) {
@@ -622,7 +622,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       final uri = await _playerRuntime.startProxyForVariant(variant);
       if (uri == null) throw StateError('切換畫質失敗：runtime 沒有回傳 playlist uri。');
       await _applyPlayerVolume();
-      await _player.open(Media(uri.toString()), play: true);
+      await _playerSession.openOrResume(uri: uri.toString(), play: true);
       await _applyPlayerVolume();
       await _waitForInitialPlaybackSettle();
     } catch (error) {
@@ -713,7 +713,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
   Future<void> _stopCurrentSession({bool clearStatus = true}) async {
     await _chatRuntime?.disconnect();
-    await _player.stop();
     _thirdPartyEmotes.clear();
     _officialEmotes.clear();
 
