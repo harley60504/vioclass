@@ -1,27 +1,19 @@
-// PATCH VERSION: twitch_media_kit_player_host_stage115_piliplus_like_media_params
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
-/// Shared media_kit player host for Twitch watch pages.
-///
-/// This intentionally follows the PiliPlus-style direction more closely:
-/// keep one app-level Player / VideoController instance alive and reuse it
-/// across WatchPage entries. A WatchPage release stops audible playback, but it
-/// does not dispose the native media_kit/libmpv/texture stack.
-///
-/// The player is disposed only by [disposeNow], which should be reserved for
-/// explicit shutdown / severe recovery cases.
 class TwitchMediaKitPlayerHost {
   static Player? _player;
   static VideoController? _videoController;
   static int _refCount = 0;
   static int _generation = 0;
+  static String? _currentMediaUri;
 
   TwitchMediaKitPlayerHost._();
+
+  static String? get currentMediaUri => _currentMediaUri;
 
   static TwitchMediaKitPlayerSession acquire({
     String title = 'Twitch Raw Proxy',
@@ -33,12 +25,10 @@ class TwitchMediaKitPlayerHost {
 
     if (player == null || controller == null) {
       _generation++;
+      _currentMediaUri = null;
       player = Player(
         configuration: PlayerConfiguration(
           title: title,
-          // PiliPlus live default is 16 MiB when expanded buffer is off.
-          // Twitch is always live in this WatchPage path, so use the same
-          // live baseline on all platforms instead of a smaller desktop value.
           bufferSize: 16 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
         ),
@@ -46,13 +36,8 @@ class TwitchMediaKitPlayerHost {
       controller = VideoController(
         player,
         configuration: const VideoControllerConfiguration(
-          // Same direction as PiliPlus: keep hardware rendering enabled and
-          // make Android surface attachment less conservative for faster first
-          // frame / fewer texture attach stalls on some devices.
           enableHardwareAcceleration: true,
           androidAttachSurfaceAfterVideoParameters: false,
-          // media_kit's Android default is auto-safe. Set it explicitly so the
-          // current app behavior is deterministic and easier to tune later.
           hwdec: 'auto-safe',
         ),
       );
@@ -69,15 +54,52 @@ class TwitchMediaKitPlayerHost {
     );
   }
 
+  static Future<void> openOrResume(
+    TwitchMediaKitPlayerSession session, {
+    required String uri,
+    bool play = true,
+    bool forceOpen = false,
+  }) async {
+    if (session.generation != _generation) {
+      throw StateError('Stale Twitch media_kit player session.');
+    }
+
+    final safeUri = uri.trim();
+    if (safeUri.isEmpty) {
+      throw ArgumentError.value(uri, 'uri', 'uri cannot be empty');
+    }
+
+    if (!forceOpen && _currentMediaUri == safeUri) {
+      if (play && !session.player.state.playing) {
+        await session.player.play();
+      }
+      return;
+    }
+
+    await session.player.open(Media(safeUri), play: play);
+    _currentMediaUri = safeUri;
+  }
+
+  static Future<void> pauseCurrent(TwitchMediaKitPlayerSession session) async {
+    if (session.generation != _generation) return;
+    await session.player.pause();
+  }
+
+  static Future<void> stopCurrent(TwitchMediaKitPlayerSession session) async {
+    if (session.generation != _generation) return;
+    await session.player.stop();
+    _currentMediaUri = null;
+  }
+
   static void _release(TwitchMediaKitPlayerSession session) {
     if (session.generation != _generation) return;
 
     _refCount = (_refCount - 1).clamp(0, 1 << 20).toInt();
     if (_refCount > 0) return;
 
-    // Stop audible playback immediately when the final WatchPage leaves, but
-    // keep the native player object alive. WatchPage already calls stop()
-    // before release, so this is an additional safety pause.
+    // Keep the native player and current media attached. Only pause audio when
+    // the last WatchPage leaves, so returning to a page can resume the same
+    // local source instead of reopening media_kit.
     unawaited(session.player.pause().catchError((_) {}));
   }
 
@@ -90,21 +112,18 @@ class TwitchMediaKitPlayerHost {
     final player = _player;
     _player = null;
     _videoController = null;
+    _currentMediaUri = null;
     _generation++;
 
     if (player == null) return;
 
     try {
       await player.pause();
-    } catch (_) {
-      // Ignore best-effort pause failures during shutdown.
-    }
+    } catch (_) {}
 
     try {
       await player.dispose();
-    } catch (_) {
-      // Ignore best-effort dispose failures during shutdown.
-    }
+    } catch (_) {}
   }
 }
 
@@ -120,6 +139,25 @@ class TwitchMediaKitPlayerSession {
     required this.videoController,
     required this.generation,
   });
+
+  String? get currentMediaUri => TwitchMediaKitPlayerHost.currentMediaUri;
+
+  Future<void> openOrResume({
+    required String uri,
+    bool play = true,
+    bool forceOpen = false,
+  }) {
+    return TwitchMediaKitPlayerHost.openOrResume(
+      this,
+      uri: uri,
+      play: play,
+      forceOpen: forceOpen,
+    );
+  }
+
+  Future<void> pauseCurrent() => TwitchMediaKitPlayerHost.pauseCurrent(this);
+
+  Future<void> stopCurrent() => TwitchMediaKitPlayerHost.stopCurrent(this);
 
   void release() {
     if (_released) return;
