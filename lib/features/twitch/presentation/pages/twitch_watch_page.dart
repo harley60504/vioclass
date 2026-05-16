@@ -1,6 +1,6 @@
-// PATCH VERSION: watch_page_ratio_drag_vertical_compact_v56
+// PATCH VERSION: watch_page_player_reload_only_v57
 // Full replacement file for lib/features/twitch/presentation/pages/twitch_watch_page.dart
-// v56: chat resize is available on phone landscape too, width is stored as a ratio, and vertical compact layouts reduce overflow.
+// v57: player-area reload only reloads the media player/HLS path; full watch reload still owns chat and engagement reconnect.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -732,6 +732,36 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
           _loadingWatch = false;
         });
       }
+    }
+  }
+
+  Future<void> _reloadPlayerOnly() async {
+    if (_loadingPlayer) return;
+
+    final channel = _channelLogin;
+
+    if (mounted) {
+      setState(() {
+        _statusText = '重新載入播放器中...';
+        _playerError = null;
+      });
+    }
+
+    try {
+      await _loadPlayer(channel);
+
+      if (!mounted || channel != _channelLogin) return;
+
+      setState(() {
+        _statusText = '播放器已重新載入 #$channel。';
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _statusText = '播放器重新載入失敗：$e';
+      });
+      _showSnack('播放器重新載入失敗：$e');
     }
   }
 
@@ -1544,7 +1574,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         onToggleMute: () => unawaited(_togglePlayerMute()),
         onVolumeChanged: (value) => unawaited(_setPlayerVolume(value)),
         onBack: () => Navigator.of(context).maybePop(),
-        onReload: _busy ? null : _loadWatch,
+        onReload: _loadingPlayer ? null : () => unawaited(_reloadPlayerOnly()),
         onStop: () => _stopCurrentSession(),
       );
     }
