@@ -92,6 +92,7 @@ class TwitchDartHlsLowLatencyProxy {
   String? _playlistUrl;
   String? _streamUrl;
   String? _streamTsUrl;
+  TwitchHlsLiveStatus? _liveStatus;
   bool _running = false;
   bool _starting = false;
 
@@ -114,6 +115,8 @@ class TwitchDartHlsLowLatencyProxy {
     if (value == null) throw StateError('Proxy has not started.');
     return value;
   }
+
+  TwitchHlsLiveStatus? get liveStatus => _liveStatus;
 
   Future<void> start() async {
     if (_running) return;
@@ -167,6 +170,13 @@ class TwitchDartHlsLowLatencyProxy {
         final message = raw['message']?.toString();
         if (message != null) {
           onLog?.call(message);
+        }
+      } else if (type == 'liveStatus') {
+        final rawStatus = raw['status'];
+        if (rawStatus is Map) {
+          _liveStatus = TwitchHlsLiveStatus.fromJson(
+            Map<String, Object?>.from(rawStatus),
+          );
         }
       } else if (type == 'error') {
         _running = false;
@@ -244,6 +254,43 @@ class TwitchDartHlsLowLatencyProxy {
     }
   }
 
+  Future<TwitchHlsLiveStatus?> requestLiveStatus({
+    Duration timeout = const Duration(milliseconds: 280),
+  }) async {
+    final control = _controlPort;
+    if (!_running || control == null) {
+      _liveStatus = null;
+      return null;
+    }
+
+    final reply = ReceivePort();
+    try {
+      control.send(<String, Object?>{
+        'type': 'liveStatus',
+        'replyPort': reply.sendPort,
+      });
+
+      final raw = await reply.first.timeout(timeout);
+      if (raw is Map) {
+        final rawStatus = raw['status'];
+        if (rawStatus is Map) {
+          final status = TwitchHlsLiveStatus.fromJson(
+            Map<String, Object?>.from(rawStatus),
+          );
+          _liveStatus = status;
+          return status;
+        }
+      }
+    } catch (_) {
+      // Best effort only. Keep the previous status so UI debugging does not
+      // flicker to null on a single missed isolate reply.
+    } finally {
+      reply.close();
+    }
+
+    return _liveStatus;
+  }
+
   Future<void> close() async {
     _starting = false;
 
@@ -272,6 +319,7 @@ class TwitchDartHlsLowLatencyProxy {
     _playlistUrl = null;
     _streamUrl = null;
     _streamTsUrl = null;
+    _liveStatus = null;
 
     final isolate = _isolate;
     _isolate = null;
@@ -382,6 +430,13 @@ Future<void> _twitchHlsProxyIsolateEntry(Map<String, Object?> args) async {
           timeout: Duration(milliseconds: timeoutMs),
         );
         commandReply?.send(<String, Object?>{'type': 'waitReady.done'});
+      }
+
+      if (type == 'liveStatus') {
+        commandReply?.send(<String, Object?>{
+          'type': 'liveStatus.done',
+          'status': proxy.liveStatus().toJson(),
+        });
       }
     }
 
@@ -507,6 +562,14 @@ class _TwitchDartHlsLowLatencyProxyCore {
     final engine = _prewarmEngine;
     if (engine == null || engine.isStopped) return;
     await engine.waitUntilReady(timeout: timeout);
+  }
+
+  TwitchHlsLiveStatus liveStatus() {
+    final engine = _prewarmEngine;
+    if (engine == null || engine.isStopped) {
+      return TwitchHlsLiveStatus.stopped();
+    }
+    return engine.liveStatus();
   }
 
   Future<void> close() async {
@@ -1670,6 +1733,33 @@ class _TwitchHlsLowLatencyEngine {
     return _maxOutputBacklogSegments;
   }
 
+  TwitchHlsLiveStatus liveStatus() {
+    final writer = _writer;
+    if (writer != null && !writer.isStopped) {
+      return writer.liveStatus();
+    }
+
+    final hasFutureSegment = _lastOutputCandidates.any(
+      (item) => item.isPrefetch,
+    );
+
+    return TwitchHlsLiveStatus(
+      running: !_stopped,
+      hasWriter: false,
+      hasFutureSegment: hasFutureSegment,
+      playlistVersion: _playlistVersion,
+      activeClientCount: _activeClientCount,
+      latestPlayableSequence: _latestPlayableSequence,
+      lastWrittenSequence: -1,
+      bufferedBytes: _liveBus.bufferedBytes,
+      lastWrittenWasPrefetch: false,
+      outputDuration: Duration.zero,
+      safeLivePosition: Duration.zero,
+      liveBackoff: Duration.zero,
+      updatedAt: DateTime.now(),
+    );
+  }
+
   List<TwitchHlsSegmentItem> _buildOutputCandidates({
     required List<TwitchHlsSegmentItem> normalItems,
     required List<TwitchHlsSegmentItem> futureItems,
@@ -1712,6 +1802,10 @@ class _TwitchHlsPersistentWriter {
   int _lastWrittenSequence = -1;
   int? _startupInitialLatestSequence;
   String? _lastMapUrl;
+  Duration _writtenOutputDuration = Duration.zero;
+  Duration _lastWrittenDuration = Duration.zero;
+  bool _lastWrittenWasPrefetch = false;
+  DateTime? _lastWrittenAt;
 
   final Set<int> _sessionWrittenSequences = <int>{};
   final Set<String> _sessionWrittenUrls = <String>{};
@@ -1755,6 +1849,45 @@ class _TwitchHlsPersistentWriter {
   void stop() {
     if (_stopped) return;
     _stopped = true;
+  }
+
+  TwitchHlsLiveStatus liveStatus() {
+    final latestPlayable = engine.latestPlayableSequence();
+    final backoff = _liveBackoff(_lastWrittenDuration);
+    final safeLivePosition = _writtenOutputDuration > backoff
+        ? _writtenOutputDuration - backoff
+        : Duration.zero;
+    final hasFutureSegment = engine._lastOutputCandidates.any(
+      (item) => item.isPrefetch,
+    );
+
+    return TwitchHlsLiveStatus(
+      running: !engine.isStopped && !_stopped,
+      hasWriter: true,
+      hasFutureSegment: hasFutureSegment,
+      playlistVersion: engine.playlistVersion(),
+      activeClientCount: engine._activeClientCount,
+      latestPlayableSequence: latestPlayable,
+      lastWrittenSequence: _lastWrittenSequence,
+      bufferedBytes: engine._liveBus.bufferedBytes,
+      lastWrittenWasPrefetch: _lastWrittenWasPrefetch,
+      outputDuration: _writtenOutputDuration,
+      safeLivePosition: safeLivePosition,
+      liveBackoff: backoff,
+      updatedAt: _lastWrittenAt ?? DateTime.now(),
+    );
+  }
+
+  Duration _liveBackoff(Duration lastSegmentDuration) {
+    final segmentMs = lastSegmentDuration.inMilliseconds;
+    if (segmentMs <= 0) return const Duration(milliseconds: 900);
+
+    final backoffMs = (segmentMs * 0.45)
+        .round()
+        .clamp(700, 1800)
+        .toInt();
+
+    return Duration(milliseconds: backoffMs);
   }
 
   Future<TwitchHlsSegmentItem?> _selectStartupItem() async {
@@ -2235,6 +2368,11 @@ class _TwitchHlsPersistentWriter {
     }
 
     engine.markWritten(item);
+
+    _writtenOutputDuration += item.duration;
+    _lastWrittenDuration = item.duration;
+    _lastWrittenWasPrefetch = item.isPrefetch;
+    _lastWrittenAt = DateTime.now();
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
+import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_playback.dart';
 import 'twitch_hls_low_latency_proxy.dart';
 
@@ -41,6 +42,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Uri? _upstreamPlaylistUri;
   String? _proxyUrl;
   String? _proxyMpvUrl;
+  TwitchHlsLiveStatus? _proxyLiveStatus;
   TwitchDartHlsLowLatencyProxy? _proxy;
   bool _loading = false;
   bool _switchingQuality = false;
@@ -56,6 +58,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Uri? get upstreamPlaylistUri => _upstreamPlaylistUri;
   String? get proxyUrl => _proxyUrl;
   String? get proxyMpvUrl => _proxyMpvUrl ?? _proxyUrl;
+  TwitchHlsLiveStatus? get proxyLiveStatus => _proxyLiveStatus;
   bool get hasProxyUrl => _proxyUrl != null && _proxyUrl!.trim().isNotEmpty;
   TwitchDartHlsLowLatencyProxy? get proxy => _proxy;
   bool get loading => _loading;
@@ -412,7 +415,28 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     // 這不是 m3u8，低延遲策略仍由 Dart proxy 自己決定 live edge / future segment。
     _proxyUrl = proxy.streamTsUrl;
     _proxyMpvUrl = proxy.streamTsUrl;
+    _proxyLiveStatus = null;
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
+  }
+
+  Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({
+    bool notify = true,
+  }) async {
+    final proxy = _proxy;
+    if (proxy == null || !proxy.isRunning) {
+      if (_proxyLiveStatus != null) {
+        _proxyLiveStatus = null;
+        if (notify) notifyListeners();
+      }
+      return null;
+    }
+
+    final status = await proxy.requestLiveStatus();
+    if (status != null) {
+      _proxyLiveStatus = status;
+      if (notify) notifyListeners();
+    }
+    return status;
   }
 
   Future<void> _stopProxy({bool notify = true}) async {
@@ -420,6 +444,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _proxy = null;
     _proxyUrl = null;
     _proxyMpvUrl = null;
+    _proxyLiveStatus = null;
 
     if (proxy != null) {
       await proxy.close();
@@ -495,6 +520,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _upstreamPlaylistUri = null;
     _proxyUrl = null;
     _proxyMpvUrl = null;
+    _proxyLiveStatus = null;
     _loading = false;
     _switchingQuality = false;
     _error = null;
@@ -534,6 +560,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'proxyUrl': proxyUrl,
       'proxyMpvUrl': proxyMpvUrl,
       'proxyStreamUrl': proxy?.streamUrl,
+      'proxyLiveStatus': proxyLiveStatus?.toJson(),
       'proxyRunning': proxy?.isRunning ?? false,
       'error': error?.toString(),
     };

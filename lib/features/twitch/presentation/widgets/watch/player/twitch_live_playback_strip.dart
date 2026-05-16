@@ -23,9 +23,39 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   bool _dragging = false;
   bool _livePinned = true;
   double? _dragValue;
+  Timer? _proxyLiveStatusTimer;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
+
+  @override
+  void initState() {
+    super.initState();
+    _startProxyLiveStatusPolling();
+  }
+
+  @override
+  void dispose() {
+    _proxyLiveStatusTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startProxyLiveStatusPolling() {
+    _proxyLiveStatusTimer?.cancel();
+    unawaited(widget.playerRuntime.refreshProxyLiveStatus());
+    _proxyLiveStatusTimer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => unawaited(widget.playerRuntime.refreshProxyLiveStatus()),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant TwitchLivePlaybackStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.playerRuntime, widget.playerRuntime)) {
+      _startProxyLiveStatusPolling();
+    }
+  }
 
   Duration _liveEdgeSeekTarget(Duration duration) {
     final ms = duration.inMilliseconds;
@@ -127,6 +157,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         ? Colors.orangeAccent
                         : Colors.white60;
                     final timeText = '$positionText / $durationText';
+                    final dynamic proxyLiveStatus =
+                        widget.playerRuntime.proxyLiveStatus;
 
                     return Row(
                       children: [
@@ -200,6 +232,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                             buffering: buffering,
                             playing: playing,
                             livePinned: isAtLiveEdge,
+                            proxyLiveStatus: proxyLiveStatus,
                           ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
@@ -247,6 +280,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     required bool buffering,
     required bool playing,
     required bool livePinned,
+    required dynamic proxyLiveStatus,
   }) {
     final pos = _formatDuration(position);
     final dur = duration.inMilliseconds > 0 ? _formatDuration(duration) : '--:--';
@@ -257,7 +291,38 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
             : playing
                 ? 'playing'
                 : 'paused';
-    return 'media_kit $state · $pos / $dur';
+
+    final proxy = _proxyStatusTooltip(proxyLiveStatus);
+    if (proxy.isEmpty) {
+      return 'media_kit $state · $pos / $dur';
+    }
+
+    return 'media_kit $state · $pos / $dur\n$proxy';
+  }
+
+  static String _proxyStatusTooltip(dynamic status) {
+    if (status == null) return '';
+
+    try {
+      final safeLivePosition = status.safeLivePosition as Duration;
+      final outputDuration = status.outputDuration as Duration;
+      final backoff = status.liveBackoff as Duration;
+      final lastSequence = status.lastWrittenSequence as int;
+      final latestSequence = status.latestPlayableSequence as int;
+      final bufferedBytes = status.bufferedBytes as int;
+      final hasFutureSegment = status.hasFutureSegment as bool;
+      final lagSegments = latestSequence - lastSequence;
+
+      return 'proxy safe=${_formatDuration(safeLivePosition)} / '
+          'out=${_formatDuration(outputDuration)} · '
+          'backoff=${backoff.inMilliseconds}ms · '
+          'seq=$lastSequence/$latestSequence · '
+          'lag=$lagSegments · '
+          'future=${hasFutureSegment ? "yes" : "no"} · '
+          'buffer=${(bufferedBytes / 1024).toStringAsFixed(0)}KB';
+    } catch (_) {
+      return 'proxy status unavailable';
+    }
   }
 
   static String _formatDuration(Duration value) {
