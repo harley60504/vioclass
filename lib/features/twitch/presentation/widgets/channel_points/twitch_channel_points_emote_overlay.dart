@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 
+const int _channelPointEmoteGridCacheSize = 96;
+const int _channelPointModifierCacheSize = 76;
+
 enum ChannelPointEmoteOverlayMode {
   choose,
   modify,
@@ -259,52 +262,49 @@ class _EmoteGrid extends StatelessWidget {
           itemCount: emotes.length,
           itemBuilder: (context, index) {
             final emote = emotes[index];
-            return InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => onSelected(emote),
-              child: Container(
-                padding: EdgeInsets.all(constraints.maxWidth < 420 ? 6 : 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF242429),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.22)),
-                ),
-                child: Column(
-                  children: [
-                    Expanded(
-                      child: Image.network(
-                        emote.imageUrl,
-                        fit: BoxFit.contain,
-                        filterQuality: FilterQuality.low,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.emoji_emotions,
-                          color: Colors.white54,
+            return RepaintBoundary(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => onSelected(emote),
+                child: Container(
+                  padding: EdgeInsets.all(constraints.maxWidth < 420 ? 6 : 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF242429),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.22)),
+                  ),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: _OptimizedChannelPointEmoteImage(
+                          imageUrl: emote.imageUrl,
+                          cacheSize: _channelPointEmoteGridCacheSize,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      emote.token,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: constraints.maxWidth < 420 ? 10 : 11,
-                        fontWeight: FontWeight.w800,
+                      const SizedBox(height: 5),
+                      Text(
+                        emote.token,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: constraints.maxWidth < 420 ? 10 : 11,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      emote.id,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white38,
-                        fontSize: constraints.maxWidth < 420 ? 8 : 9,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 1),
+                      Text(
+                        emote.id,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white38,
+                          fontSize: constraints.maxWidth < 420 ? 8 : 9,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
@@ -340,36 +340,35 @@ class _ModifierGrid extends StatelessWidget {
       itemCount: modifications.length,
       itemBuilder: (context, index) {
         final modifier = modifications[index];
-        return Card(
-          color: const Color(0xFF242429),
-          margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          child: ListTile(
-            onTap: () => onSelected(modifier),
-            leading: Image.network(
-              modifier.imageUrl.isNotEmpty ? modifier.imageUrl : emote.imageUrl,
-              width: 38,
-              height: 38,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.auto_fix_high_rounded,
-                color: Colors.white54,
+        return RepaintBoundary(
+          child: Card(
+            color: const Color(0xFF242429),
+            margin: const EdgeInsets.only(bottom: 8),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            child: ListTile(
+              onTap: () => onSelected(modifier),
+              leading: _OptimizedChannelPointEmoteImage(
+                imageUrl: modifier.imageUrl.isNotEmpty ? modifier.imageUrl : emote.imageUrl,
+                width: 38,
+                height: 38,
+                cacheSize: _channelPointModifierCacheSize,
+                fallbackIcon: Icons.auto_fix_high_rounded,
               ),
-            ),
-            title: Text(
-              modifier.token,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
+              title: Text(
+                modifier.token,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
+              subtitle: Text(
+                modifier.id,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white54),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white54),
             ),
-            subtitle: Text(
-              modifier.id,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white54),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white54),
           ),
         );
       },
@@ -405,6 +404,46 @@ class _OverlayMessage extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OptimizedChannelPointEmoteImage extends StatelessWidget {
+  final String imageUrl;
+  final double? width;
+  final double? height;
+  final int cacheSize;
+  final IconData fallbackIcon;
+
+  const _OptimizedChannelPointEmoteImage({
+    required this.imageUrl,
+    this.width,
+    this.height,
+    required this.cacheSize,
+    this.fallbackIcon = Icons.emoji_emotions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl.trim();
+    if (url.isEmpty) {
+      return Icon(fallbackIcon, color: Colors.white54);
+    }
+
+    return RepaintBoundary(
+      child: Image.network(
+        url,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) => Icon(
+          fallbackIcon,
+          color: Colors.white54,
         ),
       ),
     );
