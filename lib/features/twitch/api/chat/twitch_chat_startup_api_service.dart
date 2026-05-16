@@ -33,7 +33,7 @@ class TwitchChatStartupApiService {
 
     return TwitchChatStartupSnapshot(
       channelLogin: channelLogin.trim().toLowerCase(),
-      channelId: user['id']?.toString(),
+      channelId: user['id']?.toString() ?? '',
       badgeCatalog: TwitchBadgeCatalog(
         globalBadges: globalBadges,
         channelBadges: channelBadges,
