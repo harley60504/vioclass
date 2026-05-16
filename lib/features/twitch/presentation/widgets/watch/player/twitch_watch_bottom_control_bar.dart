@@ -73,7 +73,7 @@ class _WatchBottomControlBar extends StatelessWidget {
                           ),
                           SizedBox(width: veryNarrow ? 2 : 6),
                           if (collapseLivePlayback)
-                            _LivePlaybackOverlayButton(
+                            _LivePlaybackSheetButton(
                               player: player,
                               playerRuntime: playerRuntime,
                             )
@@ -222,163 +222,120 @@ class _WatchBottomControlBar extends StatelessWidget {
   }
 }
 
-class _LivePlaybackOverlayButton extends StatefulWidget {
+class _LivePlaybackSheetButton extends StatelessWidget {
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
 
-  const _LivePlaybackOverlayButton({
+  const _LivePlaybackSheetButton({
     required this.player,
     required this.playerRuntime,
   });
 
-  @override
-  State<_LivePlaybackOverlayButton> createState() =>
-      _LivePlaybackOverlayButtonState();
-}
+  void _showPlaybackSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: false,
+      useSafeArea: true,
+      enableDrag: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (sheetContext) {
+        final screenWidth = MediaQuery.of(sheetContext).size.width;
+        final sheetWidth = screenWidth.clamp(280.0, 520.0).toDouble();
 
-class _LivePlaybackOverlayButtonState extends State<_LivePlaybackOverlayButton> {
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
-
-  bool get _showingOverlay => _overlayEntry != null;
-
-  @override
-  void dispose() {
-    _removeOverlay(notify: false);
-    super.dispose();
-  }
-
-  void _toggleOverlay() {
-    if (_showingOverlay) {
-      _removeOverlay();
-    } else {
-      _showOverlay();
-    }
-  }
-
-  void _showOverlay() {
-    if (_overlayEntry != null) return;
-
-    final overlay = Overlay.maybeOf(context);
-    if (overlay == null) return;
-
-    final entry = OverlayEntry(
-      builder: (overlayContext) {
-        final screenWidth = MediaQuery.of(overlayContext).size.width;
-        final overlayWidth = math
-            .min(screenWidth - 24.0, 420.0)
-            .clamp(280.0, 420.0)
-            .toDouble();
-
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: GestureDetector(
-                behavior: HitTestBehavior.translucent,
-                onTap: _removeOverlay,
-              ),
-            ),
-            CompositedTransformFollower(
-              link: _layerLink,
-              showWhenUnlinked: false,
-              targetAnchor: Alignment.topCenter,
-              followerAnchor: Alignment.bottomCenter,
-              offset: const Offset(0, -12),
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  width: overlayWidth,
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xF20E0E10),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.12)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.45),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+        return SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: sheetWidth,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              decoration: BoxDecoration(
+                color: const Color(0xF20E0E10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.45),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.timeline_rounded,
-                            color: Color(0xFFBF94FF),
-                            size: 16,
-                          ),
-                          const SizedBox(width: 7),
-                          const Expanded(
-                            child: Text(
-                              '播放進度',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(999),
-                            onTap: _removeOverlay,
-                            child: const Padding(
-                              padding: EdgeInsets.all(3),
-                              child: Icon(
-                                Icons.close_rounded,
-                                color: Colors.white54,
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const Icon(
+                        Icons.timeline_rounded,
+                        color: Color(0xFFBF94FF),
+                        size: 17,
                       ),
-                      const SizedBox(height: 8),
-                      TwitchLivePlaybackStrip(
-                        player: widget.player,
-                        playerRuntime: widget.playerRuntime,
-                        compact: false,
+                      const SizedBox(width: 7),
+                      const Expanded(
+                        child: Text(
+                          '播放進度',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => Navigator.of(sheetContext).maybePop(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: Colors.white54,
+                            size: 19,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  TwitchLivePlaybackStrip(
+                    player: player,
+                    playerRuntime: playerRuntime,
+                    compact: false,
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         );
       },
     );
-
-    _overlayEntry = entry;
-    overlay.insert(entry);
-    if (mounted) setState(() {});
-  }
-
-  void _removeOverlay({bool notify = true}) {
-    final entry = _overlayEntry;
-    _overlayEntry = null;
-    entry?.remove();
-    if (notify && mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: _PlainIconButton(
-        tooltip: _showingOverlay ? '關閉播放進度' : '打開播放進度',
-        icon: Icons.timeline_rounded,
-        size: 22,
-        active: _showingOverlay,
-        dense: true,
-        onPressed: _toggleOverlay,
-      ),
+    return _PlainIconButton(
+      tooltip: '打開播放進度',
+      icon: Icons.timeline_rounded,
+      size: 22,
+      dense: true,
+      onPressed: () => _showPlaybackSheet(context),
     );
   }
 }
