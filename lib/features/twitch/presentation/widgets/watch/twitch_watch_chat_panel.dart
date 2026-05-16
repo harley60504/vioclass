@@ -146,15 +146,38 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
           final headerHeight = verticalCompact ? 42.0 : 54.0;
           final utilityBarHeight = (compactWidth || verticalCompact) ? 41.0 : 48.0;
           final inputBarHeight = verticalCompact ? 48.0 : 54.0;
-          final minMessageListHeight = keyboardVisible ? 96.0 : 132.0;
+          final predictionHasData = prediction != null && prediction.hasPrediction;
+          final hasActivePinned = pinned.any(
+            (item) => item.isActive && item.text.trim().isNotEmpty,
+          );
+          final wantsPinned = showPinned && hasActivePinned;
+          final wantsPrediction = showPrediction && predictionHasData;
+          final hasEngagementError = (widget.engagementError ?? '').isNotEmpty;
+          final estimatedPinnedHeight = wantsPinned ? 86.0 : 0.0;
+          final estimatedPredictionHeight = wantsPrediction ? 104.0 : 0.0;
+          final estimatedErrorHeight = hasEngagementError ? 26.0 : 0.0;
+          final estimatedSpacing =
+              [wantsPinned, wantsPrediction, hasEngagementError]
+                      .where((value) => value)
+                      .length >
+                  1
+              ? 8.0
+              : 0.0;
+          final estimatedEngagementHeight = (
+            estimatedPinnedHeight +
+                estimatedPredictionHeight +
+                estimatedErrorHeight +
+                estimatedSpacing,
+          ).$1.clamp(0.0, maxEngagementHeight).toDouble();
           final availableMessageListHeight = constraints.maxHeight -
               headerHeight -
               utilityBarHeight -
               inputBarHeight -
-              maxEngagementHeight;
-          final hideOptionalEngagement =
-              keyboardVisible || availableMessageListHeight < minMessageListHeight;
-          final predictionHasData = prediction != null && prediction.hasPrediction;
+              estimatedEngagementHeight;
+          final minMessageListHeight = keyboardVisible ? 84.0 : 72.0;
+          final hideOptionalEngagement = keyboardVisible ||
+              (estimatedEngagementHeight > 0 &&
+                  availableMessageListHeight < minMessageListHeight);
           final effectiveShowPinned = showPinned && !hideOptionalEngagement;
           final effectiveShowPrediction =
               showPrediction && !hideOptionalEngagement && predictionHasData;
