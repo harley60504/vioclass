@@ -19,10 +19,8 @@ dependencies:
   crypto: ^3.0.7
   uuid: ^4.5.3
   url_launcher: ^6.3.2
+  cached_network_image: ^3.4.1
 
-  # media_kit latest stable set.
-  # media_kit_libs_video already depends on platform libs, but android_video is kept
-  # explicit here so Android builds resolve the intended native lib package directly.
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
