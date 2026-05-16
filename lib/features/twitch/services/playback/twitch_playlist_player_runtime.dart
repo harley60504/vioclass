@@ -32,6 +32,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   static const int _mobileStartupMaxFps = 60;
 
   static TwitchStableHlsProxyRouter? _sharedProxy;
+  static int _sharedProxyRevision = 0;
 
   TwitchPlaylistPlayerRuntime({
     required this.playbackApi,
@@ -182,6 +183,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     if (upstreamUri == null) throw StateError('Invalid variant URL: ${variant.url}');
 
     var router = _sharedProxy;
+    final previousUpstream = router?.upstreamPlaylistUrl;
     if (router == null || !router.isRunning) {
       router = TwitchStableHlsProxyRouter(
         upstreamHeaders: defaultUpstreamHeaders,
@@ -199,16 +201,30 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _sharedProxy = router;
       _proxy = router;
       await router.start(upstreamPlaylistUrl: variant.url);
+      _sharedProxyRevision++;
     } else {
       _proxy = router;
       await router.switchUpstream(variant.url);
+      if (previousUpstream != variant.url) {
+        _sharedProxyRevision++;
+      }
     }
 
     await router.waitUntilPrewarmed();
-    _proxyUrl = router.streamTsUrl;
-    _proxyMpvUrl = router.streamTsUrl;
+    _proxyUrl = _revisionedStreamUrl(router);
+    _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
+  }
+
+  String _revisionedStreamUrl(TwitchStableHlsProxyRouter router) {
+    final uri = Uri.parse(router.streamTsUrl);
+    return uri.replace(
+      queryParameters: <String, String>{
+        ...uri.queryParameters,
+        'sourceRev': _sharedProxyRevision.toString(),
+      },
+    ).toString();
   }
 
   Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({bool notify = true}) async {
@@ -463,6 +479,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'proxyRunning': router?.isRunning ?? false,
       'proxyStablePort': router?.port,
       'proxyStableUpstream': router?.upstreamPlaylistUrl,
+      'proxySourceRevision': _sharedProxyRevision,
       'error': error?.toString(),
     };
   }
