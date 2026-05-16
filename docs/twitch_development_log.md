@@ -133,9 +133,78 @@ Twitch App 沒有 Bilibili 直播那種大量飛行彈幕，因此理論性能�
 - 更接近 PiliPlus `NetworkImgLayer` 的維護方式。
 - 降低首頁大量圖片解碼造成的 raster thread 壓力。
 
+---
+
+## Stage 110 — 聊天室貼圖、badge 與忠誠點數 icon 接入共用圖片層
+
+Commits:
+
+- `2799b79818b7045f3bc3bdae49164b1282043227`
+- `df5e1494196f6912a47a5913b8e248a4acb15397`
+
+### 背景
+
+PiliPlus 直播聊天室貼圖不是直接散落使用 `Image.network`，而是透過共用圖片層控制快取、解碼尺寸、filter quality 與 fallback。Twitch App 目前聊天室訊息列表已具備「使用者不在最新位置時不強制刷新」的設計，接下來的主要差距在圖片層。
+
+### 修改檔案
+
+- `lib/features/twitch/presentation/widgets/chat/twitch_runtime_message_tile.dart`
+- `lib/features/twitch/presentation/widgets/watch/twitch_watch_chat_panel.dart`
+
+### 修改內容
+
+- Twitch badge 改用 `TwitchCachedImageLayer`。
+- Twitch 官方 emote 改用 `TwitchCachedImageLayer`。
+- 第三方 emote 改用 `TwitchCachedImageLayer`。
+- 聊天室底部忠誠點數 icon 改用 `TwitchCachedImageLayer.avatar(...)`。
+- emote cache size 依顯示尺寸與 device pixel ratio 動態計算，並限制在 32~96 px。
+- badge 保持小尺寸 36x36 解碼。
+- 圖片 fallback 保留原本文字或 icon，不讓壞圖破壞聊天室訊息。
+
+### 預期效果
+
+- 降低聊天室大量貼圖造成的圖片解碼與 raster 壓力。
+- 讓聊天室圖片處理更接近 PiliPlus 的共用圖片層模式。
+- 後續若要調整 emote 快取策略，可集中調整 `TwitchCachedImageLayer`。
+
+---
+
+## Stage 111 — TwitchCachedImageLayer 底層改用 CachedNetworkImage
+
+Commits:
+
+- `a6b448c646e1f6311673ffba059a2630d641b162`
+- `3615d97685b389d0a61f83fef42071398e2d8997`
+
+### 背景
+
+Stage 109/110 已經把多數高頻圖片導向 `TwitchCachedImageLayer`，但底層仍是 Flutter 內建 `Image.network`。PiliPlus 的 `NetworkImgLayer` 使用 `CachedNetworkImage`，能提供更穩定的記憶體與磁碟快取行為。
+
+### 修改檔案
+
+- `pubspec.yaml`
+- `lib/features/twitch/presentation/widgets/shared/twitch_cached_image_layer.dart`
+
+### 修改內容
+
+- 新增 `cached_network_image` dependency。
+- `TwitchCachedImageLayer` 底層從 `Image.network` 改為 `CachedNetworkImage`。
+- `cacheWidth/cacheHeight` 對應到 `memCacheWidth/memCacheHeight`。
+- 保留：
+  - `filterQuality: FilterQuality.low`
+  - fallback / errorWidget
+  - avatar circular mode
+  - borderRadius clip
+  - fade in/out duration
+
+### 預期效果
+
+- 首頁縮圖、聊天室貼圖、badge、忠誠點數 icon 都會經過同一套 CachedNetworkImage 快取策略。
+- 更接近 PiliPlus `NetworkImgLayer` 的實際圖片處理架構。
+- 降低重複進出頁面、聊天室大量貼圖與快速滑動時的圖片重新下載/解碼成本。
+
 ### 下一階段候選
 
-- Stage 110：把遊戲分類 sheet 的 box art 改用 `TwitchCachedImageLayer`。
-- Stage 111：把聊天室 emote / badge / 頻道點數圖片逐步接到共用圖片層。
-- Stage 112：做 `TwitchMediaKitPlayerHost`，讓 WatchPage 之間短時間重用同一組 `Player` / `VideoController`，避免每次從首頁進直播都冷啟動 media_kit。
-- Stage 113：模仿 PiliPlus route-aware 行為，切到其他頁時暫停聊天室 heavy update，回到播放頁再恢復。
+- Stage 112：把遊戲分類 sheet 的 box art 也接到 `TwitchCachedImageLayer`。
+- Stage 113：做 `TwitchMediaKitPlayerHost`，讓 WatchPage 之間短時間重用同一組 `Player` / `VideoController`。
+- Stage 114：模仿 PiliPlus route-aware 行為，切到其他頁時暫停聊天室 heavy update，回到播放頁再恢復。
