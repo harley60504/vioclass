@@ -19,11 +19,16 @@ class TwitchLivePlaybackStrip extends StatefulWidget {
 class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   static const Duration _liveEdgeUiTolerance = Duration(seconds: 5);
   static const Duration _liveEdgeSeekBackoff = Duration(milliseconds: 350);
+  static const Duration _liveCatchUpStopTolerance = Duration(milliseconds: 1600);
+  static const Duration _liveCatchUpSeekThreshold = Duration(seconds: 8);
+  static const double _liveCatchUpRate = 1.35;
 
   bool _dragging = false;
   bool _livePinned = true;
+  bool _catchingUpToLive = false;
   double? _dragValue;
   Timer? _proxyLiveStatusTimer;
+  Timer? _liveCatchUpTimer;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
@@ -37,6 +42,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   @override
   void dispose() {
     _proxyLiveStatusTimer?.cancel();
+    _liveCatchUpTimer?.cancel();
+    unawaited(_restoreNormalPlaybackRate());
     super.dispose();
   }
 
@@ -53,6 +60,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   void didUpdateWidget(covariant TwitchLivePlaybackStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.playerRuntime, widget.playerRuntime)) {
+      _stopLiveCatchUp(restoreRate: true);
       _startProxyLiveStatusPolling();
     }
   }
@@ -123,36 +131,151 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     return value.clamp(0.0, 1.0).toDouble();
   }
 
-  Future<void> _seekToLiveEdge(
-    Duration duration, {
+  Future<void> _restoreNormalPlaybackRate() async {
+    try {
+      await player.setRate(1.0);
+    } catch (_) {}
+  }
+
+  void _stopLiveCatchUp({required bool restoreRate}) {
+    _liveCatchUpTimer?.cancel();
+    _liveCatchUpTimer = null;
+
+    if (mounted && _catchingUpToLive) {
+      setState(() {
+        _catchingUpToLive = false;
+      });
+    } else {
+      _catchingUpToLive = false;
+    }
+
+    if (restoreRate) {
+      unawaited(_restoreNormalPlaybackRate());
+    }
+  }
+
+  Future<void> _goLive({
+    required Duration position,
+    required Duration duration,
     required dynamic proxyLiveStatus,
   }) async {
+    if (duration.inMilliseconds <= 500) return;
+
     final target = _liveEdgeSeekTargetForStatus(
       mediaDuration: duration,
       proxyLiveStatus: proxyLiveStatus,
     );
     final targetSliderValue = _sliderValueForTarget(target, duration);
+    final liveLag = duration - position;
 
     setState(() {
       _dragging = true;
       _dragValue = 1.0;
       _livePinned = true;
+      _catchingUpToLive = true;
     });
 
     try {
-      await player.seek(target);
       await player.play();
+
+      // A direct seek to the HLS tail is unreliable on the raw TS proxy. Keep it
+      // only as a large-gap shortcut; the reliable part is the temporary
+      // catch-up rate below, which preserves the current playback session.
+      if (liveLag > _liveCatchUpSeekThreshold) {
+        await player.seek(target);
+      }
+
+      await player.setRate(_liveCatchUpRate);
+    } catch (_) {
+      // If rate control is not supported by the current backend, fall back to
+      // the old safe seek target instead of doing nothing.
+      try {
+        await player.seek(target);
+        await player.play();
+      } catch (_) {}
     } finally {
       if (!mounted) return;
       setState(() {
         _dragging = false;
         _dragValue = null;
-        // Keep the UI pinned as long as media_kit reports a position close to
-        // the proxy-adjusted live target. This prevents the slider from jumping
-        // right and then immediately being pulled back by position updates.
         _livePinned = targetSliderValue >= 0.90;
       });
     }
+
+    _startLiveCatchUpMonitor();
+  }
+
+  void _startLiveCatchUpMonitor() {
+    _liveCatchUpTimer?.cancel();
+    _liveCatchUpTimer = Timer.periodic(
+      const Duration(milliseconds: 350),
+      (_) => _tickLiveCatchUpMonitor(),
+    );
+    _tickLiveCatchUpMonitor();
+  }
+
+  void _tickLiveCatchUpMonitor() {
+    if (!mounted || !_catchingUpToLive) return;
+
+    final position = player.state.position;
+    final duration = player.state.duration;
+    final proxyLiveStatus = widget.playerRuntime.proxyLiveStatus;
+
+    if (duration.inMilliseconds <= 500) return;
+
+    final liveLag = duration - position;
+    final streamValue = duration.inMilliseconds <= 0
+        ? 1.0
+        : (position.inMilliseconds / duration.inMilliseconds)
+            .clamp(0.0, 1.0)
+            .toDouble();
+
+    final closeEnough = _isCloseEnoughForCatchUpStop(
+      position: position,
+      duration: duration,
+      liveLag: liveLag,
+      streamValue: streamValue,
+      proxyLiveStatus: proxyLiveStatus,
+    );
+
+    if (!closeEnough) return;
+
+    _liveCatchUpTimer?.cancel();
+    _liveCatchUpTimer = null;
+
+    unawaited(_restoreNormalPlaybackRate());
+
+    setState(() {
+      _catchingUpToLive = false;
+      _livePinned = true;
+      _dragging = false;
+      _dragValue = null;
+    });
+  }
+
+  bool _isCloseEnoughForCatchUpStop({
+    required Duration position,
+    required Duration duration,
+    required Duration liveLag,
+    required double streamValue,
+    required dynamic proxyLiveStatus,
+  }) {
+    final proxyTarget = _proxySafeTargetInMediaTimeline(
+      proxyLiveStatus: proxyLiveStatus,
+      mediaDuration: duration,
+    );
+
+    if (proxyTarget != null) {
+      final distanceFromProxySafe = position > proxyTarget
+          ? position - proxyTarget
+          : proxyTarget - position;
+      if (distanceFromProxySafe <= _liveCatchUpStopTolerance) {
+        return true;
+      }
+    }
+
+    if (liveLag <= _liveCatchUpStopTolerance) return true;
+    return streamValue >= 0.996;
   }
 
   bool _isNearLiveEdge({
@@ -281,6 +404,9 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                               max: 1,
                               onChangeStart: hasSeekableDuration
                                   ? (next) {
+                                      if (next < 0.985) {
+                                        _stopLiveCatchUp(restoreRate: true);
+                                      }
                                       setState(() {
                                         _dragging = true;
                                         _dragValue = next;
@@ -290,6 +416,9 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                   : null,
                               onChanged: hasSeekableDuration
                                   ? (next) {
+                                      if (next < 0.985) {
+                                        _stopLiveCatchUp(restoreRate: true);
+                                      }
                                       setState(() {
                                         _dragValue = next;
                                         _livePinned = next >= 0.985;
@@ -299,21 +428,29 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                               onChangeEnd: hasSeekableDuration
                                   ? (next) {
                                       final goLive = next >= 0.985;
-                                      final target = goLive
-                                          ? _liveEdgeSeekTargetForStatus(
-                                              mediaDuration: duration,
-                                              proxyLiveStatus: proxyLiveStatus,
-                                            )
-                                          : Duration(
-                                              milliseconds:
-                                                  (duration.inMilliseconds * next)
-                                                      .round(),
-                                            );
 
+                                      if (goLive) {
+                                        unawaited(
+                                          _goLive(
+                                            position: position,
+                                            duration: duration,
+                                            proxyLiveStatus: proxyLiveStatus,
+                                          ),
+                                        );
+                                        return;
+                                      }
+
+                                      final target = Duration(
+                                        milliseconds:
+                                            (duration.inMilliseconds * next)
+                                                .round(),
+                                      );
+
+                                      _stopLiveCatchUp(restoreRate: true);
                                       setState(() {
                                         _dragging = false;
                                         _dragValue = null;
-                                        _livePinned = goLive;
+                                        _livePinned = false;
                                       });
 
                                       unawaited(player.seek(target));
@@ -327,11 +464,13 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                           active: isAtLiveEdge,
                           enabled: hasSeekableDuration,
                           buffering: buffering,
+                          catchingUp: _catchingUpToLive,
                           compact: compact,
                           onPressed: hasSeekableDuration
                               ? () => unawaited(
-                                    _seekToLiveEdge(
-                                      duration,
+                                    _goLive(
+                                      position: position,
+                                      duration: duration,
                                       proxyLiveStatus: proxyLiveStatus,
                                     ),
                                   )
@@ -345,6 +484,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                             buffering: buffering,
                             playing: playing,
                             livePinned: isAtLiveEdge,
+                            catchingUp: _catchingUpToLive,
                             proxyLiveStatus: proxyLiveStatus,
                             proxyMediaTarget: proxyMediaTarget,
                           ),
@@ -394,6 +534,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     required bool buffering,
     required bool playing,
     required bool livePinned,
+    required bool catchingUp,
     required dynamic proxyLiveStatus,
     required Duration? proxyMediaTarget,
   }) {
@@ -401,11 +542,13 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     final dur = duration.inMilliseconds > 0 ? _formatDuration(duration) : '--:--';
     final state = buffering
         ? 'buffering'
-        : livePinned
-            ? 'live edge'
-            : playing
-                ? 'playing'
-                : 'paused';
+        : catchingUp
+            ? 'catching live edge'
+            : livePinned
+                ? 'live edge'
+                : playing
+                    ? 'playing'
+                    : 'paused';
 
     final proxy = _proxyStatusTooltip(
       proxyLiveStatus,
@@ -467,6 +610,7 @@ class _LiveEdgeButton extends StatelessWidget {
   final bool active;
   final bool enabled;
   final bool buffering;
+  final bool catchingUp;
   final bool compact;
   final VoidCallback? onPressed;
 
@@ -474,28 +618,35 @@ class _LiveEdgeButton extends StatelessWidget {
     required this.active,
     required this.enabled,
     required this.buffering,
+    required this.catchingUp,
     required this.compact,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final foreground = buffering
+    final foreground = buffering || catchingUp
         ? Colors.orangeAccent
         : active
             ? Colors.redAccent
             : Colors.white54;
-    final border = buffering
+    final border = buffering || catchingUp
         ? Colors.orangeAccent.withOpacity(0.42)
         : active
             ? Colors.redAccent.withOpacity(0.52)
             : Colors.white.withOpacity(0.16);
     final background = active
         ? Colors.redAccent.withOpacity(0.16)
-        : const Color(0xFF18181B).withOpacity(0.86);
+        : catchingUp
+            ? Colors.orangeAccent.withOpacity(0.12)
+            : const Color(0xFF18181B).withOpacity(0.86);
 
     return Tooltip(
-      message: active ? '目前在直播最新位置' : '跳到直播最新位置',
+      message: catchingUp
+          ? '正在追上直播最新位置'
+          : active
+              ? '目前在直播最新位置'
+              : '跳到直播最新位置',
       child: Material(
         color: background,
         borderRadius: BorderRadius.circular(999),
