@@ -36,6 +36,7 @@ import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
 import '../sheets/twitch_channel_points_sheet.dart';
@@ -180,6 +181,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   late final TwitchPinnedChatApiService _pinnedChatApi;
   late final TwitchPredictionApiService _publicPredictionApi;
   late final TwitchDropsPredictionApiService _dropsPredictionApi;
+  late final TwitchPredictionHermesRuntimeService _predictionHermesRuntime;
 
   late final Player _player;
   late final VideoController _videoController;
@@ -305,6 +307,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       client: _apiClient,
       tokenProvider: _dropsAuthService.getToken,
     );
+    _predictionHermesRuntime = TwitchPredictionHermesRuntimeService();
 
     MediaKit.ensureInitialized();
 
@@ -340,6 +343,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     unawaited(chatRuntime?.disposeRuntime());
 
     _playerRuntime.dispose();
+    unawaited(_predictionHermesRuntime.dispose());
 
     _volumePreferenceSaveDebounce?.cancel();
     _chatWidthPreferenceSaveDebounce?.cancel();
@@ -1042,6 +1046,11 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         recentMessageLimit: 100,
       );
 
+      _connectPredictionHermes(
+        channelId: startup.channelId,
+        viewerId: validation.userId,
+      );
+
       unawaited(_loadThirdPartyEmotes());
       unawaited(_refreshEngagement(showSnackOnError: false));
 
@@ -1061,6 +1070,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
   Future<void> _stopCurrentSession({bool clearStatus = true}) async {
 
+    await _predictionHermesRuntime.disconnect();
     await _chatRuntime?.disconnect();
     await _player.stop();
 
@@ -1209,6 +1219,80 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     if (lastError != null && showSnackOnError) {
       _showSnack('互動資料更新失敗：$lastError');
     }
+  }
+
+
+  void _connectPredictionHermes({
+    required String channelId,
+    required String? viewerId,
+  }) {
+    unawaited(
+      _predictionHermesRuntime.connect(
+        channelId: channelId,
+        viewerUserId: viewerId,
+        previousPrediction: _prediction,
+        onPrediction: _handleHermesPrediction,
+        onBalance: _handleHermesChannelPointsBalance,
+        onStatus: _handleHermesStatus,
+      ),
+    );
+  }
+
+  void _handleHermesPrediction(TwitchPredictionSnapshot prediction) {
+    if (!mounted) return;
+    if (!prediction.hasPrediction) return;
+
+    setState(() {
+      _prediction = prediction;
+      _engagementError = null;
+    });
+  }
+
+  void _handleHermesChannelPointsBalance(int balance) {
+    if (!mounted) return;
+
+    final current = _channelPointsSnapshot;
+    final context = current?.context;
+    if (current == null || context == null) {
+      setState(() {
+        _statusText = 'Hermes 忠誠點數餘額更新：$balance';
+      });
+      unawaited(_refreshEngagement(showSnackOnError: false));
+      return;
+    }
+
+    final nextContext = TwitchChannelPointsContext(
+      channelId: context.channelId,
+      channelLogin: context.channelLogin,
+      balance: balance,
+      availableClaimId: context.availableClaimId,
+      availableClaimPoints: context.availableClaimPoints,
+      pointsName: context.pointsName,
+      pointsIconUrl: context.pointsIconUrl,
+      raw: context.raw,
+    );
+
+    setState(() {
+      _channelPointsSnapshot = TwitchChannelPointsRuntimeSnapshot(
+        channelLogin: current.channelLogin,
+        startedAt: current.startedAt,
+        completedAt: DateTime.now(),
+        publicRead: current.publicRead,
+        publicError: current.publicError,
+        context: nextContext,
+        contextError: current.contextError,
+        rewardsResult: current.rewardsResult,
+        rewardsError: current.rewardsError,
+      );
+      _statusText = 'Hermes 忠誠點數餘額更新：$balance';
+    });
+  }
+
+  void _handleHermesStatus(String status) {
+    if (!mounted) return;
+    setState(() {
+      _statusText = status;
+    });
   }
 
   Future<void> _sendMessage() async {
@@ -1365,8 +1449,30 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         points: points,
       );
 
+      if (!mounted) return;
+
+      final outcomeId = outcome.id.trim().isNotEmpty
+          ? outcome.id.trim()
+          : outcome.title.trim();
+      final nextPrediction = prediction.withViewerPrediction(
+        outcomeId: outcomeId,
+        points: points,
+      );
+      setState(() {
+        _prediction = nextPrediction;
+      });
+
+      final balance = _channelPointsSnapshot?.balance;
+      if (balance != null) {
+        final nextBalance = balance - points;
+        _handleHermesChannelPointsBalance(nextBalance < 0 ? 0 : nextBalance);
+      }
+
       _showSnack('已送出下注：${outcome.title} · $points 點');
-      await _refreshEngagement(showSnackOnError: false);
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 850), () {
+        if (!mounted) return Future<void>.value();
+        return _refreshEngagement(showSnackOnError: false);
+      }));
     } catch (e) {
       _showSnack('下注失敗：$e');
     }
