@@ -1241,7 +1241,7 @@ class _CompactInlineVolumeControl extends StatelessWidget {
   }
 }
 
-class _LivePlaybackStrip extends StatelessWidget {
+class _LivePlaybackStrip extends StatefulWidget {
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final bool compact;
@@ -1251,6 +1251,17 @@ class _LivePlaybackStrip extends StatelessWidget {
     required this.playerRuntime,
     this.compact = false,
   });
+
+  @override
+  State<_LivePlaybackStrip> createState() => _LivePlaybackStripState();
+}
+
+class _LivePlaybackStripState extends State<_LivePlaybackStrip> {
+  bool _dragging = false;
+  double? _dragValue;
+
+  Player get player => widget.player;
+  bool get compact => widget.compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1279,28 +1290,30 @@ class _LivePlaybackStrip extends StatelessWidget {
                     final rawValue = hasSeekableDuration
                         ? position.inMilliseconds / duration.inMilliseconds
                         : 1.0;
-                    final value = rawValue.clamp(0.0, 1.0).toDouble();
+                    final streamValue = rawValue.clamp(0.0, 1.0).toDouble();
+                    final value = _dragging
+                        ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
+                        : streamValue;
+                    final previewPosition = hasSeekableDuration
+                        ? Duration(
+                            milliseconds:
+                                (duration.inMilliseconds * value).round(),
+                          )
+                        : position;
                     final liveLag = hasSeekableDuration
                         ? duration - position
                         : Duration.zero;
                     final isAtLiveEdge = !hasSeekableDuration ||
                         liveLag <= const Duration(milliseconds: 1200) ||
-                        value >= 0.992;
-                    final positionText = _formatDuration(position);
+                        streamValue >= 0.992;
+                    final positionText = _formatDuration(previewPosition);
                     final durationText = hasSeekableDuration
                         ? _formatDuration(duration)
                         : '--:--';
-                    final liveColor = buffering
+                    final timeColor = buffering
                         ? Colors.orangeAccent
-                        : isAtLiveEdge
-                            ? Colors.redAccent
-                            : Colors.white60;
-
-                    final liveText = buffering
-                        ? 'BUFFER'
-                        : isAtLiveEdge
-                            ? 'LIVE'
-                            : '$positionText / $durationText';
+                        : Colors.white60;
+                    final timeText = '$positionText / $durationText';
 
                     return Row(
                       children: [
@@ -1316,10 +1329,29 @@ class _LivePlaybackStrip extends StatelessWidget {
                               value: value,
                               min: 0,
                               max: 1,
+                              onChangeStart: hasSeekableDuration
+                                  ? (next) {
+                                      setState(() {
+                                        _dragging = true;
+                                        _dragValue = next;
+                                      });
+                                    }
+                                  : null,
                               onChanged: hasSeekableDuration
+                                  ? (next) {
+                                      setState(() {
+                                        _dragValue = next;
+                                      });
+                                    }
+                                  : null,
+                              onChangeEnd: hasSeekableDuration
                                   ? (next) {
                                       final targetMs =
                                           (duration.inMilliseconds * next).round();
+                                      setState(() {
+                                        _dragging = false;
+                                        _dragValue = null;
+                                      });
                                       unawaited(
                                         player.seek(Duration(milliseconds: targetMs)),
                                       );
@@ -1328,10 +1360,26 @@ class _LivePlaybackStrip extends StatelessWidget {
                             ),
                           ),
                         ),
-                        SizedBox(width: compact ? 8 : 12),
+                        SizedBox(width: compact ? 6 : 8),
+                        _LiveEdgeButton(
+                          active: isAtLiveEdge,
+                          enabled: hasSeekableDuration,
+                          buffering: buffering,
+                          compact: compact,
+                          onPressed: hasSeekableDuration
+                              ? () {
+                                  setState(() {
+                                    _dragging = false;
+                                    _dragValue = null;
+                                  });
+                                  unawaited(player.seek(duration));
+                                }
+                              : null,
+                        ),
+                        SizedBox(width: compact ? 6 : 8),
                         Tooltip(
                           message: _timeStatusTooltip(
-                            position: position,
+                            position: previewPosition,
                             duration: duration,
                             buffering: buffering,
                             playing: playing,
@@ -1346,41 +1394,20 @@ class _LivePlaybackStrip extends StatelessWidget {
                                 horizontal: compact ? 4 : 6,
                                 vertical: compact ? 5 : 6,
                               ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (isAtLiveEdge || buffering) ...[
-                                    Container(
-                                      width: compact ? 6 : 7,
-                                      height: compact ? 6 : 7,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: buffering
-                                            ? Colors.orangeAccent
-                                            : Colors.redAccent,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 5),
+                              child: Text(
+                                timeText,
+                                textAlign: TextAlign.right,
+                                maxLines: 1,
+                                overflow: TextOverflow.fade,
+                                softWrap: false,
+                                style: TextStyle(
+                                  color: timeColor,
+                                  fontSize: compact ? 11 : 12,
+                                  fontWeight: FontWeight.w900,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
                                   ],
-                                  Flexible(
-                                    child: Text(
-                                      liveText,
-                                      textAlign: TextAlign.right,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.fade,
-                                      softWrap: false,
-                                      style: TextStyle(
-                                        color: liveColor,
-                                        fontSize: compact ? 11 : 12,
-                                        fontWeight: FontWeight.w900,
-                                        fontFeatures: const [
-                                          FontFeature.tabularFigures(),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -1419,6 +1446,84 @@ class _LivePlaybackStrip extends StatelessWidget {
       return '$hours:$minutes:$seconds';
     }
     return '$minutes:$seconds';
+  }
+}
+
+class _LiveEdgeButton extends StatelessWidget {
+  final bool active;
+  final bool enabled;
+  final bool buffering;
+  final bool compact;
+  final VoidCallback? onPressed;
+
+  const _LiveEdgeButton({
+    required this.active,
+    required this.enabled,
+    required this.buffering,
+    required this.compact,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = buffering
+        ? Colors.orangeAccent
+        : active
+            ? Colors.redAccent
+            : Colors.white54;
+    final border = buffering
+        ? Colors.orangeAccent.withOpacity(0.42)
+        : active
+            ? Colors.redAccent.withOpacity(0.52)
+            : Colors.white.withOpacity(0.16);
+    final background = active
+        ? Colors.redAccent.withOpacity(0.16)
+        : const Color(0xFF18181B).withOpacity(0.86);
+
+    return Tooltip(
+      message: active ? '目前在直播最新位置' : '跳到直播最新位置',
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(999),
+          child: Container(
+            height: compact ? 25 : 28,
+            padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: enabled ? border : Colors.white10),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: compact ? 5 : 6,
+                  height: compact ? 5 : 6,
+                  decoration: BoxDecoration(
+                    color: enabled ? foreground : Colors.white24,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                SizedBox(width: compact ? 4 : 5),
+                Text(
+                  'LIVE',
+                  style: TextStyle(
+                    color: enabled ? foreground : Colors.white24,
+                    fontSize: compact ? 10 : 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
