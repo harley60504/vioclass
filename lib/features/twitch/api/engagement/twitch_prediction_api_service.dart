@@ -6,16 +6,32 @@ import '../core/twitch_web_gql_persisted_api_service.dart';
 class TwitchPredictionApiService {
   final TwitchWebGqlPersistedApiService gql;
 
+  static Future<TwitchPredictionSnapshot?> Function()? _lastFallbackLoader;
+
   const TwitchPredictionApiService({
     required this.gql,
   });
+
+  static Future<TwitchPredictionSnapshot?> refreshLastPredictionContext() async {
+    final loader = _lastFallbackLoader;
+    if (loader == null) return null;
+    return loader();
+  }
 
   Future<TwitchPredictionSnapshot> fetchPredictionContext({
     required String channelLogin,
     int count = 1,
   }) async {
+    final login = channelLogin.trim().toLowerCase();
+    if (login.isNotEmpty) {
+      _lastFallbackLoader = () => fetchPredictionContext(
+            channelLogin: login,
+            count: count,
+          );
+    }
+
     final raw = await fetchPredictionContextRaw(
-      channelLogin: channelLogin,
+      channelLogin: login,
       count: count,
     );
 
