@@ -1,6 +1,7 @@
-// PATCH VERSION: watch_page_ratio_drag_vertical_compact_v56
+// PATCH VERSION: watch_page_shared_player_host_stage113
 // Full replacement file for lib/features/twitch/presentation/pages/twitch_watch_page.dart
-// v56: chat resize is available on phone landscape too, width is stored as a ratio, and vertical compact layouts reduce overflow.
+// Stage 113: WatchPage now acquires media_kit Player / VideoController from
+// TwitchMediaKitPlayerHost, so route changes do not always cold-start libmpv.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -36,21 +37,20 @@ import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
+import '../dialogs/twitch_subscribe_webview_dialog_v1.dart';
 import '../sheets/twitch_channel_points_sheet.dart';
 import '../sheets/twitch_emote_picker_sheet.dart';
 import '../sheets/twitch_prediction_bet_sheet.dart';
-import '../dialogs/twitch_subscribe_webview_dialog_v1.dart';
+import '../widgets/responsive/twitch_responsive_layout.dart';
 import '../widgets/watch/twitch_watch_chat_panel.dart';
 import '../widgets/watch/twitch_watch_player_area.dart';
-import '../widgets/responsive/twitch_responsive_layout.dart';
 
 class TwitchWatchPage extends StatefulWidget {
   final TwitchStreamHeaderMetadata initialMetadata;
 
-  // Legacy entry-point arguments kept for older pages such as
-  // twitch_windows_player_page.dart. New code should prefer initialMetadata.
   final String? initialChannelLogin;
   final String? initialStreamTitle;
   final String? initialGameName;
@@ -108,10 +108,6 @@ class TwitchWatchPage extends StatefulWidget {
 class _TwitchWatchPageState extends State<TwitchWatchPage> {
   static const bool _enableChannelPointEmoteMenu = true;
 
-  // media_kit native backend uses libmpv. Keep the PlayerConfiguration
-  // bufferSize at media_kit default here so internal playback can be compared
-  // fairly against external mpv without an artificially tiny demuxer cache.
-
   static const String _chatPanelWidthPreferenceKey =
       'twitch_watch_v2_chat_panel_width';
   static const String _chatPanelRatioPreferenceKey =
@@ -123,8 +119,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   static const String _chatVisiblePreferenceKey =
       'twitch_watch_v2_chat_visible';
 
-  // Fallback keys from the first preference patch. These allow users who
-  // already saved settings with the old patch to keep their values once.
   static const String _legacyChatPanelWidthPreferenceKey =
       'twitch_watch_chat_panel_width';
   static const String _legacyPlayerVolumePreferenceKey =
@@ -166,8 +160,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   late final TwitchPredictionApiService _publicPredictionApi;
   late final TwitchDropsPredictionApiService _dropsPredictionApi;
 
-  late final Player _player;
-  late final VideoController _videoController;
+  late final TwitchMediaKitPlayerSession _playerSession;
+
+  Player get _player => _playerSession.player;
+  VideoController get _videoController => _playerSession.videoController;
 
   StreamSubscription<double>? _playerVolumeSubscription;
   Timer? _volumePreferenceSaveDebounce;
@@ -212,7 +208,9 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   void initState() {
     super.initState();
 
-    _channelController = TextEditingController(text: widget.resolvedInitialMetadata.channelLogin);
+    _channelController = TextEditingController(
+      text: widget.resolvedInitialMetadata.channelLogin,
+    );
     _messageController = TextEditingController();
 
     _apiClient = TwitchApiClient();
@@ -263,9 +261,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     );
     _relationshipApi = TwitchPrivateGqlRelationshipApiServiceV1(
       client: _apiClient,
-      // PATCH v15: token providers are split. Status check uses main OAuth;
-      // Follow / Unfollow uses Drops Android token only. Web GQL token is not
-      // allowed to fallback into relationship mutations.
       oauthTokenProvider: _authService.getValidAccessToken,
       oauthClientIdProvider: () async {
         final stored = _authService.clientId?.trim();
@@ -291,14 +286,9 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       tokenProvider: _dropsAuthService.getToken,
     );
 
-    MediaKit.ensureInitialized();
-
-    _player = Player(
-      configuration: const PlayerConfiguration(
-        title: 'Twitch Raw Proxy',
-      ),
+    _playerSession = TwitchMediaKitPlayerHost.acquire(
+      title: 'Twitch Raw Proxy',
     );
-    _videoController = VideoController(_player);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _enterMobileImmersiveByDefault();
@@ -330,7 +320,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     unawaited(_saveVolumePreference());
     unawaited(_saveChatPanelWidthPreference());
     unawaited(_playerVolumeSubscription?.cancel());
-    unawaited(_player.dispose());
+    unawaited(_player.stop().catchError((_) {}));
+    _playerSession.release();
 
     if (_fullscreenMode || _mobileImmersiveEntered) {
       unawaited(TwitchFullscreenController.exitFullscreen());
@@ -376,7 +367,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
           prefs.getBool(_legacyPlayerMutedPreferenceKey) ??
           false;
 
-      final savedChatVisible = prefs.getBool(_chatVisiblePreferenceKey) ?? _chatVisible;
+      final savedChatVisible =
+          prefs.getBool(_chatVisiblePreferenceKey) ?? _chatVisible;
 
       if (!mounted) return;
 
@@ -389,12 +381,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         _chatVisible = savedChatVisible;
       });
 
-      // Migrate any legacy value into the v2 keys immediately.
       unawaited(_saveChatPanelWidthPreference());
       unawaited(_saveVolumePreference());
     } catch (e) {
       debugPrint('load watch preferences v2 failed: $e');
-      // 偏好設定讀取失敗時維持預設值，不阻擋播放器啟動。
     }
 
     await _applyPlayerVolume();
@@ -470,7 +460,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       _volume = _lastNonZeroVolume.clamp(1.0, 100.0).toDouble();
     }
 
-    final effectiveVolume = _isMuted ? 0.0 : _volume.clamp(0.0, 100.0).toDouble();
+    final effectiveVolume =
+        _isMuted ? 0.0 : _volume.clamp(0.0, 100.0).toDouble();
     await _player.setVolume(effectiveVolume);
   }
 
@@ -561,9 +552,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       _chatPanelWidth = nextWidth;
       _chatPanelRatio = nextRatio;
     });
-
-    // Keep drag lightweight; persist only on drag end.
-    // Debouncing a preference write on every drag update made resize feel sticky.
   }
 
   double _effectiveChatPanelWidthForViewport(TwitchResponsiveLayout layout) {
@@ -640,11 +628,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
     try {
       await _stopCurrentSession(clearStatus: false);
-
-      // PATCH v33: keep the critical path short. The user should see video as
-      // soon as the live playlist/media player is ready; chat, pinned message,
-      // prediction, channel points and relationship status are loaded in the
-      // background instead of blocking the whole page transition.
       await _loadPlayer(channel);
 
       if (!mounted) return;
@@ -714,11 +697,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   Future<void> _waitForInitialPlaybackSettle() async {
-    // The raw proxy can already be producing live bytes while media_kit is still
-    // initializing. Keep the first-page critical path player-only until the
-    // native player has at least started producing a video stream, or until a
-    // short timeout is reached. Chat, emotes and engagement requests are started
-    // only after this guard so they do not compete with the first few frames.
     if (_player.state.width != null && _player.state.width! > 0) {
       return;
     }
@@ -741,8 +719,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     });
     playingSubscription = _player.stream.playing.listen((playing) {
       if (playing) {
-        // Give the decoder a tiny head start after play starts; this keeps the
-        // initial proxy route closer to external mpv without forcing a long wait.
         Timer(const Duration(milliseconds: 180), complete);
       }
     });
@@ -757,9 +733,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       final value = runtime.playlistUri;
       if (value is Uri) return value;
       if (value != null) return Uri.tryParse(value.toString());
-    } catch (_) {
-      // The runtime implementation may not expose playlistUri.
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -871,8 +845,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
       _showSnack(_isFollowing ? '已追隨 $login' : '已取消追隨 $login');
 
-      // Follow/unfollow can take a short moment to propagate. Refresh once more
-      // without blocking the button state.
       unawaited(Future<void>.delayed(const Duration(milliseconds: 900), () {
         if (!mounted) return Future<void>.value();
         return _refreshRelationshipStatus(channelLogin: login);
@@ -912,9 +884,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     try {
       await TwitchFullscreenController.setFullscreen(true);
       _mobileImmersiveEntered = true;
-    } catch (_) {
-      // Best effort only. Do not block watch page startup.
-    }
+    } catch (_) {}
   }
 
   void _toggleChatVisibility() {
@@ -946,7 +916,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     });
 
     try {
-        await _chatRuntime?.disposeRuntime();
+      await _chatRuntime?.disposeRuntime();
 
       final token = await _authService.getValidAccessToken();
       if (token == null || token.isEmpty) {
@@ -1005,7 +975,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   Future<void> _stopCurrentSession({bool clearStatus = true}) async {
-
     await _chatRuntime?.disconnect();
     await _player.stop();
 
@@ -1120,9 +1089,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     }
 
     try {
-      // PATCH v33: these three requests are independent snapshots. Start them
-      // together so pinned chat / prediction / channel points no longer form a
-      // slow serial chain after chat connects.
       await Future.wait<void>(<Future<void>>[
         loadChannelPoints(),
         loadPrediction(),
@@ -1220,7 +1186,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     );
   }
 
-  Future<List<TwitchChannelPointEmoteOption>> _loadChannelPointModifiableEmotes() async {
+  Future<List<TwitchChannelPointEmoteOption>>
+      _loadChannelPointModifiableEmotes() async {
     try {
       return await _channelPointsApi.getModifiableEmotes(
         channelLogin: _channelLogin,
