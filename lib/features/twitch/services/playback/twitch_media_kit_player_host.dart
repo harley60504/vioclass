@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_media_kit_player_host_stage112_compile_safe
+// PATCH VERSION: twitch_media_kit_player_host_stage113_pause_on_release
 
 import 'dart:async';
 
@@ -68,6 +68,11 @@ class TwitchMediaKitPlayerHost {
 
     _refCount = (_refCount - 1).clamp(0, 1 << 20).toInt();
     if (_refCount > 0) return;
+
+    // Stop audible playback immediately when the final WatchPage leaves, but
+    // keep the native player object alive for a short period to avoid cold
+    // starting libmpv / texture / decoder on the next watch page.
+    unawaited(session.player.pause().catchError((_) {}));
 
     _disposeTimer?.cancel();
     _disposeTimer = Timer(_releaseGracePeriod, () {
