@@ -1223,7 +1223,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
 
   void _connectPredictionHermes({
-    required String channelId,
+    required String? channelId,
     required String? viewerId,
   }) {
     unawaited(
