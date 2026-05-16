@@ -1263,6 +1263,37 @@ class _LivePlaybackStripState extends State<_LivePlaybackStrip> {
   Player get player => widget.player;
   bool get compact => widget.compact;
 
+  Duration _liveEdgeSeekTarget(Duration duration) {
+    final ms = duration.inMilliseconds;
+    if (ms <= 0) return Duration.zero;
+
+    // HLS live streams often ignore a seek request that lands exactly on
+    // the current duration boundary. Seek slightly before the tail so mpv
+    // treats it as a valid live-edge seek.
+    final targetMs = ms <= 700 ? ms : ms - 350;
+    return Duration(milliseconds: targetMs);
+  }
+
+  Future<void> _seekToLiveEdge(Duration duration) async {
+    final target = _liveEdgeSeekTarget(duration);
+
+    setState(() {
+      _dragging = true;
+      _dragValue = 1.0;
+    });
+
+    try {
+      await player.seek(target);
+      await player.play();
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _dragging = false;
+        _dragValue = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<Duration>(
@@ -1346,15 +1377,17 @@ class _LivePlaybackStripState extends State<_LivePlaybackStrip> {
                                   : null,
                               onChangeEnd: hasSeekableDuration
                                   ? (next) {
-                                      final targetMs =
-                                          (duration.inMilliseconds * next).round();
+                                      final target = next >= 0.992
+                                          ? _liveEdgeSeekTarget(duration)
+                                          : Duration(
+                                              milliseconds:
+                                                  (duration.inMilliseconds * next).round(),
+                                            );
                                       setState(() {
                                         _dragging = false;
                                         _dragValue = null;
                                       });
-                                      unawaited(
-                                        player.seek(Duration(milliseconds: targetMs)),
-                                      );
+                                      unawaited(player.seek(target));
                                     }
                                   : null,
                             ),
@@ -1367,13 +1400,7 @@ class _LivePlaybackStripState extends State<_LivePlaybackStrip> {
                           buffering: buffering,
                           compact: compact,
                           onPressed: hasSeekableDuration
-                              ? () {
-                                  setState(() {
-                                    _dragging = false;
-                                    _dragValue = null;
-                                  });
-                                  unawaited(player.seek(duration));
-                                }
+                              ? () => unawaited(_seekToLiveEdge(duration))
                               : null,
                         ),
                         SizedBox(width: compact ? 6 : 8),
