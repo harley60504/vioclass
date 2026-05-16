@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_stream_card_home_image_decode_cache_stage108
+
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,6 +10,10 @@ import '../../../models/discovery/twitch_live_stream.dart';
 const double twitchStreamCardGridHorizontalPadding = 36;
 const double twitchStreamCardGridSpacing = 16;
 const double twitchStreamCardGridMaxCrossAxisExtent = 380;
+
+const int _thumbnailMinPhysicalWidth = 320;
+const int _thumbnailMaxPhysicalWidth = 480;
+const int _avatarPhysicalSize = 64;
 
 /// Returns a stable tile height for the discovery stream grid.
 ///
@@ -133,53 +139,84 @@ class _StreamThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumbnailUrl = _thumbnailUrl(stream, width: 520, height: 292);
     final viewerCount = _readInt(stream, const <String>['viewerCount', 'viewer_count']);
 
     return AspectRatio(
       aspectRatio: 16 / 9,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (thumbnailUrl.isNotEmpty)
-            Image.network(
-              thumbnailUrl,
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (_, __, ___) => _ThumbnailFallback(colors: colors),
-            )
-          else
-            _ThumbnailFallback(colors: colors),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[
-                  Colors.black.withValues(alpha: 0.08),
-                  Colors.black.withValues(alpha: 0.22),
-                ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final imageWidth = _thumbnailPhysicalWidthFor(
+            context: context,
+            logicalWidth: constraints.maxWidth,
+          );
+          final imageHeight = (imageWidth * 9 / 16).round();
+          final thumbnailUrl = _thumbnailUrl(
+            stream,
+            width: imageWidth,
+            height: imageHeight,
+          );
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              if (thumbnailUrl.isNotEmpty)
+                Image.network(
+                  thumbnailUrl,
+                  fit: BoxFit.cover,
+                  cacheWidth: imageWidth,
+                  cacheHeight: imageHeight,
+                  filterQuality: FilterQuality.low,
+                  gaplessPlayback: true,
+                  errorBuilder: (_, __, ___) => _ThumbnailFallback(colors: colors),
+                )
+              else
+                _ThumbnailFallback(colors: colors),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Colors.black.withValues(alpha: 0.08),
+                      Colors.black.withValues(alpha: 0.22),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
-          Positioned(
-            top: 8,
-            left: 8,
-            child: _LiveBadge(colors: colors),
-          ),
-          if (viewerCount > 0)
-            Positioned(
-              right: 8,
-              bottom: 8,
-              child: _ViewerBadge(
-                viewerCount: viewerCount,
-                colors: colors,
+              Positioned(
+                top: 8,
+                left: 8,
+                child: _LiveBadge(colors: colors),
               ),
-            ),
-        ],
+              if (viewerCount > 0)
+                Positioned(
+                  right: 8,
+                  bottom: 8,
+                  child: _ViewerBadge(
+                    viewerCount: viewerCount,
+                    colors: colors,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
+}
+
+int _thumbnailPhysicalWidthFor({
+  required BuildContext context,
+  required double logicalWidth,
+}) {
+  final safeLogicalWidth = logicalWidth.isFinite && logicalWidth > 0
+      ? logicalWidth
+      : 320.0;
+  final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+  final physicalWidth = (safeLogicalWidth * devicePixelRatio).round();
+  return physicalWidth
+      .clamp(_thumbnailMinPhysicalWidth, _thumbnailMaxPhysicalWidth)
+      .toInt();
 }
 
 class _ThumbnailFallback extends StatelessWidget {
@@ -536,7 +573,10 @@ class _Avatar extends StatelessWidget {
           : Image.network(
               url,
               fit: BoxFit.cover,
+              cacheWidth: _avatarPhysicalSize,
+              cacheHeight: _avatarPhysicalSize,
               filterQuality: FilterQuality.low,
+              gaplessPlayback: true,
               errorBuilder: (_, __, ___) => Icon(
                 Icons.person_rounded,
                 color: colors.mutedText,
