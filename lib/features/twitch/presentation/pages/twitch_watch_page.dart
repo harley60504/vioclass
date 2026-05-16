@@ -314,6 +314,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       ),
     );
     _videoController = VideoController(_player);
+    unawaited(_applyAndroidMediaKitPerformanceHints());
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _enterMobileImmersiveByDefault();
@@ -487,6 +488,43 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
     final effectiveVolume = _isMuted ? 0.0 : _volume.clamp(0.0, 100.0).toDouble();
     await _player.setVolume(effectiveVolume);
+  }
+
+  Future<void> _applyAndroidMediaKitPerformanceHints() async {
+    if (!TwitchFullscreenController.isMobilePlatform) return;
+
+    dynamic platform;
+    try {
+      platform = (_player as dynamic).platform;
+    } catch (error) {
+      debugPrint('media_kit Android tuning skipped: platform unavailable: $error');
+      return;
+    }
+
+    Future<void> applyOption(String name, String value) async {
+      try {
+        await platform.setProperty(name, value);
+        return;
+      } catch (_) {
+        try {
+          await platform.setOption(name, value);
+        } catch (error) {
+          debugPrint('media_kit Android tuning failed: $name=$value: $error');
+        }
+      }
+    }
+
+    // Force Android MediaCodec decoding for Twitch H.264 streams. mediacodec-copy
+    // is usually safer than direct mediacodec on libmpv based Flutter rendering.
+    await applyOption('hwdec', 'mediacodec-copy');
+    await applyOption('hwdec-codecs', 'all');
+
+    // Reduce software decoder thread overhead if mpv falls back from MediaCodec.
+    await applyOption('vd-lavc-threads', '1');
+
+    // Cheap scaling helps midrange tablet GPUs when the video surface is resized.
+    await applyOption('scale', 'bilinear');
+    await applyOption('dscale', 'bilinear');
   }
 
   Future<void> _saveChatVisiblePreference() async {
@@ -712,6 +750,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         throw StateError('播放清單載入失敗，沒有 playlist uri。');
       }
 
+      await _applyAndroidMediaKitPerformanceHints();
       await _applyPlayerVolume();
       await _player.open(Media(playlistUri.toString()), play: true);
       await _applyPlayerVolume();
@@ -792,6 +831,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         throw StateError('切換畫質失敗：runtime 沒有回傳 playlist uri。');
       }
 
+      await _applyAndroidMediaKitPerformanceHints();
       await _applyPlayerVolume();
       await _player.open(Media(uri.toString()), play: true);
       await _applyPlayerVolume();
