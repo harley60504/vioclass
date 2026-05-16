@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage132_staged_startup
+// PATCH VERSION: twitch_watch_page_stage133_blocking_startup_mask
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -348,6 +348,26 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   bool get _busy => _loadingAuth || _loadingWatch || _loadingPlayer || _connectingChat;
+
+  bool get _showBlockingStartupMask {
+    return _loadingAuth ||
+        _loadingWatch ||
+        _loadingPlayer ||
+        _chatBootstrapping ||
+        _engagementBootstrapping ||
+        _emoteBootstrapping ||
+        _relationshipBootstrapping;
+  }
+
+  String get _startupMaskTitle {
+    if (_loadingAuth) return '正在準備 Twitch 工作階段...';
+    if (_loadingPlayer || _loadingWatch) return '正在載入直播...';
+    if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
+    if (_engagementBootstrapping || _loadingEngagement) return '正在載入互動資料...';
+    if (_emoteBootstrapping || _loadingEmotes) return '正在整理貼圖資料...';
+    if (_relationshipBootstrapping || _checkingRelationship) return '正在同步頻道狀態...';
+    return '正在載入...';
+  }
 
   Future<void> _loadWatchPreferences() async {
     try {
@@ -1260,7 +1280,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     }
 
     Widget buildChatPanel() {
-      final panel = TwitchWatchChatPanel(
+      return TwitchWatchChatPanel(
         runtime: runtime,
         viewerLogin: _viewerLogin,
         viewerId: _viewerId,
@@ -1281,27 +1301,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         onOpenChannelPoints: _openChannelPointsSheet,
         onOpenPrediction: _openPredictionBetSheet,
       );
-
-      if (runtime != null || !_chatBootstrapping) return panel;
-
-      return Stack(
-        children: [
-          Positioned.fill(child: panel),
-          const Positioned.fill(
-            child: IgnorePointer(
-              child: _WatchStartupOverlay(
-                title: '正在連線聊天室...',
-                subtitle: '播放器已優先啟動，聊天室與互動資料會分批載入',
-              ),
-            ),
-          ),
-        ],
-      );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0E0E10),
-      body: LayoutBuilder(
+    Widget buildMainBody() {
+      return LayoutBuilder(
         builder: (context, constraints) {
           final layout = TwitchResponsiveLayout.fromConstraints(constraints);
 
@@ -1367,56 +1370,93 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
             ],
           );
         },
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0E0E10),
+      body: Stack(
+        children: [
+          Positioned.fill(child: buildMainBody()),
+          if (_showBlockingStartupMask)
+            Positioned.fill(
+              child: _WatchBlockingStartupOverlay(
+                title: _startupMaskTitle,
+                subtitle: '正在分階段啟動播放器、聊天室與互動資料，請稍候。',
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _WatchStartupOverlay extends StatelessWidget {
+class _WatchBlockingStartupOverlay extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _WatchStartupOverlay({
+  const _WatchBlockingStartupOverlay({
     required this.title,
     required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: const Color(0xFF111116).withOpacity(0.86),
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2.4),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w900,
+    return AbsorbPointer(
+      absorbing: true,
+      child: Container(
+        color: const Color(0xFF050507).withOpacity(0.76),
+        alignment: Alignment.center,
+        padding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+            decoration: BoxDecoration(
+              color: const Color(0xFF18181B).withOpacity(0.96),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0xAA000000),
+                  blurRadius: 28,
+                  offset: Offset(0, 14),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12.5,
+                    height: 1.45,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 5),
-          Text(
-            subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 11,
-              height: 1.35,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
