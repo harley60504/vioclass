@@ -2,7 +2,7 @@ import './twitch_chat_badge.dart';
 
 class TwitchChatStartupSnapshot {
   final String channelLogin;
-  final String? channelId;
+  final String channelId;
   final TwitchBadgeCatalog badgeCatalog;
   final Map<String, dynamic>? chatRestrictions;
   final Map<String, dynamic>? chatRoomState;
@@ -15,7 +15,7 @@ class TwitchChatStartupSnapshot {
     required this.channelLogin,
     required this.badgeCatalog,
     required this.operations,
-    this.channelId,
+    this.channelId = '',
     this.chatRestrictions,
     this.chatRoomState,
     this.chatChannelData,
@@ -23,7 +23,7 @@ class TwitchChatStartupSnapshot {
     this.recentMessages = const <Map<String, dynamic>>[],
   });
 
-  bool get hasChannelId => channelId != null && channelId!.isNotEmpty;
+  bool get hasChannelId => channelId.isNotEmpty;
   bool get hasBadges => badgeCatalog.totalCount > 0;
 
   Map<String, dynamic> toJson() {
