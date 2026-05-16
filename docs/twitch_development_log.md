@@ -195,42 +195,11 @@ PiliPlus 使用 fork/新 API 風格的 media_kit 配置，其中 `PlayerConfigur
   - `hwdec: 'auto-safe'`
 - 新增 `flutter/foundation.dart` import 以使用 `kDebugMode`。
 
-### 與 PiliPlus 差異
-
-已對齊：
-
-- singleton / shared player 長駐方向。
-- live 16MB buffer baseline。
-- debug/release logLevel。
-- VideoController 硬體加速。
-- Android surface attach timing 設為 false。
-- hwdec 明確指定 auto-safe。
-
-尚未對齊：
-
-- `PlayerConfiguration.options['video-sync']`
-- `PlayerConfiguration.options['volume-max']`
-- `PlayerConfiguration.options['ao']`
-- `PlayerConfiguration.options['autosync']`
-
-原因：官方 media_kit `PlayerConfiguration` 目前沒有 `options` 欄位。若要完全跟 PiliPlus 一樣，需要升級 / fork media_kit，或改用可設定 mpv property/command 的替代方式。
-
-### 測試建議
-
-1. Android 平板進直播，確認不黑畫面。
-2. 離開播放頁後再進，確認 shared player 仍可重用。
-3. 若 Android 出現黑畫面或首幀不出來，優先回退 `androidAttachSurfaceAfterVideoParameters: false`。
-4. 若特定平板解碼異常，再測 `hwdec: 'auto'` 或移除 explicit hwdec 使用 media_kit 預設。
-
 ---
 
 ## Stage 116 — 保留賭盤下注本地狀態，避免 realtime 更新覆蓋
 
 Commit: `8deabae81dacba1bc46f2b42573624b985eb2b8f`
-
-### 背景
-
-當 Twitch 賭盤開啟並持續收到 Hermes / GQL realtime snapshot 時，下注 sheet 會更新 `_visiblePrediction`。部分 snapshot 只帶全域 outcome totals，不一定立即帶目前 viewer 的下注結果，造成使用者剛下注後 UI 顯示的「下注哪邊」和「下注多少」被新 snapshot 洗掉。
 
 ### 修改檔案
 
@@ -249,16 +218,40 @@ Commit: `8deabae81dacba1bc46f2b42573624b985eb2b8f`
 - submit 時先 optimistic 記錄本地 outcome / points，避免送出後下一個 snapshot 把 UI 重置。
 - submit 失敗時回滾本地 points；若回到 0 則清除本地 outcome。
 
+---
+
+## Stage 117 — 賭盤倒數與 GQL fallback snapshot 同步
+
+Commits:
+
+- `4e33a55373c0ac2d606fbb997144814dad624ae6`
+- `dd3875435ec5f2e1f6e2fc254ce58de62fe24ff2`
+
+### 背景
+
+賭盤 sheet 需要顯示鎖盤/結算時間；另外使用者下注後，即使 Hermes realtime snapshot 沒有立即帶 viewer prediction，本地 UI 也應能透過 GQL fallback 修正「我下了哪邊 / 下了多少」。WatchPage 下注後原本就會 `_refreshEngagement()`，因此可以讓 GQL snapshot 自動發布到同一個 realtime bus，而不是額外大改 WatchPage。
+
+### 修改檔案
+
+- `lib/features/twitch/presentation/sheets/twitch_prediction_bet_sheet.dart`
+- `lib/features/twitch/api/engagement/twitch_prediction_api_service.dart`
+
+### 修改內容
+
+- `TwitchPredictionBetSheet` 新增倒數顯示：
+  - ACTIVE / OPEN：顯示 `鎖盤剩 mm:ss`。
+  - LOCKED / RESOLVE_PENDING：顯示 `結算剩 mm:ss` 或 `等待結算`。
+  - 結束後：顯示結算時間。
+- sheet 內部每秒刷新倒數，不影響其他頁面。
+- 新增 GQL fallback hook：
+  - sheet 下注後可觸發 fallback refresh。
+  - fallback 失敗時保留 optimistic / local 狀態。
+- `TwitchPredictionApiService.fetchPredictionContext(...)` 在成功解析 GQL snapshot 後，會呼叫 `TwitchPredictionHermesRealtimeBus.publishPrediction(snapshot)`。
+- 因為 WatchPage 的 `_refreshEngagement()` 本來就會呼叫 `fetchPredictionContext(...)`，下注後 GQL snapshot 會自動回灌到下注 sheet。
+
 ### 預期效果
 
-- 下注後不會因為 realtime 更新而把「已下注」狀態壓掉。
-- 已下注邊、我的點數、鎖住另一邊的 UI 會保持穩定。
-- outcome 總點數、使用者數、賠率、百分比仍會持續刷新。
-
-### 測試建議
-
-1. 開啟正在 ACTIVE 的賭盤 sheet。
-2. 輸入下注點數並點其中一邊下注。
-3. 在其他觀眾下注造成比例更新時，確認自己的已下注邊與點數不會消失。
-4. 確認另一邊會維持鎖住，只能加注同一邊。
-5. 若下注 API 失敗，確認不會永久保留錯誤的 optimistic bet。
+- 賭盤 sheet 可看到鎖盤或結算倒數。
+- 下注後先 optimistic 顯示本地下注意圖。
+- 後續 GQL fallback snapshot 會修正 viewer outcome / viewerPoints。
+- Hermes 與 GQL 都可更新同一個 sheet，不會彼此覆蓋掉本地下注狀態。
