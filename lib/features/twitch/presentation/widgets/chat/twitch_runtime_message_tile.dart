@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_runtime_message_tile_cached_images_stage110
+
 import 'package:flutter/material.dart';
 
 import '../../../models/chat/twitch_chat_message_metadata.dart';
@@ -5,6 +7,7 @@ import '../../../models/chat/twitch_chat_render_segment.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../models/emotes/twitch_third_party_emote.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../shared/twitch_cached_image_layer.dart';
 
 class TwitchRuntimeMessageTile extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
@@ -108,8 +111,6 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
   }
 }
 
-
-
 class _ChatMessageVisualMetrics {
   final double scale;
   final bool compact;
@@ -168,23 +169,23 @@ class _NormalMessageCard extends StatelessWidget {
         child: SizedBox(
           width: double.infinity,
           child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1B1B23),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.075)),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),
-            child: _MessageContent(
-              message: message,
-              thirdPartyEmotes: thirdPartyEmotes,
-              displayColor: displayColor,
-              displayNameText: displayNameText,
-              showSystemMessage: true,
-              showTimestamp: showTimestamp,
-              metrics: metrics,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B1B23),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.075)),
             ),
-          ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),
+              child: _MessageContent(
+                message: message,
+                thirdPartyEmotes: thirdPartyEmotes,
+                displayColor: displayColor,
+                displayNameText: displayNameText,
+                showSystemMessage: true,
+                showTimestamp: showTimestamp,
+                metrics: metrics,
+              ),
+            ),
           ),
         ),
       ),
@@ -230,99 +231,99 @@ class _SpecialMessageCard extends StatelessWidget {
         child: SizedBox(
           width: double.infinity,
           child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: style.backgroundColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: style.borderColor),
-          ),
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: Container(
-                  width: 4,
-                  decoration: BoxDecoration(
-                    color: style.accentColor,
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      bottomLeft: Radius.circular(12),
+            decoration: BoxDecoration(
+              color: style.backgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: style.borderColor),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  child: Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: style.accentColor,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        bottomLeft: Radius.circular(12),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 9, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(style.icon, size: 15, color: style.accentColor),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            metadata.specialLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: style.accentColor,
-                              fontSize: 11 * metrics.scale,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.2,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 9, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(style.icon, size: 15, color: style.accentColor),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              metadata.specialLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: style.accentColor,
+                                fontSize: 11 * metrics.scale,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.2,
+                              ),
                             ),
                           ),
-                        ),
-                        if (showTimestamp) ...[
-                          const SizedBox(width: 7),
-                          _TimestampChip(
-                            time: message.receivedAt,
-                            metrics: metrics,
-                          ),
+                          if (showTimestamp) ...[
+                            const SizedBox(width: 7),
+                            _TimestampChip(
+                              time: message.receivedAt,
+                              metrics: metrics,
+                            ),
+                          ],
+                          if (metadata.msgId != null &&
+                              metadata.msgId!.trim().isNotEmpty) ...[
+                            const SizedBox(width: 6),
+                            _SmallChip(
+                              label: metadata.msgId!,
+                              metrics: metrics,
+                            ),
+                          ],
                         ],
-                        if (metadata.msgId != null &&
-                            metadata.msgId!.trim().isNotEmpty) ...[
-                          const SizedBox(width: 6),
-                          _SmallChip(
-                            label: metadata.msgId!,
-                            metrics: metrics,
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (bannerText != null && bannerText.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        bannerText,
-                        textAlign: TextAlign.left,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: metrics.compactMessageFontSize,
-                          height: metrics.lineHeight,
-                          fontWeight: FontWeight.w800,
-                        ),
                       ),
-                    ],
-                    if (hasVisibleChatText) ...[
-                      if (bannerText != null && bannerText.isNotEmpty)
+                      if (bannerText != null && bannerText.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                      _MessageContent(
-                        message: message,
-                        thirdPartyEmotes: thirdPartyEmotes,
-                        displayColor: displayColor,
-                        displayNameText: displayNameText,
-                        showSystemMessage: false,
-                        showTimestamp: false,
-                        compact: true,
-                        metrics: metrics,
-                      ),
+                        Text(
+                          bannerText,
+                          textAlign: TextAlign.left,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: metrics.compactMessageFontSize,
+                            height: metrics.lineHeight,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                      if (hasVisibleChatText) ...[
+                        if (bannerText != null && bannerText.isNotEmpty)
+                          const SizedBox(height: 6),
+                        _MessageContent(
+                          message: message,
+                          thirdPartyEmotes: thirdPartyEmotes,
+                          displayColor: displayColor,
+                          displayNameText: displayNameText,
+                          showSystemMessage: false,
+                          showTimestamp: false,
+                          compact: true,
+                          metrics: metrics,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           ),
         ),
       ),
@@ -387,8 +388,8 @@ class _MessageContent extends StatelessWidget {
                 if (badge.image1x.isNotEmpty)
                   Tooltip(
                     message: badge.title,
-                    child: Image.network(
-                      badge.image1x,
+                    child: TwitchCachedImageLayer(
+                      imageUrl: badge.image1x,
                       width: compact
                           ? metrics.compactBadgeSize
                           : metrics.badgeSize,
@@ -397,9 +398,9 @@ class _MessageContent extends StatelessWidget {
                           : metrics.badgeSize,
                       cacheWidth: 36,
                       cacheHeight: 36,
-                      gaplessPlayback: true,
-                      filterQuality: FilterQuality.low,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      fit: BoxFit.contain,
+                      fallbackColor: Colors.transparent,
+                      errorWidget: const SizedBox.shrink(),
                     ),
                   ),
               Text(
@@ -749,26 +750,31 @@ class _TextOrThirdPartyEmote extends StatelessWidget {
       );
     }
 
+    final size = item.isZeroWidth
+        ? metrics.zeroWidthEmoteSize
+        : metrics.thirdPartyEmoteSize;
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(32, 96)
+        .toInt();
+
     return Tooltip(
       message: '${item.name} · ${item.providerLabel}',
-      child: Image.network(
-        item.imageUrl,
-        width: item.isZeroWidth
-            ? metrics.zeroWidthEmoteSize
-            : metrics.thirdPartyEmoteSize,
-        height: item.isZeroWidth
-            ? metrics.zeroWidthEmoteSize
-            : metrics.thirdPartyEmoteSize,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (_, __, ___) {
-          return Text(
-            item.name,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: metrics.messageFontSize,
-            ),
-          );
-        },
+      child: TwitchCachedImageLayer(
+        imageUrl: item.imageUrl,
+        width: size,
+        height: size,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        fit: BoxFit.contain,
+        fallbackColor: Colors.transparent,
+        errorWidget: Text(
+          item.name,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: metrics.messageFontSize,
+          ),
+        ),
       ),
     );
   }
@@ -816,29 +822,32 @@ class _EmoteSegment extends StatelessWidget {
     }
 
     final size = metrics.emoteSize;
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(32, 96)
+        .toInt();
+
     return Tooltip(
       message: segment.content.isEmpty
           ? (segment.emoteId == null
               ? 'Twitch emote'
               : 'Twitch emote ${segment.emoteId}')
           : segment.content,
-      child: Image.network(
-        imageUrl,
+      child: TwitchCachedImageLayer(
+        imageUrl: imageUrl,
         width: size,
         height: size,
-        cacheWidth: (size * 2).round(),
-        cacheHeight: (size * 2).round(),
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, __, ___) {
-          return Text(
-            segment.content.isEmpty ? '[emote]' : segment.content,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: metrics.messageFontSize,
-            ),
-          );
-        },
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        fit: BoxFit.contain,
+        fallbackColor: Colors.transparent,
+        errorWidget: Text(
+          segment.content.isEmpty ? '[emote]' : segment.content,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: metrics.messageFontSize,
+          ),
+        ),
       ),
     );
   }
