@@ -1,9 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+
+const int _thirdPartyGridLimit = 96;
+const int _combinedGridLimit = 120;
+const int _officialGridLimit = 72;
+const int _officialIdGridLimit = 96;
+const int _emoteGridCacheSize = 96;
+const int _emotePreviewCacheSize = 144;
+const Duration _emoteSearchDebounceDuration = Duration(milliseconds: 180);
 
 enum _EmotePickerTab {
   recent,
@@ -46,8 +57,6 @@ Future<String?> showTwitchOfficialEmoteIdPickerSheet({
     ),
   );
 }
-
-
 
 Future<void> showTwitchEmotePickerSheet({
   required BuildContext context,
@@ -95,17 +104,27 @@ class _TwitchThirdPartyEmotePickerSheetState
     extends State<TwitchThirdPartyEmotePickerSheet> {
   final TextEditingController _searchController = TextEditingController();
 
+  Timer? _searchDebounce;
   String _query = '';
   _EmotePickerTab _selectedTab = _EmotePickerTab.recent;
   _OfficialEmoteSubFilter _officialSubFilter = _OfficialEmoteSubFilter.usable;
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   TwitchOfficialEmoteCacheService? get _official => widget.officialCache;
+
+  void _setSearchQueryDebounced(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(_emoteSearchDebounceDuration, () {
+      if (!mounted) return;
+      setState(() => _query = value.trim());
+    });
+  }
 
   void _finishInsert(String name) {
     final trimmed = name.trim();
@@ -137,19 +156,14 @@ class _TwitchThirdPartyEmotePickerSheetState
     switch (_selectedTab) {
       case _EmotePickerTab.recent:
         return const <TwitchThirdPartyEmote>[];
-
       case _EmotePickerTab.favorites:
         return widget.cache.favoriteEmotes;
-
       case _EmotePickerTab.twitch:
         return const <TwitchThirdPartyEmote>[];
-
       case _EmotePickerTab.bttv:
         return widget.cache.emotesForProvider(TwitchThirdPartyEmoteProvider.bttv);
-
       case _EmotePickerTab.sevenTv:
         return widget.cache.emotesForProvider(TwitchThirdPartyEmoteProvider.sevenTv);
-
       case _EmotePickerTab.ffz:
         return widget.cache.emotesForProvider(TwitchThirdPartyEmoteProvider.ffz);
     }
@@ -205,7 +219,7 @@ class _TwitchThirdPartyEmotePickerSheetState
         .where((emote) => query.isEmpty ||
             emote.name.toLowerCase().contains(query) ||
             emote.id.toLowerCase().contains(query))
-        .take(240)
+        .take(_thirdPartyGridLimit)
         .toList(growable: false);
 
     final official = _official;
@@ -297,7 +311,7 @@ class _TwitchThirdPartyEmotePickerSheetState
                       vertical: 8,
                     ),
                   ),
-                  onChanged: (value) => setState(() => _query = value.trim()),
+                  onChanged: _setSearchQueryDebounced,
                 ),
               ),
             ),
@@ -315,70 +329,70 @@ class _TwitchThirdPartyEmotePickerSheetState
                       onChanged: () => setState(() {}),
                     )
                   : isTwitchTab
-                  ? _TwitchOfficialEmotePanel(
-                      official: official,
-                      query: query,
-                      loading: widget.loading || (official?.loading ?? false),
-                      emptyText: _emptyText(),
-                      subFilter: _officialSubFilter,
-                      onSubFilterChanged: (value) {
-                        setState(() => _officialSubFilter = value);
-                      },
-                      onInsert: _selectOfficialEmote,
-                      onChanged: () => setState(() {}),
-                    )
-                  : isFavoritesTab
-                      ? _FavoriteEmotePanel(
-                          thirdPartyFavorites: widget.cache.favoriteEmotes,
-                          officialFavorites:
-                              official?.favoriteEmotes ?? const <TwitchOfficialEmote>[],
-                          thirdPartyCache: widget.cache,
-                          officialCache: official,
+                      ? _TwitchOfficialEmotePanel(
+                          official: official,
                           query: query,
+                          loading: widget.loading || (official?.loading ?? false),
                           emptyText: _emptyText(),
-                          onInsertThirdParty: _selectThirdPartyEmote,
-                          onInsertOfficial: _selectOfficialEmote,
+                          subFilter: _officialSubFilter,
+                          onSubFilterChanged: (value) {
+                            setState(() => _officialSubFilter = value);
+                          },
+                          onInsert: _selectOfficialEmote,
                           onChanged: () => setState(() {}),
                         )
-                      : filtered.isEmpty
-                          ? Center(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 24),
-                                child: Text(
-                                  _emptyText(),
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.white54,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ),
+                      : isFavoritesTab
+                          ? _FavoriteEmotePanel(
+                              thirdPartyFavorites: widget.cache.favoriteEmotes,
+                              officialFavorites:
+                                  official?.favoriteEmotes ?? const <TwitchOfficialEmote>[],
+                              thirdPartyCache: widget.cache,
+                              officialCache: official,
+                              query: query,
+                              emptyText: _emptyText(),
+                              onInsertThirdParty: _selectThirdPartyEmote,
+                              onInsertOfficial: _selectOfficialEmote,
+                              onChanged: () => setState(() {}),
                             )
-                          : GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                maxCrossAxisExtent: 120,
-                                mainAxisSpacing: 8,
-                                crossAxisSpacing: 8,
-                                childAspectRatio: 1.08,
-                              ),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                final emote = filtered[index];
-                                final favorite = widget.cache.isFavorite(emote);
+                          : filtered.isEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                                    child: Text(
+                                      _emptyText(),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white54,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : GridView.builder(
+                                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                                  gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                    maxCrossAxisExtent: 120,
+                                    mainAxisSpacing: 8,
+                                    crossAxisSpacing: 8,
+                                    childAspectRatio: 1.08,
+                                  ),
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, index) {
+                                    final emote = filtered[index];
+                                    final favorite = widget.cache.isFavorite(emote);
 
-                                return _ThirdPartyEmoteGridCard(
-                                  emote: emote,
-                                  favorite: favorite,
-                                  onInsert: () => _selectThirdPartyEmote(emote),
-                                  onToggleFavorite: () {
-                                    setState(() {
-                                      widget.cache.toggleFavorite(emote);
-                                    });
+                                    return _ThirdPartyEmoteGridCard(
+                                      emote: emote,
+                                      favorite: favorite,
+                                      onInsert: () => _selectThirdPartyEmote(emote),
+                                      onToggleFavorite: () {
+                                        setState(() {
+                                          widget.cache.toggleFavorite(emote);
+                                        });
+                                      },
+                                    );
                                   },
-                                );
-                              },
-                            ),
+                                ),
             ),
           ],
         ),
@@ -386,8 +400,6 @@ class _TwitchThirdPartyEmotePickerSheetState
     );
   }
 }
-
-
 
 class _RecentEmotePanel extends StatelessWidget {
   final List<TwitchThirdPartyEmote> thirdPartyRecent;
@@ -427,7 +439,7 @@ class _RecentEmotePanel extends StatelessWidget {
               emote.name.toLowerCase().contains(lowerQuery) ||
               emote.id.toLowerCase().contains(lowerQuery))
           .map(_FavoriteEmoteEntry.thirdParty),
-    ];
+    ].take(_combinedGridLimit).toList(growable: false);
 
     if (entries.isEmpty) {
       return Center(
@@ -533,7 +545,9 @@ class _FavoriteEmotePanel extends StatelessWidget {
       ...official,
     ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-    if (entries.isEmpty) {
+    final visibleEntries = entries.take(_combinedGridLimit).toList(growable: false);
+
+    if (visibleEntries.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -557,9 +571,9 @@ class _FavoriteEmotePanel extends StatelessWidget {
         crossAxisSpacing: 8,
         childAspectRatio: 1.08,
       ),
-      itemCount: entries.length,
+      itemCount: visibleEntries.length,
       itemBuilder: (context, index) {
-        final entry = entries[index];
+        final entry = visibleEntries[index];
 
         if (entry.thirdParty != null) {
           final emote = entry.thirdParty!;
@@ -767,7 +781,7 @@ class _TwitchOfficialEmotePanel extends StatelessWidget {
         .where((emote) => query.isEmpty ||
             emote.name.toLowerCase().contains(query) ||
             emote.id.toLowerCase().contains(query))
-        .take(120)
+        .take(_officialGridLimit)
         .toList(growable: false);
   }
 }
@@ -919,76 +933,77 @@ class _ThirdPartyEmoteGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onInsert,
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFF242429),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: emote.isZeroWidth
-                ? const Color(0xFFEAB308).withOpacity(0.55)
-                : Colors.white.withOpacity(0.08),
+    return RepaintBoundary(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onInsert,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF242429),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: emote.isZeroWidth
+                  ? const Color(0xFFEAB308).withOpacity(0.55)
+                  : Colors.white.withOpacity(0.08),
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: Center(
-                    child: Image.network(
-                      emote.imageUrl,
-                      filterQuality: FilterQuality.medium,
-                      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+          child: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: _OptimizedEmoteImage(
+                        imageUrl: emote.imageUrl,
+                        cacheSize: _emoteGridCacheSize,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  emote.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      emote.providerLabel,
-                      style: const TextStyle(fontSize: 9, color: Colors.white38),
-                    ),
-                    if (emote.isZeroWidth) ...[
-                      const SizedBox(width: 4),
-                      const Text(
-                        'ZW',
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: Color(0xFFEAB308),
-                          fontWeight: FontWeight.w900,
-                        ),
+                  const SizedBox(height: 4),
+                  Text(
+                    emote.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        emote.providerLabel,
+                        style: const TextStyle(fontSize: 9, color: Colors.white38),
                       ),
+                      if (emote.isZeroWidth) ...[
+                        const SizedBox(width: 4),
+                        const Text(
+                          'ZW',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Color(0xFFEAB308),
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
-              ],
-            ),
-            Positioned(
-              top: -8,
-              right: -8,
-              child: IconButton(
-                visualDensity: VisualDensity.compact,
-                onPressed: onToggleFavorite,
-                icon: Icon(
-                  favorite ? Icons.star : Icons.star_border,
-                  size: 18,
-                  color: favorite ? const Color(0xFFEAB308) : Colors.white54,
+                  ),
+                ],
+              ),
+              Positioned(
+                top: -8,
+                right: -8,
+                child: IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onToggleFavorite,
+                  icon: Icon(
+                    favorite ? Icons.star : Icons.star_border,
+                    size: 18,
+                    color: favorite ? const Color(0xFFEAB308) : Colors.white54,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1012,10 +1027,11 @@ class _OfficialEmoteGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: locked ? null : onInsert,
-      child: Opacity(
+    return RepaintBoundary(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: locked ? null : onInsert,
+        child: Opacity(
           opacity: locked ? 0.48 : 1,
           child: Container(
             padding: const EdgeInsets.all(8),
@@ -1034,10 +1050,9 @@ class _OfficialEmoteGridCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Center(
-                        child: Image.network(
-                          emote.imageUrl,
-                          filterQuality: FilterQuality.medium,
-                          errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                        child: _OptimizedEmoteImage(
+                          imageUrl: emote.imageUrl,
+                          cacheSize: _emoteGridCacheSize,
                         ),
                       ),
                     ),
@@ -1087,10 +1102,10 @@ class _OfficialEmoteGridCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
     );
   }
 }
-
 
 class _TwitchOfficialEmoteIdPickerSheet extends StatefulWidget {
   final TwitchOfficialEmoteCacheService officialCache;
@@ -1121,12 +1136,22 @@ class _TwitchOfficialEmoteIdPickerSheet extends StatefulWidget {
 class _TwitchOfficialEmoteIdPickerSheetState
     extends State<_TwitchOfficialEmoteIdPickerSheet> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
   String _query = '';
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _setSearchQueryDebounced(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(_emoteSearchDebounceDuration, () {
+      if (!mounted) return;
+      setState(() => _query = value);
+    });
   }
 
   @override
@@ -1182,7 +1207,7 @@ class _TwitchOfficialEmoteIdPickerSheetState
                     borderSide: const BorderSide(color: Color(0xFF9146FF)),
                   ),
                 ),
-                onChanged: (value) => setState(() => _query = value),
+                onChanged: _setSearchQueryDebounced,
               ),
             ),
             Expanded(
@@ -1245,7 +1270,7 @@ class _TwitchOfficialEmoteIdPickerSheetState
             query.isEmpty ||
             emote.name.toLowerCase().contains(query) ||
             emote.id.toLowerCase().contains(query))
-        .take(160)
+        .take(_officialIdGridLimit)
         .toList(growable: false);
   }
 }
@@ -1314,9 +1339,10 @@ class _OfficialEmoteIdGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: () async {
+    return RepaintBoundary(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () async {
           final selectedId = await _confirmOfficialEmoteId(
             context: context,
             emote: emote,
@@ -1340,11 +1366,9 @@ class _OfficialEmoteIdGridCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Center(
-                  child: Image.network(
-                    emote.imageUrl,
-                    filterQuality: FilterQuality.medium,
-                    errorBuilder: (_, __, ___) =>
-                        const Icon(Icons.broken_image, color: Colors.white54),
+                  child: _OptimizedEmoteImage(
+                    imageUrl: emote.imageUrl,
+                    cacheSize: _emoteGridCacheSize,
                   ),
                 ),
               ),
@@ -1384,6 +1408,7 @@ class _OfficialEmoteIdGridCard extends StatelessWidget {
             ],
           ),
         ),
+      ),
     );
   }
 }
@@ -1412,13 +1437,11 @@ Future<String?> _confirmOfficialEmoteId({
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Center(
-                      child: Image.network(
-                        emote.imageUrl,
+                      child: _OptimizedEmoteImage(
+                        imageUrl: emote.imageUrl,
                         width: 72,
                         height: 72,
-                        filterQuality: FilterQuality.medium,
-                        errorBuilder: (_, __, ___) =>
-                            const Icon(Icons.broken_image, color: Colors.white54),
+                        cacheSize: _emotePreviewCacheSize,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1468,4 +1491,40 @@ Future<String?> _confirmOfficialEmoteId({
       );
     },
   );
+}
+
+class _OptimizedEmoteImage extends StatelessWidget {
+  final String imageUrl;
+  final double? width;
+  final double? height;
+  final int cacheSize;
+
+  const _OptimizedEmoteImage({
+    required this.imageUrl,
+    this.width,
+    this.height,
+    this.cacheSize = _emoteGridCacheSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl.trim();
+    if (url.isEmpty) {
+      return const Icon(Icons.broken_image, color: Colors.white54);
+    }
+
+    return RepaintBoundary(
+      child: Image.network(
+        url,
+        width: width,
+        height: height,
+        fit: BoxFit.contain,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.broken_image, color: Colors.white54),
+      ),
+    );
+  }
 }
