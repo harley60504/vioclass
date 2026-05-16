@@ -4,10 +4,6 @@
 
 Commit: `c36d4ab455a508da5b74ee09ecd84bf5ec22ab22`
 
-### 背景
-
-Android 平板第一次進入播放頁時容易出現明顯卡頓。根據 PiliPlus 的架構觀察，問題不應直接歸因於 proxy；PiliPlus 本身也使用 media_kit，但透過播放器重用、圖片快取、Sliver list/grid、彈幕 canvas 化與狀態更新節流來維持流暢。
-
 ### 修改檔案
 
 - `lib/features/twitch/services/playback/twitch_playlist_player_runtime.dart`
@@ -138,10 +134,6 @@ Commits:
 - `901a4153498e383f4d6929a6ebae0184f38f9af5`
 - `e3ccea1fe1bf37463b11384640a3fca72b6e06f6`
 
-### 背景
-
-Stage 112 已建立 `TwitchMediaKitPlayerHost` 與畫質記憶，但 `TwitchWatchPage` 本體仍然在每次進入頁面時建立新的 `Player` / `VideoController`，並於 dispose 時直接 `_player.dispose()`。這會讓每次進播放頁都重新冷啟動 media_kit/libmpv/texture。
-
 ### 修改檔案
 
 - `lib/features/twitch/services/playback/twitch_media_kit_player_host.dart`
@@ -150,7 +142,6 @@ Stage 112 已建立 `TwitchMediaKitPlayerHost` 與畫質記憶，但 `TwitchWatc
 ### 修改內容
 
 - `TwitchMediaKitPlayerHost` 最後一個 owner release 時會先 `pause()`，避免離開頁面後仍有聲音。
-- 保留 shared player 24 秒，不立即 dispose。
 - `TwitchWatchPage` 改為：
   - import `twitch_media_kit_player_host.dart`
   - `initState()` 中透過 `TwitchMediaKitPlayerHost.acquire()` 取得 session。
@@ -158,10 +149,36 @@ Stage 112 已建立 `TwitchMediaKitPlayerHost` 與畫質記憶，但 `TwitchWatc
   - `dispose()` 不再直接 `_player.dispose()`，改成 `_player.stop()` 後 `_playerSession.release()`。
 - 短時間返回播放頁或切台時，可重用同一個 media_kit player 物件，降低 cold-start 成本。
 
-### 測試建議
+---
 
-1. Android 平板冷啟動後第一次進直播，確認可正常播放。
-2. 返回首頁後 24 秒內再進直播，觀察是否比以前更快進入播放。
-3. 離開播放頁後確認聲音不會繼續播放。
-4. 快速切不同直播，確認畫質、音量、聊天室、忠誠點數功能仍正常。
-5. 24 秒後再進播放頁，確認仍可正常重新建立 player。
+## Stage 114 — Shared player 改為 PiliPlus-like 長駐模式
+
+Commit: `46797d17b666426d5a00bd7c70e2284e9efc24ec`
+
+### 背景
+
+24 秒 warm window 只能覆蓋立即返回首頁又馬上點另一台的場景，對一般瀏覽目錄再進直播的使用行為不夠有感。PiliPlus 的核心做法不是短 timer，而是 singleton player controller + ref-count：播放頁切換來源時重用同一組 player，最後釋放時才 dispose。
+
+### 修改檔案
+
+- `lib/features/twitch/services/playback/twitch_media_kit_player_host.dart`
+
+### 修改內容
+
+- 移除自動 dispose timer。
+- `release()` 後不再排程 dispose。
+- 最後一個 WatchPage release 時只做 safety pause。
+- shared `Player` / `VideoController` 長駐於 App process 中。
+- 只有呼叫 `TwitchMediaKitPlayerHost.disposeNow()` 才會真正 dispose。
+- live bufferSize 統一調整為 `16 * 1024 * 1024`，對齊 PiliPlus live default 非 expanded buffer 設定。
+
+### 預期效果
+
+- 回首頁滑動一段時間後再進直播，也不會重新 cold-start media_kit/libmpv/texture。
+- 更接近 PiliPlus 的 player singleton / reuse 策略。
+- WatchPage 仍會在 dispose 時 `_player.stop()`，所以不會背景繼續串流或播放聲音。
+
+### 後續候選
+
+- Stage 115：確認目前 media_kit / media_kit_video 版本是否支援 `VideoControllerConfiguration`，再補 `enableHardwareAcceleration` 與 `androidAttachSurfaceAfterVideoParameters: false`。
+- Stage 116：加入 AppLifecycleObserver，只在 app detached / 記憶體壓力 / 明確重置時呼叫 `disposeNow()`。
