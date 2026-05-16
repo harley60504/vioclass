@@ -11,6 +11,7 @@ import '../chat/twitch_chat_empty_view.dart';
 import '../chat/twitch_chat_engagement_strip.dart';
 import '../chat/twitch_chat_input_bar.dart';
 import '../chat/twitch_chat_message_list.dart';
+import '../shared/twitch_cached_image_layer.dart';
 import '../shared/twitch_default_channel_points_icon.dart';
 import '../channel_points/twitch_channel_points_sheet_utils.dart';
 import '../../settings/twitch_chat_appearance_controller.dart';
@@ -540,14 +541,13 @@ class _ChannelPointsIcon extends StatelessWidget {
     final url = iconUrl?.trim();
 
     if (url != null && url.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          url,
-          width: 18,
-          height: 18,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallbackIcon(),
-        ),
+      return TwitchCachedImageLayer.avatar(
+        imageUrl: url,
+        size: 18,
+        cacheWidth: 36,
+        cacheHeight: 36,
+        fallbackColor: Colors.transparent,
+        errorWidget: _fallbackIcon(),
       );
     }
 
@@ -566,7 +566,6 @@ class _ChannelPointsIcon extends StatelessWidget {
     return const TwitchDefaultChannelPointsIcon(size: 18);
   }
 }
-
 
 class _UtilityButton extends StatelessWidget {
   final String tooltip;
