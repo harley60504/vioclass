@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_playlist_player_runtime_saved_quality_restore_stage112
+// PATCH VERSION: twitch_playlist_player_runtime_stable_proxy_router_stage125
 
 import 'dart:async';
 
@@ -11,6 +11,7 @@ import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
 import 'twitch_hls_low_latency_proxy.dart';
+import 'twitch_stable_hls_proxy_router.dart';
 
 class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   final TwitchPlaybackApiService playbackApi;
@@ -26,8 +27,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     'Pragma': 'no-cache',
   };
 
-  // Restored preferred-quality persistence. These include the new WatchPage
-  // runtime keys plus legacy FVP keys so older saved choices keep working.
   static const String _preferredQualityPreferenceKey =
       'twitch_watch_v2_preferred_quality';
   static const String _preferredQualityChannelPreferencePrefix =
@@ -37,8 +36,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   static const String _legacyPreferredQualityChannelPreferencePrefix =
       'twitch_fvp_proxy_preferred_quality_';
 
-  // Safe startup is only used when the user has never selected a preferred
-  // quality. If a saved quality exists, user intent wins.
   static const int _mobileStartupTargetHeight = 720;
   static const int _mobileStartupMaxFps = 60;
 
@@ -60,7 +57,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   String? _proxyUrl;
   String? _proxyMpvUrl;
   TwitchHlsLiveStatus? _proxyLiveStatus;
-  TwitchDartHlsLowLatencyProxy? _proxy;
+  TwitchStableHlsProxyRouter? _proxy;
   bool _loading = false;
   bool _switchingQuality = false;
   Object? _error;
@@ -78,7 +75,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   String? get proxyMpvUrl => _proxyMpvUrl ?? _proxyUrl;
   TwitchHlsLiveStatus? get proxyLiveStatus => _proxyLiveStatus;
   bool get hasProxyUrl => _proxyUrl != null && _proxyUrl!.trim().isNotEmpty;
-  TwitchDartHlsLowLatencyProxy? get proxy => _proxy;
+  TwitchStableHlsProxyRouter? get proxy => _proxy;
   bool get loading => _loading;
   bool get switchingQuality => _switchingQuality;
   bool get busy => _loading || _switchingQuality;
@@ -110,11 +107,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _switchingQuality = false;
     _error = null;
     _masterPlaylistUri = null;
-    await _stopProxy(notify: false);
-    _playlistUri = null;
-    _upstreamPlaylistUri = null;
-    _proxyUrl = null;
-    _proxyMpvUrl = null;
     _masterPlaylistText = '';
     _variants = const <TwitchM3u8Variant>[];
     _currentVariant = null;
@@ -200,6 +192,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
       if (selected == null) {
         _playlistUri = baseCandidate.masterUri;
+        _upstreamPlaylistUri = baseCandidate.masterUri;
         return baseCandidate.masterUri;
       }
 
@@ -210,7 +203,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return _playlistUri;
     } catch (e) {
       _error = e;
-      _playlistUri = null;
+      if (_playlistUri == null) {
+        _playlistUri = null;
+      }
       return null;
     } finally {
       _loading = false;
@@ -446,30 +441,32 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<Uri?> _startProxyForVariant(TwitchM3u8Variant variant) async {
-    await _stopProxy(notify: false);
-
     final upstreamUri = Uri.tryParse(variant.url);
     if (upstreamUri == null) {
       throw StateError('Invalid variant URL: ${variant.url}');
     }
 
-    final proxy = TwitchDartHlsLowLatencyProxy(
-      upstreamPlaylistUrl: variant.url,
-      upstreamHeaders: defaultUpstreamHeaders,
-      edgeSegmentCount: 1,
-      prefetchSegmentCount: 3,
-      outputFutureSegments: true,
-      futureOutputSegmentCount: 1,
-      dropBehindLiveEdge: true,
-      startupEdgeSegmentCount: 1,
-      startupRequirePrefetchedFirstSegment: false,
-      startupSkipCurrentLatestSegment: false,
-      startupMode: TwitchHlsStartupMode.streamlinkLiveEdge,
-      verboseLogging: false,
-    );
+    var proxy = _proxy;
+    if (proxy == null || !proxy.isRunning) {
+      proxy = TwitchStableHlsProxyRouter(
+        upstreamHeaders: defaultUpstreamHeaders,
+        edgeSegmentCount: 1,
+        prefetchSegmentCount: 3,
+        outputFutureSegments: true,
+        futureOutputSegmentCount: 1,
+        dropBehindLiveEdge: true,
+        startupEdgeSegmentCount: 1,
+        startupRequirePrefetchedFirstSegment: false,
+        startupSkipCurrentLatestSegment: false,
+        startupMode: TwitchHlsStartupMode.streamlinkLiveEdge,
+        verboseLogging: false,
+      );
+      _proxy = proxy;
+      await proxy.start(upstreamPlaylistUrl: variant.url);
+    } else {
+      await proxy.switchUpstream(variant.url);
+    }
 
-    _proxy = proxy;
-    await proxy.start();
     await proxy.waitUntilPrewarmed();
 
     _proxyUrl = proxy.streamTsUrl;
@@ -700,6 +697,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'proxyStreamUrl': proxy?.streamUrl,
       'proxyLiveStatus': proxyLiveStatus?.toJson(),
       'proxyRunning': proxy?.isRunning ?? false,
+      'proxyStablePort': proxy?.port,
+      'proxyStableUpstream': proxy?.upstreamPlaylistUrl,
       'error': error?.toString(),
     };
   }
