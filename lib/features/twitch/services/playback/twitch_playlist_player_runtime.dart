@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_playlist_player_runtime_stable_proxy_router_stage125
-
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -10,7 +8,6 @@ import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
-import 'twitch_hls_low_latency_proxy.dart';
 import 'twitch_stable_hls_proxy_router.dart';
 
 class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
@@ -21,23 +18,19 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
     'Origin': 'https://www.twitch.tv',
     'Referer': 'https://www.twitch.tv/',
-    'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
   };
 
-  static const String _preferredQualityPreferenceKey =
-      'twitch_watch_v2_preferred_quality';
-  static const String _preferredQualityChannelPreferencePrefix =
-      'twitch_watch_v2_preferred_quality_';
-  static const String _legacyPreferredQualityPreferenceKey =
-      'twitch_fvp_proxy_preferred_quality';
-  static const String _legacyPreferredQualityChannelPreferencePrefix =
-      'twitch_fvp_proxy_preferred_quality_';
-
+  static const String _qualityKey = 'twitch_watch_v2_preferred_quality';
+  static const String _qualityChannelPrefix = 'twitch_watch_v2_preferred_quality_';
+  static const String _legacyQualityKey = 'twitch_fvp_proxy_preferred_quality';
+  static const String _legacyQualityChannelPrefix = 'twitch_fvp_proxy_preferred_quality_';
   static const int _mobileStartupTargetHeight = 720;
   static const int _mobileStartupMaxFps = 60;
+
+  static TwitchStableHlsProxyRouter? _sharedProxy;
 
   TwitchPlaylistPlayerRuntime({
     required this.playbackApi,
@@ -75,15 +68,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   String? get proxyMpvUrl => _proxyMpvUrl ?? _proxyUrl;
   TwitchHlsLiveStatus? get proxyLiveStatus => _proxyLiveStatus;
   bool get hasProxyUrl => _proxyUrl != null && _proxyUrl!.trim().isNotEmpty;
-  TwitchStableHlsProxyRouter? get proxy => _proxy;
+  TwitchStableHlsProxyRouter? get proxy => _proxy ?? _sharedProxy;
   bool get loading => _loading;
   bool get switchingQuality => _switchingQuality;
   bool get busy => _loading || _switchingQuality;
   Object? get error => _error;
   bool get hasPlaylist => _playlistUri != null;
   String get masterPlaylistText => _masterPlaylistText;
-  List<TwitchM3u8Variant> get variants =>
-      List<TwitchM3u8Variant>.unmodifiable(_variants);
+  List<TwitchM3u8Variant> get variants => List<TwitchM3u8Variant>.unmodifiable(_variants);
   TwitchM3u8Variant? get currentVariant => _currentVariant;
   String get adAwareStatus => _adAwareStatus;
   String? get lastPreferredQualityName => _lastPreferredQualityName;
@@ -95,11 +87,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(
-        channelLogin,
-        'channelLogin',
-        'channelLogin cannot be empty',
-      );
+      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
     }
 
     _channelLogin = login;
@@ -114,310 +102,58 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final storedPreferredQuality = await _loadPreferredQualityName(login);
-      final effectivePreferredQualityName = preferredVariantName?.trim().isNotEmpty == true
+      final storedQuality = await _loadPreferredQualityName(login);
+      final wantedQuality = preferredVariantName?.trim().isNotEmpty == true
           ? preferredVariantName!.trim()
-          : storedPreferredQuality;
-      _lastPreferredQualityName = effectivePreferredQualityName;
+          : storedQuality;
+      _lastPreferredQualityName = wantedQuality;
 
-      final candidates = await Future.wait<_PlaybackCandidate?>(
-        <Future<_PlaybackCandidate?>>[
-          _loadCandidate(
-            login,
-            platform: 'web',
-            playerType: 'site',
-            sourceTag: 'web-site',
-            defaultHasAds: true,
-          ),
-          _loadCandidate(
-            login,
-            platform: 'android',
-            playerType: 'autoplay',
-            sourceTag: 'android-autoplay',
-            defaultHasAds: false,
-          ),
-          _loadCandidate(
-            login,
-            platform: 'ios',
-            playerType: 'site',
-            sourceTag: 'ios-site',
-            defaultHasAds: false,
-          ),
-        ],
-      );
+      final candidates = await Future.wait<_PlaybackCandidate?>([
+        _loadCandidate(login, platform: 'web', playerType: 'site', sourceTag: 'web-site', defaultHasAds: true),
+        _loadCandidate(login, platform: 'android', playerType: 'autoplay', sourceTag: 'android-autoplay', defaultHasAds: false),
+        _loadCandidate(login, platform: 'ios', playerType: 'site', sourceTag: 'ios-site', defaultHasAds: false),
+      ]);
 
-      final webCandidate = candidates.firstWhere(
-        (candidate) => candidate?.sourceTag == 'web-site',
-        orElse: () => null,
-      );
-      final androidCandidate = candidates.firstWhere(
-        (candidate) => candidate?.sourceTag == 'android-autoplay',
-        orElse: () => null,
-      );
-      final iosCandidate = candidates.firstWhere(
-        (candidate) => candidate?.sourceTag == 'ios-site',
-        orElse: () => null,
-      );
-
-      final baseCandidate = webCandidate ?? androidCandidate ?? iosCandidate;
-      if (baseCandidate == null) {
+      final web = candidates.whereType<_PlaybackCandidate>().where((c) => c.sourceTag == 'web-site').firstOrNull;
+      final android = candidates.whereType<_PlaybackCandidate>().where((c) => c.sourceTag == 'android-autoplay').firstOrNull;
+      final ios = candidates.whereType<_PlaybackCandidate>().where((c) => c.sourceTag == 'ios-site').firstOrNull;
+      final base = web ?? android ?? ios;
+      if (base == null) {
         throw StateError('Twitch master playlist 載入失敗：所有 playback source 都失敗。');
       }
 
-      final mergedVariants = _mergeAdAwareVariants(
-        baseVariants: baseCandidate.variants,
-        cleanCandidates: <_PlaybackCandidate>[
-          if (androidCandidate != null) androidCandidate,
-          if (iosCandidate != null) iosCandidate,
-        ],
+      final merged = _mergeAdAwareVariants(
+        baseVariants: base.variants,
+        cleanCandidates: [if (android != null) android, if (ios != null) ios],
       );
 
-      _masterPlaylistUri = baseCandidate.masterUri;
-      _masterPlaylistText = baseCandidate.masterPlaylistText;
-      _variants = mergedVariants;
-      _adAwareStatus = _buildAdAwareStatus(
-        webCandidate: webCandidate,
-        androidCandidate: androidCandidate,
-        iosCandidate: iosCandidate,
-        mergedVariants: mergedVariants,
-      );
+      _masterPlaylistUri = base.masterUri;
+      _masterPlaylistText = base.masterPlaylistText;
+      _variants = merged;
+      _adAwareStatus = 'web=${web?.variants.length ?? 0}, android=${android?.variants.length ?? 0}, ios=${ios?.variants.length ?? 0}, clean=${merged.where((v) => !v.hasAds).length}';
 
       final selected = preferredVariant == null
-          ? _findVariantByName(mergedVariants, effectivePreferredQualityName) ??
-              selectDefaultVariant(
-                mergedVariants,
-                allowMobileStartupSafeQuality: effectivePreferredQualityName == null,
-              )
-          : _findMatchingMergedVariant(mergedVariants, preferredVariant) ?? preferredVariant;
+          ? _findVariantByName(merged, wantedQuality) ??
+              selectDefaultVariant(merged, allowMobileStartupSafeQuality: wantedQuality == null)
+          : _findMatchingMergedVariant(merged, preferredVariant) ?? preferredVariant;
 
       if (selected == null) {
-        _playlistUri = baseCandidate.masterUri;
-        _upstreamPlaylistUri = baseCandidate.masterUri;
-        return baseCandidate.masterUri;
+        _playlistUri = base.masterUri;
+        _upstreamPlaylistUri = base.masterUri;
+        return base.masterUri;
       }
 
       _currentVariant = selected;
-      _upstreamPlaylistUri = Uri.tryParse(selected.url) ?? baseCandidate.masterUri;
+      _upstreamPlaylistUri = Uri.tryParse(selected.url) ?? base.masterUri;
       _playlistUri = await _startProxyForVariant(selected);
-
       return _playlistUri;
     } catch (e) {
       _error = e;
-      if (_playlistUri == null) {
-        _playlistUri = null;
-      }
       return null;
     } finally {
       _loading = false;
       notifyListeners();
     }
-  }
-
-  Future<String?> _loadPreferredQualityName(String login) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final channelKey = '$_preferredQualityChannelPreferencePrefix$login';
-      final legacyChannelKey = '$_legacyPreferredQualityChannelPreferencePrefix$login';
-      final value = prefs.getString(channelKey) ??
-          prefs.getString(_preferredQualityPreferenceKey) ??
-          prefs.getString(legacyChannelKey) ??
-          prefs.getString(_legacyPreferredQualityPreferenceKey);
-      final trimmed = value?.trim();
-      return trimmed == null || trimmed.isEmpty ? null : trimmed;
-    } catch (e) {
-      debugPrint('load preferred Twitch quality failed: $e');
-      return null;
-    }
-  }
-
-  Future<void> _savePreferredQualityName(
-    String login,
-    TwitchM3u8Variant variant,
-  ) async {
-    final qualityName = variant.name.trim();
-    if (login.trim().isEmpty || qualityName.isEmpty) return;
-
-    _lastPreferredQualityName = qualityName;
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_preferredQualityPreferenceKey, qualityName);
-      await prefs.setString(
-        '$_preferredQualityChannelPreferencePrefix${login.trim().toLowerCase()}',
-        qualityName,
-      );
-    } catch (e) {
-      debugPrint('save preferred Twitch quality failed: $e');
-    }
-  }
-
-  Future<_PlaybackCandidate?> _loadCandidate(
-    String login, {
-    required String platform,
-    required String playerType,
-    required String sourceTag,
-    required bool defaultHasAds,
-  }) async {
-    try {
-      final token = await playbackApi.getLivePlaybackAccessToken(
-        channelLogin: login,
-        platform: platform,
-        playerType: playerType,
-      );
-
-      final masterUri = playbackApi.buildLivePlaylistUri(
-        channelLogin: login,
-        accessToken: token,
-      );
-
-      final response = await _dio.getUri<String>(
-        masterUri,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: const <String, String>{
-            'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
-            'Origin': 'https://www.twitch.tv',
-            'Referer': 'https://www.twitch.tv/',
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-          },
-          validateStatus: (status) => status != null && status < 500,
-        ),
-      );
-
-      final status = response.statusCode ?? 0;
-      final text = response.data ?? '';
-      if (status >= 400 || text.trim().isEmpty) {
-        return null;
-      }
-
-      final variants = TwitchM3u8Parser.parseMasterPlaylist(
-        text,
-        masterUri: masterUri,
-        defaultHasAds: defaultHasAds,
-        sourceTag: sourceTag,
-      );
-
-      if (variants.isEmpty) return null;
-
-      return _PlaybackCandidate(
-        sourceTag: sourceTag,
-        masterUri: masterUri,
-        masterPlaylistText: text,
-        token: token,
-        variants: variants,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  List<TwitchM3u8Variant> _mergeAdAwareVariants({
-    required List<TwitchM3u8Variant> baseVariants,
-    required List<_PlaybackCandidate> cleanCandidates,
-  }) {
-    if (baseVariants.isEmpty) {
-      for (final candidate in cleanCandidates) {
-        if (candidate.variants.isNotEmpty) return candidate.variants;
-      }
-      return const <TwitchM3u8Variant>[];
-    }
-
-    final cleanByQuality = <String, TwitchM3u8Variant>{};
-    for (final candidate in cleanCandidates) {
-      for (final variant in candidate.variants) {
-        final key = variant.adAwareQualityKey;
-        final existing = cleanByQuality[key];
-        if (existing == null || _preferCleanCandidate(variant, existing) < 0) {
-          cleanByQuality[key] = variant;
-        }
-      }
-    }
-
-    final merged = <TwitchM3u8Variant>[];
-    final usedCleanUrls = <String>{};
-
-    for (final base in baseVariants) {
-      final clean = cleanByQuality[base.adAwareQualityKey];
-      if (clean != null) {
-        usedCleanUrls.add(clean.url);
-        merged.add(
-          base.copyWith(
-            url: clean.url,
-            hasAds: false,
-            sourceTag: clean.sourceTag,
-          ),
-        );
-      } else {
-        merged.add(
-          base.copyWith(
-            hasAds: true,
-            sourceTag: base.sourceTag.isEmpty ? 'web-site' : base.sourceTag,
-          ),
-        );
-      }
-    }
-
-    for (final clean in cleanByQuality.values) {
-      if (usedCleanUrls.contains(clean.url)) continue;
-      if (merged.any((variant) => variant.url == clean.url)) continue;
-      merged.add(clean.copyWith(hasAds: false));
-    }
-
-    return _sortVariants(merged);
-  }
-
-  int _preferCleanCandidate(TwitchM3u8Variant a, TwitchM3u8Variant b) {
-    final aAndroid = a.sourceTag == 'android-autoplay';
-    final bAndroid = b.sourceTag == 'android-autoplay';
-    if (aAndroid != bAndroid) return aAndroid ? -1 : 1;
-
-    final heightCompare = b.height.compareTo(a.height);
-    if (heightCompare != 0) return heightCompare;
-
-    final fpsCompare = b.fpsRounded.compareTo(a.fpsRounded);
-    if (fpsCompare != 0) return fpsCompare;
-
-    return 0;
-  }
-
-  List<TwitchM3u8Variant> _sortVariants(List<TwitchM3u8Variant> input) {
-    final output = input.toList();
-    output.sort((a, b) {
-      if (a.hasAds != b.hasAds) return a.hasAds ? 1 : -1;
-
-      final aVideo = !a.isAudioOnly;
-      final bVideo = !b.isAudioOnly;
-      if (aVideo != bVideo) return aVideo ? -1 : 1;
-
-      final heightCompare = b.height.compareTo(a.height);
-      if (heightCompare != 0) return heightCompare;
-
-      final fpsCompare = b.fpsRounded.compareTo(a.fpsRounded);
-      if (fpsCompare != 0) return fpsCompare;
-
-      final bandwidthCompare = (b.bandwidth ?? 0).compareTo(a.bandwidth ?? 0);
-      if (bandwidthCompare != 0) return bandwidthCompare;
-
-      return a.name.compareTo(b.name);
-    });
-    return output;
-  }
-
-  String _buildAdAwareStatus({
-    required _PlaybackCandidate? webCandidate,
-    required _PlaybackCandidate? androidCandidate,
-    required _PlaybackCandidate? iosCandidate,
-    required List<TwitchM3u8Variant> mergedVariants,
-  }) {
-    final cleanCount = mergedVariants.where((variant) => !variant.hasAds).length;
-    final adCount = mergedVariants.length - cleanCount;
-    return 'web=${webCandidate?.variants.length ?? 0}, '
-        'android=${androidCandidate?.variants.length ?? 0}, '
-        'ios=${iosCandidate?.variants.length ?? 0}, '
-        'clean=$cleanCount, fallback=$adCount';
   }
 
   Future<Uri?> startProxyForVariant(TwitchM3u8Variant variant) async {
@@ -442,13 +178,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
   Future<Uri?> _startProxyForVariant(TwitchM3u8Variant variant) async {
     final upstreamUri = Uri.tryParse(variant.url);
-    if (upstreamUri == null) {
-      throw StateError('Invalid variant URL: ${variant.url}');
-    }
+    if (upstreamUri == null) throw StateError('Invalid variant URL: ${variant.url}');
 
-    var proxy = _proxy;
-    if (proxy == null || !proxy.isRunning) {
-      proxy = TwitchStableHlsProxyRouter(
+    var router = _sharedProxy;
+    if (router == null || !router.isRunning) {
+      router = TwitchStableHlsProxyRouter(
         upstreamHeaders: defaultUpstreamHeaders,
         edgeSegmentCount: 1,
         prefetchSegmentCount: 3,
@@ -461,25 +195,24 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         startupMode: TwitchHlsStartupMode.streamlinkLiveEdge,
         verboseLogging: false,
       );
-      _proxy = proxy;
-      await proxy.start(upstreamPlaylistUrl: variant.url);
+      _sharedProxy = router;
+      _proxy = router;
+      await router.start(upstreamPlaylistUrl: variant.url);
     } else {
-      await proxy.switchUpstream(variant.url);
+      _proxy = router;
+      await router.switchUpstream(variant.url);
     }
 
-    await proxy.waitUntilPrewarmed();
-
-    _proxyUrl = proxy.streamTsUrl;
-    _proxyMpvUrl = proxy.streamTsUrl;
+    await router.waitUntilPrewarmed();
+    _proxyUrl = router.streamTsUrl;
+    _proxyMpvUrl = router.streamTsUrl;
     _proxyLiveStatus = null;
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
   }
 
-  Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({
-    bool notify = true,
-  }) async {
-    final proxy = _proxy;
-    if (proxy == null || !proxy.isRunning) {
+  Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({bool notify = true}) async {
+    final router = _proxy ?? _sharedProxy;
+    if (router == null || !router.isRunning) {
       if (_proxyLiveStatus != null) {
         _proxyLiveStatus = null;
         if (notify) notifyListeners();
@@ -487,7 +220,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
 
-    final status = await proxy.requestLiveStatus();
+    _proxy = router;
+    final status = await router.requestLiveStatus();
     if (status != null) {
       _proxyLiveStatus = status;
       if (notify) notifyListeners();
@@ -495,20 +229,139 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return status;
   }
 
-  Future<void> _stopProxy({bool notify = true}) async {
-    final proxy = _proxy;
+  Future<void> _stopProxy({bool notify = true, bool closeShared = true}) async {
+    final router = _proxy ?? _sharedProxy;
     _proxy = null;
     _proxyUrl = null;
     _proxyMpvUrl = null;
     _proxyLiveStatus = null;
 
-    if (proxy != null) {
-      await proxy.close();
+    if (closeShared && router != null) {
+      if (identical(_sharedProxy, router)) _sharedProxy = null;
+      await router.close();
     }
 
-    if (notify) {
-      notifyListeners();
+    if (notify) notifyListeners();
+  }
+
+  Future<String?> _loadPreferredQualityName(String login) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final value = prefs.getString('$_qualityChannelPrefix$login') ??
+          prefs.getString(_qualityKey) ??
+          prefs.getString('$_legacyQualityChannelPrefix$login') ??
+          prefs.getString(_legacyQualityKey);
+      final text = value?.trim();
+      return text == null || text.isEmpty ? null : text;
+    } catch (_) {
+      return null;
     }
+  }
+
+  Future<void> _savePreferredQualityName(String login, TwitchM3u8Variant variant) async {
+    final name = variant.name.trim();
+    if (login.trim().isEmpty || name.isEmpty) return;
+    _lastPreferredQualityName = name;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_qualityKey, name);
+      await prefs.setString('$_qualityChannelPrefix${login.trim().toLowerCase()}', name);
+    } catch (_) {}
+  }
+
+  Future<_PlaybackCandidate?> _loadCandidate(
+    String login, {
+    required String platform,
+    required String playerType,
+    required String sourceTag,
+    required bool defaultHasAds,
+  }) async {
+    try {
+      final token = await playbackApi.getLivePlaybackAccessToken(
+        channelLogin: login,
+        platform: platform,
+        playerType: playerType,
+      );
+      final masterUri = playbackApi.buildLivePlaylistUri(channelLogin: login, accessToken: token);
+      final response = await _dio.getUri<String>(
+        masterUri,
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: defaultUpstreamHeaders,
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+      final text = response.data ?? '';
+      if ((response.statusCode ?? 0) >= 400 || text.trim().isEmpty) return null;
+      final variants = TwitchM3u8Parser.parseMasterPlaylist(
+        text,
+        masterUri: masterUri,
+        defaultHasAds: defaultHasAds,
+        sourceTag: sourceTag,
+      );
+      if (variants.isEmpty) return null;
+      return _PlaybackCandidate(
+        sourceTag: sourceTag,
+        masterUri: masterUri,
+        masterPlaylistText: text,
+        token: token,
+        variants: variants,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<TwitchM3u8Variant> _mergeAdAwareVariants({
+    required List<TwitchM3u8Variant> baseVariants,
+    required List<_PlaybackCandidate> cleanCandidates,
+  }) {
+    if (baseVariants.isEmpty) {
+      for (final c in cleanCandidates) {
+        if (c.variants.isNotEmpty) return c.variants;
+      }
+      return const <TwitchM3u8Variant>[];
+    }
+
+    final cleanByKey = <String, TwitchM3u8Variant>{};
+    for (final c in cleanCandidates) {
+      for (final v in c.variants) {
+        final old = cleanByKey[v.adAwareQualityKey];
+        if (old == null || _sortScore(v) > _sortScore(old)) cleanByKey[v.adAwareQualityKey] = v;
+      }
+    }
+
+    final merged = <TwitchM3u8Variant>[];
+    final used = <String>{};
+    for (final base in baseVariants) {
+      final clean = cleanByKey[base.adAwareQualityKey];
+      if (clean == null) {
+        merged.add(base.copyWith(hasAds: true, sourceTag: base.sourceTag.isEmpty ? 'web-site' : base.sourceTag));
+      } else {
+        used.add(clean.url);
+        merged.add(base.copyWith(url: clean.url, hasAds: false, sourceTag: clean.sourceTag));
+      }
+    }
+    for (final clean in cleanByKey.values) {
+      if (!used.contains(clean.url) && !merged.any((v) => v.url == clean.url)) merged.add(clean.copyWith(hasAds: false));
+    }
+    return _sortVariants(merged);
+  }
+
+  List<TwitchM3u8Variant> _sortVariants(List<TwitchM3u8Variant> variants) {
+    final list = variants.toList();
+    list.sort((a, b) => _sortScore(b).compareTo(_sortScore(a)));
+    return list;
+  }
+
+  int _sortScore(TwitchM3u8Variant v) {
+    var score = 0;
+    if (!v.hasAds) score += 100000000;
+    if (!v.isAudioOnly) score += 10000000;
+    score += v.height * 10000;
+    score += v.fpsRounded * 100;
+    score += (v.bandwidth ?? 0) ~/ 1000;
+    return score;
   }
 
   TwitchM3u8Variant? selectDefaultVariant(
@@ -516,36 +369,20 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     bool allowMobileStartupSafeQuality = true,
   }) {
     if (variants.isEmpty) return null;
-
-    final videoVariants = variants.where((variant) => !variant.isAudioOnly).toList();
-    final cleanVideoVariants = videoVariants.where((variant) => !variant.hasAds).toList();
-    final cleanVariants = variants.where((variant) => !variant.hasAds).toList();
-
-    final preferredPool = cleanVideoVariants.isNotEmpty
-        ? cleanVideoVariants
-        : videoVariants.isNotEmpty
-            ? videoVariants
-            : cleanVariants.isNotEmpty
-                ? cleanVariants
-                : variants.toList();
+    final videos = variants.where((v) => !v.isAudioOnly).toList();
+    final pool = videos.isNotEmpty ? videos : variants.toList();
 
     if (allowMobileStartupSafeQuality && _prefersMobileStartupSafeQuality) {
-      final startupSafeVariant = _selectMobileStartupSafeVariant(preferredPool);
-      if (startupSafeVariant != null) return startupSafeVariant;
+      final safe = pool.where((v) {
+        final fps = v.fpsRounded;
+        return v.height > 0 && v.height <= _mobileStartupTargetHeight && (fps == 0 || fps <= _mobileStartupMaxFps);
+      }).toList();
+      if (safe.isNotEmpty) return _sortVariants(safe).first;
     }
 
-    TwitchM3u8Variant? source;
-    for (final variant in preferredPool) {
-      if (_isSourceLikeVariant(variant)) {
-        source = variant;
-        break;
-      }
-    }
-
+    final source = pool.where(_isSourceLikeVariant).firstOrNull;
     if (source != null) return source;
-
-    final sorted = _sortVariants(preferredPool);
-    return sorted.first;
+    return _sortVariants(pool).first;
   }
 
   bool get _prefersMobileStartupSafeQuality {
@@ -566,89 +403,20 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return text.contains('source') || text.contains('chunked');
   }
 
-  TwitchM3u8Variant? _selectMobileStartupSafeVariant(
-    List<TwitchM3u8Variant> variants,
-  ) {
-    final videoVariants = variants.where((variant) => !variant.isAudioOnly).toList();
-    if (videoVariants.isEmpty) return null;
-
-    final nonSourceVideoVariants = videoVariants
-        .where((variant) => !_isSourceLikeVariant(variant))
-        .toList();
-    final candidates = nonSourceVideoVariants.isNotEmpty
-        ? nonSourceVideoVariants
-        : videoVariants;
-
-    final capped = candidates.where((variant) {
-      final height = variant.height;
-      final fps = variant.fpsRounded;
-      return height > 0 &&
-          height <= _mobileStartupTargetHeight &&
-          (fps == 0 || fps <= _mobileStartupMaxFps);
-    }).toList();
-
-    if (capped.isNotEmpty) {
-      return _sortVariants(capped).first;
-    }
-
-    final measurable = candidates.where((variant) => variant.height > 0).toList();
-    if (measurable.isEmpty) {
-      return _sortVariants(candidates).first;
-    }
-
-    measurable.sort((a, b) {
-      final aAboveTarget = a.height > _mobileStartupTargetHeight;
-      final bAboveTarget = b.height > _mobileStartupTargetHeight;
-      if (aAboveTarget != bAboveTarget) return aAboveTarget ? 1 : -1;
-
-      final aDistance = (a.height - _mobileStartupTargetHeight).abs();
-      final bDistance = (b.height - _mobileStartupTargetHeight).abs();
-      if (aDistance != bDistance) return aDistance.compareTo(bDistance);
-
-      final aFpsPenalty = a.fpsRounded > _mobileStartupMaxFps ? 1 : 0;
-      final bFpsPenalty = b.fpsRounded > _mobileStartupMaxFps ? 1 : 0;
-      if (aFpsPenalty != bFpsPenalty) return aFpsPenalty.compareTo(bFpsPenalty);
-
-      if (a.hasAds != b.hasAds) return a.hasAds ? 1 : -1;
-
-      final bandwidthCompare = (b.bandwidth ?? 0).compareTo(a.bandwidth ?? 0);
-      if (bandwidthCompare != 0) return bandwidthCompare;
-
-      return a.name.compareTo(b.name);
-    });
-
-    return measurable.first;
+  TwitchM3u8Variant? _findVariantByName(List<TwitchM3u8Variant> variants, String? name) {
+    final target = name?.trim();
+    if (target == null || target.isEmpty) return null;
+    final matches = variants.where((v) => v.name == target || v.displayName == target).toList();
+    return matches.isEmpty ? null : _sortVariants(matches).first;
   }
 
-  TwitchM3u8Variant? _findVariantByName(
-    List<TwitchM3u8Variant> variants,
-    String? name,
-  ) {
-    final clean = name?.trim();
-    if (clean == null || clean.isEmpty) return null;
-
-    final exact = variants.where(
-      (variant) => variant.name == clean || variant.displayName == clean,
-    );
-    if (exact.isEmpty) return null;
-
-    final sorted = _sortVariants(exact.toList());
-    return sorted.first;
-  }
-
-  TwitchM3u8Variant? _findMatchingMergedVariant(
-    List<TwitchM3u8Variant> variants,
-    TwitchM3u8Variant preferred,
-  ) {
-    final matches = variants
-        .where((variant) => variant.adAwareQualityKey == preferred.adAwareQualityKey)
-        .toList();
-    if (matches.isEmpty) return null;
-    return _sortVariants(matches).first;
+  TwitchM3u8Variant? _findMatchingMergedVariant(List<TwitchM3u8Variant> variants, TwitchM3u8Variant preferred) {
+    final matches = variants.where((v) => v.adAwareQualityKey == preferred.adAwareQualityKey).toList();
+    return matches.isEmpty ? null : _sortVariants(matches).first;
   }
 
   void clear() {
-    unawaited(_stopProxy(notify: false));
+    unawaited(_stopProxy(notify: false, closeShared: true));
     _channelLogin = '';
     _masterPlaylistUri = null;
     _playlistUri = null;
@@ -669,11 +437,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   @override
   void dispose() {
     _dio.close(force: true);
-    unawaited(_stopProxy(notify: false));
+    unawaited(_stopProxy(notify: false, closeShared: false));
     super.dispose();
   }
 
   Map<String, dynamic> toJson() {
+    final router = _proxy ?? _sharedProxy;
     return <String, dynamic>{
       'channelLogin': channelLogin,
       'loading': loading,
@@ -681,24 +450,18 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'hasPlaylist': hasPlaylist,
       'adAwareStatus': adAwareStatus,
       'lastPreferredQualityName': lastPreferredQualityName,
-      'masterPlaylistUriPreview': masterPlaylistUri?.toString().replaceFirst(
-            RegExp(r'token=[^&]+'),
-            'token=<hidden>',
-          ),
-      'playlistUriPreview': playlistUri?.toString().replaceFirst(
-            RegExp(r'token=[^&]+'),
-            'token=<hidden>',
-          ),
+      'masterPlaylistUriPreview': masterPlaylistUri?.toString(),
+      'playlistUriPreview': playlistUri?.toString(),
       'variantCount': variants.length,
       'currentVariant': currentVariant?.toString(),
       'upstreamPlaylistUri': upstreamPlaylistUri?.toString(),
       'proxyUrl': proxyUrl,
       'proxyMpvUrl': proxyMpvUrl,
-      'proxyStreamUrl': proxy?.streamUrl,
+      'proxyStreamUrl': router?.streamUrl,
       'proxyLiveStatus': proxyLiveStatus?.toJson(),
-      'proxyRunning': proxy?.isRunning ?? false,
-      'proxyStablePort': proxy?.port,
-      'proxyStableUpstream': proxy?.upstreamPlaylistUrl,
+      'proxyRunning': router?.isRunning ?? false,
+      'proxyStablePort': router?.port,
+      'proxyStableUpstream': router?.upstreamPlaylistUrl,
       'error': error?.toString(),
     };
   }
