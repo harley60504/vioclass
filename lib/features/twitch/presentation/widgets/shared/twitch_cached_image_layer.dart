@@ -1,13 +1,14 @@
-// PATCH VERSION: twitch_cached_image_layer_stage109
+// PATCH VERSION: twitch_cached_image_layer_cached_network_image_stage111
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-/// Lightweight shared image layer for Twitch UI.
+/// Shared image layer for Twitch UI.
 ///
-/// This intentionally stays on top of Flutter's built-in [Image.network]
-/// instead of adding a new dependency. The goal is the same direction as
-/// PiliPlus' NetworkImgLayer: every high-frequency image should explicitly
-/// control decode size, filter quality, fallback UI, and clipping behavior.
+/// This mirrors the direction of PiliPlus' NetworkImgLayer: high-frequency
+/// images such as stream thumbnails, avatars, badges, emotes and channel point
+/// icons should all explicitly control decode size, filter quality, fallback
+/// UI, clipping behavior and cache behavior in one place.
 class TwitchCachedImageLayer extends StatelessWidget {
   final String? imageUrl;
   final double width;
@@ -20,6 +21,8 @@ class TwitchCachedImageLayer extends StatelessWidget {
   final BorderRadius? borderRadius;
   final bool circular;
   final bool gaplessPlayback;
+  final Duration fadeInDuration;
+  final Duration fadeOutDuration;
   final Widget? placeholder;
   final Widget? errorWidget;
   final Color fallbackColor;
@@ -40,6 +43,8 @@ class TwitchCachedImageLayer extends StatelessWidget {
     this.borderRadius,
     this.circular = false,
     this.gaplessPlayback = true,
+    this.fadeInDuration = const Duration(milliseconds: 80),
+    this.fadeOutDuration = const Duration(milliseconds: 80),
     this.placeholder,
     this.errorWidget,
     this.fallbackColor = const Color(0xFF111116),
@@ -64,6 +69,8 @@ class TwitchCachedImageLayer extends StatelessWidget {
     this.fallbackIconColor = Colors.white38,
     this.fallbackIconSize,
     this.gaplessPlayback = true,
+    this.fadeInDuration = const Duration(milliseconds: 80),
+    this.fadeOutDuration = const Duration(milliseconds: 80),
   })  : width = size,
         height = size,
         circular = true,
@@ -78,17 +85,19 @@ class TwitchCachedImageLayer extends StatelessWidget {
     if (url.isEmpty) {
       child = fallback;
     } else {
-      child = Image.network(
-        url,
+      child = CachedNetworkImage(
+        imageUrl: url,
         width: width,
         height: height,
+        memCacheWidth: cacheWidth,
+        memCacheHeight: cacheHeight,
         fit: fit,
         alignment: alignment,
-        cacheWidth: cacheWidth,
-        cacheHeight: cacheHeight,
         filterQuality: filterQuality,
-        gaplessPlayback: gaplessPlayback,
-        errorBuilder: (_, __, ___) => errorWidget ?? _fallback(),
+        fadeInDuration: fadeInDuration,
+        fadeOutDuration: fadeOutDuration,
+        placeholder: (_, _) => fallback,
+        errorWidget: (_, _, _) => errorWidget ?? _fallback(),
       );
     }
 
