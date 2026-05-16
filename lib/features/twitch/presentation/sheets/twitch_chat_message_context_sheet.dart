@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_context_sheet_reply_thread_only_v63
+// PATCH VERSION: chat_message_context_sheet_cached_emotes_stage131
 // Place at: lib/features/twitch/presentation/sheets/twitch_chat_message_context_sheet.dart
 //
 // Stage 103:
@@ -9,6 +9,11 @@
 //   message. Sibling replies are not shown when opening a child reply.
 // - Keep the clean original sheet style and keep Twitch / third-party emote
 //   rendering in the message body.
+//
+// Stage 131:
+// - Reuse TwitchCachedImageLayer for context-sheet emote rendering.
+// - Keep cacheWidth/cacheHeight bounded and isolate reply cards with
+//   RepaintBoundary.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +23,7 @@ import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import '../widgets/shared/twitch_cached_image_layer.dart';
 
 Future<void> showTwitchChatMessageContextSheet({
   required BuildContext context,
@@ -183,7 +189,9 @@ class _ReplyThreadBuilder {
     if (parentLogin.isEmpty && parentBody.isEmpty) return null;
 
     for (final candidate in messages.reversed) {
-      if (_messageIdentityKey(candidate) == _messageIdentityKey(message)) continue;
+      if (_messageIdentityKey(candidate) == _messageIdentityKey(message)) {
+        continue;
+      }
       if (candidate.receivedAt.isAfter(message.receivedAt)) continue;
 
       final candidateLogin = _normalizeLogin(candidate.userLogin);
@@ -375,65 +383,69 @@ class _ReplyThreadMessageCard extends StatelessWidget {
     final displayName = _displayName(message);
     final depthIndent = (entry.depth * 12.0).clamp(0.0, 42.0).toDouble();
 
-    return Padding(
-      padding: EdgeInsets.only(left: depthIndent),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(13),
-          onTap: () => _copyMessage(context, message),
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-            decoration: BoxDecoration(
-              color: selected ? const Color(0xFF241B32) : const Color(0xFF1B1B23),
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(
+    return RepaintBoundary(
+      child: Padding(
+        padding: EdgeInsets.only(left: depthIndent),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(13),
+            onTap: () => _copyMessage(context, message),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+              decoration: BoxDecoration(
                 color: selected
-                    ? const Color(0xFF9146FF).withOpacity(0.62)
-                    : Colors.white.withOpacity(0.08),
+                    ? const Color(0xFF241B32)
+                    : const Color(0xFF1B1B23),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF9146FF).withOpacity(0.62)
+                      : Colors.white.withOpacity(0.08),
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _EntryKindChip(kind: entry.kind),
-                    const SizedBox(width: 7),
-                    Expanded(
-                      child: Text(
-                        displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFD9C5FF),
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w900,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _EntryKindChip(kind: entry.kind),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFD9C5FF),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _formatTime(message.receivedAt),
-                      style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatTime(message.receivedAt),
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                    ),
+                    ],
+                  ),
+                  if (_hasRelation(message)) ...[
+                    const SizedBox(height: 7),
+                    _RelationLine(message: message),
                   ],
-                ),
-                if (_hasRelation(message)) ...[
-                  const SizedBox(height: 7),
-                  _RelationLine(message: message),
+                  const SizedBox(height: 8),
+                  _CompactMessageBody(
+                    message: message,
+                    thirdPartyEmotes: thirdPartyEmotes,
+                  ),
                 ],
-                const SizedBox(height: 8),
-                _CompactMessageBody(
-                  message: message,
-                  thirdPartyEmotes: thirdPartyEmotes,
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -442,7 +454,8 @@ class _ReplyThreadMessageCard extends StatelessWidget {
   }
 
   bool _hasRelation(TwitchChatRuntimeMessage message) {
-    return _replyTargetLogin(message).isNotEmpty || _mentionedLogins(message).isNotEmpty;
+    return _replyTargetLogin(message).isNotEmpty ||
+        _mentionedLogins(message).isNotEmpty;
   }
 
   Future<void> _copyMessage(
@@ -628,7 +641,9 @@ List<String> _mentionedLogins(TwitchChatRuntimeMessage message) {
   }
 
   final reply = _replyTargetDisplayName(message).trim().toLowerCase();
-  return output.where((login) => login.trim().toLowerCase() != reply).toList(growable: false);
+  return output
+      .where((login) => login.trim().toLowerCase() != reply)
+      .toList(growable: false);
 }
 
 String _firstNonEmpty(List<Object? Function()> readers) {
@@ -842,17 +857,22 @@ class _NetworkEmote extends StatelessWidget {
     final url = imageUrl?.trim() ?? '';
     if (url.isEmpty) return _PlainText(text: fallbackText);
 
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context))
+        .round()
+        .clamp(32, 96)
+        .toInt();
+
     return Tooltip(
       message: tooltip,
-      child: Image.network(
-        url,
+      child: TwitchCachedImageLayer(
+        imageUrl: url,
         width: size,
         height: size,
-        cacheWidth: (size * 2).round(),
-        cacheHeight: (size * 2).round(),
-        gaplessPlayback: true,
-        filterQuality: FilterQuality.low,
-        errorBuilder: (_, __, ___) => _PlainText(text: fallbackText),
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        fit: BoxFit.contain,
+        fallbackColor: Colors.transparent,
+        errorWidget: _PlainText(text: fallbackText),
       ),
     );
   }
