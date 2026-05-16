@@ -1,13 +1,14 @@
-// PATCH VERSION: twitch_playlist_player_runtime_android_startup_safe_quality_v42
+// PATCH VERSION: twitch_playlist_player_runtime_saved_quality_restore_stage112
 
 import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/playback/twitch_playback_api_service.dart';
-import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_hls_proxy_models.dart';
+import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
 import 'twitch_hls_low_latency_proxy.dart';
 
@@ -25,9 +26,19 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     'Pragma': 'no-cache',
   };
 
-  // Android tablets are sensitive to first-frame decoder / texture warm-up.
-  // Keep proxy behavior unchanged, but avoid defaulting mobile startup to
-  // Source/chunked when a clean 720p-or-lower variant is available.
+  // Restored preferred-quality persistence. These include the new WatchPage
+  // runtime keys plus legacy FVP keys so older saved choices keep working.
+  static const String _preferredQualityPreferenceKey =
+      'twitch_watch_v2_preferred_quality';
+  static const String _preferredQualityChannelPreferencePrefix =
+      'twitch_watch_v2_preferred_quality_';
+  static const String _legacyPreferredQualityPreferenceKey =
+      'twitch_fvp_proxy_preferred_quality';
+  static const String _legacyPreferredQualityChannelPreferencePrefix =
+      'twitch_fvp_proxy_preferred_quality_';
+
+  // Safe startup is only used when the user has never selected a preferred
+  // quality. If a saved quality exists, user intent wins.
   static const int _mobileStartupTargetHeight = 720;
   static const int _mobileStartupMaxFps = 60;
 
@@ -57,6 +68,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   List<TwitchM3u8Variant> _variants = const <TwitchM3u8Variant>[];
   TwitchM3u8Variant? _currentVariant;
   String _adAwareStatus = '';
+  String? _lastPreferredQualityName;
 
   String get channelLogin => _channelLogin;
   Uri? get masterPlaylistUri => _masterPlaylistUri;
@@ -73,9 +85,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Object? get error => _error;
   bool get hasPlaylist => _playlistUri != null;
   String get masterPlaylistText => _masterPlaylistText;
-  List<TwitchM3u8Variant> get variants => List<TwitchM3u8Variant>.unmodifiable(_variants);
+  List<TwitchM3u8Variant> get variants =>
+      List<TwitchM3u8Variant>.unmodifiable(_variants);
   TwitchM3u8Variant? get currentVariant => _currentVariant;
   String get adAwareStatus => _adAwareStatus;
+  String? get lastPreferredQualityName => _lastPreferredQualityName;
 
   Future<Uri?> loadLivePlaylist({
     required String channelLogin,
@@ -108,6 +122,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final storedPreferredQuality = await _loadPreferredQualityName(login);
+      final effectivePreferredQualityName = preferredVariantName?.trim().isNotEmpty == true
+          ? preferredVariantName!.trim()
+          : storedPreferredQuality;
+      _lastPreferredQualityName = effectivePreferredQualityName;
+
       final candidates = await Future.wait<_PlaybackCandidate?>(
         <Future<_PlaybackCandidate?>>[
           _loadCandidate(
@@ -171,12 +191,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       );
 
       final selected = preferredVariant == null
-          ? _findVariantByName(mergedVariants, preferredVariantName) ??
-              selectDefaultVariant(mergedVariants)
+          ? _findVariantByName(mergedVariants, effectivePreferredQualityName) ??
+              selectDefaultVariant(
+                mergedVariants,
+                allowMobileStartupSafeQuality: effectivePreferredQualityName == null,
+              )
           : _findMatchingMergedVariant(mergedVariants, preferredVariant) ?? preferredVariant;
 
       if (selected == null) {
-        // Fallback：至少回 master playlist，避免播放器完全不能播。
         _playlistUri = baseCandidate.masterUri;
         return baseCandidate.masterUri;
       }
@@ -193,6 +215,44 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     } finally {
       _loading = false;
       notifyListeners();
+    }
+  }
+
+  Future<String?> _loadPreferredQualityName(String login) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final channelKey = '$_preferredQualityChannelPreferencePrefix$login';
+      final legacyChannelKey = '$_legacyPreferredQualityChannelPreferencePrefix$login';
+      final value = prefs.getString(channelKey) ??
+          prefs.getString(_preferredQualityPreferenceKey) ??
+          prefs.getString(legacyChannelKey) ??
+          prefs.getString(_legacyPreferredQualityPreferenceKey);
+      final trimmed = value?.trim();
+      return trimmed == null || trimmed.isEmpty ? null : trimmed;
+    } catch (e) {
+      debugPrint('load preferred Twitch quality failed: $e');
+      return null;
+    }
+  }
+
+  Future<void> _savePreferredQualityName(
+    String login,
+    TwitchM3u8Variant variant,
+  ) async {
+    final qualityName = variant.name.trim();
+    if (login.trim().isEmpty || qualityName.isEmpty) return;
+
+    _lastPreferredQualityName = qualityName;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_preferredQualityPreferenceKey, qualityName);
+      await prefs.setString(
+        '$_preferredQualityChannelPreferencePrefix${login.trim().toLowerCase()}',
+        qualityName,
+      );
+    } catch (e) {
+      debugPrint('save preferred Twitch quality failed: $e');
     }
   }
 
@@ -305,8 +365,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       }
     }
 
-    // If the Android/iOS context exposes extra variants not present in the web
-    // master playlist, keep them as fallback options.
     for (final clean in cleanByQuality.values) {
       if (usedCleanUrls.contains(clean.url)) continue;
       if (merged.any((variant) => variant.url == clean.url)) continue;
@@ -317,7 +375,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   int _preferCleanCandidate(TwitchM3u8Variant a, TwitchM3u8Variant b) {
-    // Prefer Android autoplay first because this mirrors the CRX no-ads path.
     final aAndroid = a.sourceTag == 'android-autoplay';
     final bAndroid = b.sourceTag == 'android-autoplay';
     if (aAndroid != bAndroid) return aAndroid ? -1 : 1;
@@ -368,7 +425,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         'clean=$cleanCount, fallback=$adCount';
   }
 
-  /// 切換畫質時重建 Dart HLS proxy，並回傳本機 proxy URL。
   Future<Uri?> startProxyForVariant(TwitchM3u8Variant variant) async {
     _switchingQuality = true;
     _error = null;
@@ -378,6 +434,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _currentVariant = variant;
       _upstreamPlaylistUri = Uri.tryParse(variant.url);
       _playlistUri = await _startProxyForVariant(variant);
+      await _savePreferredQualityName(_channelLogin, variant);
       return _playlistUri;
     } catch (e) {
       _error = e;
@@ -415,10 +472,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     await proxy.start();
     await proxy.waitUntilPrewarmed();
 
-    // v41: 內部 media_kit 與外部 mpv 使用完全相同的 Dart raw proxy route。
-    // /stream.ts 與 / 都會進同一個 _handleStream engine，但統一使用 /stream.ts
-    // 可以避免比較時一邊是 root、一邊是 stream.ts 造成判讀混亂。
-    // 這不是 m3u8，低延遲策略仍由 Dart proxy 自己決定 live edge / future segment。
     _proxyUrl = proxy.streamTsUrl;
     _proxyMpvUrl = proxy.streamTsUrl;
     _proxyLiveStatus = null;
@@ -461,7 +514,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
   }
 
-  TwitchM3u8Variant? selectDefaultVariant(List<TwitchM3u8Variant> variants) {
+  TwitchM3u8Variant? selectDefaultVariant(
+    List<TwitchM3u8Variant> variants, {
+    bool allowMobileStartupSafeQuality = true,
+  }) {
     if (variants.isEmpty) return null;
 
     final videoVariants = variants.where((variant) => !variant.isAudioOnly).toList();
@@ -476,7 +532,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
                 ? cleanVariants
                 : variants.toList();
 
-    if (_prefersMobileStartupSafeQuality) {
+    if (allowMobileStartupSafeQuality && _prefersMobileStartupSafeQuality) {
       final startupSafeVariant = _selectMobileStartupSafeVariant(preferredPool);
       if (startupSafeVariant != null) return startupSafeVariant;
     }
@@ -616,7 +672,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   @override
   void dispose() {
     _dio.close(force: true);
-    // Best effort: dispose cannot await. Runtime callers should call clear/stop by recreating page.
     unawaited(_stopProxy(notify: false));
     super.dispose();
   }
@@ -628,6 +683,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'switchingQuality': switchingQuality,
       'hasPlaylist': hasPlaylist,
       'adAwareStatus': adAwareStatus,
+      'lastPreferredQualityName': lastPreferredQualityName,
       'masterPlaylistUriPreview': masterPlaylistUri?.toString().replaceFirst(
             RegExp(r'token=[^&]+'),
             'token=<hidden>',
