@@ -19,16 +19,20 @@ class TwitchLivePlaybackStrip extends StatefulWidget {
 class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   static const Duration _liveEdgeUiTolerance = Duration(seconds: 5);
   static const Duration _liveEdgeSeekBackoff = Duration(milliseconds: 350);
-  static const Duration _liveCatchUpStopTolerance = Duration(milliseconds: 1600);
-  static const Duration _liveCatchUpSeekThreshold = Duration(seconds: 8);
-  static const double _liveCatchUpRate = 1.35;
+  static const Duration _liveSeekVerifyDelay = Duration(milliseconds: 420);
+  static const Duration _liveSeekSuccessTolerance = Duration(milliseconds: 2200);
+  static const List<Duration> _liveSeekBackoffCandidates = <Duration>[
+    Duration(milliseconds: 1200),
+    Duration(milliseconds: 1800),
+    Duration(milliseconds: 2600),
+    Duration(milliseconds: 3800),
+  ];
 
   bool _dragging = false;
   bool _livePinned = true;
-  bool _catchingUpToLive = false;
+  bool _seekingLiveEdge = false;
   double? _dragValue;
   Timer? _proxyLiveStatusTimer;
-  Timer? _liveCatchUpTimer;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
@@ -42,8 +46,6 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   @override
   void dispose() {
     _proxyLiveStatusTimer?.cancel();
-    _liveCatchUpTimer?.cancel();
-    unawaited(_restoreNormalPlaybackRate());
     super.dispose();
   }
 
@@ -60,7 +62,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   void didUpdateWidget(covariant TwitchLivePlaybackStrip oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.playerRuntime, widget.playerRuntime)) {
-      _stopLiveCatchUp(restoreRate: true);
+      _stopLiveSeekAttempt();
       _startProxyLiveStatusPolling();
     }
   }
@@ -78,6 +80,14 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     if (value < min) return min;
     if (value > max) return max;
     return value;
+  }
+
+  Duration _safeLiveLag({
+    required Duration position,
+    required Duration duration,
+  }) {
+    final lag = duration - position;
+    return lag.isNegative ? Duration.zero : lag;
   }
 
   Duration? _proxySafeTargetInMediaTimeline({
@@ -125,32 +135,58 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
         _liveEdgeSeekTarget(mediaDuration);
   }
 
+  List<Duration> _liveSeekTargets({
+    required Duration mediaDuration,
+    required dynamic proxyLiveStatus,
+  }) {
+    final maxTarget = mediaDuration.inMilliseconds > 900
+        ? mediaDuration - const Duration(milliseconds: 250)
+        : mediaDuration;
+    final targets = <Duration>[];
+
+    void addTarget(Duration value) {
+      final target = _clampDuration(value, Duration.zero, maxTarget);
+      final duplicate = targets.any((item) {
+        final diff = item > target ? item - target : target - item;
+        return diff <= const Duration(milliseconds: 180);
+      });
+      if (!duplicate) targets.add(target);
+    }
+
+    // Try several real seek targets near the media tail. Some HLS tail targets
+    // are rejected or clamped by media_kit/mpv, so a single magic number is not
+    // reliable enough.
+    for (final backoff in _liveSeekBackoffCandidates) {
+      addTarget(mediaDuration - backoff);
+    }
+
+    final proxyTarget = _proxySafeTargetInMediaTimeline(
+      proxyLiveStatus: proxyLiveStatus,
+      mediaDuration: mediaDuration,
+    );
+    if (proxyTarget != null) {
+      addTarget(proxyTarget);
+    }
+
+    addTarget(_liveEdgeSeekTarget(mediaDuration));
+
+    targets.sort((a, b) => b.compareTo(a));
+    return targets;
+  }
+
   double _sliderValueForTarget(Duration target, Duration duration) {
     if (duration.inMilliseconds <= 0) return 1.0;
     final value = target.inMilliseconds / duration.inMilliseconds;
     return value.clamp(0.0, 1.0).toDouble();
   }
 
-  Future<void> _restoreNormalPlaybackRate() async {
-    try {
-      await player.setRate(1.0);
-    } catch (_) {}
-  }
-
-  void _stopLiveCatchUp({required bool restoreRate}) {
-    _liveCatchUpTimer?.cancel();
-    _liveCatchUpTimer = null;
-
-    if (mounted && _catchingUpToLive) {
+  void _stopLiveSeekAttempt() {
+    if (mounted && _seekingLiveEdge) {
       setState(() {
-        _catchingUpToLive = false;
+        _seekingLiveEdge = false;
       });
     } else {
-      _catchingUpToLive = false;
-    }
-
-    if (restoreRate) {
-      unawaited(_restoreNormalPlaybackRate());
+      _seekingLiveEdge = false;
     }
   }
 
@@ -161,99 +197,96 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   }) async {
     if (duration.inMilliseconds <= 500) return;
 
-    final target = _liveEdgeSeekTargetForStatus(
+    final targets = _liveSeekTargets(
       mediaDuration: duration,
       proxyLiveStatus: proxyLiveStatus,
     );
-    final targetSliderValue = _sliderValueForTarget(target, duration);
-    final liveLag = duration - position;
+    if (targets.isEmpty) return;
+
+    final originalPosition = position;
 
     setState(() {
       _dragging = true;
       _dragValue = 1.0;
       _livePinned = true;
-      _catchingUpToLive = true;
+      _seekingLiveEdge = true;
     });
+
+    var reachedLive = false;
+    var lastTarget = targets.first;
 
     try {
       await player.play();
 
-      // A direct seek to the HLS tail is unreliable on the raw TS proxy. Keep it
-      // only as a large-gap shortcut; the reliable part is the temporary
-      // catch-up rate below, which preserves the current playback session.
-      if (liveLag > _liveCatchUpSeekThreshold) {
+      for (final target in targets) {
+        lastTarget = target;
         await player.seek(target);
-      }
+        await Future<void>.delayed(_liveSeekVerifyDelay);
 
-      await player.setRate(_liveCatchUpRate);
+        final currentPosition = player.state.position;
+        final currentDuration = player.state.duration;
+        final currentProxyStatus = widget.playerRuntime.proxyLiveStatus;
+
+        if (_isLiveSeekSuccessful(
+          originalPosition: originalPosition,
+          target: target,
+          position: currentPosition,
+          duration: currentDuration,
+          proxyLiveStatus: currentProxyStatus,
+        )) {
+          reachedLive = true;
+          break;
+        }
+      }
     } catch (_) {
-      // If rate control is not supported by the current backend, fall back to
-      // the old safe seek target instead of doing nothing.
-      try {
-        await player.seek(target);
-        await player.play();
-      } catch (_) {}
+      reachedLive = false;
     } finally {
       if (!mounted) return;
+
+      final targetSliderValue = _sliderValueForTarget(lastTarget, player.state.duration);
       setState(() {
         _dragging = false;
         _dragValue = null;
-        _livePinned = targetSliderValue >= 0.90;
+        _seekingLiveEdge = false;
+        _livePinned = reachedLive || targetSliderValue >= 0.97;
       });
     }
-
-    _startLiveCatchUpMonitor();
   }
 
-  void _startLiveCatchUpMonitor() {
-    _liveCatchUpTimer?.cancel();
-    _liveCatchUpTimer = Timer.periodic(
-      const Duration(milliseconds: 350),
-      (_) => _tickLiveCatchUpMonitor(),
-    );
-    _tickLiveCatchUpMonitor();
-  }
+  bool _isLiveSeekSuccessful({
+    required Duration originalPosition,
+    required Duration target,
+    required Duration position,
+    required Duration duration,
+    required dynamic proxyLiveStatus,
+  }) {
+    if (duration.inMilliseconds <= 500) return false;
 
-  void _tickLiveCatchUpMonitor() {
-    if (!mounted || !_catchingUpToLive) return;
-
-    final position = player.state.position;
-    final duration = player.state.duration;
-    final proxyLiveStatus = widget.playerRuntime.proxyLiveStatus;
-
-    if (duration.inMilliseconds <= 500) return;
-
-    final liveLag = duration - position;
+    final liveLag = _safeLiveLag(position: position, duration: duration);
     final streamValue = duration.inMilliseconds <= 0
         ? 1.0
         : (position.inMilliseconds / duration.inMilliseconds)
             .clamp(0.0, 1.0)
             .toDouble();
 
-    final closeEnough = _isCloseEnoughForCatchUpStop(
+    final closeEnough = _isCloseEnoughForLive(
       position: position,
       duration: duration,
       liveLag: liveLag,
       streamValue: streamValue,
       proxyLiveStatus: proxyLiveStatus,
     );
+    if (closeEnough) return true;
 
-    if (!closeEnough) return;
+    final distanceFromTarget = position > target ? position - target : target - position;
+    if (distanceFromTarget <= _liveSeekSuccessTolerance) return true;
 
-    _liveCatchUpTimer?.cancel();
-    _liveCatchUpTimer = null;
-
-    unawaited(_restoreNormalPlaybackRate());
-
-    setState(() {
-      _catchingUpToLive = false;
-      _livePinned = true;
-      _dragging = false;
-      _dragValue = null;
-    });
+    final movedForward = position - originalPosition;
+    return movedForward > const Duration(seconds: 3) &&
+        liveLag <= const Duration(seconds: 7);
   }
 
-  bool _isCloseEnoughForCatchUpStop({
+  bool _isCloseEnoughForLive({
     required Duration position,
     required Duration duration,
     required Duration liveLag,
@@ -269,13 +302,13 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
       final distanceFromProxySafe = position > proxyTarget
           ? position - proxyTarget
           : proxyTarget - position;
-      if (distanceFromProxySafe <= _liveCatchUpStopTolerance) {
+      if (distanceFromProxySafe <= _liveSeekSuccessTolerance) {
         return true;
       }
     }
 
-    if (liveLag <= _liveCatchUpStopTolerance) return true;
-    return streamValue >= 0.996;
+    if (liveLag <= _liveSeekSuccessTolerance) return true;
+    return streamValue >= 0.992;
   }
 
   bool _isNearLiveEdge({
@@ -302,9 +335,6 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
         return true;
       }
 
-      // If media_kit is already close to its own tail and proxy says the writer
-      // is only one segment behind, keep LIVE active. This matches the HLS
-      // streamlink-style edge where proxy output and media_kit duration differ.
       try {
         final lagSegments = proxyLiveStatus.lagSegments as int;
         if (lagSegments <= 1 && liveLag <= const Duration(milliseconds: 2600)) {
@@ -348,7 +378,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         : 1.0;
                     final streamValue = rawValue.clamp(0.0, 1.0).toDouble();
                     final liveLag = hasSeekableDuration
-                        ? duration - position
+                        ? _safeLiveLag(position: position, duration: duration)
                         : Duration.zero;
                     final dynamic proxyLiveStatus =
                         widget.playerRuntime.proxyLiveStatus;
@@ -405,7 +435,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                               onChangeStart: hasSeekableDuration
                                   ? (next) {
                                       if (next < 0.985) {
-                                        _stopLiveCatchUp(restoreRate: true);
+                                        _stopLiveSeekAttempt();
                                       }
                                       setState(() {
                                         _dragging = true;
@@ -417,7 +447,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                               onChanged: hasSeekableDuration
                                   ? (next) {
                                       if (next < 0.985) {
-                                        _stopLiveCatchUp(restoreRate: true);
+                                        _stopLiveSeekAttempt();
                                       }
                                       setState(() {
                                         _dragValue = next;
@@ -446,7 +476,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                                 .round(),
                                       );
 
-                                      _stopLiveCatchUp(restoreRate: true);
+                                      _stopLiveSeekAttempt();
                                       setState(() {
                                         _dragging = false;
                                         _dragValue = null;
@@ -464,7 +494,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                           active: isAtLiveEdge,
                           enabled: hasSeekableDuration,
                           buffering: buffering,
-                          catchingUp: _catchingUpToLive,
+                          seeking: _seekingLiveEdge,
                           compact: compact,
                           onPressed: hasSeekableDuration
                               ? () => unawaited(
@@ -484,7 +514,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                             buffering: buffering,
                             playing: playing,
                             livePinned: isAtLiveEdge,
-                            catchingUp: _catchingUpToLive,
+                            seeking: _seekingLiveEdge,
                             proxyLiveStatus: proxyLiveStatus,
                             proxyMediaTarget: proxyMediaTarget,
                           ),
@@ -534,7 +564,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     required bool buffering,
     required bool playing,
     required bool livePinned,
-    required bool catchingUp,
+    required bool seeking,
     required dynamic proxyLiveStatus,
     required Duration? proxyMediaTarget,
   }) {
@@ -542,8 +572,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     final dur = duration.inMilliseconds > 0 ? _formatDuration(duration) : '--:--';
     final state = buffering
         ? 'buffering'
-        : catchingUp
-            ? 'catching live edge'
+        : seeking
+            ? 'seeking live edge'
             : livePinned
                 ? 'live edge'
                 : playing
@@ -610,7 +640,7 @@ class _LiveEdgeButton extends StatelessWidget {
   final bool active;
   final bool enabled;
   final bool buffering;
-  final bool catchingUp;
+  final bool seeking;
   final bool compact;
   final VoidCallback? onPressed;
 
@@ -618,32 +648,32 @@ class _LiveEdgeButton extends StatelessWidget {
     required this.active,
     required this.enabled,
     required this.buffering,
-    required this.catchingUp,
+    required this.seeking,
     required this.compact,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final foreground = buffering || catchingUp
+    final foreground = buffering || seeking
         ? Colors.orangeAccent
         : active
             ? Colors.redAccent
             : Colors.white54;
-    final border = buffering || catchingUp
+    final border = buffering || seeking
         ? Colors.orangeAccent.withOpacity(0.42)
         : active
             ? Colors.redAccent.withOpacity(0.52)
             : Colors.white.withOpacity(0.16);
     final background = active
         ? Colors.redAccent.withOpacity(0.16)
-        : catchingUp
+        : seeking
             ? Colors.orangeAccent.withOpacity(0.12)
             : const Color(0xFF18181B).withOpacity(0.86);
 
     return Tooltip(
-      message: catchingUp
-          ? '正在追上直播最新位置'
+      message: seeking
+          ? '正在嘗試跳到直播最新位置'
           : active
               ? '目前在直播最新位置'
               : '跳到直播最新位置',
