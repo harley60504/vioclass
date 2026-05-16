@@ -73,6 +73,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   bool showPrediction = true;
 
   String? lastPredictionId;
+  double _lastEngagementContentHeight = 0.0;
 
   @override
   void initState() {
@@ -115,6 +116,17 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     return prediction.isResolvedLike || prediction.isLockedLike;
   }
 
+  void _handleEngagementMeasured(Size size) {
+    if (!mounted) return;
+
+    final nextHeight = size.height.isFinite ? size.height : 0.0;
+    if ((_lastEngagementContentHeight - nextHeight).abs() < 1.0) return;
+
+    setState(() {
+      _lastEngagementContentHeight = nextHeight;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentRuntime = widget.runtime;
@@ -146,38 +158,29 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
           final headerHeight = verticalCompact ? 42.0 : 54.0;
           final utilityBarHeight = (compactWidth || verticalCompact) ? 41.0 : 48.0;
           final inputBarHeight = verticalCompact ? 48.0 : 54.0;
+          final fixedChromeHeight = headerHeight + utilityBarHeight + inputBarHeight;
           final predictionHasData = prediction != null && prediction.hasPrediction;
           final hasActivePinned = pinned.any(
             (item) => item.isActive && item.text.trim().isNotEmpty,
           );
-          final wantsPinned = showPinned && hasActivePinned;
-          final wantsPrediction = showPrediction && predictionHasData;
           final hasEngagementError = (widget.engagementError ?? '').isNotEmpty;
-          final estimatedPinnedHeight = wantsPinned ? 86.0 : 0.0;
-          final estimatedPredictionHeight = wantsPrediction ? 104.0 : 0.0;
-          final estimatedErrorHeight = hasEngagementError ? 26.0 : 0.0;
-          final estimatedSpacing =
-              [wantsPinned, wantsPrediction, hasEngagementError]
-                      .where((value) => value)
-                      .length >
-                  1
-              ? 8.0
-              : 0.0;
-          final estimatedEngagementHeight = (
-            estimatedPinnedHeight +
-                estimatedPredictionHeight +
-                estimatedErrorHeight +
-                estimatedSpacing,
-          ).$1.clamp(0.0, maxEngagementHeight).toDouble();
-          final availableMessageListHeight = constraints.maxHeight -
-              headerHeight -
-              utilityBarHeight -
-              inputBarHeight -
-              estimatedEngagementHeight;
-          final minMessageListHeight = keyboardVisible ? 84.0 : 72.0;
+          final wantsEngagement =
+              (showPinned && hasActivePinned) ||
+              (showPrediction && predictionHasData) ||
+              hasEngagementError;
+          final minMessageListHeight = keyboardVisible ? 84.0 : 48.0;
+          final maxUsableEngagementHeight = (constraints.maxHeight -
+                  fixedChromeHeight -
+                  minMessageListHeight)
+              .clamp(0.0, maxEngagementHeight)
+              .toDouble();
+          final measuredEngagementHeight = _lastEngagementContentHeight;
+          final engagementWouldOverflow =
+              measuredEngagementHeight > 0 &&
+              measuredEngagementHeight > maxUsableEngagementHeight + 1.0;
           final hideOptionalEngagement = keyboardVisible ||
-              (estimatedEngagementHeight > 0 &&
-                  availableMessageListHeight < minMessageListHeight);
+              (wantsEngagement && maxUsableEngagementHeight < 48.0) ||
+              engagementWouldOverflow;
           final effectiveShowPinned = showPinned && !hideOptionalEngagement;
           final effectiveShowPrediction =
               showPrediction && !hideOptionalEngagement && predictionHasData;
@@ -206,21 +209,24 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 ),
               ),
               ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxEngagementHeight),
+                constraints: BoxConstraints(maxHeight: maxUsableEngagementHeight),
                 child: SingleChildScrollView(
                   padding: EdgeInsets.zero,
                   physics: const ClampingScrollPhysics(),
-                  child: TwitchChatEngagementStrip(
-                    channelPoints: widget.channelPoints,
-                    pinnedMessages: pinned,
-                    prediction: effectiveShowPrediction ? prediction : null,
-                    loading: widget.loadingEngagement,
-                    error: widget.engagementError,
-                    onRefresh: widget.onRefreshEngagement,
-                    onOpenChannelPoints: widget.onOpenChannelPoints,
-                    onOpenPrediction: widget.onOpenPrediction,
-                    showPinned: effectiveShowPinned,
-                    showPrediction: effectiveShowPrediction,
+                  child: _MeasureSize(
+                    onChange: _handleEngagementMeasured,
+                    child: TwitchChatEngagementStrip(
+                      channelPoints: widget.channelPoints,
+                      pinnedMessages: pinned,
+                      prediction: effectiveShowPrediction ? prediction : null,
+                      loading: widget.loadingEngagement,
+                      error: widget.engagementError,
+                      onRefresh: widget.onRefreshEngagement,
+                      onOpenChannelPoints: widget.onOpenChannelPoints,
+                      onOpenPrediction: widget.onOpenPrediction,
+                      showPinned: effectiveShowPinned,
+                      showPrediction: effectiveShowPrediction,
+                    ),
                   ),
                 ),
               ),
@@ -285,6 +291,58 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
         },
       ),
     );
+  }
+}
+
+class _MeasureSize extends StatefulWidget {
+  final Widget child;
+  final ValueChanged<Size> onChange;
+
+  const _MeasureSize({
+    required this.child,
+    required this.onChange,
+  });
+
+  @override
+  State<_MeasureSize> createState() => _MeasureSizeState();
+}
+
+class _MeasureSizeState extends State<_MeasureSize> {
+  Size? _oldSize;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
+  }
+
+  @override
+  void didUpdateWidget(covariant _MeasureSize oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
+  }
+
+  void _notifySize() {
+    if (!mounted) return;
+
+    final size = context.size;
+    if (size == null) return;
+
+    final oldSize = _oldSize;
+    if (oldSize != null &&
+        (oldSize.width - size.width).abs() < 1.0 &&
+        (oldSize.height - size.height).abs() < 1.0) {
+      return;
+    }
+
+    _oldSize = size;
+    widget.onChange(size);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _notifySize());
+    return widget.child;
   }
 }
 
