@@ -21,12 +21,15 @@ class TwitchPredictionApiService {
   Future<TwitchPredictionSnapshot> fetchPredictionContext({
     required String channelLogin,
     int count = 1,
+    String? viewerUserId,
   }) async {
     final login = channelLogin.trim().toLowerCase();
+    final safeViewerUserId = viewerUserId?.trim();
     if (login.isNotEmpty) {
       _lastFallbackLoader = () => fetchPredictionContext(
             channelLogin: login,
             count: count,
+            viewerUserId: safeViewerUserId,
           );
     }
 
@@ -42,9 +45,12 @@ class TwitchPredictionApiService {
           _readChannelIdFromObject(raw.response);
       if (channelId != null && channelId.trim().isNotEmpty) {
         // StreamNook-style path: GQL is the initial active snapshot, Hermes is
-        // the realtime prediction event stream.
+        // the realtime prediction event stream. Pass viewerUserId when known so
+        // Hermes can distinguish the current viewer's prediction-made / top
+        // predictor entries from everyone else's bets.
         unawaited(TwitchPredictionHermesGlobalRuntime.ensureConnected(
           channelId: channelId,
+          viewerUserId: safeViewerUserId,
           previousPrediction: snapshot,
         ));
       }
