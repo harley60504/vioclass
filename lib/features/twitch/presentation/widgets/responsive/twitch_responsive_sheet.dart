@@ -67,7 +67,6 @@ TwitchUnifiedSheetSizeSpec _resolveUnifiedSheetSize({
   );
 }
 
-
 Future<T?> showTwitchResponsiveSheet<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -93,7 +92,8 @@ Future<T?> showTwitchResponsiveSheet<T>({
   final availableDialogWidth = math.max(260.0, viewportSize.width - 20.0);
   final availableDialogHeight = math.max(
     180.0,
-    viewportSize.height - media.padding.top - media.padding.bottom - (keyboardOpen ? 4.0 : 10.0),
+    viewportSize.height - media.padding.top - media.padding.bottom -
+        (keyboardOpen ? 4.0 : 10.0),
   );
   final effectiveMaxWidth = math.min(resolvedSize.maxWidth, availableDialogWidth);
 
@@ -110,18 +110,21 @@ Future<T?> showTwitchResponsiveSheet<T>({
             insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             backgroundColor: Colors.transparent,
             child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: effectiveMaxWidth,
-                maxHeight: math.min(availableDialogHeight, viewportSize.height * resolvedSize.landscapeHeightFactor),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Material(
-                  color: backgroundColor,
-                  child: builder(dialogContext),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: effectiveMaxWidth,
+                  maxHeight: math.min(
+                    availableDialogHeight,
+                    viewportSize.height * resolvedSize.landscapeHeightFactor,
+                  ),
                 ),
-              ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Material(
+                    color: backgroundColor,
+                    child: builder(dialogContext),
+                  ),
+                ),
               ),
             ),
           ),
@@ -145,28 +148,26 @@ Future<T?> showTwitchResponsiveSheet<T>({
         child: Padding(
           padding: EdgeInsets.only(bottom: insetBottom),
           child: Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: effectiveMaxWidth,
-              maxHeight: viewportSize.height * resolvedSize.portraitHeightFactor,
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-              child: Material(
-                color: backgroundColor,
-                child: builder(sheetContext),
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: effectiveMaxWidth,
+                maxHeight: viewportSize.height * resolvedSize.portraitHeightFactor,
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                child: Material(
+                  color: backgroundColor,
+                  child: builder(sheetContext),
+                ),
               ),
             ),
-          ),
           ),
         ),
       );
     },
   );
 }
-
-
 
 Future<T?> showTwitchUnifiedSheet<T>({
   required BuildContext context,
@@ -405,6 +406,9 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
           imageUrl,
           width: 24,
           height: 24,
+          cacheWidth: 48,
+          cacheHeight: 48,
+          filterQuality: FilterQuality.low,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _fallbackIcon(),
         ),
@@ -428,7 +432,6 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
     );
   }
 }
-
 
 class TwitchResponsiveSheetHeader extends StatelessWidget {
   final String? title;
@@ -469,7 +472,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                 title!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
                 ),
