@@ -157,8 +157,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                   setState(() => showPinned = !showPinned);
                 },
                 onTogglePrediction: () {
-                  if (predictionBannerAllowed && !hideOptionalEngagement) {
-                    setState(() => showPrediction = !showPrediction);
+                  if (effectiveShowPrediction) {
+                    setState(() => showPrediction = false);
                     return;
                   }
 
