@@ -86,9 +86,56 @@ PiliPlus 首頁順暢的關鍵之一是列表與圖片層控制得比較細：Sl
 3. 從首頁點進直播，觀察第一次播放器卡頓是否減少。
 4. 對比修改前後 Android Studio Performance Overlay 或 Flutter DevTools 的 raster / UI frame spikes。
 
+---
+
+## Stage 109 — 建立共用 TwitchCachedImageLayer 並接入直播卡片
+
+Commits:
+
+- `a0396abf0b0905bbfc0e3932f4150ce76f5b1f96`
+- `e6f98eb577ecd157adc343778fdca192a19f6137`
+
+### 背景
+
+Stage 108 先在直播卡片內局部降低圖片解碼成本，但優化邏輯仍散在單一 widget 中。PiliPlus 的做法更接近共用 `NetworkImgLayer`，讓 avatar、thumbnail、emote、背景圖、分類封面都使用一致的圖片解碼與 fallback 策略。
+
+Twitch App 沒有 Bilibili 直播那種大量飛行彈幕，因此理論性能壓力更低；若圖片層與播放器生命週期逐步靠近 PiliPlus，Android 平板應能明顯更順。
+
+### 新增檔案
+
+- `lib/features/twitch/presentation/widgets/shared/twitch_cached_image_layer.dart`
+
+### 修改檔案
+
+- `lib/features/twitch/presentation/widgets/discovery/twitch_stream_card.dart`
+
+### 修改內容
+
+- 新增 `TwitchCachedImageLayer`。
+- 支援：
+  - `cacheWidth`
+  - `cacheHeight`
+  - `filterQuality`
+  - `gaplessPlayback`
+  - `borderRadius`
+  - circular avatar mode
+  - fallback icon / color
+- 新增工具方法：
+  - `physicalWidthFor(...)`
+  - `heightForAspectRatio(...)`
+- 將直播卡片 thumbnail 改用 `TwitchCachedImageLayer`。
+- 將直播主 avatar 改用 `TwitchCachedImageLayer.avatar(...)`。
+- 保留 Stage 108 的 320~480 physical px 縮圖上限策略。
+
+### 預期效果
+
+- 後續圖片優化集中在共用層，不需要散落修改多個 widget。
+- 更接近 PiliPlus `NetworkImgLayer` 的維護方式。
+- 降低首頁大量圖片解碼造成的 raster thread 壓力。
+
 ### 下一階段候選
 
-- Stage 109：把遊戲分類 sheet 的 box art 也改成統一圖片解碼策略。
-- Stage 110：建立 `TwitchCachedImageLayer`，統一直播縮圖、頭像、分類封面、emote 的 cacheWidth/filterQuality/fallback。
-- Stage 111：檢查 `TwitchWatchPage` 是否需要跨頁 player runtime，避免每次從列表進播放頁都重新建立 media_kit Player。
-- Stage 112：首幀後延遲啟動聊天室、emote、prediction、channel points。
+- Stage 110：把遊戲分類 sheet 的 box art 改用 `TwitchCachedImageLayer`。
+- Stage 111：把聊天室 emote / badge / 頻道點數圖片逐步接到共用圖片層。
+- Stage 112：做 `TwitchMediaKitPlayerHost`，讓 WatchPage 之間短時間重用同一組 `Player` / `VideoController`，避免每次從首頁進直播都冷啟動 media_kit。
+- Stage 113：模仿 PiliPlus route-aware 行為，切到其他頁時暫停聊天室 heavy update，回到播放頁再恢復。
