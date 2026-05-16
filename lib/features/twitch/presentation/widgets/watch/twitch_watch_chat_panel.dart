@@ -132,25 +132,32 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
         builder: (context, constraints) {
           final media = MediaQuery.of(context);
           final keyboardVisible = media.viewInsets.bottom > 0;
-          final shortChatPanel = constraints.maxHeight < 560 ||
-              (media.orientation == Orientation.landscape &&
-                  constraints.maxHeight < 620);
-          final hideOptionalEngagement = keyboardVisible || shortChatPanel;
           final verticalCompact = constraints.maxHeight < 520 ||
               (media.orientation == Orientation.landscape &&
                   constraints.maxHeight < 620) ||
               keyboardVisible;
           final ultraVerticalCompact = constraints.maxHeight < 410;
           final compactWidth = constraints.maxWidth < 300;
-          final predictionHasData = prediction != null && prediction.hasPrediction;
-          final effectiveShowPinned = showPinned && !hideOptionalEngagement;
-          final effectiveShowPrediction =
-              showPrediction && !hideOptionalEngagement && predictionHasData;
           final maxEngagementHeight = ultraVerticalCompact
               ? (constraints.maxHeight * 0.34).clamp(110.0, 180.0).toDouble()
               : verticalCompact
                   ? (constraints.maxHeight * 0.38).clamp(130.0, 230.0).toDouble()
                   : (constraints.maxHeight * 0.42).clamp(160.0, 320.0).toDouble();
+          final headerHeight = verticalCompact ? 42.0 : 54.0;
+          final utilityBarHeight = (compactWidth || verticalCompact) ? 41.0 : 48.0;
+          final inputBarHeight = verticalCompact ? 48.0 : 54.0;
+          final minMessageListHeight = keyboardVisible ? 96.0 : 132.0;
+          final availableMessageListHeight = constraints.maxHeight -
+              headerHeight -
+              utilityBarHeight -
+              inputBarHeight -
+              maxEngagementHeight;
+          final hideOptionalEngagement =
+              keyboardVisible || availableMessageListHeight < minMessageListHeight;
+          final predictionHasData = prediction != null && prediction.hasPrediction;
+          final effectiveShowPinned = showPinned && !hideOptionalEngagement;
+          final effectiveShowPrediction =
+              showPrediction && !hideOptionalEngagement && predictionHasData;
 
           return Column(
             children: [
