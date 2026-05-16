@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage127_open_or_resume
+// PATCH VERSION: twitch_watch_page_stage132_staged_startup
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -176,6 +176,12 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   StreamSubscription<double>? _playerVolumeSubscription;
   Timer? _volumePreferenceSaveDebounce;
   Timer? _chatWidthPreferenceSaveDebounce;
+  Timer? _chatStartupTimer;
+  Timer? _engagementStartupTimer;
+  Timer? _emoteStartupTimer;
+  Timer? _relationshipStartupTimer;
+
+  int _watchLoadGeneration = 0;
 
   TwitchChatRuntime? _chatRuntime;
 
@@ -193,6 +199,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   bool _chatVisible = true;
   bool _fullscreenMode = false;
   bool _mobileImmersiveEntered = false;
+  bool _chatBootstrapping = false;
+  bool _engagementBootstrapping = false;
+  bool _emoteBootstrapping = false;
+  bool _relationshipBootstrapping = false;
 
   double _chatPanelWidth = 430;
   double _chatPanelRatio = 0.34;
@@ -300,6 +310,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
   @override
   void dispose() {
+    _cancelDeferredWatchTasks();
     _channelController.dispose();
     _messageController.dispose();
 
@@ -566,27 +577,40 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   Future<void> _loadWatch() async {
     if (_loadingWatch) return;
     final channel = _channelLogin;
+    _cancelDeferredWatchTasks();
+    final generation = ++_watchLoadGeneration;
+
     setState(() {
       _loadingWatch = true;
       _playerError = null;
       _engagementError = null;
       _relationshipError = null;
+      _chatBootstrapping = false;
+      _engagementBootstrapping = false;
+      _emoteBootstrapping = false;
+      _relationshipBootstrapping = false;
     });
 
     try {
-      await _stopCurrentSession(clearStatus: false);
-      await _loadPlayer(channel);
-      if (!mounted) return;
+      await _stopCurrentSession(
+        clearStatus: false,
+        cancelDeferredTasks: false,
+      );
+      if (!_isCurrentWatchTask(generation, channel)) return;
 
-      unawaited(_connectChat(channel).catchError((Object error, StackTrace stackTrace) {
-        if (!mounted) return;
-        _showSnack('聊天室連線失敗：$error');
-      }));
-      unawaited(_refreshRelationshipStatus(channelLogin: channel));
+      await _loadPlayer(channel);
+      if (!_isCurrentWatchTask(generation, channel)) return;
+
+      _scheduleDeferredWatchStartup(
+        channel: channel,
+        generation: generation,
+      );
     } catch (error) {
       if (mounted) _showSnack('載入 Watch Page 失敗：$error');
     } finally {
-      if (mounted) setState(() => _loadingWatch = false);
+      if (mounted && generation == _watchLoadGeneration) {
+        setState(() => _loadingWatch = false);
+      }
     }
   }
 
@@ -661,6 +685,112 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     return completer.future;
   }
 
+  void _scheduleDeferredWatchStartup({
+    required String channel,
+    required int generation,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      _chatBootstrapping = true;
+      _engagementBootstrapping = true;
+      _emoteBootstrapping = true;
+      _relationshipBootstrapping = true;
+    });
+
+    _chatStartupTimer = Timer(const Duration(milliseconds: 320), () {
+      if (!_isCurrentWatchTask(generation, channel)) return;
+      unawaited(_runDeferredChatStartup(channel, generation));
+    });
+
+    _engagementStartupTimer = Timer(const Duration(milliseconds: 950), () {
+      if (!_isCurrentWatchTask(generation, channel)) return;
+      unawaited(_runDeferredEngagementStartup(generation, channel));
+    });
+
+    _emoteStartupTimer = Timer(const Duration(milliseconds: 1650), () {
+      if (!_isCurrentWatchTask(generation, channel)) return;
+      unawaited(_runDeferredEmoteStartup(generation, channel));
+    });
+
+    _relationshipStartupTimer = Timer(const Duration(milliseconds: 2200), () {
+      if (!_isCurrentWatchTask(generation, channel)) return;
+      unawaited(_runDeferredRelationshipStartup(generation, channel));
+    });
+  }
+
+  Future<void> _runDeferredChatStartup(
+    String channel,
+    int generation,
+  ) async {
+    try {
+      await _connectChat(channel);
+    } catch (error) {
+      if (_isCurrentWatchTask(generation, channel)) {
+        _showSnack('聊天室連線失敗：$error');
+      }
+    } finally {
+      if (_isCurrentWatchTask(generation, channel)) {
+        setState(() => _chatBootstrapping = false);
+      }
+    }
+  }
+
+  Future<void> _runDeferredEngagementStartup(
+    int generation,
+    String channel,
+  ) async {
+    try {
+      await _refreshEngagement(showSnackOnError: false);
+    } finally {
+      if (_isCurrentWatchTask(generation, channel)) {
+        setState(() => _engagementBootstrapping = false);
+      }
+    }
+  }
+
+  Future<void> _runDeferredEmoteStartup(
+    int generation,
+    String channel,
+  ) async {
+    try {
+      await _loadThirdPartyEmotes();
+    } finally {
+      if (_isCurrentWatchTask(generation, channel)) {
+        setState(() => _emoteBootstrapping = false);
+      }
+    }
+  }
+
+  Future<void> _runDeferredRelationshipStartup(
+    int generation,
+    String channel,
+  ) async {
+    try {
+      await _refreshRelationshipStatus(channelLogin: channel);
+    } finally {
+      if (_isCurrentWatchTask(generation, channel)) {
+        setState(() => _relationshipBootstrapping = false);
+      }
+    }
+  }
+
+  bool _isCurrentWatchTask(int generation, String channel) {
+    return mounted &&
+        generation == _watchLoadGeneration &&
+        channel.trim().toLowerCase() == _channelLogin;
+  }
+
+  void _cancelDeferredWatchTasks() {
+    _chatStartupTimer?.cancel();
+    _engagementStartupTimer?.cancel();
+    _emoteStartupTimer?.cancel();
+    _relationshipStartupTimer?.cancel();
+    _chatStartupTimer = null;
+    _engagementStartupTimer = null;
+    _emoteStartupTimer = null;
+    _relationshipStartupTimer = null;
+  }
+
   Future<void> _connectChat(String channel) async {
     setState(() => _connectingChat = true);
     try {
@@ -703,15 +833,20 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         preloadRecentMessages: true,
         recentMessageLimit: 100,
       );
-
-      unawaited(_loadThirdPartyEmotes());
-      unawaited(_refreshEngagement(showSnackOnError: false));
     } finally {
       if (mounted) setState(() => _connectingChat = false);
     }
   }
 
-  Future<void> _stopCurrentSession({bool clearStatus = true}) async {
+  Future<void> _stopCurrentSession({
+    bool clearStatus = true,
+    bool cancelDeferredTasks = true,
+  }) async {
+    if (cancelDeferredTasks) {
+      _watchLoadGeneration++;
+      _cancelDeferredWatchTasks();
+    }
+
     await _chatRuntime?.disconnect();
     _thirdPartyEmotes.clear();
     _officialEmotes.clear();
@@ -726,6 +861,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       _playerError = null;
       _relationshipError = null;
       _isFollowing = false;
+      _chatBootstrapping = false;
+      _engagementBootstrapping = false;
+      _emoteBootstrapping = false;
+      _relationshipBootstrapping = false;
     });
   }
 
@@ -948,7 +1087,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       context: context,
       cache: _thirdPartyEmotes,
       officialCache: _officialEmotes,
-      loading: _thirdPartyEmotes.loading || _officialEmotes.loading || _loadingEmotes,
+      loading: _thirdPartyEmotes.loading || _officialEmotes.loading || _loadingEmotes || _emoteBootstrapping,
       onRefresh: () => _loadThirdPartyEmotes(forceRefresh: true),
       onEmoteSelected: (emoteText) {
         final clean = emoteText.trim();
@@ -962,7 +1101,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     await showTwitchChannelPointsSheet(
       context: context,
       snapshot: _channelPointsSnapshot,
-      loading: _loadingEngagement,
+      loading: _loadingEngagement || _engagementBootstrapping,
       onRefresh: () => _refreshEngagement(showSnackOnError: true),
       onClaim: _claimCommunityPoints,
       onRedeemReward: _redeemChannelPointReward,
@@ -1101,7 +1240,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         qualityBusy: _playerRuntime.switchingQuality || _loadingPlayer,
         onQualitySelected: (variant) => unawaited(_selectPlayerQuality(variant)),
         isFollowing: _isFollowing,
-        relationshipBusy: _checkingRelationship || _followBusy,
+        relationshipBusy: _checkingRelationship || _followBusy || _relationshipBootstrapping,
         relationshipError: _relationshipError,
         onToggleFollow: _toggleFollowChannel,
         onSubscribe: _openSubscribePage,
@@ -1121,17 +1260,17 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     }
 
     Widget buildChatPanel() {
-      return TwitchWatchChatPanel(
+      final panel = TwitchWatchChatPanel(
         runtime: runtime,
         viewerLogin: _viewerLogin,
         viewerId: _viewerId,
         thirdPartyEmoteCache: _thirdPartyEmotes,
         emoteCount: _thirdPartyEmotes.count,
-        loadingEmotes: _loadingEmotes || _thirdPartyEmotes.loading,
+        loadingEmotes: _loadingEmotes || _thirdPartyEmotes.loading || _emoteBootstrapping,
         channelPoints: _channelPointsSnapshot,
         pinnedMessages: _pinnedMessages,
         prediction: _prediction,
-        loadingEngagement: _loadingEngagement,
+        loadingEngagement: _loadingEngagement || _engagementBootstrapping,
         engagementError: _engagementError,
         messageController: _messageController,
         sending: _sending,
@@ -1141,6 +1280,22 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         onRefreshEngagement: () => _refreshEngagement(showSnackOnError: true),
         onOpenChannelPoints: _openChannelPointsSheet,
         onOpenPrediction: _openPredictionBetSheet,
+      );
+
+      if (runtime != null || !_chatBootstrapping) return panel;
+
+      return Stack(
+        children: [
+          Positioned.fill(child: panel),
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: _WatchStartupOverlay(
+                title: '正在連線聊天室...',
+                subtitle: '播放器已優先啟動，聊天室與互動資料會分批載入',
+              ),
+            ),
+          ),
+        ],
       );
     }
 
@@ -1212,6 +1367,56 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _WatchStartupOverlay extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _WatchStartupOverlay({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFF111116).withOpacity(0.86),
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 11,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
