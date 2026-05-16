@@ -37,6 +37,64 @@ class TwitchPredictionHermesRealtimeBus {
   }
 }
 
+/// App-level Hermes prediction coordinator.
+///
+/// This mirrors the StreamNook direction: use GQL as the active prediction
+/// snapshot / fallback, then keep the UI hot with Hermes prediction events.
+/// It intentionally lives outside WatchPage so sheets and engagement banners can
+/// keep receiving prediction updates through [TwitchPredictionHermesRealtimeBus]
+/// without forcing high-frequency GQL polling.
+class TwitchPredictionHermesGlobalRuntime {
+  static final TwitchPredictionHermesRuntimeService _runtime =
+      TwitchPredictionHermesRuntimeService();
+
+  static String? _channelId;
+  static String? _viewerUserId;
+
+  TwitchPredictionHermesGlobalRuntime._();
+
+  static Future<void> ensureConnected({
+    required String? channelId,
+    String? viewerUserId,
+    TwitchPredictionSnapshot? previousPrediction,
+  }) async {
+    final safeChannelId = channelId?.trim() ?? '';
+    final safeViewerUserId = viewerUserId?.trim();
+
+    if (safeChannelId.isEmpty) return;
+
+    final sameChannel = _channelId == safeChannelId;
+    final sameViewer = (_viewerUserId ?? '') == (safeViewerUserId ?? '');
+    if (sameChannel && sameViewer && _runtime.connected) {
+      if (previousPrediction != null && previousPrediction.hasPrediction) {
+        TwitchPredictionHermesRealtimeBus.publishPrediction(previousPrediction);
+      }
+      return;
+    }
+
+    _channelId = safeChannelId;
+    _viewerUserId = safeViewerUserId == null || safeViewerUserId.isEmpty
+        ? null
+        : safeViewerUserId;
+
+    await _runtime.connect(
+      channelId: safeChannelId,
+      viewerUserId: _viewerUserId,
+      previousPrediction: previousPrediction,
+      onPrediction: TwitchPredictionHermesRealtimeBus.publishPrediction,
+      onStatus: (status) {
+        // Keep this quiet in UI; use debug logs if needed later.
+      },
+    );
+  }
+
+  static Future<void> disconnect() async {
+    _channelId = null;
+    _viewerUserId = null;
+    await _runtime.disconnect();
+  }
+}
+
 class TwitchPredictionHermesRuntimeService {
   WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _subscription;
