@@ -1,28 +1,22 @@
-// PATCH VERSION: twitch_media_kit_player_host_stage113_pause_on_release
+// PATCH VERSION: twitch_media_kit_player_host_stage114_piliplus_like_persistent
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 /// Shared media_kit player host for Twitch watch pages.
 ///
-/// PiliPlus keeps a player controller instance around and only releases the
-/// underlying player when the final owner leaves. This host applies the same
-/// idea in a lightweight way:
+/// This intentionally follows the PiliPlus-style direction more closely:
+/// keep one app-level Player / VideoController instance alive and reuse it
+/// across WatchPage entries. A WatchPage release stops audible playback, but it
+/// does not dispose the native media_kit/libmpv/texture stack.
 ///
-/// - WatchPage calls [acquire] during initState.
-/// - WatchPage calls [TwitchMediaKitPlayerSession.release] during dispose.
-/// - The Player / VideoController are not disposed immediately; they stay warm
-///   for a short grace period so returning to another stream does not cold-start
-///   libmpv / texture / decoder again.
+/// The player is disposed only by [disposeNow], which should be reserved for
+/// explicit shutdown / severe recovery cases.
 class TwitchMediaKitPlayerHost {
-  static const Duration _releaseGracePeriod = Duration(seconds: 24);
-
   static Player? _player;
   static VideoController? _videoController;
-  static Timer? _disposeTimer;
   static int _refCount = 0;
   static int _generation = 0;
 
@@ -33,9 +27,6 @@ class TwitchMediaKitPlayerHost {
   }) {
     MediaKit.ensureInitialized();
 
-    _disposeTimer?.cancel();
-    _disposeTimer = null;
-
     var player = _player;
     var controller = _videoController;
 
@@ -44,9 +35,10 @@ class TwitchMediaKitPlayerHost {
       player = Player(
         configuration: PlayerConfiguration(
           title: title,
-          bufferSize: defaultTargetPlatform == TargetPlatform.android
-              ? 16 * 1024 * 1024
-              : 8 * 1024 * 1024,
+          // PiliPlus live default is 16 MiB when expanded buffer is off.
+          // Twitch is always live in this WatchPage path, so use the same
+          // live baseline on all platforms instead of a smaller desktop value.
+          bufferSize: 16 * 1024 * 1024,
         ),
       );
       controller = VideoController(player);
@@ -70,20 +62,12 @@ class TwitchMediaKitPlayerHost {
     if (_refCount > 0) return;
 
     // Stop audible playback immediately when the final WatchPage leaves, but
-    // keep the native player object alive for a short period to avoid cold
-    // starting libmpv / texture / decoder on the next watch page.
+    // keep the native player object alive. WatchPage already calls stop()
+    // before release, so this is an additional safety pause.
     unawaited(session.player.pause().catchError((_) {}));
-
-    _disposeTimer?.cancel();
-    _disposeTimer = Timer(_releaseGracePeriod, () {
-      if (_refCount > 0) return;
-      unawaited(_disposeCurrent());
-    });
   }
 
   static Future<void> disposeNow() async {
-    _disposeTimer?.cancel();
-    _disposeTimer = null;
     _refCount = 0;
     await _disposeCurrent();
   }
