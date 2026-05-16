@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/engagement/twitch_prediction.dart';
+import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 Future<void> showTwitchPredictionBetSheet({
@@ -8,6 +11,8 @@ Future<void> showTwitchPredictionBetSheet({
   required TwitchPredictionSnapshot prediction,
   required Future<void> Function(TwitchPredictionOutcome outcome, int points) onBet,
 }) {
+  TwitchPredictionHermesRealtimeBus.publishPrediction(prediction);
+
   return showTwitchResponsiveSheet<void>(
     context: context,
     size: TwitchUnifiedSheetSize.medium,
@@ -35,17 +40,64 @@ class TwitchPredictionBetSheet extends StatefulWidget {
 class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   final TextEditingController _pointsController = TextEditingController(text: '10');
 
+  StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
+  late TwitchPredictionSnapshot _visiblePrediction;
   bool _submitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    _visiblePrediction = _bestInitialPrediction();
+    _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream.listen(
+      (prediction) {
+        if (!mounted || prediction == null || !prediction.hasPrediction) return;
+        if (!_samePredictionFamily(_visiblePrediction, prediction)) return;
+        setState(() {
+          _visiblePrediction = prediction;
+        });
+      },
+    );
+  }
+
+  @override
   void dispose() {
+    _predictionSubscription?.cancel();
     _pointsController.dispose();
     super.dispose();
   }
 
+  TwitchPredictionSnapshot _bestInitialPrediction() {
+    final realtime = TwitchPredictionHermesRealtimeBus.latestPrediction;
+    if (realtime != null &&
+        realtime.hasPrediction &&
+        _samePredictionFamily(widget.prediction, realtime)) {
+      return realtime;
+    }
+    return widget.prediction;
+  }
+
+  bool _samePredictionFamily(
+    TwitchPredictionSnapshot current,
+    TwitchPredictionSnapshot next,
+  ) {
+    final currentId = current.id.trim();
+    final nextId = next.id.trim();
+    if (currentId.isNotEmpty && nextId.isNotEmpty) {
+      return currentId == nextId;
+    }
+
+    final currentTitle = current.title.trim();
+    final nextTitle = next.title.trim();
+    if (currentTitle.isNotEmpty && nextTitle.isNotEmpty) {
+      return currentTitle == nextTitle;
+    }
+
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final prediction = widget.prediction;
+    final prediction = _visiblePrediction;
     final status = prediction.status.toUpperCase();
     final isActive = status == 'ACTIVE' || status == 'OPEN';
     final viewerChoiceId = _viewerChoiceId(prediction);
@@ -158,8 +210,17 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
 
     try {
       await widget.onBet(outcome, points);
-      if (context.mounted) {
-        Navigator.of(context).pop();
+      final outcomeId = _outcomeIdentity(outcome);
+      final optimistic = _visiblePrediction.withViewerPrediction(
+        outcomeId: outcomeId,
+        points: points,
+      );
+      TwitchPredictionHermesRealtimeBus.publishPrediction(optimistic);
+
+      if (mounted) {
+        setState(() {
+          _visiblePrediction = optimistic;
+        });
       }
     } finally {
       if (mounted) {
