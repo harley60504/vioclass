@@ -7,10 +7,17 @@ class TwitchPredictionApiService {
   final TwitchWebGqlPersistedApiService gql;
 
   static Future<TwitchPredictionSnapshot?> Function()? _lastFallbackLoader;
+  static String? _lastViewerUserId;
 
   const TwitchPredictionApiService({
     required this.gql,
   });
+
+  static void rememberViewerUserId(String? viewerUserId) {
+    final safeViewerUserId = viewerUserId?.trim();
+    if (safeViewerUserId == null || safeViewerUserId.isEmpty) return;
+    _lastViewerUserId = safeViewerUserId;
+  }
 
   static Future<TwitchPredictionSnapshot?> refreshLastPredictionContext() async {
     final loader = _lastFallbackLoader;
@@ -24,7 +31,12 @@ class TwitchPredictionApiService {
     String? viewerUserId,
   }) async {
     final login = channelLogin.trim().toLowerCase();
-    final safeViewerUserId = viewerUserId?.trim();
+    final explicitViewerUserId = viewerUserId?.trim();
+    final safeViewerUserId = explicitViewerUserId != null && explicitViewerUserId.isNotEmpty
+        ? explicitViewerUserId
+        : _lastViewerUserId;
+    rememberViewerUserId(safeViewerUserId);
+
     if (login.isNotEmpty) {
       _lastFallbackLoader = () => fetchPredictionContext(
             channelLogin: login,
