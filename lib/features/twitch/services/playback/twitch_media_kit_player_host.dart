@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_media_kit_player_host_stage112
+// PATCH VERSION: twitch_media_kit_player_host_stage112_compile_safe
 
 import 'dart:async';
 
@@ -47,7 +47,6 @@ class TwitchMediaKitPlayerHost {
           bufferSize: defaultTargetPlatform == TargetPlatform.android
               ? 16 * 1024 * 1024
               : 8 * 1024 * 1024,
-          logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
         ),
       );
       controller = VideoController(player);
