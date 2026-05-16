@@ -88,27 +88,26 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     final prediction = widget.prediction;
     final oldPrediction = oldWidget.prediction;
     final id = prediction?.id ?? '';
-    final hasViewerBet = _hasViewerPredictionBet(prediction);
-    final oldHasViewerBet = _hasViewerPredictionBet(oldPrediction);
     final shouldAutoHidePrediction = _shouldAutoHidePredictionBanner(prediction);
     final oldShouldAutoHidePrediction =
         _shouldAutoHidePredictionBanner(oldPrediction);
 
     if (id.isNotEmpty && id != lastPredictionId) {
       lastPredictionId = id;
-      showPrediction = hasViewerBet || !shouldAutoHidePrediction;
+      showPrediction = !shouldAutoHidePrediction;
       return;
     }
 
-    if (hasViewerBet && !oldHasViewerBet) {
+    if (id.isNotEmpty &&
+        oldShouldAutoHidePrediction &&
+        !shouldAutoHidePrediction) {
       showPrediction = true;
       return;
     }
 
     if (id.isNotEmpty &&
         !oldShouldAutoHidePrediction &&
-        shouldAutoHidePrediction &&
-        !hasViewerBet) {
+        shouldAutoHidePrediction) {
       showPrediction = false;
     }
   }
@@ -121,17 +120,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   bool _shouldAutoHidePredictionBanner(TwitchPredictionSnapshot? prediction) {
     if (prediction == null || !prediction.hasPrediction) return true;
-    if (_hasViewerPredictionBet(prediction)) return false;
-    return prediction.isResolvedLike || prediction.isLockedLike;
-  }
-
-  bool _hasViewerPredictionBet(TwitchPredictionSnapshot? prediction) {
-    if (prediction == null || !prediction.hasPrediction) return false;
-    final viewerOutcomeId = prediction.viewerOutcomeId?.trim();
-    if (viewerOutcomeId != null && viewerOutcomeId.isNotEmpty) return true;
-    final viewerOutcome = prediction.viewerOutcome;
-    return viewerOutcome != null &&
-        (viewerOutcome.isViewerChoice || viewerOutcome.viewerPoints > 0);
+    final status = prediction.normalizedStatus;
+    if (status.isEmpty) return false;
+    return status != 'ACTIVE' && status != 'OPEN';
   }
 
   @override
