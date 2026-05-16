@@ -44,16 +44,26 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   late TwitchPredictionSnapshot _visiblePrediction;
   bool _submitting = false;
 
+  // Local viewer bet draft/optimistic state.
+  //
+  // Hermes event-updated packets often carry global outcome totals but may not
+  // immediately include the current viewer's prediction. Without keeping this
+  // local state, each realtime update can overwrite the sheet and make the UI
+  // look like the user's selected side / amount disappeared.
+  String? _localViewerOutcomeId;
+  int _localViewerPoints = 0;
+
   @override
   void initState() {
     super.initState();
     _visiblePrediction = _bestInitialPrediction();
+    _rememberViewerPredictionFrom(_visiblePrediction);
     _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream.listen(
       (prediction) {
         if (!mounted || prediction == null || !prediction.hasPrediction) return;
         if (!_samePredictionFamily(_visiblePrediction, prediction)) return;
         setState(() {
-          _visiblePrediction = prediction;
+          _visiblePrediction = _mergeIncomingPrediction(prediction);
         });
       },
     );
@@ -93,6 +103,41 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     }
 
     return true;
+  }
+
+  TwitchPredictionSnapshot _mergeIncomingPrediction(
+    TwitchPredictionSnapshot incoming,
+  ) {
+    _rememberViewerPredictionFrom(_visiblePrediction);
+
+    final incomingViewer = incoming.viewerOutcome;
+    final incomingViewerId = _viewerChoiceId(incoming);
+    if (incomingViewer != null && incomingViewerId.isNotEmpty) {
+      _rememberViewerPredictionFrom(incoming);
+      return incoming;
+    }
+
+    final localOutcomeId = _localViewerOutcomeId?.trim() ?? '';
+    if (localOutcomeId.isEmpty) return incoming;
+
+    return incoming.withViewerPrediction(
+      outcomeId: localOutcomeId,
+      points: _localViewerPoints,
+      addToExisting: false,
+    );
+  }
+
+  void _rememberViewerPredictionFrom(TwitchPredictionSnapshot prediction) {
+    final viewerChoiceId = _viewerChoiceId(prediction).trim();
+    if (viewerChoiceId.isEmpty) return;
+
+    final viewerChoice = _outcomeByIdentity(prediction.outcomes, viewerChoiceId);
+    final points = viewerChoice?.viewerPoints ?? 0;
+
+    _localViewerOutcomeId = viewerChoiceId;
+    if (points > 0) {
+      _localViewerPoints = points;
+    }
   }
 
   @override
@@ -206,14 +251,21 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     final points = int.tryParse(_pointsController.text.trim()) ?? 0;
     if (points <= 0) return;
 
-    setState(() => _submitting = true);
+    final outcomeId = _outcomeIdentity(outcome);
+    if (outcomeId.isEmpty) return;
+
+    setState(() {
+      _submitting = true;
+      _localViewerOutcomeId = outcomeId;
+      _localViewerPoints += points;
+    });
 
     try {
       await widget.onBet(outcome, points);
-      final outcomeId = _outcomeIdentity(outcome);
       final optimistic = _visiblePrediction.withViewerPrediction(
         outcomeId: outcomeId,
-        points: points,
+        points: _localViewerPoints,
+        addToExisting: false,
       );
       TwitchPredictionHermesRealtimeBus.publishPrediction(optimistic);
 
@@ -222,6 +274,12 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
           _visiblePrediction = optimistic;
         });
       }
+    } catch (_) {
+      _localViewerPoints = (_localViewerPoints - points).clamp(0, 1 << 62).toInt();
+      if (_localViewerPoints <= 0) {
+        _localViewerOutcomeId = null;
+      }
+      rethrow;
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
