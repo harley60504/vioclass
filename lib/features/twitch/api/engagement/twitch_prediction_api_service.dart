@@ -38,6 +38,16 @@ class TwitchPredictionApiService {
     final snapshot = TwitchPredictionSnapshot.fromRawResponse(raw.response);
     if (snapshot.hasPrediction) {
       TwitchPredictionHermesRealtimeBus.publishPrediction(snapshot);
+      final channelId = _readChannelIdFromPrediction(snapshot.rawPrediction) ??
+          _readChannelIdFromObject(raw.response);
+      if (channelId != null && channelId.trim().isNotEmpty) {
+        // StreamNook-style path: GQL is the initial active snapshot, Hermes is
+        // the realtime prediction event stream.
+        unawaited(TwitchPredictionHermesGlobalRuntime.ensureConnected(
+          channelId: channelId,
+          previousPrediction: snapshot,
+        ));
+      }
     }
     return snapshot;
   }
@@ -145,4 +155,48 @@ mutation MakePrediction($input: MakePredictionInput!) {
     final now = DateTime.now().microsecondsSinceEpoch;
     return 'ntapp-$now';
   }
+}
+
+void unawaited(Future<void> future) {}
+
+String? _readChannelIdFromPrediction(Map<String, dynamic>? prediction) {
+  if (prediction == null) return null;
+  return _readChannelIdFromObject(prediction);
+}
+
+String? _readChannelIdFromObject(Object? value) {
+  if (value is Map) {
+    final direct = _readString(
+      value['channelId'] ??
+          value['channelID'] ??
+          value['channel_id'] ??
+          value['ownerId'] ??
+          value['ownerID'] ??
+          value['owner_id'] ??
+          value['broadcasterId'] ??
+          value['broadcasterID'] ??
+          value['broadcaster_id'] ??
+          value['roomId'] ??
+          value['roomID'] ??
+          value['room_id'],
+    );
+    if (direct != null && direct.isNotEmpty) return direct;
+
+    for (final entry in value.entries) {
+      final found = _readChannelIdFromObject(entry.value);
+      if (found != null && found.isNotEmpty) return found;
+    }
+  } else if (value is List) {
+    for (final item in value) {
+      final found = _readChannelIdFromObject(item);
+      if (found != null && found.isNotEmpty) return found;
+    }
+  }
+
+  return null;
+}
+
+String? _readString(Object? value) {
+  final text = value?.toString().trim();
+  return text == null || text.isEmpty ? null : text;
 }
