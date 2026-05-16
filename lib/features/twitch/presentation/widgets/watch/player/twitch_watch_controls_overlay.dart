@@ -129,6 +129,7 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
                         metadata: widget.metadata,
                         isFollowing: widget.isFollowing,
                         followBusy: widget.followBusy,
+                        player: widget.player,
                         onBack: widget.onBack,
                         onToggleFollow: widget.onToggleFollow,
                         onSubscribe: widget.onSubscribe,
