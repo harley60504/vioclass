@@ -7,8 +7,8 @@ import 'twitch_hls_low_latency_proxy.dart';
 /// Stable local URL wrapper for Twitch HLS playback.
 ///
 /// media_kit is sensitive to repeatedly opening different local URLs such as
-/// http://127.0.0.1:<new-port>/stream.ts. This router keeps one outer HTTP
-/// server / port stable and swaps the inner low-latency proxy when the Twitch
+/// `http://127.0.0.1:PORT/stream.ts`. This router keeps one outer HTTP server
+/// and port stable while swapping the inner low-latency proxy when the Twitch
 /// upstream playlist changes.
 ///
 /// Stage 125 intentionally keeps the existing low-latency proxy implementation
