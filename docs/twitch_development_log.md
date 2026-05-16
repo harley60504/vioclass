@@ -155,10 +155,6 @@ Commits:
 
 Commit: `46797d17b666426d5a00bd7c70e2284e9efc24ec`
 
-### 背景
-
-24 秒 warm window 只能覆蓋立即返回首頁又馬上點另一台的場景，對一般瀏覽目錄再進直播的使用行為不夠有感。PiliPlus 的核心做法不是短 timer，而是 singleton player controller + ref-count：播放頁切換來源時重用同一組 player，最後釋放時才 dispose。
-
 ### 修改檔案
 
 - `lib/features/twitch/services/playback/twitch_media_kit_player_host.dart`
@@ -172,13 +168,56 @@ Commit: `46797d17b666426d5a00bd7c70e2284e9efc24ec`
 - 只有呼叫 `TwitchMediaKitPlayerHost.disposeNow()` 才會真正 dispose。
 - live bufferSize 統一調整為 `16 * 1024 * 1024`，對齊 PiliPlus live default 非 expanded buffer 設定。
 
-### 預期效果
+---
 
-- 回首頁滑動一段時間後再進直播，也不會重新 cold-start media_kit/libmpv/texture。
-- 更接近 PiliPlus 的 player singleton / reuse 策略。
-- WatchPage 仍會在 dispose 時 `_player.stop()`，所以不會背景繼續串流或播放聲音。
+## Stage 115 — 對齊可用的 PiliPlus media_kit 初始化參數
 
-### 後續候選
+Commit: `bab80c4b5755ca7849364de548e28acdaa2ae4eb`
 
-- Stage 115：確認目前 media_kit / media_kit_video 版本是否支援 `VideoControllerConfiguration`，再補 `enableHardwareAcceleration` 與 `androidAttachSurfaceAfterVideoParameters: false`。
-- Stage 116：加入 AppLifecycleObserver，只在 app detached / 記憶體壓力 / 明確重置時呼叫 `disposeNow()`。
+### 背景
+
+PiliPlus 使用 fork/新 API 風格的 media_kit 配置，其中 `PlayerConfiguration.options` 可設定 mpv options，例如 `video-sync`、`volume-max`、`ao`、`autosync`。目前本專案使用官方 `media_kit: ^1.2.6` 與 `media_kit_video: ^2.0.1`，官方 `PlayerConfiguration` 沒有 `options` 欄位，不能直接照抄，否則會編譯失敗。
+
+官方 `media_kit_video` 支援 `VideoController(player, configuration: VideoControllerConfiguration(...))`，因此這一階段先對齊可安全使用的部分。
+
+### 修改檔案
+
+- `lib/features/twitch/services/playback/twitch_media_kit_player_host.dart`
+
+### 修改內容
+
+- `PlayerConfiguration` 新增：
+  - `logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error`
+  - 保留 live `bufferSize: 16 * 1024 * 1024`
+- `VideoController` 改為帶入 `VideoControllerConfiguration`：
+  - `enableHardwareAcceleration: true`
+  - `androidAttachSurfaceAfterVideoParameters: false`
+  - `hwdec: 'auto-safe'`
+- 新增 `flutter/foundation.dart` import 以使用 `kDebugMode`。
+
+### 與 PiliPlus 差異
+
+已對齊：
+
+- singleton / shared player 長駐方向。
+- live 16MB buffer baseline。
+- debug/release logLevel。
+- VideoController 硬體加速。
+- Android surface attach timing 設為 false。
+- hwdec 明確指定 auto-safe。
+
+尚未對齊：
+
+- `PlayerConfiguration.options['video-sync']`
+- `PlayerConfiguration.options['volume-max']`
+- `PlayerConfiguration.options['ao']`
+- `PlayerConfiguration.options['autosync']`
+
+原因：官方 media_kit `PlayerConfiguration` 目前沒有 `options` 欄位。若要完全跟 PiliPlus 一樣，需要升級 / fork media_kit，或改用可設定 mpv property/command 的替代方式。
+
+### 測試建議
+
+1. Android 平板進直播，確認不黑畫面。
+2. 離開播放頁後再進，確認 shared player 仍可重用。
+3. 若 Android 出現黑畫面或首幀不出來，優先回退 `androidAttachSurfaceAfterVideoParameters: false`。
+4. 若特定平板解碼異常，再測 `hwdec: 'auto'` 或移除 explicit hwdec 使用 media_kit 預設。
