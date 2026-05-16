@@ -49,7 +49,7 @@ class _WatchBottomControlBar extends StatelessWidget {
             final barHeight = useCompactLayout ? 58.0 : 72.0;
             final horizontalPadding = veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0;
 
-            final compactDesignWidth = veryNarrow ? 360.0 : 620.0;
+            final compactDesignWidth = veryNarrow ? 390.0 : 620.0;
             final compactDesignHeight = 58.0;
             final contentWidth = useCompactLayout ? compactDesignWidth : constraints.maxWidth;
             final contentHeight = useCompactLayout ? compactDesignHeight : barHeight;
@@ -72,12 +72,13 @@ class _WatchBottomControlBar extends StatelessWidget {
                             },
                           ),
                           SizedBox(width: veryNarrow ? 2 : 6),
-                          if (collapseLivePlayback)
+                          if (collapseLivePlayback) ...[
                             _LivePlaybackSheetButton(
                               player: player,
                               playerRuntime: playerRuntime,
-                            )
-                          else
+                            ),
+                            const Spacer(),
+                          ] else ...[
                             Expanded(
                               child: TwitchLivePlaybackStrip(
                                 player: player,
@@ -85,22 +86,21 @@ class _WatchBottomControlBar extends StatelessWidget {
                                 compact: true,
                               ),
                             ),
+                          ],
                           SizedBox(width: veryNarrow ? 2 : 6),
                           _CompactInlineVolumeControl(
                             muted: muted,
                             volume: volume,
-                            sliderWidth: veryNarrow ? 54 : 76,
+                            sliderWidth: veryNarrow ? 50 : 76,
                             onToggleMute: onToggleMute,
                             onVolumeChanged: onVolumeChanged,
                           ),
-                          if (!veryNarrow) ...[
-                            const SizedBox(width: 4),
-                            _QualityButton(
-                              variants: qualityVariants,
-                              currentVariant: currentVariant,
-                              onChanged: onQualityChanged,
-                            ),
-                          ],
+                          SizedBox(width: veryNarrow ? 1 : 4),
+                          _QualityButton(
+                            variants: qualityVariants,
+                            currentVariant: currentVariant,
+                            onChanged: onQualityChanged,
+                          ),
                           _PlainIconButton(
                             tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
                             icon: chatVisible
