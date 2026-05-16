@@ -165,9 +165,16 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                   Expanded(
                     child: ListView.separated(
                       padding: const EdgeInsets.only(bottom: 12),
-                      itemCount: prediction.outcomes.length,
+                      itemCount: prediction.outcomes.length + 1,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
+                        if (index >= prediction.outcomes.length) {
+                          return _PredictionDebugIdPanel(
+                            prediction: prediction,
+                            viewerChoiceId: viewerChoiceId,
+                          );
+                        }
+
                         final outcome = prediction.outcomes[index];
                         final outcomeIdentity = _outcomeIdentity(outcome);
                         final selectedByViewer = hasViewerChoice &&
@@ -402,6 +409,128 @@ class _PredictionOutcomeBetCard extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PredictionDebugIdPanel extends StatelessWidget {
+  final TwitchPredictionSnapshot prediction;
+  final String viewerChoiceId;
+
+  const _PredictionDebugIdPanel({
+    required this.prediction,
+    required this.viewerChoiceId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final viewerOutcome = viewerChoiceId.trim().isEmpty ? '--' : viewerChoiceId.trim();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111116),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.bug_report_rounded,
+                size: 15,
+                color: Color(0xFFBF94FF),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Prediction Debug ID',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.82),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _PredictionDebugLine(
+            label: 'pid',
+            value: prediction.id.trim().isEmpty ? '--' : prediction.id.trim(),
+          ),
+          _PredictionDebugLine(
+            label: 'viewerOutcomeId',
+            value: viewerOutcome,
+            highlight: viewerOutcome != '--',
+          ),
+          const SizedBox(height: 7),
+          ...prediction.outcomes.map((outcome) {
+            final oid = outcome.id.trim().isEmpty ? '--' : outcome.id.trim();
+            final identity = _outcomeIdentity(outcome);
+            final selected = viewerChoiceId.trim().isNotEmpty &&
+                identity.trim().isNotEmpty &&
+                identity.trim() == viewerChoiceId.trim();
+            final viewerText = outcome.viewerPoints > 0
+                ? ' · viewerPoints=${outcome.viewerPoints}'
+                : '';
+
+            return _PredictionDebugLine(
+              label: selected ? 'oid ✓' : 'oid',
+              value: '$oid · ${outcome.title}$viewerText',
+              highlight: selected,
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _PredictionDebugLine extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool highlight;
+
+  const _PredictionDebugLine({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = highlight ? Colors.greenAccent : Colors.white54;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: SelectableText.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            TextSpan(
+              text: value,
+              style: TextStyle(
+                color: Colors.white.withOpacity(highlight ? 0.88 : 0.62),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        style: const TextStyle(
+          fontSize: 11,
+          height: 1.25,
+          fontFamily: 'monospace',
         ),
       ),
     );
