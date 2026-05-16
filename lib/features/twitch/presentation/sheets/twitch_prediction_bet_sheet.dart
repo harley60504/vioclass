@@ -10,6 +10,7 @@ Future<void> showTwitchPredictionBetSheet({
   required BuildContext context,
   required TwitchPredictionSnapshot prediction,
   required Future<void> Function(TwitchPredictionOutcome outcome, int points) onBet,
+  Future<TwitchPredictionSnapshot?> Function()? onRefreshPrediction,
 }) {
   TwitchPredictionHermesRealtimeBus.publishPrediction(prediction);
 
@@ -19,6 +20,7 @@ Future<void> showTwitchPredictionBetSheet({
     builder: (_) => TwitchPredictionBetSheet(
       prediction: prediction,
       onBet: onBet,
+      onRefreshPrediction: onRefreshPrediction,
     ),
   );
 }
@@ -26,11 +28,13 @@ Future<void> showTwitchPredictionBetSheet({
 class TwitchPredictionBetSheet extends StatefulWidget {
   final TwitchPredictionSnapshot prediction;
   final Future<void> Function(TwitchPredictionOutcome outcome, int points) onBet;
+  final Future<TwitchPredictionSnapshot?> Function()? onRefreshPrediction;
 
   const TwitchPredictionBetSheet({
     super.key,
     required this.prediction,
     required this.onBet,
+    this.onRefreshPrediction,
   });
 
   @override
@@ -41,8 +45,10 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   final TextEditingController _pointsController = TextEditingController(text: '10');
 
   StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
+  Timer? _countdownTimer;
   late TwitchPredictionSnapshot _visiblePrediction;
   bool _submitting = false;
+  bool _refreshingGqlFallback = false;
 
   // Local viewer bet draft/optimistic state.
   //
@@ -67,11 +73,18 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         });
       },
     );
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final hasLiveTime = _visiblePrediction.locksAt != null ||
+          _visiblePrediction.endedAt != null;
+      if (hasLiveTime) setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _predictionSubscription?.cancel();
+    _countdownTimer?.cancel();
     _pointsController.dispose();
     super.dispose();
   }
@@ -156,6 +169,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     final totalUsers = prediction.totalUsers > 0
         ? prediction.totalUsers
         : prediction.outcomes.fold<int>(0, (sum, item) => sum + item.users);
+    final timeLabel = _predictionTimeLabel(prediction);
     final helperText = !isActive
         ? '這個賭盤目前不能下注'
         : hasViewerChoice
@@ -167,7 +181,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         builder: (context, constraints) {
           return TwitchUnifiedSheetScaffold(
             title: prediction.title.isEmpty ? '賭盤預測' : prediction.title,
-            subtitle: '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${_formatCompact(totalPoints)} 點 · ${_formatCompact(totalUsers)} 人',
+            subtitle: '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${_formatCompact(totalPoints)} 點 · ${_formatCompact(totalUsers)} 人${timeLabel == null ? '' : ' · $timeLabel'}',
             icon: Icons.how_to_vote_rounded,
             showRefresh: false,
             child: Padding(
@@ -184,6 +198,8 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                     totalPoints: totalPoints,
                     totalUsers: totalUsers,
                     viewerChoice: viewerChoice,
+                    timeLabel: timeLabel,
+                    refreshingGqlFallback: _refreshingGqlFallback,
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -274,6 +290,8 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
           _visiblePrediction = optimistic;
         });
       }
+
+      unawaited(_refreshPredictionFromGqlFallback());
     } catch (_) {
       _localViewerPoints = (_localViewerPoints - points).clamp(0, 1 << 62).toInt();
       if (_localViewerPoints <= 0) {
@@ -286,6 +304,37 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
       }
     }
   }
+
+  Future<void> _refreshPredictionFromGqlFallback() async {
+    final loader = widget.onRefreshPrediction;
+    if (loader == null || _refreshingGqlFallback) return;
+
+    if (mounted) {
+      setState(() => _refreshingGqlFallback = true);
+    }
+
+    try {
+      final refreshed = await loader();
+      if (!mounted || refreshed == null || !refreshed.hasPrediction) return;
+      if (!_samePredictionFamily(_visiblePrediction, refreshed)) return;
+
+      final merged = _mergeIncomingPrediction(refreshed);
+      _rememberViewerPredictionFrom(merged);
+      TwitchPredictionHermesRealtimeBus.publishPrediction(merged);
+
+      if (mounted) {
+        setState(() {
+          _visiblePrediction = merged;
+        });
+      }
+    } catch (_) {
+      // GQL fallback is best-effort. Keep optimistic/local state if it fails.
+    } finally {
+      if (mounted) {
+        setState(() => _refreshingGqlFallback = false);
+      }
+    }
+  }
 }
 
 class _PredictionMetaRow extends StatelessWidget {
@@ -293,12 +342,16 @@ class _PredictionMetaRow extends StatelessWidget {
   final int totalPoints;
   final int totalUsers;
   final TwitchPredictionOutcome? viewerChoice;
+  final String? timeLabel;
+  final bool refreshingGqlFallback;
 
   const _PredictionMetaRow({
     required this.status,
     required this.totalPoints,
     required this.totalUsers,
     this.viewerChoice,
+    this.timeLabel,
+    this.refreshingGqlFallback = false,
   });
 
   @override
@@ -310,12 +363,22 @@ class _PredictionMetaRow extends StatelessWidget {
       runSpacing: 7,
       children: [
         _PredictionChip(label: status.isEmpty ? 'ACTIVE' : status.toUpperCase()),
+        if (timeLabel != null)
+          _PredictionChip(
+            label: timeLabel!,
+            color: Colors.orangeAccent,
+          ),
         _PredictionChip(label: '${_formatCompact(totalPoints)} 點'),
         _PredictionChip(label: '${_formatCompact(totalUsers)} 人'),
         if (choice != null)
           _PredictionChip(
             label: '已下注 ${choice.title.isEmpty ? '此邊' : choice.title}',
             color: Colors.greenAccent,
+          ),
+        if (refreshingGqlFallback)
+          const _PredictionChip(
+            label: '同步中',
+            color: Color(0xFF8AB4F8),
           ),
       ],
     );
@@ -527,6 +590,59 @@ String _outcomeIdentity(TwitchPredictionOutcome outcome) {
   final id = outcome.id.trim();
   if (id.isNotEmpty) return id;
   return outcome.title.trim();
+}
+
+String? _predictionTimeLabel(TwitchPredictionSnapshot prediction) {
+  final status = prediction.normalizedStatus;
+  final now = DateTime.now();
+
+  if (status == 'ACTIVE' || status == 'OPEN') {
+    final locksAt = prediction.locksAt;
+    if (locksAt == null) return null;
+    final remaining = locksAt.difference(now);
+    if (remaining.inSeconds > 0) {
+      return '鎖盤剩 ${_formatDuration(remaining)}';
+    }
+    return '已鎖盤';
+  }
+
+  if (prediction.isLockedLike) {
+    final endedAt = prediction.endedAt;
+    if (endedAt != null) {
+      final remaining = endedAt.difference(now);
+      if (remaining.inSeconds > 0) {
+        return '結算剩 ${_formatDuration(remaining)}';
+      }
+    }
+    return '等待結算';
+  }
+
+  final endedAt = prediction.endedAt;
+  if (endedAt != null) {
+    return '結算 ${_formatClock(endedAt)}';
+  }
+
+  return null;
+}
+
+String _formatDuration(Duration value) {
+  final totalSeconds = value.inSeconds <= 0 ? 0 : value.inSeconds;
+  final hours = totalSeconds ~/ 3600;
+  final minutes = (totalSeconds % 3600) ~/ 60;
+  final seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return '${hours}h ${minutes.toString().padLeft(2, '0')}m';
+  }
+
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
+
+String _formatClock(DateTime value) {
+  final local = value.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
 }
 
 String _formatCompact(int value) {
