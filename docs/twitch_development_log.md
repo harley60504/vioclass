@@ -174,12 +174,6 @@ Commit: `46797d17b666426d5a00bd7c70e2284e9efc24ec`
 
 Commit: `bab80c4b5755ca7849364de548e28acdaa2ae4eb`
 
-### 背景
-
-PiliPlus 使用 fork/新 API 風格的 media_kit 配置，其中 `PlayerConfiguration.options` 可設定 mpv options，例如 `video-sync`、`volume-max`、`ao`、`autosync`。目前本專案使用官方 `media_kit: ^1.2.6` 與 `media_kit_video: ^2.0.1`，官方 `PlayerConfiguration` 沒有 `options` 欄位，不能直接照抄，否則會編譯失敗。
-
-官方 `media_kit_video` 支援 `VideoController(player, configuration: VideoControllerConfiguration(...))`，因此這一階段先對齊可安全使用的部分。
-
 ### 修改檔案
 
 - `lib/features/twitch/services/playback/twitch_media_kit_player_host.dart`
@@ -211,12 +205,8 @@ Commit: `8deabae81dacba1bc46f2b42573624b985eb2b8f`
   - `_localViewerOutcomeId`
   - `_localViewerPoints`
 - sheet 初始化時會記住既有 viewer prediction。
-- realtime prediction 更新進來時：
-  - 如果 incoming snapshot 明確帶 viewer choice，採用 incoming 並同步本地狀態。
-  - 如果 incoming snapshot 沒有 viewer choice，但本地已有下注狀態，將本地 viewer outcome / points merge 回 incoming。
-  - 全域總點數、比例、狀態仍會跟著 realtime 更新。
-- submit 時先 optimistic 記錄本地 outcome / points，避免送出後下一個 snapshot 把 UI 重置。
-- submit 失敗時回滾本地 points；若回到 0 則清除本地 outcome。
+- realtime prediction 更新進來時，若 incoming snapshot 沒有 viewer choice，但本地已有下注狀態，會將本地 viewer outcome / points merge 回 incoming。
+- submit 時先 optimistic 記錄本地 outcome / points；submit 失敗時回滾。
 
 ---
 
@@ -227,10 +217,6 @@ Commits:
 - `4e33a55373c0ac2d606fbb997144814dad624ae6`
 - `dd3875435ec5f2e1f6e2fc254ce58de62fe24ff2`
 
-### 背景
-
-賭盤 sheet 需要顯示鎖盤/結算時間；另外使用者下注後，即使 Hermes realtime snapshot 沒有立即帶 viewer prediction，本地 UI 也應能透過 GQL fallback 修正「我下了哪邊 / 下了多少」。WatchPage 下注後原本就會 `_refreshEngagement()`，因此可以讓 GQL snapshot 自動發布到同一個 realtime bus，而不是額外大改 WatchPage。
-
 ### 修改檔案
 
 - `lib/features/twitch/presentation/sheets/twitch_prediction_bet_sheet.dart`
@@ -238,20 +224,44 @@ Commits:
 
 ### 修改內容
 
-- `TwitchPredictionBetSheet` 新增倒數顯示：
-  - ACTIVE / OPEN：顯示 `鎖盤剩 mm:ss`。
-  - LOCKED / RESOLVE_PENDING：顯示 `結算剩 mm:ss` 或 `等待結算`。
-  - 結束後：顯示結算時間。
+- `TwitchPredictionBetSheet` 新增倒數顯示。
 - sheet 內部每秒刷新倒數，不影響其他頁面。
-- 新增 GQL fallback hook：
-  - sheet 下注後可觸發 fallback refresh。
-  - fallback 失敗時保留 optimistic / local 狀態。
 - `TwitchPredictionApiService.fetchPredictionContext(...)` 在成功解析 GQL snapshot 後，會呼叫 `TwitchPredictionHermesRealtimeBus.publishPrediction(snapshot)`。
 - 因為 WatchPage 的 `_refreshEngagement()` 本來就會呼叫 `fetchPredictionContext(...)`，下注後 GQL snapshot 會自動回灌到下注 sheet。
 
+---
+
+## Stage 118 — 賭盤 sheet 開啟即 GQL fallback，並以 StreamNook 方式推算倒數
+
+Commits:
+
+- `7609e937ba9732b9ffdf839f3ca74f4021a72379`
+- `d739dd4f55be78eea743e10b80902f9ba1c3c184`
+
+### 背景
+
+StreamNook 參考流程是「進聊天室先查 active prediction snapshot，再監聽 prediction-created / updated / locked / ended」，而 prediction event payload 概念包含 `prediction_window_seconds` 與 `created_at`。因此倒數不應只依賴 `locksAt`；若 Twitch GQL / Hermes 沒直接提供 `locksAt`，可以用 `createdAt + prediction_window_seconds` 推算鎖盤時間。
+
+### 修改檔案
+
+- `lib/features/twitch/api/engagement/twitch_prediction_api_service.dart`
+- `lib/features/twitch/presentation/sheets/twitch_prediction_bet_sheet.dart`
+
+### 修改內容
+
+- `TwitchPredictionApiService` 新增 static fallback loader：
+  - 每次 `fetchPredictionContext(channelLogin)` 成功前會註冊最後一次可用 loader。
+  - 新增 `refreshLastPredictionContext()` 供 sheet 開啟時呼叫。
+- `TwitchPredictionBetSheet.initState()` 現在會立即呼叫 GQL fallback，不再等下注後才 refresh。
+- 倒數時間改用 `_effectiveLocksAt(...)`：
+  - 優先使用 `prediction.locksAt`。
+  - 若沒有 `locksAt`，讀 `createdAt / created_at / startedAt / started_at`。
+  - 再讀 `predictionWindowSeconds / prediction_window_seconds / durationSeconds / windowSeconds` 等欄位。
+  - 成功時以 `createdAt + windowSeconds` 推算鎖盤時間。
+- 倒數 timer 也改成檢查 `_effectiveLocksAt(...)`，避免 active 但沒有 `locksAt` 時不刷新。
+
 ### 預期效果
 
-- 賭盤 sheet 可看到鎖盤或結算倒數。
-- 下注後先 optimistic 顯示本地下注意圖。
-- 後續 GQL fallback snapshot 會修正 viewer outcome / viewerPoints。
-- Hermes 與 GQL 都可更新同一個 sheet，不會彼此覆蓋掉本地下注狀態。
+- 每次打開賭盤 sheet 都會主動用 GQL snapshot 校正 viewerPoints / viewerOutcome。
+- 若 Twitch 只提供 `created_at + prediction_window_seconds`，仍能顯示 `鎖盤剩 mm:ss`。
+- Hermes realtime、GQL snapshot、local optimistic state 會透過同一個 bus 合併，不互相覆蓋。
