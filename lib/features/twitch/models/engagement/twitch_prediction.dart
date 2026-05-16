@@ -67,6 +67,63 @@ class TwitchPredictionSnapshot {
     return null;
   }
 
+  TwitchPredictionSnapshot copyWith({
+    String? id,
+    String? title,
+    String? status,
+    int? totalPoints,
+    int? totalUsers,
+    DateTime? createdAt,
+    DateTime? locksAt,
+    DateTime? endedAt,
+    String? winningOutcomeId,
+    String? viewerOutcomeId,
+    List<TwitchPredictionOutcome>? outcomes,
+    Map<String, dynamic>? rawPrediction,
+  }) {
+    return TwitchPredictionSnapshot(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      status: status ?? this.status,
+      totalPoints: totalPoints ?? this.totalPoints,
+      totalUsers: totalUsers ?? this.totalUsers,
+      createdAt: createdAt ?? this.createdAt,
+      locksAt: locksAt ?? this.locksAt,
+      endedAt: endedAt ?? this.endedAt,
+      winningOutcomeId: winningOutcomeId ?? this.winningOutcomeId,
+      viewerOutcomeId: viewerOutcomeId ?? this.viewerOutcomeId,
+      outcomes: outcomes ?? this.outcomes,
+      rawPrediction: rawPrediction ?? this.rawPrediction,
+    );
+  }
+
+  TwitchPredictionSnapshot withViewerPrediction({
+    required String outcomeId,
+    required int points,
+    bool addToExisting = true,
+  }) {
+    final safeOutcomeId = outcomeId.trim();
+    if (safeOutcomeId.isEmpty) return this;
+
+    final updatedOutcomes = outcomes.map((outcome) {
+      final isTarget = outcome.id == safeOutcomeId ||
+          (outcome.id.isEmpty && outcome.title == safeOutcomeId);
+      final nextViewerPoints = isTarget
+          ? (addToExisting ? outcome.viewerPoints + points : points)
+          : 0;
+
+      return outcome.copyWith(
+        isViewerChoice: isTarget,
+        viewerPoints: nextViewerPoints,
+      );
+    }).toList(growable: false);
+
+    return copyWith(
+      viewerOutcomeId: safeOutcomeId,
+      outcomes: updatedOutcomes,
+    );
+  }
+
   factory TwitchPredictionSnapshot.empty() {
     return const TwitchPredictionSnapshot(
       id: '',
@@ -78,8 +135,69 @@ class TwitchPredictionSnapshot {
     );
   }
 
+  factory TwitchPredictionSnapshot.fromHermesPayload(
+    Object? payload, {
+    String? viewerUserId,
+    TwitchPredictionSnapshot? previous,
+  }) {
+    final root = payload is Map ? payload.map((key, value) => MapEntry(key.toString(), value)) : <String, dynamic>{};
+    final type = root['type']?.toString();
+    final data = root['data'];
+
+    if (type == 'event-updated' && data is Map) {
+      final event = data['event'];
+      if (event is Map) {
+        return TwitchPredictionSnapshot.fromRawResponse(event)
+            ._withViewerFromHermesEvent(event, viewerUserId: viewerUserId);
+      }
+    }
+
+    if (type == 'prediction-made' && data is Map) {
+      final prediction = data['prediction'];
+      if (prediction is Map) {
+        final eventId = _readString(
+              prediction['event_id'] ?? prediction['eventID'] ?? prediction['eventId'],
+            ) ??
+            previous?.id ??
+            '';
+        final outcomeId = _readString(
+              prediction['outcome_id'] ?? prediction['outcomeID'] ?? prediction['outcomeId'],
+            ) ??
+            '';
+        final points = _readInt(prediction['points']) ?? 0;
+        final userId = _readString(prediction['user_id'] ?? prediction['userId']);
+        final viewerId = viewerUserId?.trim();
+        final isViewer = viewerId == null ||
+            viewerId.isEmpty ||
+            userId == null ||
+            userId.isEmpty ||
+            userId == viewerId;
+
+        final base = previous ??
+            TwitchPredictionSnapshot(
+              id: eventId,
+              title: '',
+              status: 'ACTIVE',
+              totalPoints: 0,
+              totalUsers: 0,
+              outcomes: const <TwitchPredictionOutcome>[],
+              rawPrediction: prediction.map((key, value) => MapEntry(key.toString(), value)),
+            );
+
+        if (!isViewer || outcomeId.isEmpty) return base;
+        return base.withViewerPrediction(outcomeId: outcomeId, points: points);
+      }
+    }
+
+    return TwitchPredictionSnapshot.fromRawResponse(root);
+  }
+
   factory TwitchPredictionSnapshot.fromRawResponse(Object? response) {
-    final root = response is Map<String, dynamic> ? response : <String, dynamic>{};
+    final root = response is Map<String, dynamic>
+        ? response
+        : response is Map
+            ? response.map((key, value) => MapEntry(key.toString(), value))
+            : <String, dynamic>{};
     final maps = _collectMaps(root);
 
     final predictionMap = maps.firstWhere(
@@ -91,7 +209,8 @@ class TwitchPredictionSnapshot {
             map.containsKey('prediction') ||
             map.containsKey('event') ||
             map.containsKey('status') ||
-            map.containsKey('title');
+            map.containsKey('title') ||
+            map.containsKey('question');
         return hasOutcomes && hasPredictionWords;
       },
       orElse: () => const <String, dynamic>{},
@@ -110,7 +229,8 @@ class TwitchPredictionSnapshot {
 
     final outcomes = rawOutcomes is List
         ? rawOutcomes
-            .whereType<Map<String, dynamic>>()
+            .whereType<Map>()
+            .map((json) => json.map((key, value) => MapEntry(key.toString(), value)))
             .map(
               (json) => TwitchPredictionOutcome.fromFlexibleJson(
                 json,
@@ -163,6 +283,43 @@ class TwitchPredictionSnapshot {
     );
   }
 
+  TwitchPredictionSnapshot _withViewerFromHermesEvent(
+    Map event, {
+    String? viewerUserId,
+  }) {
+    final viewerId = viewerUserId?.trim();
+    if (viewerId == null || viewerId.isEmpty) return this;
+
+    String? viewerOutcome;
+    int viewerPoints = 0;
+
+    final rawOutcomes = event['outcomes'];
+    if (rawOutcomes is List) {
+      for (final rawOutcome in rawOutcomes) {
+        if (rawOutcome is! Map) continue;
+        final outcomeId = _readString(rawOutcome['id'] ?? rawOutcome['outcome_id']);
+        final topPredictors = rawOutcome['top_predictors'] ?? rawOutcome['topPredictors'];
+        if (topPredictors is! List) continue;
+
+        for (final predictor in topPredictors) {
+          if (predictor is! Map) continue;
+          final userId = _readString(predictor['user_id'] ?? predictor['userId']);
+          if (userId != viewerId) continue;
+          viewerOutcome = outcomeId;
+          viewerPoints = _readInt(predictor['points']) ?? viewerPoints;
+          break;
+        }
+      }
+    }
+
+    if (viewerOutcome == null || viewerOutcome!.isEmpty) return this;
+    return withViewerPrediction(
+      outcomeId: viewerOutcome!,
+      points: viewerPoints,
+      addToExisting: false,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'hasPrediction': hasPrediction,
@@ -205,6 +362,30 @@ class TwitchPredictionOutcome {
     this.viewerPoints = 0,
     this.odds,
   });
+
+  TwitchPredictionOutcome copyWith({
+    String? id,
+    String? title,
+    String? color,
+    int? points,
+    int? users,
+    bool? isWinner,
+    bool? isViewerChoice,
+    int? viewerPoints,
+    double? odds,
+  }) {
+    return TwitchPredictionOutcome(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      color: color ?? this.color,
+      points: points ?? this.points,
+      users: users ?? this.users,
+      isWinner: isWinner ?? this.isWinner,
+      isViewerChoice: isViewerChoice ?? this.isViewerChoice,
+      viewerPoints: viewerPoints ?? this.viewerPoints,
+      odds: odds ?? this.odds,
+    );
+  }
 
   factory TwitchPredictionOutcome.fromFlexibleJson(
     Map<String, dynamic> json, {
@@ -377,7 +558,7 @@ int? _readInt(Object? value) {
   if (value == null) return null;
   if (value is int) return value;
   if (value is double) return value.round();
-  return int.tryParse(value.toString());
+  return int.tryParse(value.toString().replaceAll(',', ''));
 }
 
 double? _readDouble(Object? value) {
