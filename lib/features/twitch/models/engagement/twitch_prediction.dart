@@ -782,13 +782,17 @@ _ViewerPredictionRecord? _readViewerPredictionRecordFromObject(
     }
   }
 
-  final outcomeId = _readOutcomeIdFromObject(map) ??
-      _readOutcomeIdFromObject(map['outcome']) ??
+  // A viewer prediction record has its own prediction id in `id`, while the
+  // actual selected outcome is nested under `outcome.id`. Do not treat the
+  // record id as an outcome id, otherwise viewerOutcomeId becomes the user's
+  // Prediction id and cannot match either outcome card.
+  final outcomeId = _readOutcomeIdFromObject(map['outcome']) ??
       _readOutcomeIdFromObject(map['choice']) ??
       _readOutcomeIdFromObject(map['selectedOutcome']) ??
       _readOutcomeIdFromObject(map['selected_outcome']) ??
       _readOutcomeIdFromObject(map['predictionOption']) ??
-      _readOutcomeIdFromObject(map['prediction_option']);
+      _readOutcomeIdFromObject(map['prediction_option']) ??
+      _readDirectOutcomeIdFromRecordMap(map);
 
   if (outcomeId == null || outcomeId.isEmpty) {
     for (final key in const <String>[
@@ -812,10 +816,8 @@ _ViewerPredictionRecord? _readViewerPredictionRecordFromObject(
   );
 }
 
-String? _readOutcomeIdFromObject(Object? value) {
-  if (value is! Map) return null;
-  final map = value.map((key, value) => MapEntry(key.toString(), value));
-  final direct = _readString(
+String? _readDirectOutcomeIdFromRecordMap(Map<String, dynamic> map) {
+  return _readString(
     map['outcomeID'] ??
         map['outcomeId'] ??
         map['outcome_id'] ??
@@ -832,6 +834,12 @@ String? _readOutcomeIdFromObject(Object? value) {
         map['predictionOptionId'] ??
         map['prediction_option_id'],
   );
+}
+
+String? _readOutcomeIdFromObject(Object? value) {
+  if (value is! Map) return null;
+  final map = value.map((key, value) => MapEntry(key.toString(), value));
+  final direct = _readDirectOutcomeIdFromRecordMap(map);
   if (direct != null) return direct;
   return _readString(map['id']);
 }
