@@ -1,5 +1,6 @@
 import '../core/twitch_api_client.dart';
 import '../core/twitch_api_constants.dart';
+import '../engagement/twitch_prediction_api_service.dart';
 
 class TwitchTokenValidation {
   final String clientId;
@@ -52,7 +53,9 @@ class TwitchAuthApiService {
       },
     );
 
-    return TwitchTokenValidation.fromJson(response);
+    final validation = TwitchTokenValidation.fromJson(response);
+    TwitchPredictionApiService.rememberViewerUserId(validation.userId);
+    return validation;
   }
 
   Future<void> revokeToken(String accessToken) async {
