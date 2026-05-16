@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -75,10 +76,11 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     );
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      final hasLiveTime = _visiblePrediction.locksAt != null ||
+      final hasLiveTime = _effectiveLocksAt(_visiblePrediction) != null ||
           _visiblePrediction.endedAt != null;
       if (hasLiveTime) setState(() {});
     });
+    unawaited(_refreshPredictionFromGqlFallback());
   }
 
   @override
@@ -306,8 +308,9 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   }
 
   Future<void> _refreshPredictionFromGqlFallback() async {
-    final loader = widget.onRefreshPrediction;
-    if (loader == null || _refreshingGqlFallback) return;
+    final loader = widget.onRefreshPrediction ??
+        TwitchPredictionApiService.refreshLastPredictionContext;
+    if (_refreshingGqlFallback) return;
 
     if (mounted) {
       setState(() => _refreshingGqlFallback = true);
@@ -597,7 +600,7 @@ String? _predictionTimeLabel(TwitchPredictionSnapshot prediction) {
   final now = DateTime.now();
 
   if (status == 'ACTIVE' || status == 'OPEN') {
-    final locksAt = prediction.locksAt;
+    final locksAt = _effectiveLocksAt(prediction);
     if (locksAt == null) return null;
     final remaining = locksAt.difference(now);
     if (remaining.inSeconds > 0) {
@@ -622,6 +625,59 @@ String? _predictionTimeLabel(TwitchPredictionSnapshot prediction) {
     return '結算 ${_formatClock(endedAt)}';
   }
 
+  return null;
+}
+
+DateTime? _effectiveLocksAt(TwitchPredictionSnapshot prediction) {
+  final explicit = prediction.locksAt;
+  if (explicit != null) return explicit;
+
+  final createdAt = prediction.createdAt ??
+      _readDateFromRaw(prediction.rawPrediction, const <String>[
+        'createdAt',
+        'created_at',
+        'startedAt',
+        'started_at',
+      ]);
+  if (createdAt == null) return null;
+
+  final windowSeconds = _readIntFromRaw(prediction.rawPrediction, const <String>[
+    'predictionWindowSeconds',
+    'prediction_window_seconds',
+    'predictionWindowDurationSeconds',
+    'prediction_window_duration_seconds',
+    'durationSeconds',
+    'duration_seconds',
+    'windowSeconds',
+    'window_seconds',
+  ]);
+
+  if (windowSeconds == null || windowSeconds <= 0) return null;
+  return createdAt.add(Duration(seconds: windowSeconds));
+}
+
+DateTime? _readDateFromRaw(Map<String, dynamic>? raw, List<String> keys) {
+  if (raw == null) return null;
+  for (final key in keys) {
+    final value = raw[key];
+    final text = value?.toString();
+    if (text == null || text.trim().isEmpty) continue;
+    final parsed = DateTime.tryParse(text.trim());
+    if (parsed != null) return parsed;
+  }
+  return null;
+}
+
+int? _readIntFromRaw(Map<String, dynamic>? raw, List<String> keys) {
+  if (raw == null) return null;
+  for (final key in keys) {
+    final value = raw[key];
+    if (value == null) continue;
+    if (value is int) return value;
+    if (value is num) return value.round();
+    final parsed = int.tryParse(value.toString().replaceAll(',', '').trim());
+    if (parsed != null) return parsed;
+  }
   return null;
 }
 
