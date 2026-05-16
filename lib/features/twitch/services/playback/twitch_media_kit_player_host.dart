@@ -1,7 +1,8 @@
-// PATCH VERSION: twitch_media_kit_player_host_stage114_piliplus_like_persistent
+// PATCH VERSION: twitch_media_kit_player_host_stage115_piliplus_like_media_params
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -39,9 +40,22 @@ class TwitchMediaKitPlayerHost {
           // Twitch is always live in this WatchPage path, so use the same
           // live baseline on all platforms instead of a smaller desktop value.
           bufferSize: 16 * 1024 * 1024,
+          logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
         ),
       );
-      controller = VideoController(player);
+      controller = VideoController(
+        player,
+        configuration: const VideoControllerConfiguration(
+          // Same direction as PiliPlus: keep hardware rendering enabled and
+          // make Android surface attachment less conservative for faster first
+          // frame / fewer texture attach stalls on some devices.
+          enableHardwareAcceleration: true,
+          androidAttachSurfaceAfterVideoParameters: false,
+          // media_kit's Android default is auto-safe. Set it explicitly so the
+          // current app behavior is deterministic and easier to tune later.
+          hwdec: 'auto-safe',
+        ),
+      );
       _player = player;
       _videoController = controller;
     }
