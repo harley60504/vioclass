@@ -47,16 +47,11 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
 
   StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
   Timer? _countdownTimer;
+  Timer? _gqlFallbackTimer;
   late TwitchPredictionSnapshot _visiblePrediction;
   bool _submitting = false;
   bool _refreshingGqlFallback = false;
 
-  // Local viewer bet draft/optimistic state.
-  //
-  // Hermes event-updated packets often carry global outcome totals but may not
-  // immediately include the current viewer's prediction. Without keeping this
-  // local state, each realtime update can overwrite the sheet and make the UI
-  // look like the user's selected side / amount disappeared.
   String? _localViewerOutcomeId;
   int _localViewerPoints = 0;
 
@@ -80,6 +75,18 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
           _visiblePrediction.endedAt != null;
       if (hasLiveTime) setState(() {});
     });
+    _gqlFallbackTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || _submitting || _refreshingGqlFallback) return;
+      final status = _visiblePrediction.normalizedStatus;
+      final shouldRefresh = status == 'ACTIVE' ||
+          status == 'OPEN' ||
+          status.contains('LOCKED') ||
+          status.contains('RESOLVE_PENDING') ||
+          status.isEmpty;
+      if (shouldRefresh) {
+        unawaited(_refreshPredictionFromGqlFallback());
+      }
+    });
     unawaited(_refreshPredictionFromGqlFallback());
   }
 
@@ -87,6 +94,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   void dispose() {
     _predictionSubscription?.cancel();
     _countdownTimer?.cancel();
+    _gqlFallbackTimer?.cancel();
     _pointsController.dispose();
     super.dispose();
   }
