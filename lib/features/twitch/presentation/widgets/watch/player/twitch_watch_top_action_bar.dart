@@ -4,6 +4,7 @@ class _WatchTopActionBar extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool isFollowing;
   final bool followBusy;
+  final Player player;
   final VoidCallback onBack;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
@@ -14,12 +15,20 @@ class _WatchTopActionBar extends StatelessWidget {
     required this.metadata,
     required this.isFollowing,
     required this.followBusy,
+    required this.player,
     required this.onBack,
     required this.onToggleFollow,
     required this.onSubscribe,
     required this.onReload,
     required this.onStop,
   });
+
+  Future<void> _pauseThenBack() async {
+    try {
+      await player.pause();
+    } catch (_) {}
+    onBack();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +101,7 @@ class _WatchTopActionBar extends StatelessWidget {
                 compact: true,
                 tiny: actionTiny,
                 height: controlHeight,
-                onPressed: onBack,
+                onPressed: () => unawaited(_pauseThenBack()),
               ),
               SizedBox(width: actionGap),
               _WatchCompactAvatarTile(
@@ -114,7 +123,7 @@ class _WatchTopActionBar extends StatelessWidget {
                 tooltip: '返回',
                 icon: Icons.arrow_back,
                 height: controlHeight,
-                onPressed: onBack,
+                onPressed: () => unawaited(_pauseThenBack()),
               ),
               const SizedBox(width: 10),
               Expanded(child: infoCard),
