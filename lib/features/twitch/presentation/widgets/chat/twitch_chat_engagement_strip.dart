@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
@@ -174,6 +176,7 @@ class _PredictionCard extends StatelessWidget {
         : outcomes.fold<int>(0, (sum, outcome) => sum + outcome.points);
     final resolved = prediction.isResolvedLike;
     final canceled = prediction.isCanceledLike;
+    final active = status == 'ACTIVE' || status == 'OPEN';
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
@@ -235,6 +238,8 @@ class _PredictionCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 _PredictionStatusPill(
                   label: status,
+                  locksAt: prediction.locksAt,
+                  active: active,
                   resolved: resolved,
                   canceled: canceled,
                 ),
@@ -257,24 +262,99 @@ class _PredictionCard extends StatelessWidget {
   }
 }
 
-class _PredictionStatusPill extends StatelessWidget {
+class _PredictionStatusPill extends StatefulWidget {
   final String label;
+  final DateTime? locksAt;
+  final bool active;
   final bool resolved;
   final bool canceled;
 
   const _PredictionStatusPill({
     required this.label,
+    required this.locksAt,
+    required this.active,
     required this.resolved,
     required this.canceled,
   });
 
   @override
+  State<_PredictionStatusPill> createState() => _PredictionStatusPillState();
+}
+
+class _PredictionStatusPillState extends State<_PredictionStatusPill> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PredictionStatusPill oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.locksAt != widget.locksAt ||
+        oldWidget.active != widget.active ||
+        oldWidget.resolved != widget.resolved ||
+        oldWidget.canceled != widget.canceled) {
+      _syncTimer();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _syncTimer() {
+    _timer?.cancel();
+    _timer = null;
+
+    if (!_shouldTick) return;
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (!_shouldTick) {
+        _timer?.cancel();
+        _timer = null;
+      }
+      setState(() {});
+    });
+  }
+
+  bool get _shouldTick {
+    final locksAt = widget.locksAt;
+    if (!widget.active || widget.resolved || widget.canceled || locksAt == null) {
+      return false;
+    }
+    return locksAt.isAfter(DateTime.now());
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final color = canceled
+    final locksAt = widget.locksAt;
+    final remaining = locksAt == null ? null : locksAt.difference(DateTime.now());
+    final displayLabel = widget.active &&
+            !widget.resolved &&
+            !widget.canceled &&
+            remaining != null
+        ? remaining.inSeconds > 0
+            ? '關盤 ${_formatLockCountdown(remaining)}'
+            : '即將關盤'
+        : widget.label;
+    final urgent = widget.active &&
+        !widget.resolved &&
+        !widget.canceled &&
+        remaining != null &&
+        remaining.inSeconds <= 30;
+    final color = widget.canceled
         ? Colors.orangeAccent
-        : resolved
+        : widget.resolved
             ? Colors.greenAccent
-            : const Color(0xFFBF94FF);
+            : urgent
+                ? Colors.orangeAccent
+                : const Color(0xFFBF94FF);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -284,7 +364,9 @@ class _PredictionStatusPill extends StatelessWidget {
         border: Border.all(color: color.withOpacity(0.34)),
       ),
       child: Text(
-        label,
+        displayLabel,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: color,
           fontSize: 10.5,
@@ -577,4 +659,18 @@ String _formatCompact(int value) {
     return '${v.toStringAsFixed(v.abs() >= 10 ? 1 : 2)}k';
   }
   return value.toString();
+}
+
+String _formatLockCountdown(Duration duration) {
+  final safeSeconds = duration.inSeconds < 0 ? 0 : duration.inSeconds;
+  final hours = safeSeconds ~/ 3600;
+  final minutes = (safeSeconds % 3600) ~/ 60;
+  final seconds = safeSeconds % 60;
+
+  String two(int value) => value.toString().padLeft(2, '0');
+
+  if (hours > 0) {
+    return '$hours:${two(minutes)}:${two(seconds)}';
+  }
+  return '$minutes:${two(seconds)}';
 }
