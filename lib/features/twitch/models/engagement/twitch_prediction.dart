@@ -224,12 +224,17 @@ class TwitchPredictionSnapshot {
       return TwitchPredictionSnapshot.empty();
     }
 
+    final predictionId = _readPredictionId(predictionMap);
     final rawOutcomes = predictionMap['outcomes'] ??
         predictionMap['choices'] ??
         predictionMap['predictionOptions'] ??
         predictionMap['prediction_options'];
 
-    final viewerPrediction = _readViewerPredictionRecord(predictionMap, maps);
+    final viewerPrediction = _readViewerPredictionRecord(
+      predictionMap,
+      maps,
+      eventId: predictionId,
+    );
     final winningOutcomeId = _readWinningOutcomeId(predictionMap);
     final viewerOutcomeId = _readViewerOutcomeId(predictionMap) ??
         viewerPrediction?.outcomeId;
@@ -264,16 +269,7 @@ class TwitchPredictionSnapshot {
         : const <TwitchPredictionOutcome>[];
 
     return TwitchPredictionSnapshot(
-      id: _readString(
-            predictionMap['id'] ??
-                predictionMap['eventID'] ??
-                predictionMap['eventId'] ??
-                predictionMap['event_id'] ??
-                predictionMap['predictionID'] ??
-                predictionMap['predictionId'] ??
-                predictionMap['prediction_id'],
-          ) ??
-          '',
+      id: predictionId ?? '',
       title: _readString(predictionMap['title'] ?? predictionMap['question']) ?? '',
       status: _readString(predictionMap['status'] ?? predictionMap['state']) ?? '',
       totalPoints: _readInt(
@@ -545,8 +541,11 @@ Map<String, dynamic> _findPredictionMap(List<Map<String, dynamic>> maps) {
     if (map.containsKey('event')) score += 1;
     if (map.containsKey('status') || map.containsKey('state')) score += 3;
     if (map.containsKey('title') || map.containsKey('question')) score += 3;
-    if (_readViewerPredictionRecord(map, maps) != null) score += 4;
-    if (_readString(map['id'] ?? map['eventID'] ?? map['eventId']) != null) score += 2;
+    final predictionId = _readPredictionId(map);
+    if (_readViewerPredictionRecord(map, maps, eventId: predictionId) != null) {
+      score += 4;
+    }
+    if (predictionId != null) score += 2;
 
     if (score > bestScore) {
       best = map;
@@ -581,6 +580,24 @@ List<Map<String, dynamic>> _collectMaps(Object? value) {
 
   visit(value);
   return output;
+}
+
+String? _readPredictionId(Map<String, dynamic> predictionMap) {
+  return _readString(
+    predictionMap['id'] ??
+        predictionMap['eventID'] ??
+        predictionMap['eventId'] ??
+        predictionMap['event_id'] ??
+        predictionMap['predictionID'] ??
+        predictionMap['predictionId'] ??
+        predictionMap['prediction_id'],
+  );
+}
+
+String? _readPredictionIdFromObject(Object? value) {
+  if (value is! Map) return null;
+  final map = value.map((key, value) => MapEntry(key.toString(), value));
+  return _readPredictionId(map);
 }
 
 String? _readWinningOutcomeId(Map<String, dynamic> predictionMap) {
@@ -641,8 +658,9 @@ String? _readViewerOutcomeId(Map<String, dynamic> predictionMap) {
 
 _ViewerPredictionRecord? _readViewerPredictionRecord(
   Map<String, dynamic> predictionMap,
-  List<Map<String, dynamic>> maps,
-) {
+  List<Map<String, dynamic>> maps, {
+  String? eventId,
+}) {
   final directOutcome = _readViewerOutcomeIdWithoutNested(predictionMap);
   if (directOutcome != null) {
     return _ViewerPredictionRecord(
@@ -669,11 +687,16 @@ _ViewerPredictionRecord? _readViewerPredictionRecord(
       'viewerPredictionEvent',
       'viewer_prediction_event',
     ]) {
-      final record = _readViewerPredictionRecordFromObject(map[key]);
+      final record = _readViewerPredictionRecordFromObject(
+        map[key],
+        eventId: eventId,
+      );
       if (record != null) return record;
     }
 
     for (final key in const <String>[
+      'recentPredictions',
+      'recent_predictions',
       'viewerPredictions',
       'viewer_predictions',
       'myPredictions',
@@ -686,7 +709,10 @@ _ViewerPredictionRecord? _readViewerPredictionRecord(
       final value = map[key];
       if (value is List) {
         for (final item in value) {
-          final record = _readViewerPredictionRecordFromObject(item);
+          final record = _readViewerPredictionRecordFromObject(
+            item,
+            eventId: eventId,
+          );
           if (record != null) return record;
         }
       }
@@ -717,10 +743,16 @@ String? _readViewerOutcomeIdWithoutNested(Map<String, dynamic> predictionMap) {
   return null;
 }
 
-_ViewerPredictionRecord? _readViewerPredictionRecordFromObject(Object? value) {
+_ViewerPredictionRecord? _readViewerPredictionRecordFromObject(
+  Object? value, {
+  String? eventId,
+}) {
   if (value is List) {
     for (final item in value) {
-      final record = _readViewerPredictionRecordFromObject(item);
+      final record = _readViewerPredictionRecordFromObject(
+        item,
+        eventId: eventId,
+      );
       if (record != null) return record;
     }
     return null;
@@ -729,6 +761,27 @@ _ViewerPredictionRecord? _readViewerPredictionRecordFromObject(Object? value) {
   if (value is! Map) return null;
 
   final map = value.map((key, value) => MapEntry(key.toString(), value));
+  final expectedEventId = eventId?.trim();
+  if (expectedEventId != null && expectedEventId.isNotEmpty) {
+    final recordEventId = _readString(
+          map['eventID'] ??
+              map['eventId'] ??
+              map['event_id'] ??
+              map['predictionEventID'] ??
+              map['predictionEventId'] ??
+              map['prediction_event_id'],
+        ) ??
+        _readPredictionIdFromObject(map['event']) ??
+        _readPredictionIdFromObject(map['predictionEvent']) ??
+        _readPredictionIdFromObject(map['prediction_event']);
+
+    if (recordEventId != null &&
+        recordEventId.trim().isNotEmpty &&
+        recordEventId.trim() != expectedEventId) {
+      return null;
+    }
+  }
+
   final outcomeId = _readOutcomeIdFromObject(map) ??
       _readOutcomeIdFromObject(map['outcome']) ??
       _readOutcomeIdFromObject(map['choice']) ??
@@ -744,7 +797,10 @@ _ViewerPredictionRecord? _readViewerPredictionRecordFromObject(Object? value) {
       'prediction_event',
       'event',
     ]) {
-      final nested = _readViewerPredictionRecordFromObject(map[key]);
+      final nested = _readViewerPredictionRecordFromObject(
+        map[key],
+        eventId: eventId,
+      );
       if (nested != null) return nested;
     }
     return null;
