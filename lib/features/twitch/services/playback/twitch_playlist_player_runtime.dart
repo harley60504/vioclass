@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_playlist_player_runtime_same_proxy_route_v41
+// PATCH VERSION: twitch_playlist_player_runtime_android_startup_safe_quality_v42
 
 import 'dart:async';
 
@@ -24,6 +24,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
   };
+
+  // Android tablets are sensitive to first-frame decoder / texture warm-up.
+  // Keep proxy behavior unchanged, but avoid defaulting mobile startup to
+  // Source/chunked when a clean 720p-or-lower variant is available.
+  static const int _mobileStartupTargetHeight = 720;
+  static const int _mobileStartupMaxFps = 60;
 
   TwitchPlaylistPlayerRuntime({
     required this.playbackApi,
@@ -470,10 +476,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
                 ? cleanVariants
                 : variants.toList();
 
+    if (_prefersMobileStartupSafeQuality) {
+      final startupSafeVariant = _selectMobileStartupSafeVariant(preferredPool);
+      if (startupSafeVariant != null) return startupSafeVariant;
+    }
+
     TwitchM3u8Variant? source;
     for (final variant in preferredPool) {
-      final text = '${variant.name} ${variant.videoGroupId ?? ''}'.toLowerCase();
-      if (text.contains('source') || text.contains('chunked')) {
+      if (_isSourceLikeVariant(variant)) {
         source = variant;
         break;
       }
@@ -483,6 +493,78 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
     final sorted = _sortVariants(preferredPool);
     return sorted.first;
+  }
+
+  bool get _prefersMobileStartupSafeQuality {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
+    }
+  }
+
+  bool _isSourceLikeVariant(TwitchM3u8Variant variant) {
+    final text = '${variant.name} ${variant.videoGroupId ?? ''}'.toLowerCase();
+    return text.contains('source') || text.contains('chunked');
+  }
+
+  TwitchM3u8Variant? _selectMobileStartupSafeVariant(
+    List<TwitchM3u8Variant> variants,
+  ) {
+    final videoVariants = variants.where((variant) => !variant.isAudioOnly).toList();
+    if (videoVariants.isEmpty) return null;
+
+    final nonSourceVideoVariants = videoVariants
+        .where((variant) => !_isSourceLikeVariant(variant))
+        .toList();
+    final candidates = nonSourceVideoVariants.isNotEmpty
+        ? nonSourceVideoVariants
+        : videoVariants;
+
+    final capped = candidates.where((variant) {
+      final height = variant.height;
+      final fps = variant.fpsRounded;
+      return height > 0 &&
+          height <= _mobileStartupTargetHeight &&
+          (fps == 0 || fps <= _mobileStartupMaxFps);
+    }).toList();
+
+    if (capped.isNotEmpty) {
+      return _sortVariants(capped).first;
+    }
+
+    final measurable = candidates.where((variant) => variant.height > 0).toList();
+    if (measurable.isEmpty) {
+      return _sortVariants(candidates).first;
+    }
+
+    measurable.sort((a, b) {
+      final aAboveTarget = a.height > _mobileStartupTargetHeight;
+      final bAboveTarget = b.height > _mobileStartupTargetHeight;
+      if (aAboveTarget != bAboveTarget) return aAboveTarget ? 1 : -1;
+
+      final aDistance = (a.height - _mobileStartupTargetHeight).abs();
+      final bDistance = (b.height - _mobileStartupTargetHeight).abs();
+      if (aDistance != bDistance) return aDistance.compareTo(bDistance);
+
+      final aFpsPenalty = a.fpsRounded > _mobileStartupMaxFps ? 1 : 0;
+      final bFpsPenalty = b.fpsRounded > _mobileStartupMaxFps ? 1 : 0;
+      if (aFpsPenalty != bFpsPenalty) return aFpsPenalty.compareTo(bFpsPenalty);
+
+      if (a.hasAds != b.hasAds) return a.hasAds ? 1 : -1;
+
+      final bandwidthCompare = (b.bandwidth ?? 0).compareTo(a.bandwidth ?? 0);
+      if (bandwidthCompare != 0) return bandwidthCompare;
+
+      return a.name.compareTo(b.name);
+    });
+
+    return measurable.first;
   }
 
   TwitchM3u8Variant? _findVariantByName(
