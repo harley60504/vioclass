@@ -42,10 +42,11 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     final base = selectedBaseEmote;
     final choosingModifier = mode == ChannelPointEmoteOverlayMode.modify && base != null;
+
     return Material(
-      color: Colors.black.withOpacity(0.36),
+      color: Colors.black.withOpacity(0.48),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(10, 54, 10, 10),
+        margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: const Color(0xFF18181B),
           borderRadius: BorderRadius.circular(16),
@@ -61,93 +62,139 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-              decoration: const BoxDecoration(
-                color: Color(0xFF18181B),
-                border: Border(bottom: BorderSide(color: Color(0xFF2A2A2D))),
-              ),
-              child: Row(
-                children: [
-                  if (onBack != null)
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 420;
+                final searchField = SizedBox(
+                  height: 38,
+                  child: TextField(
+                    onChanged: choosingModifier ? null : onQueryChanged,
+                    enabled: !choosingModifier,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      hintText: choosingModifier ? '選擇修改效果' : '搜尋名稱或 emote ID',
+                      hintStyle: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 13,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: Colors.white54,
+                        size: 18,
+                      ),
+                      prefixIconConstraints: const BoxConstraints(
+                        minWidth: 34,
+                        minHeight: 34,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF0E0E10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 8,
+                      ),
+                    ),
+                  ),
+                );
+
+                final actionButtons = Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     IconButton(
-                      tooltip: '返回',
+                      tooltip: '重新載入',
                       visualDensity: VisualDensity.compact,
-                      onPressed: onBack,
+                      onPressed: loading ? null : onReload,
+                      icon: loading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(
+                              Icons.refresh_rounded,
+                              color: Colors.white70,
+                              size: 20,
+                            ),
+                    ),
+                    IconButton(
+                      tooltip: '關閉',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onClose,
                       icon: const Icon(
-                        Icons.arrow_back_rounded,
+                        Icons.close_rounded,
                         color: Colors.white70,
                         size: 20,
                       ),
                     ),
-                  Expanded(
-                    child: SizedBox(
-                      height: 38,
-                      child: TextField(
-                        onChanged: choosingModifier ? null : onQueryChanged,
-                        enabled: !choosingModifier,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
-                        decoration: InputDecoration(
-                          isDense: true,
-                          hintText: choosingModifier
-                              ? '選擇修改效果'
-                              : '搜尋名稱或 emote ID',
-                          hintStyle: const TextStyle(
-                            color: Colors.white38,
-                            fontSize: 13,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            color: Colors.white54,
-                            size: 18,
-                          ),
-                          prefixIconConstraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 34,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFF0E0E10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 8,
-                          ),
+                  ],
+                );
+
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF18181B),
+                    border: Border(bottom: BorderSide(color: Color(0xFF2A2A2D))),
+                  ),
+                  child: compact
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                if (onBack != null)
+                                  IconButton(
+                                    tooltip: '返回',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: onBack,
+                                    icon: const Icon(
+                                      Icons.arrow_back_rounded,
+                                      color: Colors.white70,
+                                      size: 20,
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    rewardTitle.isEmpty ? '選擇 emote' : rewardTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                actionButtons,
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            searchField,
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            if (onBack != null)
+                              IconButton(
+                                tooltip: '返回',
+                                visualDensity: VisualDensity.compact,
+                                onPressed: onBack,
+                                icon: const Icon(
+                                  Icons.arrow_back_rounded,
+                                  color: Colors.white70,
+                                  size: 20,
+                                ),
+                              ),
+                            Expanded(child: searchField),
+                            const SizedBox(width: 6),
+                            actionButtons,
+                          ],
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  IconButton(
-                    tooltip: '重新載入',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: loading ? null : onReload,
-                    icon: loading
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(
-                            Icons.refresh_rounded,
-                            color: Colors.white70,
-                            size: 20,
-                          ),
-                  ),
-                  IconButton(
-                    tooltip: '關閉',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: onClose,
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             Expanded(
               child: loading
@@ -190,65 +237,78 @@ class _EmoteGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 0.78,
-      ),
-      itemCount: emotes.length,
-      itemBuilder: (context, index) {
-        final emote = emotes[index];
-        return InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => onSelected(emote),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF242429),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.22)),
-            ),
-            child: Column(
-              children: [
-                Expanded(
-                  child: Image.network(
-                    emote.imageUrl,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.low,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.emoji_emotions,
-                      color: Colors.white54,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  emote.token,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  emote.id,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white38,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth >= 760
+            ? 6
+            : constraints.maxWidth >= 560
+                ? 5
+                : constraints.maxWidth >= 420
+                    ? 4
+                    : 3;
+        final itemExtent = constraints.maxWidth < 420 ? 104.0 : 118.0;
+
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            mainAxisExtent: itemExtent,
           ),
+          itemCount: emotes.length,
+          itemBuilder: (context, index) {
+            final emote = emotes[index];
+            return InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => onSelected(emote),
+              child: Container(
+                padding: EdgeInsets.all(constraints.maxWidth < 420 ? 6 : 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF242429),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.22)),
+                ),
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: Image.network(
+                        emote.imageUrl,
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.low,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.emoji_emotions,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      emote.token,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: constraints.maxWidth < 420 ? 10 : 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      emote.id,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: constraints.maxWidth < 420 ? 8 : 9,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -334,14 +394,14 @@ class _OverlayMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: Colors.white38, size: 44),
-            const SizedBox(height: 12),
+            Icon(icon, color: Colors.white30, size: 32),
+            const SizedBox(height: 10),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white60,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
