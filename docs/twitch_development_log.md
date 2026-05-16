@@ -221,3 +221,44 @@ PiliPlus 使用 fork/新 API 風格的 media_kit 配置，其中 `PlayerConfigur
 2. 離開播放頁後再進，確認 shared player 仍可重用。
 3. 若 Android 出現黑畫面或首幀不出來，優先回退 `androidAttachSurfaceAfterVideoParameters: false`。
 4. 若特定平板解碼異常，再測 `hwdec: 'auto'` 或移除 explicit hwdec 使用 media_kit 預設。
+
+---
+
+## Stage 116 — 保留賭盤下注本地狀態，避免 realtime 更新覆蓋
+
+Commit: `8deabae81dacba1bc46f2b42573624b985eb2b8f`
+
+### 背景
+
+當 Twitch 賭盤開啟並持續收到 Hermes / GQL realtime snapshot 時，下注 sheet 會更新 `_visiblePrediction`。部分 snapshot 只帶全域 outcome totals，不一定立即帶目前 viewer 的下注結果，造成使用者剛下注後 UI 顯示的「下注哪邊」和「下注多少」被新 snapshot 洗掉。
+
+### 修改檔案
+
+- `lib/features/twitch/presentation/sheets/twitch_prediction_bet_sheet.dart`
+
+### 修改內容
+
+- 新增本地 viewer bet 狀態：
+  - `_localViewerOutcomeId`
+  - `_localViewerPoints`
+- sheet 初始化時會記住既有 viewer prediction。
+- realtime prediction 更新進來時：
+  - 如果 incoming snapshot 明確帶 viewer choice，採用 incoming 並同步本地狀態。
+  - 如果 incoming snapshot 沒有 viewer choice，但本地已有下注狀態，將本地 viewer outcome / points merge 回 incoming。
+  - 全域總點數、比例、狀態仍會跟著 realtime 更新。
+- submit 時先 optimistic 記錄本地 outcome / points，避免送出後下一個 snapshot 把 UI 重置。
+- submit 失敗時回滾本地 points；若回到 0 則清除本地 outcome。
+
+### 預期效果
+
+- 下注後不會因為 realtime 更新而把「已下注」狀態壓掉。
+- 已下注邊、我的點數、鎖住另一邊的 UI 會保持穩定。
+- outcome 總點數、使用者數、賠率、百分比仍會持續刷新。
+
+### 測試建議
+
+1. 開啟正在 ACTIVE 的賭盤 sheet。
+2. 輸入下注點數並點其中一邊下注。
+3. 在其他觀眾下注造成比例更新時，確認自己的已下注邊與點數不會消失。
+4. 確認另一邊會維持鎖住，只能加注同一邊。
+5. 若下注 API 失敗，確認不會永久保留錯誤的 optimistic bet。
