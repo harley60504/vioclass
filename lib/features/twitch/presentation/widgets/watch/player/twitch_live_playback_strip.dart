@@ -21,6 +21,10 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   static const Duration _liveEdgeSeekBackoff = Duration(milliseconds: 350);
   static const Duration _liveSeekVerifyDelay = Duration(milliseconds: 420);
   static const Duration _liveSeekSuccessTolerance = Duration(milliseconds: 2200);
+  static const bool _liveSeekProbeEnabled = bool.fromEnvironment(
+    'TWITCH_LIVE_SEEK_PROBE',
+    defaultValue: false,
+  );
   static const List<Duration> _liveSeekBackoffCandidates = <Duration>[
     Duration(milliseconds: 1200),
     Duration(milliseconds: 1800),
@@ -192,6 +196,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   }
 
   void _appendLiveSeekProbeLine(List<String> lines, String line) {
+    if (!_liveSeekProbeEnabled) return;
     lines.add(line);
     debugPrint('[TwitchLiveSeek] $line');
   }
