@@ -1,4 +1,5 @@
 import '../../models/engagement/twitch_prediction.dart';
+import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../core/twitch_api_constants.dart';
 import '../core/twitch_web_gql_persisted_api_service.dart';
 
@@ -18,7 +19,11 @@ class TwitchPredictionApiService {
       count: count,
     );
 
-    return TwitchPredictionSnapshot.fromRawResponse(raw.response);
+    final snapshot = TwitchPredictionSnapshot.fromRawResponse(raw.response);
+    if (snapshot.hasPrediction) {
+      TwitchPredictionHermesRealtimeBus.publishPrediction(snapshot);
+    }
+    return snapshot;
   }
 
   Future<TwitchWebGqlPersistedResult> fetchPredictionContextRaw({
