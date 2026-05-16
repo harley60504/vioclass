@@ -60,6 +60,7 @@ class TwitchMediaKitPlayerHost {
     bool play = true,
     bool forceOpen = false,
   }) async {
+    if (session._released) return;
     if (session.generation != _generation) {
       throw StateError('Stale Twitch media_kit player session.');
     }
@@ -70,14 +71,19 @@ class TwitchMediaKitPlayerHost {
     }
 
     if (!forceOpen && _currentMediaUri == safeUri) {
-      if (play && !session.player.state.playing) {
+      if (play && !session.player.state.playing && !session._released) {
         await session.player.play();
       }
       return;
     }
 
+    if (session._released) return;
     await session.player.open(Media(safeUri), play: play);
-    _currentMediaUri = safeUri;
+    if (!session._released) {
+      _currentMediaUri = safeUri;
+    } else {
+      unawaited(session.player.pause().catchError((_) {}));
+    }
   }
 
   static Future<void> pauseCurrent(TwitchMediaKitPlayerSession session) async {
@@ -94,13 +100,17 @@ class TwitchMediaKitPlayerHost {
   static void _release(TwitchMediaKitPlayerSession session) {
     if (session.generation != _generation) return;
 
+    // Always pause when a WatchPage releases its session. This prevents audio
+    // from continuing on the home/discovery page when the native player is kept
+    // alive for reuse, and also protects against leaked/overlapping ref counts.
+    unawaited(session.player.pause().catchError((_) {}));
+
     _refCount = (_refCount - 1).clamp(0, 1 << 20).toInt();
     if (_refCount > 0) return;
 
-    // Keep the native player and current media attached. Only pause audio when
-    // the last WatchPage leaves, so returning to a page can resume the same
-    // local source instead of reopening media_kit.
-    unawaited(session.player.pause().catchError((_) {}));
+    // Keep the native player and current media attached after the last
+    // WatchPage leaves. Re-entering a stream can resume the same local source
+    // without rebuilding media_kit, but audio stays paused while off-page.
   }
 
   static Future<void> disposeNow() async {
