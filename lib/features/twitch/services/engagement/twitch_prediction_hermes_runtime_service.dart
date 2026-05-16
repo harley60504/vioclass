@@ -46,6 +46,7 @@ class TwitchPredictionHermesRuntimeService {
   bool _connected = false;
   String? _viewerUserId;
   TwitchPredictionSnapshot? _lastPrediction;
+  _HermesViewerPredictionRecord? _pendingViewerPrediction;
   TwitchHermesPredictionHandler? _onPrediction;
   TwitchHermesBalanceHandler? _onBalance;
   TwitchHermesStatusHandler? _onStatus;
@@ -73,9 +74,9 @@ class TwitchPredictionHermesRuntimeService {
 
     final generation = ++_generation;
     _viewerUserId = safeViewerId == null || safeViewerId.isEmpty ? null : safeViewerId;
-    _lastPrediction = previousPrediction;
-    if (previousPrediction != null && previousPrediction.hasPrediction) {
-      TwitchPredictionHermesRealtimeBus.publishPrediction(previousPrediction);
+    _lastPrediction = _applyPendingViewerPrediction(previousPrediction);
+    if (_lastPrediction != null && _lastPrediction!.hasPrediction) {
+      TwitchPredictionHermesRealtimeBus.publishPrediction(_lastPrediction);
     }
     _onPrediction = onPrediction;
     _onBalance = onBalance;
@@ -114,6 +115,7 @@ class TwitchPredictionHermesRuntimeService {
       _subscribe('predictions-channel-v1.$safeChannelId');
       if (_viewerUserId != null) {
         _subscribe('community-points-user-v1.$_viewerUserId');
+        _subscribe('predictions-user-v1.$_viewerUserId');
       }
 
       _emitStatus('Hermes prediction subscribed');
@@ -238,6 +240,10 @@ class TwitchPredictionHermesRuntimeService {
       }
     }
 
+    if (lowerTopic.contains('predictions-user-v1')) {
+      _handleUserPredictionPayload(payload);
+    }
+
     if (lowerTopic.contains('predictions-channel-v1') ||
         eventType == 'event-updated' ||
         eventType == 'prediction-made') {
@@ -248,11 +254,43 @@ class TwitchPredictionHermesRuntimeService {
       );
 
       if (next.hasPrediction) {
-        _lastPrediction = next;
-        TwitchPredictionHermesRealtimeBus.publishPrediction(next);
-        _onPrediction?.call(next);
+        final merged = _applyPendingViewerPrediction(next) ?? next;
+        _lastPrediction = merged;
+        TwitchPredictionHermesRealtimeBus.publishPrediction(merged);
+        _onPrediction?.call(merged);
       }
     }
+  }
+
+  void _handleUserPredictionPayload(Map<dynamic, dynamic> payload) {
+    final record = _readViewerPredictionRecord(payload);
+    if (record == null || record.outcomeId.trim().isEmpty) return;
+
+    _pendingViewerPrediction = record;
+
+    final base = _lastPrediction ?? TwitchPredictionHermesRealtimeBus.latestPrediction;
+    final merged = _applyPendingViewerPrediction(base);
+    if (merged == null || !merged.hasPrediction) return;
+
+    _lastPrediction = merged;
+    TwitchPredictionHermesRealtimeBus.publishPrediction(merged);
+    _onPrediction?.call(merged);
+  }
+
+  TwitchPredictionSnapshot? _applyPendingViewerPrediction(
+    TwitchPredictionSnapshot? prediction,
+  ) {
+    final record = _pendingViewerPrediction;
+    if (prediction == null || record == null) return prediction;
+    if (!prediction.hasPrediction || record.outcomeId.trim().isEmpty) {
+      return prediction;
+    }
+
+    return prediction.withViewerPrediction(
+      outcomeId: record.outcomeId,
+      points: record.points,
+      addToExisting: false,
+    );
   }
 
   int? _readBalance(Map<dynamic, dynamic> payload) {
@@ -268,6 +306,101 @@ class TwitchPredictionHermesRuntimeService {
     }
 
     return _readInt(payload['balance'] ?? payload['points'] ?? payload['value']);
+  }
+
+  _HermesViewerPredictionRecord? _readViewerPredictionRecord(Object? payload) {
+    final maps = <Map<String, dynamic>>[];
+
+    void collect(Object? value) {
+      if (value is Map<String, dynamic>) {
+        maps.add(value);
+        for (final item in value.values) {
+          collect(item);
+        }
+      } else if (value is Map) {
+        final map = value.map((key, value) => MapEntry(key.toString(), value));
+        maps.add(map);
+        for (final item in map.values) {
+          collect(item);
+        }
+      } else if (value is List) {
+        for (final item in value) {
+          collect(item);
+        }
+      }
+    }
+
+    collect(payload);
+
+    _HermesViewerPredictionRecord? fallback;
+
+    for (final map in maps) {
+      final outcomeId = _readOutcomeId(map) ??
+          _readOutcomeIdFromObject(map['outcome']) ??
+          _readOutcomeIdFromObject(map['choice']) ??
+          _readOutcomeIdFromObject(map['selectedOutcome']) ??
+          _readOutcomeIdFromObject(map['selected_outcome']) ??
+          _readOutcomeIdFromObject(map['predictionOption']) ??
+          _readOutcomeIdFromObject(map['prediction_option']);
+
+      if (outcomeId == null || outcomeId.trim().isEmpty) continue;
+
+      final points = _readViewerPredictionPoints(map) ?? 0;
+      final record = _HermesViewerPredictionRecord(
+        outcomeId: outcomeId.trim(),
+        points: points,
+      );
+
+      if (points > 0) return record;
+      fallback ??= record;
+    }
+
+    return fallback;
+  }
+
+  String? _readOutcomeId(Map<String, dynamic> map) {
+    return _readString(
+      map['outcomeID'] ??
+          map['outcomeId'] ??
+          map['outcome_id'] ??
+          map['selectedOutcomeId'] ??
+          map['selectedOutcomeID'] ??
+          map['selected_outcome_id'] ??
+          map['choiceID'] ??
+          map['choiceId'] ??
+          map['choice_id'] ??
+          map['optionID'] ??
+          map['optionId'] ??
+          map['option_id'] ??
+          map['predictionOptionID'] ??
+          map['predictionOptionId'] ??
+          map['prediction_option_id'],
+    );
+  }
+
+  String? _readOutcomeIdFromObject(Object? value) {
+    if (value is! Map) return null;
+    return _readOutcomeId(value.map((key, value) => MapEntry(key.toString(), value)));
+  }
+
+  int? _readViewerPredictionPoints(Map<String, dynamic> map) {
+    return _readInt(
+      map['points'] ??
+          map['channelPoints'] ??
+          map['channel_points'] ??
+          map['viewerPoints'] ??
+          map['viewer_points'] ??
+          map['predictedPoints'] ??
+          map['predicted_points'] ??
+          map['amount'] ??
+          map['value'],
+    );
+  }
+
+  String? _readString(Object? value) {
+    final text = value?.toString();
+    if (text == null || text.trim().isEmpty) return null;
+    return text.trim();
   }
 
   int? _readInt(Object? value) {
@@ -288,4 +421,14 @@ class TwitchPredictionHermesRuntimeService {
       (_) => random.nextInt(16).toRadixString(16),
     ).join();
   }
+}
+
+class _HermesViewerPredictionRecord {
+  final String outcomeId;
+  final int points;
+
+  const _HermesViewerPredictionRecord({
+    required this.outcomeId,
+    required this.points,
+  });
 }
