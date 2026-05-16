@@ -169,6 +169,7 @@ class TwitchPredictionHermesRuntimeService {
 
       _subscribe('predictions-channel-v1.$safeChannelId');
       if (_viewerUserId != null) {
+        _subscribe('predictions-user-v1.$_viewerUserId');
         _subscribe('community-points-user-v1.$_viewerUserId');
       }
 
@@ -294,29 +295,49 @@ class TwitchPredictionHermesRuntimeService {
       }
     }
 
-    final isPredictionTopic = lowerTopic.contains('predictions-channel-v1');
-    if (isPredictionTopic || _isPredictionEventType(eventType)) {
-      _handlePredictionPayload(payload, eventType: eventType);
+    final isChannelPredictionTopic =
+        lowerTopic.contains('predictions-channel-v1');
+    final isUserPredictionTopic = lowerTopic.contains('predictions-user-v1');
+    if (isChannelPredictionTopic ||
+        isUserPredictionTopic ||
+        _isPredictionEventType(eventType)) {
+      _handlePredictionPayload(
+        payload,
+        eventType: eventType,
+        scopedToViewer: isUserPredictionTopic,
+      );
     }
   }
 
   void _handlePredictionPayload(
     Map<dynamic, dynamic> payload, {
     required String? eventType,
+    bool scopedToViewer = false,
   }) {
     final type = eventType?.trim().toLowerCase() ?? '';
 
-    if (type == 'prediction-made') {
-      final viewerPrediction = _readViewerPredictionMade(payload);
-      final base = _lastPrediction;
-      if (viewerPrediction == null || base == null || !base.hasPrediction) return;
-      final next = base.withViewerPrediction(
-        outcomeId: viewerPrediction.outcomeId,
-        points: viewerPrediction.points,
-        addToExisting: true,
+    if (scopedToViewer || type == 'prediction-made') {
+      final viewerPrediction = _readViewerPredictionMade(
+        payload,
+        scopedToViewer: scopedToViewer,
       );
-      _publishPrediction(next);
-      return;
+      final base = _lastPrediction;
+      if (viewerPrediction != null && base != null && base.hasPrediction) {
+        final sameEvent = viewerPrediction.eventId == null ||
+            viewerPrediction.eventId!.trim().isEmpty ||
+            base.id.trim().isEmpty ||
+            viewerPrediction.eventId!.trim() == base.id.trim();
+        if (sameEvent) {
+          final next = base.withViewerPrediction(
+            outcomeId: viewerPrediction.outcomeId,
+            points: viewerPrediction.points,
+            addToExisting: viewerPrediction.addToExisting,
+          );
+          _publishPrediction(next);
+          return;
+        }
+      }
+      if (type == 'prediction-made') return;
     }
 
     final normalizedPayload = _normalizePredictionPayload(payload);
@@ -364,7 +385,10 @@ class TwitchPredictionHermesRuntimeService {
         type == 'prediction-ended' ||
         type == 'prediction-resolved' ||
         type == 'prediction-canceled' ||
-        type == 'prediction-cancelled';
+        type == 'prediction-cancelled' ||
+        type == 'user-prediction-made' ||
+        type == 'user-prediction-updated' ||
+        type == 'prediction-result';
   }
 
   Map<String, dynamic>? _normalizePredictionPayload(Map<dynamic, dynamic> payload) {
@@ -381,40 +405,144 @@ class TwitchPredictionHermesRuntimeService {
     };
   }
 
-  _HermesViewerPrediction? _readViewerPredictionMade(Map<dynamic, dynamic> payload) {
+  _HermesViewerPrediction? _readViewerPredictionMade(
+    Map<dynamic, dynamic> payload, {
+    bool scopedToViewer = false,
+  }) {
     final viewerId = _viewerUserId?.trim();
-    if (viewerId == null || viewerId.isEmpty) return null;
+    if (!scopedToViewer && (viewerId == null || viewerId.isEmpty)) return null;
+
+    final candidates = <Object?>[
+      payload,
+      payload['data'],
+      payload['prediction'],
+      payload['user_prediction'],
+      payload['userPrediction'],
+      payload['prediction_result'],
+      payload['predictionResult'],
+    ];
 
     final data = payload['data'];
-    if (data is! Map) return null;
+    if (data is Map) {
+      candidates.addAll(<Object?>[
+        data['prediction'],
+        data['user_prediction'],
+        data['userPrediction'],
+        data['prediction_result'],
+        data['predictionResult'],
+        data['event'],
+      ]);
+    }
 
-    final prediction = data['prediction'] ?? data['user_prediction'];
-    if (prediction is! Map) return null;
+    for (final candidate in candidates) {
+      final result = _readViewerPredictionFromObject(
+        candidate,
+        scopedToViewer: scopedToViewer,
+        viewerId: viewerId,
+      );
+      if (result != null) return result;
+    }
 
+    return null;
+  }
+
+  _HermesViewerPrediction? _readViewerPredictionFromObject(
+    Object? value, {
+    required bool scopedToViewer,
+    required String? viewerId,
+  }) {
+    if (value is List) {
+      for (final item in value) {
+        final result = _readViewerPredictionFromObject(
+          item,
+          scopedToViewer: scopedToViewer,
+          viewerId: viewerId,
+        );
+        if (result != null) return result;
+      }
+      return null;
+    }
+
+    if (value is! Map) return null;
+
+    final map = value.map((key, value) => MapEntry(key.toString(), value));
     final userId = _readString(
-      prediction['user_id'] ??
-          prediction['userId'] ??
-          _readNested(prediction['user'], 'id'),
+      map['user_id'] ??
+          map['userId'] ??
+          map['viewer_id'] ??
+          map['viewerId'] ??
+          _readNested(map['user'], 'id') ??
+          _readNested(map['viewer'], 'id'),
     );
-    if (userId == null || userId != viewerId) return null;
+    if (!scopedToViewer &&
+        viewerId != null &&
+        viewerId.isNotEmpty &&
+        userId != null &&
+        userId != viewerId) {
+      return null;
+    }
 
+    final eventId = _readString(
+      map['event_id'] ??
+          map['eventID'] ??
+          map['eventId'] ??
+          map['prediction_event_id'] ??
+          map['predictionEventId'] ??
+          map['predictionEventID'] ??
+          _readNested(map['event'], 'id') ??
+          _readNested(map['predictionEvent'], 'id') ??
+          _readNested(map['prediction_event'], 'id'),
+    );
     final outcomeId = _readString(
-      prediction['outcome_id'] ??
-          prediction['outcomeID'] ??
-          prediction['outcomeId'] ??
-          _readNested(prediction['outcome'], 'id'),
+      map['outcome_id'] ??
+          map['outcomeID'] ??
+          map['outcomeId'] ??
+          map['choice_id'] ??
+          map['choiceId'] ??
+          map['prediction_option_id'] ??
+          map['predictionOptionId'] ??
+          _readNested(map['outcome'], 'id') ??
+          _readNested(map['choice'], 'id') ??
+          _readNested(map['predictionOption'], 'id') ??
+          _readNested(map['prediction_option'], 'id'),
     );
     final points = _readInt(
-          prediction['points'] ??
-              prediction['channel_points_used'] ??
-              prediction['channelPointsUsed'] ??
-              prediction['amount'] ??
-              prediction['value'],
+          map['points'] ??
+              map['channel_points_used'] ??
+              map['channelPointsUsed'] ??
+              map['channel_points'] ??
+              map['channelPoints'] ??
+              map['amount'] ??
+              map['value'],
         ) ??
         0;
 
-    if (outcomeId == null || outcomeId.isEmpty || points <= 0) return null;
-    return _HermesViewerPrediction(outcomeId: outcomeId, points: points);
+    if (outcomeId != null && outcomeId.isNotEmpty && points > 0) {
+      return _HermesViewerPrediction(
+        eventId: eventId,
+        outcomeId: outcomeId,
+        points: points,
+        addToExisting: !scopedToViewer,
+      );
+    }
+
+    for (final key in const <String>[
+      'prediction',
+      'user_prediction',
+      'userPrediction',
+      'prediction_result',
+      'predictionResult',
+      'result',
+    ]) {
+      final nested = _readViewerPredictionFromObject(
+        map[key],
+        scopedToViewer: scopedToViewer,
+        viewerId: viewerId,
+      );
+      if (nested != null) return nested;
+    }
+
+    return null;
   }
 
   _HermesViewerPrediction? _readViewerFromTopPredictors(Map<dynamic, dynamic> payload) {
@@ -526,11 +654,15 @@ class TwitchPredictionHermesRuntimeService {
 }
 
 class _HermesViewerPrediction {
+  final String? eventId;
   final String outcomeId;
   final int points;
+  final bool addToExisting;
 
   const _HermesViewerPrediction({
+    this.eventId,
     required this.outcomeId,
     required this.points,
+    this.addToExisting = false,
   });
 }
