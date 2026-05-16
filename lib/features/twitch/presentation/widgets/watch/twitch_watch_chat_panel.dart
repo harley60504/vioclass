@@ -85,11 +85,22 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     super.didUpdateWidget(oldWidget);
 
     final prediction = widget.prediction;
+    final oldPrediction = oldWidget.prediction;
     final id = prediction?.id ?? '';
+    final shouldAutoHidePrediction = _shouldAutoHidePredictionBanner(prediction);
+    final oldShouldAutoHidePrediction =
+        _shouldAutoHidePredictionBanner(oldPrediction);
 
     if (id.isNotEmpty && id != lastPredictionId) {
       lastPredictionId = id;
-      showPrediction = true;
+      showPrediction = !shouldAutoHidePrediction;
+      return;
+    }
+
+    if (id.isNotEmpty &&
+        !oldShouldAutoHidePrediction &&
+        shouldAutoHidePrediction) {
+      showPrediction = false;
     }
   }
 
@@ -99,7 +110,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     super.dispose();
   }
 
-  bool _shouldHidePredictionBanner(TwitchPredictionSnapshot? prediction) {
+  bool _shouldAutoHidePredictionBanner(TwitchPredictionSnapshot? prediction) {
     if (prediction == null || !prediction.hasPrediction) return true;
     return prediction.isResolvedLike || prediction.isLockedLike;
   }
@@ -132,10 +143,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
           final ultraVerticalCompact = constraints.maxHeight < 410;
           final compactWidth = constraints.maxWidth < 300;
           final predictionHasData = prediction != null && prediction.hasPrediction;
-          final predictionBannerAllowed = !_shouldHidePredictionBanner(prediction);
           final effectiveShowPinned = showPinned && !hideOptionalEngagement;
           final effectiveShowPrediction =
-              showPrediction && !hideOptionalEngagement && predictionBannerAllowed;
+              showPrediction && !hideOptionalEngagement && predictionHasData;
           final maxEngagementHeight = ultraVerticalCompact
               ? (constraints.maxHeight * 0.34).clamp(110.0, 180.0).toDouble()
               : verticalCompact
@@ -157,12 +167,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                   setState(() => showPinned = !showPinned);
                 },
                 onTogglePrediction: () {
-                  if (effectiveShowPrediction) {
-                    setState(() => showPrediction = false);
-                    return;
-                  }
-
-                  widget.onOpenPrediction();
+                  setState(() => showPrediction = !showPrediction);
                 },
                 onRefresh: widget.onRefreshEngagement,
                 onOpenAppearance: () => showTwitchChatAppearanceSheet(
@@ -324,7 +329,7 @@ class _ChatHeader extends StatelessWidget {
             tooltip: predictionVisible
                 ? '隱藏賭盤通知'
                 : hasPrediction
-                    ? '打開賭盤'
+                    ? '顯示賭盤通知'
                     : '沒有賭盤',
             icon: Icons.how_to_vote_rounded,
             active: predictionVisible,
