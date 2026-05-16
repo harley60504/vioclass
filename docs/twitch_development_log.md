@@ -265,3 +265,54 @@ StreamNook 參考流程是「進聊天室先查 active prediction snapshot，再
 - 每次打開賭盤 sheet 都會主動用 GQL snapshot 校正 viewerPoints / viewerOutcome。
 - 若 Twitch 只提供 `created_at + prediction_window_seconds`，仍能顯示 `鎖盤剩 mm:ss`。
 - Hermes realtime、GQL snapshot、local optimistic state 會透過同一個 bus 合併，不互相覆蓋。
+
+---
+
+## Stage 119 — StreamNook-style Prediction Hermes event stream
+
+Commits:
+
+- `ded3adbe60570b83b1fbe6723fa95cadb61216bd`
+- `d9e4ace16fb15a9afcb599d34d7bf5252d811673`
+
+### 背景
+
+StreamNook 的 prediction 流程不是高頻 GQL polling，而是：
+
+1. 先用 GQL 取得 active prediction snapshot。
+2. 再用 Hermes / event listener 接收 prediction-created、updated、locked、ended 等事件。
+3. 下注後用 GQL fallback 校正 viewer outcome / viewer points。
+
+本專案原本已有 `TwitchPredictionHermesRuntimeService`，也已實作 `predictions-channel-v1.<channelId>` topic，但 WatchPage 主流程沒有正式啟動這條 event stream，因此賭盤更新仍主要仰賴 GQL fallback。
+
+### 修改檔案
+
+- `lib/features/twitch/services/engagement/twitch_prediction_hermes_runtime_service.dart`
+- `lib/features/twitch/api/engagement/twitch_prediction_api_service.dart`
+
+### 修改內容
+
+- 新增 `TwitchPredictionHermesGlobalRuntime`：
+  - 內部持有 app-level `TwitchPredictionHermesRuntimeService`。
+  - `ensureConnected(channelId, viewerUserId, previousPrediction)` 會連線 Hermes。
+  - 重複同一 channel / viewer 且已連線時不重連。
+  - 透過 `TwitchPredictionHermesRealtimeBus` 發布最新 prediction。
+- `TwitchPredictionApiService.fetchPredictionContext(...)` 在 GQL snapshot 成功後：
+  - 先 publish snapshot 到 realtime bus。
+  - 從 raw prediction / raw GQL response 遞迴解析 channelId。
+  - 若取得 channelId，呼叫 `TwitchPredictionHermesGlobalRuntime.ensureConnected(...)`。
+- Hermes topic 仍沿用既有：
+  - `predictions-channel-v1.<channelId>`
+  - `community-points-user-v1.<viewerId>`，目前 viewer id 尚未由此 path 傳入，後續可補。
+
+### 預期效果
+
+- 只要 WatchPage 原本的 `_refreshEngagement()` 成功取得 active prediction，Hermes prediction event stream 就會自動啟動。
+- 賭盤 sheet 可透過 `TwitchPredictionHermesRealtimeBus` 收到 event-updated / prediction-made 類更新。
+- 不需要高頻 GQL polling 就能更接近官方 / StreamNook 的即時更新模型。
+
+### 後續候選
+
+- Stage 120：將 viewerUserId 傳入 `ensureConnected(...)`，讓 `prediction-made` 更準確判斷自己的下注。
+- Stage 121：讓聊天室 banner 也直接訂閱 realtime bus，而不只依靠 WatchPage `_prediction` prop。
+- Stage 122：加入 Hermes status debug UI / log，方便確認 topic subscribe 是否成功。
