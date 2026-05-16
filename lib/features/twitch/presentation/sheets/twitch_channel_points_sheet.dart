@@ -131,18 +131,18 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
         .length;
 
     return SafeArea(
-      child: TwitchUnifiedSheetScaffold(
-        title: current?.pointsName ?? '忠誠點數',
-        subtitle: balance == null
-            ? '讀取點數與可兌換項目 · $availableCount/${rewards.length} 可用'
-            : '${formatChannelPointFullNumber(balance)} 點 · $availableCount/${rewards.length} 可用',
-        icon: Icons.stars_rounded,
-        iconImageUrl: current?.pointsIconUrl,
-        loading: widget.loading,
-        onRefresh: widget.onRefresh,
-        child: Stack(
-          children: [
-            Column(
+      child: Stack(
+        children: [
+          TwitchUnifiedSheetScaffold(
+            title: current?.pointsName ?? '忠誠點數',
+            subtitle: balance == null
+                ? '讀取點數與可兌換項目 · $availableCount/${rewards.length} 可用'
+                : '${formatChannelPointFullNumber(balance)} 點 · $availableCount/${rewards.length} 可用',
+            icon: Icons.stars_rounded,
+            iconImageUrl: current?.pointsIconUrl,
+            loading: widget.loading,
+            onRefresh: widget.onRefresh,
+            child: Column(
               children: [
                 if (current != null && current.contextError != null)
                   ChannelPointsErrorBanner(
@@ -222,37 +222,37 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
                 ),
               ],
             ),
-            if (_isEmoteOverlayVisible)
-              Positioned.fill(
-                child: ChannelPointEmoteMenuOverlay(
-                  mode: _emoteOverlayMode!,
-                  rewardTitle: channelPointRewardTitle(_emoteOverlayReward ?? const <String, dynamic>{}),
-                  emotes: _visibleOverlayEmotes(),
-                  selectedBaseEmote: _selectedBaseEmote,
-                  loading: _emoteOverlayLoading,
-                  error: _emoteOverlayError,
-                  query: _emoteSearchQuery,
-                  onQueryChanged: (value) {
-                    setState(() {
-                      _emoteSearchQuery = value.trim().toLowerCase();
-                    });
-                  },
-                  onBack: _selectedBaseEmote == null
-                      ? null
-                      : () {
-                          setState(() {
-                            _selectedBaseEmote = null;
-                            _emoteSearchQuery = '';
-                          });
-                        },
-                  onClose: _closeEmoteOverlay,
-                  onReload: _reloadEmoteOverlay,
-                  onChooseEmote: _completeChooseEmote,
-                  onChooseModifier: _completeModifyEmote,
-                ),
+          ),
+          if (_isEmoteOverlayVisible)
+            Positioned.fill(
+              child: ChannelPointEmoteMenuOverlay(
+                mode: _emoteOverlayMode!,
+                rewardTitle: channelPointRewardTitle(_emoteOverlayReward ?? const <String, dynamic>{}),
+                emotes: _visibleOverlayEmotes(),
+                selectedBaseEmote: _selectedBaseEmote,
+                loading: _emoteOverlayLoading,
+                error: _emoteOverlayError,
+                query: _emoteSearchQuery,
+                onQueryChanged: (value) {
+                  setState(() {
+                    _emoteSearchQuery = value.trim().toLowerCase();
+                  });
+                },
+                onBack: _selectedBaseEmote == null
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedBaseEmote = null;
+                          _emoteSearchQuery = '';
+                        });
+                      },
+                onClose: _closeEmoteOverlay,
+                onReload: _reloadEmoteOverlay,
+                onChooseEmote: _completeChooseEmote,
+                onChooseModifier: _completeModifyEmote,
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
