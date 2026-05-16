@@ -8,6 +8,7 @@ import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
+import 'twitch_hls_low_latency_proxy.dart' show TwitchHlsStartupMode;
 import 'twitch_stable_hls_proxy_router.dart';
 
 class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
@@ -124,7 +125,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
       final merged = _mergeAdAwareVariants(
         baseVariants: base.variants,
-        cleanCandidates: [if (android != null) android, if (ios != null) ios],
+        cleanCandidates: [?android, ?ios],
       );
 
       _masterPlaylistUri = base.masterUri;
