@@ -32,6 +32,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   bool _livePinned = true;
   bool _seekingLiveEdge = false;
   double? _dragValue;
+  String? _lastLiveSeekProbeSummary;
   Timer? _proxyLiveStatusTimer;
 
   Player get player => widget.player;
@@ -190,6 +191,26 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     }
   }
 
+  void _appendLiveSeekProbeLine(List<String> lines, String line) {
+    lines.add(line);
+    debugPrint('[TwitchLiveSeek] $line');
+  }
+
+  String _liveSeekProbeProxyLine(
+    dynamic proxyLiveStatus, {
+    required Duration mediaDuration,
+  }) {
+    final mediaTarget = _proxySafeTargetInMediaTimeline(
+      proxyLiveStatus: proxyLiveStatus,
+      mediaDuration: mediaDuration,
+    );
+    final proxy = _proxyStatusTooltip(
+      proxyLiveStatus,
+      proxyMediaTarget: mediaTarget,
+    );
+    return proxy.isEmpty ? 'proxy=unavailable' : proxy;
+  }
+
   Future<void> _goLive({
     required Duration position,
     required Duration duration,
@@ -204,12 +225,23 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     if (targets.isEmpty) return;
 
     final originalPosition = position;
+    final probeLines = <String>[];
+    _appendLiveSeekProbeLine(
+      probeLines,
+      'START before=${_formatDuration(position)}/${_formatDuration(duration)} '
+      'targets=${targets.map(_formatDuration).join(', ')}',
+    );
+    _appendLiveSeekProbeLine(
+      probeLines,
+      _liveSeekProbeProxyLine(proxyLiveStatus, mediaDuration: duration),
+    );
 
     setState(() {
       _dragging = true;
       _dragValue = 1.0;
       _livePinned = true;
       _seekingLiveEdge = true;
+      _lastLiveSeekProbeSummary = probeLines.join('\n');
     });
 
     var reachedLive = false;
@@ -218,37 +250,76 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     try {
       await player.play();
 
-      for (final target in targets) {
+      for (var index = 0; index < targets.length; index++) {
+        final target = targets[index];
         lastTarget = target;
+        final beforeTryPosition = player.state.position;
+        final beforeTryDuration = player.state.duration;
+
+        _appendLiveSeekProbeLine(
+          probeLines,
+          'TRY #${index + 1} target=${_formatDuration(target)} '
+          'before=${_formatDuration(beforeTryPosition)}/${_formatDuration(beforeTryDuration)}',
+        );
+
         await player.seek(target);
         await Future<void>.delayed(_liveSeekVerifyDelay);
 
         final currentPosition = player.state.position;
         final currentDuration = player.state.duration;
         final currentProxyStatus = widget.playerRuntime.proxyLiveStatus;
+        final liveLag = currentDuration.inMilliseconds > 500
+            ? _safeLiveLag(position: currentPosition, duration: currentDuration)
+            : Duration.zero;
+        final distanceFromTarget = currentPosition > target
+            ? currentPosition - target
+            : target - currentPosition;
+        final movedForward = currentPosition - originalPosition;
 
-        if (_isLiveSeekSuccessful(
+        final success = _isLiveSeekSuccessful(
           originalPosition: originalPosition,
           target: target,
           position: currentPosition,
           duration: currentDuration,
           proxyLiveStatus: currentProxyStatus,
-        )) {
+        );
+
+        _appendLiveSeekProbeLine(
+          probeLines,
+          'AFTER #${index + 1} pos=${_formatDuration(currentPosition)}/'
+          '${_formatDuration(currentDuration)} lag=${liveLag.inMilliseconds}ms '
+          'dist=${distanceFromTarget.inMilliseconds}ms '
+          'moved=${movedForward.inMilliseconds}ms '
+          'success=$success',
+        );
+
+        if (success) {
           reachedLive = true;
           break;
         }
       }
-    } catch (_) {
+    } catch (error) {
       reachedLive = false;
+      _appendLiveSeekProbeLine(probeLines, 'ERROR $error');
     } finally {
       if (!mounted) return;
 
-      final targetSliderValue = _sliderValueForTarget(lastTarget, player.state.duration);
+      final finalPosition = player.state.position;
+      final finalDuration = player.state.duration;
+      final targetSliderValue = _sliderValueForTarget(lastTarget, finalDuration);
+      _appendLiveSeekProbeLine(
+        probeLines,
+        'END reached=$reachedLive final=${_formatDuration(finalPosition)}/'
+        '${_formatDuration(finalDuration)} sliderTarget='
+        '${targetSliderValue.toStringAsFixed(3)}',
+      );
+
       setState(() {
         _dragging = false;
         _dragValue = null;
         _seekingLiveEdge = false;
         _livePinned = reachedLive || targetSliderValue >= 0.97;
+        _lastLiveSeekProbeSummary = probeLines.join('\n');
       });
     }
   }
@@ -517,6 +588,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                             seeking: _seekingLiveEdge,
                             proxyLiveStatus: proxyLiveStatus,
                             proxyMediaTarget: proxyMediaTarget,
+                            liveSeekProbe: _lastLiveSeekProbeSummary,
                           ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
@@ -567,6 +639,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     required bool seeking,
     required dynamic proxyLiveStatus,
     required Duration? proxyMediaTarget,
+    required String? liveSeekProbe,
   }) {
     final pos = _formatDuration(position);
     final dur = duration.inMilliseconds > 0 ? _formatDuration(duration) : '--:--';
@@ -584,11 +657,14 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
       proxyLiveStatus,
       proxyMediaTarget: proxyMediaTarget,
     );
-    if (proxy.isEmpty) {
-      return 'media_kit $state · $pos / $dur';
-    }
+    final parts = <String>[
+      'media_kit $state · $pos / $dur',
+      if (proxy.isNotEmpty) proxy,
+      if (liveSeekProbe != null && liveSeekProbe.trim().isNotEmpty)
+        'last LIVE probe:\n$liveSeekProbe',
+    ];
 
-    return 'media_kit $state · $pos / $dur\n$proxy';
+    return parts.join('\n');
   }
 
   static String _proxyStatusTooltip(
