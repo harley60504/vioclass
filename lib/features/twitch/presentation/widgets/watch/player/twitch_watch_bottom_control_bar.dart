@@ -45,10 +45,11 @@ class _WatchBottomControlBar extends StatelessWidget {
           builder: (context, constraints) {
             final veryNarrow = constraints.maxWidth < 430;
             final useCompactLayout = constraints.maxWidth < 700;
+            final collapseLivePlayback = veryNarrow;
             final barHeight = useCompactLayout ? 58.0 : 72.0;
             final horizontalPadding = veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0;
 
-            final compactDesignWidth = veryNarrow ? 430.0 : 620.0;
+            final compactDesignWidth = veryNarrow ? 360.0 : 620.0;
             final compactDesignHeight = 58.0;
             final contentWidth = useCompactLayout ? compactDesignWidth : constraints.maxWidth;
             final contentHeight = useCompactLayout ? compactDesignHeight : barHeight;
@@ -71,13 +72,19 @@ class _WatchBottomControlBar extends StatelessWidget {
                             },
                           ),
                           SizedBox(width: veryNarrow ? 2 : 6),
-                          Expanded(
-                            child: TwitchLivePlaybackStrip(
+                          if (collapseLivePlayback)
+                            _LivePlaybackOverlayButton(
                               player: player,
                               playerRuntime: playerRuntime,
-                              compact: true,
+                            )
+                          else
+                            Expanded(
+                              child: TwitchLivePlaybackStrip(
+                                player: player,
+                                playerRuntime: playerRuntime,
+                                compact: true,
+                              ),
                             ),
-                          ),
                           SizedBox(width: veryNarrow ? 2 : 6),
                           _CompactInlineVolumeControl(
                             muted: muted,
@@ -211,6 +218,167 @@ class _WatchBottomControlBar extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+class _LivePlaybackOverlayButton extends StatefulWidget {
+  final Player player;
+  final TwitchPlaylistPlayerRuntime playerRuntime;
+
+  const _LivePlaybackOverlayButton({
+    required this.player,
+    required this.playerRuntime,
+  });
+
+  @override
+  State<_LivePlaybackOverlayButton> createState() =>
+      _LivePlaybackOverlayButtonState();
+}
+
+class _LivePlaybackOverlayButtonState extends State<_LivePlaybackOverlayButton> {
+  final LayerLink _layerLink = LayerLink();
+  OverlayEntry? _overlayEntry;
+
+  bool get _showingOverlay => _overlayEntry != null;
+
+  @override
+  void dispose() {
+    _removeOverlay(notify: false);
+    super.dispose();
+  }
+
+  void _toggleOverlay() {
+    if (_showingOverlay) {
+      _removeOverlay();
+    } else {
+      _showOverlay();
+    }
+  }
+
+  void _showOverlay() {
+    if (_overlayEntry != null) return;
+
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    final entry = OverlayEntry(
+      builder: (overlayContext) {
+        final screenWidth = MediaQuery.of(overlayContext).size.width;
+        final overlayWidth = math
+            .min(screenWidth - 24.0, 420.0)
+            .clamp(280.0, 420.0)
+            .toDouble();
+
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: _removeOverlay,
+              ),
+            ),
+            CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              targetAnchor: Alignment.topCenter,
+              followerAnchor: Alignment.bottomCenter,
+              offset: const Offset(0, -12),
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: overlayWidth,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xF20E0E10),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.45),
+                        blurRadius: 24,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.timeline_rounded,
+                            color: Color(0xFFBF94FF),
+                            size: 16,
+                          ),
+                          const SizedBox(width: 7),
+                          const Expanded(
+                            child: Text(
+                              '播放進度',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: _removeOverlay,
+                            child: const Padding(
+                              padding: EdgeInsets.all(3),
+                              child: Icon(
+                                Icons.close_rounded,
+                                color: Colors.white54,
+                                size: 18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TwitchLivePlaybackStrip(
+                        player: widget.player,
+                        playerRuntime: widget.playerRuntime,
+                        compact: false,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    _overlayEntry = entry;
+    overlay.insert(entry);
+    if (mounted) setState(() {});
+  }
+
+  void _removeOverlay({bool notify = true}) {
+    final entry = _overlayEntry;
+    _overlayEntry = null;
+    entry?.remove();
+    if (notify && mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: _PlainIconButton(
+        tooltip: _showingOverlay ? '關閉播放進度' : '打開播放進度',
+        icon: Icons.timeline_rounded,
+        size: 22,
+        active: _showingOverlay,
+        dense: true,
+        onPressed: _toggleOverlay,
+      ),
     );
   }
 }
