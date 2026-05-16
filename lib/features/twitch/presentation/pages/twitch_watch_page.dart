@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage133_blocking_startup_mask
+// PATCH VERSION: twitch_watch_page_stage133_pipeline_startup_mask
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -176,10 +176,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   StreamSubscription<double>? _playerVolumeSubscription;
   Timer? _volumePreferenceSaveDebounce;
   Timer? _chatWidthPreferenceSaveDebounce;
-  Timer? _chatStartupTimer;
-  Timer? _engagementStartupTimer;
-  Timer? _emoteStartupTimer;
-  Timer? _relationshipStartupTimer;
 
   int _watchLoadGeneration = 0;
 
@@ -621,14 +617,15 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       await _loadPlayer(channel);
       if (!_isCurrentWatchTask(generation, channel)) return;
 
-      _scheduleDeferredWatchStartup(
+      setState(() => _loadingWatch = false);
+      unawaited(_runWatchStartupPipeline(
         channel: channel,
         generation: generation,
-      );
+      ));
     } catch (error) {
       if (mounted) _showSnack('載入 Watch Page 失敗：$error');
     } finally {
-      if (mounted && generation == _watchLoadGeneration) {
+      if (mounted && generation == _watchLoadGeneration && _loadingWatch) {
         setState(() => _loadingWatch = false);
       }
     }
@@ -705,37 +702,34 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     return completer.future;
   }
 
-  void _scheduleDeferredWatchStartup({
+  Future<void> _runWatchStartupPipeline({
     required String channel,
     required int generation,
-  }) {
-    if (!mounted) return;
-    setState(() {
-      _chatBootstrapping = true;
-      _engagementBootstrapping = true;
-      _emoteBootstrapping = true;
-      _relationshipBootstrapping = true;
-    });
+  }) async {
+    await _yieldToUi();
+    if (!_isCurrentWatchTask(generation, channel)) return;
 
-    _chatStartupTimer = Timer(const Duration(milliseconds: 320), () {
-      if (!_isCurrentWatchTask(generation, channel)) return;
-      unawaited(_runDeferredChatStartup(channel, generation));
-    });
+    setState(() => _chatBootstrapping = true);
+    await _runDeferredChatStartup(channel, generation);
+    await _yieldToUi();
+    if (!_isCurrentWatchTask(generation, channel)) return;
 
-    _engagementStartupTimer = Timer(const Duration(milliseconds: 950), () {
-      if (!_isCurrentWatchTask(generation, channel)) return;
-      unawaited(_runDeferredEngagementStartup(generation, channel));
-    });
+    setState(() => _engagementBootstrapping = true);
+    await _runDeferredEngagementStartup(generation, channel);
+    await _yieldToUi();
+    if (!_isCurrentWatchTask(generation, channel)) return;
 
-    _emoteStartupTimer = Timer(const Duration(milliseconds: 1650), () {
-      if (!_isCurrentWatchTask(generation, channel)) return;
-      unawaited(_runDeferredEmoteStartup(generation, channel));
-    });
+    setState(() => _emoteBootstrapping = true);
+    await _runDeferredEmoteStartup(generation, channel);
+    await _yieldToUi();
+    if (!_isCurrentWatchTask(generation, channel)) return;
 
-    _relationshipStartupTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (!_isCurrentWatchTask(generation, channel)) return;
-      unawaited(_runDeferredRelationshipStartup(generation, channel));
-    });
+    setState(() => _relationshipBootstrapping = true);
+    await _runDeferredRelationshipStartup(generation, channel);
+  }
+
+  Future<void> _yieldToUi() async {
+    await Future<void>.delayed(Duration.zero);
   }
 
   Future<void> _runDeferredChatStartup(
@@ -801,14 +795,13 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   void _cancelDeferredWatchTasks() {
-    _chatStartupTimer?.cancel();
-    _engagementStartupTimer?.cancel();
-    _emoteStartupTimer?.cancel();
-    _relationshipStartupTimer?.cancel();
-    _chatStartupTimer = null;
-    _engagementStartupTimer = null;
-    _emoteStartupTimer = null;
-    _relationshipStartupTimer = null;
+    if (!mounted) return;
+    setState(() {
+      _chatBootstrapping = false;
+      _engagementBootstrapping = false;
+      _emoteBootstrapping = false;
+      _relationshipBootstrapping = false;
+    });
   }
 
   Future<void> _connectChat(String channel) async {
