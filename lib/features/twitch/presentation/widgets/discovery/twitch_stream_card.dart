@@ -1,11 +1,11 @@
-// PATCH VERSION: twitch_stream_card_home_image_decode_cache_stage108
+// PATCH VERSION: twitch_stream_card_shared_cached_image_layer_stage109
 
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
-
+import '../shared/twitch_cached_image_layer.dart';
 
 const double twitchStreamCardGridHorizontalPadding = 36;
 const double twitchStreamCardGridSpacing = 16;
@@ -54,7 +54,6 @@ double twitchStreamCardGridMainAxisExtent(double viewportWidth) {
 
   return (thumbnailHeight + infoHeight).clamp(306.0, 392.0).toDouble();
 }
-
 
 class TwitchStreamCard extends StatelessWidget {
   final TwitchLiveStream stream;
@@ -145,11 +144,16 @@ class _StreamThumbnail extends StatelessWidget {
       aspectRatio: 16 / 9,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final imageWidth = _thumbnailPhysicalWidthFor(
+          final imageWidth = TwitchCachedImageLayer.physicalWidthFor(
             context: context,
             logicalWidth: constraints.maxWidth,
+            minPhysicalWidth: _thumbnailMinPhysicalWidth,
+            maxPhysicalWidth: _thumbnailMaxPhysicalWidth,
           );
-          final imageHeight = (imageWidth * 9 / 16).round();
+          final imageHeight = TwitchCachedImageLayer.heightForAspectRatio(
+            width: imageWidth,
+            aspectRatio: 16 / 9,
+          );
           final thumbnailUrl = _thumbnailUrl(
             stream,
             width: imageWidth,
@@ -159,18 +163,17 @@ class _StreamThumbnail extends StatelessWidget {
           return Stack(
             fit: StackFit.expand,
             children: [
-              if (thumbnailUrl.isNotEmpty)
-                Image.network(
-                  thumbnailUrl,
-                  fit: BoxFit.cover,
-                  cacheWidth: imageWidth,
-                  cacheHeight: imageHeight,
-                  filterQuality: FilterQuality.low,
-                  gaplessPlayback: true,
-                  errorBuilder: (_, __, ___) => _ThumbnailFallback(colors: colors),
-                )
-              else
-                _ThumbnailFallback(colors: colors),
+              TwitchCachedImageLayer(
+                imageUrl: thumbnailUrl,
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                cacheWidth: imageWidth,
+                cacheHeight: imageHeight,
+                fallbackColor: colors.thumbnailFallback,
+                fallbackIcon: Icons.live_tv_rounded,
+                fallbackIconColor: colors.mutedText,
+                fallbackIconSize: 36,
+              ),
               DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -200,40 +203,6 @@ class _StreamThumbnail extends StatelessWidget {
             ],
           );
         },
-      ),
-    );
-  }
-}
-
-int _thumbnailPhysicalWidthFor({
-  required BuildContext context,
-  required double logicalWidth,
-}) {
-  final safeLogicalWidth = logicalWidth.isFinite && logicalWidth > 0
-      ? logicalWidth
-      : 320.0;
-  final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-  final physicalWidth = (safeLogicalWidth * devicePixelRatio).round();
-  return physicalWidth
-      .clamp(_thumbnailMinPhysicalWidth, _thumbnailMaxPhysicalWidth)
-      .toInt();
-}
-
-class _ThumbnailFallback extends StatelessWidget {
-  final _StreamCardColors colors;
-
-  const _ThumbnailFallback({required this.colors});
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colors.thumbnailFallback,
-      ),
-      child: Icon(
-        Icons.live_tv_rounded,
-        color: colors.mutedText,
-        size: 36,
       ),
     );
   }
@@ -553,8 +522,6 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final url = imageUrl.trim();
-
     return Container(
       width: size,
       height: size,
@@ -564,25 +531,15 @@ class _Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: colors.border),
       ),
-      child: url.isEmpty
-          ? Icon(
-              Icons.person_rounded,
-              color: colors.mutedText,
-              size: size * 0.57,
-            )
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              cacheWidth: _avatarPhysicalSize,
-              cacheHeight: _avatarPhysicalSize,
-              filterQuality: FilterQuality.low,
-              gaplessPlayback: true,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.person_rounded,
-                color: colors.mutedText,
-                size: size * 0.57,
-              ),
-            ),
+      child: TwitchCachedImageLayer.avatar(
+        imageUrl: imageUrl,
+        size: size,
+        cacheWidth: _avatarPhysicalSize,
+        cacheHeight: _avatarPhysicalSize,
+        fallbackColor: colors.softFill,
+        fallbackIconColor: colors.mutedText,
+        fallbackIconSize: size * 0.57,
+      ),
     );
   }
 }
