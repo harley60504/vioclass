@@ -177,6 +177,7 @@ class _PredictionCard extends StatelessWidget {
     final resolved = prediction.isResolvedLike;
     final canceled = prediction.isCanceledLike;
     final active = status == 'ACTIVE' || status == 'OPEN';
+    final effectiveLocksAt = _effectiveLocksAt(prediction);
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
@@ -238,7 +239,7 @@ class _PredictionCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 _PredictionStatusPill(
                   label: status,
-                  locksAt: prediction.locksAt,
+                  locksAt: effectiveLocksAt,
                   active: active,
                   resolved: resolved,
                   canceled: canceled,
@@ -642,6 +643,53 @@ class _MiniStat extends StatelessWidget {
       ),
     );
   }
+}
+
+DateTime? _effectiveLocksAt(TwitchPredictionSnapshot prediction) {
+  final explicit = prediction.locksAt;
+  if (explicit != null) return explicit;
+
+  // StreamNook-style fallback: prediction lock time is created_at plus the
+  // prediction_window_seconds payload value from the realtime/GQL snapshot.
+  final createdAt = prediction.createdAt ??
+      _readDateFromRaw(prediction.rawPrediction, const <String>[
+        'created_at',
+        'createdAt',
+      ]);
+  if (createdAt == null) return null;
+
+  final windowSeconds = _readIntFromRaw(prediction.rawPrediction, const <String>[
+    'prediction_window_seconds',
+    'predictionWindowSeconds',
+  ]);
+  if (windowSeconds == null || windowSeconds <= 0) return null;
+
+  return createdAt.add(Duration(seconds: windowSeconds));
+}
+
+DateTime? _readDateFromRaw(Map<String, dynamic>? raw, List<String> keys) {
+  if (raw == null) return null;
+  for (final key in keys) {
+    final value = raw[key];
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) continue;
+    final parsed = DateTime.tryParse(text);
+    if (parsed != null) return parsed;
+  }
+  return null;
+}
+
+int? _readIntFromRaw(Map<String, dynamic>? raw, List<String> keys) {
+  if (raw == null) return null;
+  for (final key in keys) {
+    final value = raw[key];
+    if (value == null) continue;
+    if (value is int) return value;
+    if (value is num) return value.round();
+    final parsed = int.tryParse(value.toString().replaceAll(',', '').trim());
+    if (parsed != null) return parsed;
+  }
+  return null;
 }
 
 String _formatCompact(int value) {
