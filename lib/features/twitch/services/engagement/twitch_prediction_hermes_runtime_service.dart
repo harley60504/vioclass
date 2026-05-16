@@ -15,6 +15,28 @@ typedef TwitchHermesPredictionHandler = void Function(
 typedef TwitchHermesBalanceHandler = void Function(int balance);
 typedef TwitchHermesStatusHandler = void Function(String status);
 
+class TwitchPredictionHermesRealtimeBus {
+  TwitchPredictionHermesRealtimeBus._();
+
+  static final StreamController<TwitchPredictionSnapshot?> _predictionController =
+      StreamController<TwitchPredictionSnapshot?>.broadcast();
+
+  static TwitchPredictionSnapshot? _latestPrediction;
+
+  static TwitchPredictionSnapshot? get latestPrediction => _latestPrediction;
+
+  static Stream<TwitchPredictionSnapshot?> get predictionStream {
+    return _predictionController.stream;
+  }
+
+  static void publishPrediction(TwitchPredictionSnapshot? prediction) {
+    _latestPrediction = prediction;
+    if (!_predictionController.isClosed) {
+      _predictionController.add(prediction);
+    }
+  }
+}
+
 class TwitchPredictionHermesRuntimeService {
   WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _subscription;
@@ -31,7 +53,7 @@ class TwitchPredictionHermesRuntimeService {
   bool get connected => _connected;
 
   Future<void> connect({
-    required String channelId,
+    required String? channelId,
     required String? viewerUserId,
     TwitchPredictionSnapshot? previousPrediction,
     TwitchHermesPredictionHandler? onPrediction,
@@ -39,7 +61,7 @@ class TwitchPredictionHermesRuntimeService {
     TwitchHermesStatusHandler? onStatus,
     String clientId = TwitchApiConstants.twitchWebClientId,
   }) async {
-    final safeChannelId = channelId.trim();
+    final safeChannelId = channelId?.trim() ?? '';
     final safeViewerId = viewerUserId?.trim();
 
     await disconnect();
@@ -52,6 +74,9 @@ class TwitchPredictionHermesRuntimeService {
     final generation = ++_generation;
     _viewerUserId = safeViewerId == null || safeViewerId.isEmpty ? null : safeViewerId;
     _lastPrediction = previousPrediction;
+    if (previousPrediction != null && previousPrediction.hasPrediction) {
+      TwitchPredictionHermesRealtimeBus.publishPrediction(previousPrediction);
+    }
     _onPrediction = onPrediction;
     _onBalance = onBalance;
     _onStatus = onStatus;
@@ -224,6 +249,7 @@ class TwitchPredictionHermesRuntimeService {
 
       if (next.hasPrediction) {
         _lastPrediction = next;
+        TwitchPredictionHermesRealtimeBus.publishPrediction(next);
         _onPrediction?.call(next);
       }
     }
