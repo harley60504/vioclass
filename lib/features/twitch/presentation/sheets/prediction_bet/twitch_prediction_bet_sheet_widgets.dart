@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_prediction_bet_sheet_widgets_stage166
+// PATCH VERSION: twitch_prediction_bet_sheet_widgets_stage167_helpers
 //
 // UI widgets for the prediction bet sheet. Runtime / Hermes / GQL fallback
 // logic stays in twitch_prediction_bet_sheet.dart.
@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_prediction.dart';
+import 'twitch_prediction_bet_helpers.dart';
 
 class TwitchPredictionBetMetaRow extends StatelessWidget {
   final String status;
@@ -41,8 +42,12 @@ class TwitchPredictionBetMetaRow extends StatelessWidget {
             label: timeLabel!,
             color: Colors.orangeAccent,
           ),
-        TwitchPredictionBetChip(label: '${_formatCompact(totalPoints)} 點'),
-        TwitchPredictionBetChip(label: '${_formatCompact(totalUsers)} 人'),
+        TwitchPredictionBetChip(
+          label: '${twitchPredictionFormatCompact(totalPoints)} 點',
+        ),
+        TwitchPredictionBetChip(
+          label: '${twitchPredictionFormatCompact(totalUsers)} 人',
+        ),
         if (choice != null)
           TwitchPredictionBetChip(
             label: '已下注 ${choice.title.isEmpty ? '此邊' : choice.title}',
@@ -180,11 +185,15 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                   runSpacing: 7,
                   children: [
                     TwitchPredictionBetChip(label: '${(percent * 100).round()}%'),
-                    TwitchPredictionBetChip(label: '${_formatCompact(outcome.points)} 點'),
-                    TwitchPredictionBetChip(label: '${_formatCompact(outcome.users)} 人'),
+                    TwitchPredictionBetChip(
+                      label: '${twitchPredictionFormatCompact(outcome.points)} 點',
+                    ),
+                    TwitchPredictionBetChip(
+                      label: '${twitchPredictionFormatCompact(outcome.users)} 人',
+                    ),
                     if (outcome.viewerPoints > 0)
                       TwitchPredictionBetChip(
-                        label: '我的 ${_formatCompact(outcome.viewerPoints)} 點',
+                        label: '我的 ${twitchPredictionFormatCompact(outcome.viewerPoints)} 點',
                         color: Colors.greenAccent,
                       ),
                     if (odds != null)
@@ -232,26 +241,4 @@ class TwitchPredictionBetChip extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatCompact(int value) {
-  if (value >= 1000000000) {
-    final text = (value / 1000000000).toStringAsFixed(value >= 10000000000 ? 1 : 2);
-    return '${_trimTrailingZero(text)}B';
-  }
-  if (value >= 1000000) {
-    final text = (value / 1000000).toStringAsFixed(value >= 10000000 ? 1 : 2);
-    return '${_trimTrailingZero(text)}M';
-  }
-  if (value >= 1000) {
-    final text = (value / 1000).toStringAsFixed(value >= 10000 ? 1 : 2);
-    return '${_trimTrailingZero(text)}k';
-  }
-  return value.toString();
-}
-
-String _trimTrailingZero(String text) {
-  return text
-      .replaceFirst(RegExp(r'\.0+$'), '')
-      .replaceFirst(RegExp(r'(\.\d*[1-9])0+$'), r'$1');
 }
