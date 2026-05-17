@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_pinned_message_banner_stage145
+// PATCH VERSION: twitch_pinned_message_banner_stage192_glass_card
 //
 // Extracted pinned-message UI component. Keep pinned card visuals here instead
 // of embedding style decisions inside the engagement strip.
@@ -41,11 +41,30 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(9, 7, 9, 7),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
-        color: TwitchUiColors.surfaceCard,
-        borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-        border: Border.all(color: Colors.white.withOpacity(0.07)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFF221530).withOpacity(0.96),
+            const Color(0xFF15151D).withOpacity(0.98),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.18)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: TwitchUiColors.primary.withOpacity(0.14),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.28),
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -53,10 +72,10 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
           TwitchUiAvatar(
             imageUrl: avatarUrl,
             displayName: sender,
-            size: 32,
+            size: 33,
             accentColor: senderColor,
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,12 +83,24 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(
-                      Icons.push_pin_rounded,
-                      color: Color(0xFF9AA4B2),
-                      size: 12,
+                    Container(
+                      width: 20,
+                      height: 20,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: TwitchUiColors.primary.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: TwitchUiColors.primarySoft.withOpacity(0.28),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.push_pin_rounded,
+                        color: TwitchUiColors.primarySoft,
+                        size: 12,
+                      ),
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 7),
                     Flexible(
                       child: Text(
                         sender,
@@ -100,13 +131,13 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 6),
                 Text(
                   message.text,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Color(0xFFF2F2F4),
+                    color: Color(0xFFF5F0FF),
                     fontSize: TwitchUiFontSize.cardBody,
                     height: 1.24,
                     fontWeight: TwitchUiFontWeight.body,
