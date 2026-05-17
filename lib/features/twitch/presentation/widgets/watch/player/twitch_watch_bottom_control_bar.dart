@@ -190,30 +190,26 @@ class _WatchBottomControlBar extends StatelessWidget {
               ),
             );
 
-            return Container(
-              height: barHeight,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: const Color(0xEE0E0E10),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withOpacity(0.10)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.32),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+            final barContent = useCompactLayout
+                ? ClipRect(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.center,
+                      child: controlsContent,
+                    ),
+                  )
+                : controlsContent;
+
+            return TwitchGlassSurface(
+              borderRadius: BorderRadius.circular(24),
+              backgroundColor: Colors.black.withOpacity(0.42),
+              borderColor: Colors.white.withOpacity(0.12),
+              blurSigma: 20,
+              boxShadow: TwitchGlassPanelShadow.soft(opacity: 0.36),
+              child: SizedBox(
+                height: barHeight,
+                child: barContent,
               ),
-              child: useCompactLayout
-                  ? ClipRect(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
-                        child: controlsContent,
-                      ),
-                    )
-                  : controlsContent,
             );
           },
         );
@@ -248,78 +244,74 @@ class _LivePlaybackSheetButton extends StatelessWidget {
           top: false,
           child: Align(
             alignment: Alignment.bottomCenter,
-            child: Container(
-              width: sheetWidth,
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-              decoration: BoxDecoration(
-                color: const Color(0xF20E0E10),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white.withOpacity(0.12)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.45),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 36,
-                      height: 4,
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                    ),
-                  ),
-                  Row(
+            child: TwitchGlassSurface(
+              borderRadius: BorderRadius.circular(22),
+              backgroundColor: Colors.black.withOpacity(0.50),
+              borderColor: Colors.white.withOpacity(0.13),
+              blurSigma: 22,
+              boxShadow: TwitchGlassPanelShadow.soft(opacity: 0.45),
+              child: SizedBox(
+                width: sheetWidth,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.timeline_rounded,
-                        color: Color(0xFFBF94FF),
-                        size: 17,
-                      ),
-                      const SizedBox(width: 7),
-                      const Expanded(
-                        child: Text(
-                          '播放進度',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white24,
+                            borderRadius: BorderRadius.circular(999),
                           ),
                         ),
                       ),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(999),
-                        onTap: () => Navigator.of(sheetContext).maybePop(),
-                        child: const Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Icon(
-                            Icons.close_rounded,
-                            color: Colors.white54,
-                            size: 19,
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.timeline_rounded,
+                            color: Color(0xFFBF94FF),
+                            size: 17,
                           ),
-                        ),
+                          const SizedBox(width: 7),
+                          const Expanded(
+                            child: Text(
+                              '播放進度',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: () => Navigator.of(sheetContext).maybePop(),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.close_rounded,
+                                color: Colors.white54,
+                                size: 19,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TwitchLivePlaybackStrip(
+                        player: player,
+                        playerRuntime: playerRuntime,
+                        compact: false,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  TwitchLivePlaybackStrip(
-                    player: player,
-                    playerRuntime: playerRuntime,
-                    compact: false,
-                  ),
-                ],
+                ),
               ),
             ),
           ),
