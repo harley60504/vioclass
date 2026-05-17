@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_models_stage179_official_limits
+// PATCH VERSION: twitch_emote_picker_models_stage180_no_official_hard_limit
 //
 // Shared enums, constants and non-widget helpers for Twitch emote picker sheets.
 
@@ -9,8 +9,6 @@ import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 
 const int twitchThirdPartyGridLimit = 96;
 const int twitchCombinedGridLimit = 120;
-const int twitchOfficialGridLimit = 180;
-const int twitchOfficialIdGridLimit = 240;
 const int twitchEmoteGridCacheSize = 96;
 const int twitchEmotePreviewCacheSize = 144;
 const Duration twitchEmoteSearchDebounceDuration = Duration(milliseconds: 180);
@@ -130,13 +128,11 @@ List<TwitchThirdPartyEmote> filterThirdPartyEmotes({
 List<TwitchOfficialEmote> filterOfficialEmotes({
   required List<TwitchOfficialEmote> source,
   required String query,
-  int limit = twitchOfficialGridLimit,
 }) {
   final lowerQuery = query.trim().toLowerCase();
   return source
       .where((emote) => lowerQuery.isEmpty ||
           emote.name.toLowerCase().contains(lowerQuery) ||
           emote.id.toLowerCase().contains(lowerQuery))
-      .take(limit)
       .toList(growable: false);
 }
