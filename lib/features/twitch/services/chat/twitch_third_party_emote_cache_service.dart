@@ -304,7 +304,16 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       imageUrl: imageUrl,
       provider: provider,
       isZeroWidth: json['isZeroWidth'] == true,
+      width: _readInt(json['width']),
+      height: _readInt(json['height']),
     );
+  }
+
+  int? _readInt(Object? value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    return int.tryParse(value.toString());
   }
 
   Future<void> loadForChannel({
