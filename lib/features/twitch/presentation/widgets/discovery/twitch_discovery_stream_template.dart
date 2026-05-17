@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_discovery_stream_template_stage105_fixed_project_paths
+// PATCH VERSION: twitch_discovery_stream_template_stage135_watch_route_guard
 // Shared discovery stream grid for FollowingPage and BrowsePage.
 
 import 'dart:async';
@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
-import '../../pages/twitch_watch_page.dart';
+import '../../pages/twitch_watch_route_guard.dart';
 import 'twitch_stream_card.dart';
 
 class TwitchDiscoveryStreamGrid extends StatelessWidget {
@@ -84,7 +84,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   void _openWatchPage(BuildContext context, TwitchLiveStream stream) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => TwitchWatchPage(
+        builder: (_) => TwitchWatchRouteGuard(
           initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
         ),
       ),
