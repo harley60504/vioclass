@@ -22,6 +22,10 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
   final String? viewerId;
+  final String fallbackProfileImageUrl;
+  final String fallbackDisplayName;
+  final String fallbackUserId;
+  final String fallbackLogin;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
   final int emoteCount;
   final bool loadingEmotes;
@@ -44,6 +48,10 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.runtime,
     required this.viewerLogin,
     required this.viewerId,
+    this.fallbackProfileImageUrl = '',
+    this.fallbackDisplayName = '',
+    this.fallbackUserId = '',
+    this.fallbackLogin = '',
     required this.thirdPartyEmoteCache,
     required this.emoteCount,
     required this.loadingEmotes,
@@ -210,6 +218,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                     onOpenPrediction: widget.onOpenPrediction,
                     showPinned: effectiveShowPinned,
                     showPrediction: effectiveShowPrediction,
+                    fallbackProfileImageUrl: widget.fallbackProfileImageUrl,
+                    fallbackDisplayName: widget.fallbackDisplayName,
+                    fallbackUserId: widget.fallbackUserId,
+                    fallbackLogin: widget.fallbackLogin,
                   ),
                 ),
               ),
@@ -533,7 +545,6 @@ class _ChannelPointsCompactButton extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _ChannelPointsIcon extends StatelessWidget {
