@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_runtime_message_tile_cached_images_stage110
+// PATCH VERSION: twitch_runtime_message_tile_fixed_height_emotes_stage142
 
 import 'package:flutter/material.dart';
 
@@ -750,22 +750,22 @@ class _TextOrThirdPartyEmote extends StatelessWidget {
       );
     }
 
-    final size = item.isZeroWidth
+    final height = item.isZeroWidth
         ? metrics.zeroWidthEmoteSize
         : metrics.thirdPartyEmoteSize;
-    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context))
-        .round()
-        .clamp(32, 96)
-        .toInt();
+    final width = (height * item.aspectRatio).clamp(height * 0.5, height * 4.0).toDouble();
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final cacheWidth = (width * devicePixelRatio).round().clamp(32, 160).toInt();
+    final cacheHeight = (height * devicePixelRatio).round().clamp(32, 96).toInt();
 
     return Tooltip(
       message: '${item.name} · ${item.providerLabel}',
       child: TwitchCachedImageLayer(
         imageUrl: item.imageUrl,
-        width: size,
-        height: size,
-        cacheWidth: cacheSize,
-        cacheHeight: cacheSize,
+        width: width,
+        height: height,
+        cacheWidth: cacheWidth,
+        cacheHeight: cacheHeight,
         fit: BoxFit.contain,
         fallbackColor: Colors.transparent,
         errorWidget: Text(
@@ -821,8 +821,10 @@ class _EmoteSegment extends StatelessWidget {
       );
     }
 
-    final size = metrics.emoteSize;
-    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context))
+    final height = metrics.emoteSize;
+    final width = height;
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final cacheSize = (height * devicePixelRatio)
         .round()
         .clamp(32, 96)
         .toInt();
@@ -835,8 +837,8 @@ class _EmoteSegment extends StatelessWidget {
           : segment.content,
       child: TwitchCachedImageLayer(
         imageUrl: imageUrl,
-        width: size,
-        height: size,
+        width: width,
+        height: height,
         cacheWidth: cacheSize,
         cacheHeight: cacheSize,
         fit: BoxFit.contain,
