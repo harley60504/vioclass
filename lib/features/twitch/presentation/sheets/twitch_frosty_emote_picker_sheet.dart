@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_frosty_emote_picker_sheet_stage219a
+// PATCH VERSION: twitch_frosty_emote_picker_sheet_stage219b_scroll_jank_fix
 //
 // Frosty-style experimental emote picker.
 //
@@ -6,9 +6,10 @@
 // - Keep the old emote picker files intact.
 // - Use a lightweight GridView.builder cell similar to Frosty's emote menu.
 // - Show all matching emotes instead of clipping third-party grids to 96 items.
-// - Use CachedNetworkImage for smoother repeated scrolling.
+// - Use CachedNetworkImage with explicit memory/disk cache sizing for smoother scrolling.
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -19,6 +20,9 @@ import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'emote_picker/twitch_emote_picker_models.dart';
+
+const int _frostyGridMemCacheSize = 96;
+const int _frostyGridDiskCacheSize = 128;
 
 Future<void> showTwitchFrostyEmotePickerSheet({
   required BuildContext context,
@@ -354,12 +358,10 @@ class _FrostyEmoteGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final width = media.size.width;
-    final height = media.size.height;
     final landscape = media.orientation == Orientation.landscape;
 
     final crossAxisCount = _resolveCrossAxisCount(
       width: width,
-      height: height,
       landscape: landscape,
     );
 
@@ -371,7 +373,7 @@ class _FrostyEmoteGrid extends StatelessWidget {
         addAutomaticKeepAlives: false,
         addRepaintBoundaries: true,
         addSemanticIndexes: false,
-        cacheExtent: 420,
+        cacheExtent: 180,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
           mainAxisSpacing: 2,
@@ -393,13 +395,14 @@ class _FrostyEmoteGrid extends StatelessWidget {
 
   int _resolveCrossAxisCount({
     required double width,
-    required double height,
     required bool landscape,
   }) {
-    if (width >= 1200) return landscape ? 14 : 10;
-    if (width >= 900) return landscape ? 12 : 9;
-    if (width >= 700) return landscape ? 10 : 8;
-    return landscape ? 8 : 6;
+    if (landscape) {
+      return width >= 700 ? 6 : 5;
+    }
+    if (width >= 900) return 8;
+    if (width >= 700) return 7;
+    return 6;
   }
 }
 
@@ -433,39 +436,80 @@ class _FrostyEmoteTile extends StatelessWidget {
                   color: Colors.white38,
                   size: 22,
                 )
-              : Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Opacity(
-                      opacity: locked ? 0.42 : 1,
-                      child: CachedNetworkImage(
-                        imageUrl: imageUrl,
-                        cacheKey: entry.stableKey,
-                        fit: BoxFit.contain,
-                        fadeInDuration: Duration.zero,
-                        fadeOutDuration: Duration.zero,
-                        useOldImageOnUrlChange: true,
-                        placeholder: (_, __) => const SizedBox.shrink(),
-                        errorWidget: (_, __, ___) => const Icon(
-                          Icons.broken_image_rounded,
-                          color: Colors.white38,
-                          size: 22,
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final side = math.max(
+                      24.0,
+                      math.min(constraints.maxWidth, constraints.maxHeight) * 0.84,
+                    );
+                    final image = _FrostyCachedEmoteImage(
+                      imageUrl: imageUrl,
+                      cacheKey: entry.stableKey,
+                      size: side,
+                      locked: locked,
+                    );
+
+                    if (!locked) return image;
+
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        image,
+                        const Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Icon(
+                            Icons.lock_rounded,
+                            color: Color(0xFFFFD166),
+                            size: 14,
+                          ),
                         ),
-                      ),
-                    ),
-                    if (locked)
-                      const Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Icon(
-                          Icons.lock_rounded,
-                          color: Color(0xFFFFD166),
-                          size: 14,
-                        ),
-                      ),
-                  ],
+                      ],
+                    );
+                  },
                 ),
         ),
+      ),
+    );
+  }
+}
+
+class _FrostyCachedEmoteImage extends StatelessWidget {
+  final String imageUrl;
+  final String cacheKey;
+  final double size;
+  final bool locked;
+
+  const _FrostyCachedEmoteImage({
+    required this.imageUrl,
+    required this.cacheKey,
+    required this.size,
+    required this.locked,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      cacheKey: cacheKey,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      memCacheWidth: _frostyGridMemCacheSize,
+      memCacheHeight: _frostyGridMemCacheSize,
+      maxWidthDiskCache: _frostyGridDiskCacheSize,
+      maxHeightDiskCache: _frostyGridDiskCacheSize,
+      filterQuality: FilterQuality.low,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      useOldImageOnUrlChange: true,
+      color: locked ? Colors.white.withOpacity(0.42) : null,
+      colorBlendMode: locked ? BlendMode.modulate : null,
+      placeholder: (_, __) => const SizedBox.shrink(),
+      errorWidget: (_, __, ___) => const Icon(
+        Icons.broken_image_rounded,
+        color: Colors.white38,
+        size: 22,
       ),
     );
   }
