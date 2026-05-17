@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage198_pinned_font_scale
+// PATCH VERSION: twitch_watch_chat_panel_stage208_translucent_chat_panel
 
 import 'dart:async';
 
@@ -141,26 +141,12 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
         .toList(growable: false);
     final prediction = widget.prediction;
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: <Color>[
-            Color(0xFF101014),
-            Color(0xFF0E0E10),
-          ],
-        ),
+        color: Colors.black.withOpacity(0.34),
         border: Border(
-          left: BorderSide(color: Colors.white.withOpacity(0.07)),
+          left: BorderSide(color: Colors.white.withOpacity(0.055)),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.22),
-            blurRadius: 16,
-            offset: const Offset(-7, 0),
-          ),
-        ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
