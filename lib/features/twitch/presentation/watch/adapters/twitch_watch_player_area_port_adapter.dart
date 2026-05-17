@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_port_adapters_stage187b_player_chat
+// PATCH VERSION: twitch_watch_port_adapters_stage187d_cleanup
 
 import 'dart:async';
 
@@ -169,7 +169,9 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       fallbackLogin: metadata.channelLogin,
       thirdPartyEmoteCache: emotes.thirdParty,
       emoteCount: emotes.thirdParty.count,
-      loadingEmotes: loadingEmotes || emotes.thirdParty.loading || emotes.official.loading,
+      loadingEmotes: loadingEmotes ||
+          emotes.thirdParty.loading ||
+          emotes.official.loading,
       channelPoints: channelPoints,
       pinnedMessages: pinnedMessages,
       prediction: prediction,
