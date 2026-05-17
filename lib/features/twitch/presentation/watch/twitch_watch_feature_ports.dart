@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage186g_chat_emote_ports
+// PATCH VERSION: twitch_watch_feature_ports_stage186h_relationship_port
 //
 // Feature-facing ports for Watch composition.
 //
@@ -9,6 +9,7 @@
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../api/channel/twitch_private_gql_relationship_api_service_v1.dart';
 import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../models/chat/twitch_chat_startup.dart';
@@ -314,6 +315,50 @@ class TwitchWatchRelationshipPort {
   final TwitchWatchRelationshipServices services;
 
   const TwitchWatchRelationshipPort({required this.services});
+
+  Future<TwitchPrivateGqlRelationshipSnapshot> fetchRelationship({
+    required String channelLogin,
+    String? targetUserId,
+    String? viewerUserId,
+  }) {
+    return services.relationshipApi.fetchRelationship(
+      channelLogin: channelLogin,
+      targetUserId: targetUserId,
+      viewerUserId: viewerUserId,
+    );
+  }
+
+  Future<TwitchPrivateGqlRelationshipSnapshot> followChannel({
+    required String channelLogin,
+    String? targetUserId,
+    String? viewerUserId,
+  }) {
+    return services.relationshipApi.followChannel(
+      channelLogin: channelLogin,
+      targetUserId: targetUserId,
+      viewerUserId: viewerUserId,
+    );
+  }
+
+  Future<TwitchPrivateGqlRelationshipSnapshot> unfollowChannel({
+    required String channelLogin,
+    String? targetUserId,
+    String? viewerUserId,
+  }) {
+    return services.relationshipApi.unfollowChannel(
+      channelLogin: channelLogin,
+      targetUserId: targetUserId,
+      viewerUserId: viewerUserId,
+    );
+  }
+
+  Uri buildSubscribeUri(String channelLogin) {
+    return services.subscribeApi.buildSubscribeUri(channelLogin);
+  }
+
+  Uri buildChannelUri(String channelLogin) {
+    return services.subscribeApi.buildChannelUri(channelLogin);
+  }
 }
 
 class TwitchWatchFeaturePorts {
