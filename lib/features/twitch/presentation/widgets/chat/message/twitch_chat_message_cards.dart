@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_cards_stage157
+// PATCH VERSION: twitch_chat_message_cards_stage158_hide_raw_msg_id
 //
 // Normal and special chat message card shells. The runtime tile chooses which
 // card to render; this file owns the visual card frames.
@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
-import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_content.dart';
 import 'twitch_chat_message_special_style.dart';
 import 'twitch_chat_message_timestamp.dart';
@@ -156,14 +155,6 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                             const SizedBox(width: 7),
                             TwitchChatTimestampChip(
                               time: message.receivedAt,
-                              metrics: metrics,
-                            ),
-                          ],
-                          if (metadata.msgId != null &&
-                              metadata.msgId!.trim().isNotEmpty) ...[
-                            const SizedBox(width: 6),
-                            TwitchChatSmallChip(
-                              label: metadata.msgId!,
                               metrics: metrics,
                             ),
                           ],
