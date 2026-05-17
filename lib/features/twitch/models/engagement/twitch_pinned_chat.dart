@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_pinned_chat_model_avatar_stage144
+// PATCH VERSION: twitch_pinned_chat_model_avatar_enrichment_stage145
 
 class TwitchPinnedChatMessage {
   final String pinId;
@@ -29,6 +29,24 @@ class TwitchPinnedChatMessage {
     final now = DateTime.now().toUtc();
     final end = endsAt;
     return end == null || end.isAfter(now);
+  }
+
+  TwitchPinnedChatMessage copyWith({
+    TwitchPinnedChatUser? sender,
+    TwitchPinnedChatUser? pinnedBy,
+  }) {
+    return TwitchPinnedChatMessage(
+      pinId: pinId,
+      type: type,
+      messageId: messageId,
+      text: text,
+      sentAt: sentAt,
+      startsAt: startsAt,
+      updatedAt: updatedAt,
+      endsAt: endsAt,
+      sender: sender ?? this.sender,
+      pinnedBy: pinnedBy ?? this.pinnedBy,
+    );
   }
 
   factory TwitchPinnedChatMessage.fromGqlNode(Map<String, dynamic> node) {
@@ -98,6 +116,7 @@ class TwitchPinnedChatMessage {
 
 class TwitchPinnedChatUser {
   final String id;
+  final String login;
   final String displayName;
   final String chatColor;
   final String profileImageUrl;
@@ -105,22 +124,53 @@ class TwitchPinnedChatUser {
 
   const TwitchPinnedChatUser({
     required this.id,
+    this.login = '',
     required this.displayName,
     this.chatColor = '',
     this.profileImageUrl = '',
     this.displayBadges = const <TwitchPinnedChatBadge>[],
   });
 
+  TwitchPinnedChatUser copyWith({
+    String? login,
+    String? displayName,
+    String? chatColor,
+    String? profileImageUrl,
+  }) {
+    return TwitchPinnedChatUser(
+      id: id,
+      login: login ?? this.login,
+      displayName: displayName ?? this.displayName,
+      chatColor: chatColor ?? this.chatColor,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      displayBadges: displayBadges,
+    );
+  }
+
   static TwitchPinnedChatUser? fromNullableJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
 
     return TwitchPinnedChatUser(
       id: value['id']?.toString() ?? '',
-      displayName: value['displayName']?.toString() ?? '',
+      login: _readLogin(value),
+      displayName: value['displayName']?.toString() ??
+          value['display_name']?.toString() ??
+          value['login']?.toString() ??
+          '',
       chatColor: value['chatColor']?.toString() ?? '',
       profileImageUrl: _readProfileImageUrl(value),
       displayBadges: TwitchPinnedChatBadge.listFromJson(value['displayBadges']),
     );
+  }
+
+  static String _readLogin(Map<String, dynamic> value) {
+    final login = value['login'] ??
+        value['name'] ??
+        value['userLogin'] ??
+        value['user_login'] ??
+        value['displayName'] ??
+        value['display_name'];
+    return login?.toString().trim().toLowerCase() ?? '';
   }
 
   static String _readProfileImageUrl(Map<String, dynamic> value) {
@@ -149,6 +199,7 @@ class TwitchPinnedChatUser {
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'id': id,
+      'login': login,
       'displayName': displayName,
       'chatColor': chatColor,
       'profileImageUrl': profileImageUrl,
