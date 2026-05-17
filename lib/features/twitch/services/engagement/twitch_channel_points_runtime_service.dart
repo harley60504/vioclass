@@ -18,11 +18,48 @@ class TwitchChannelPointsRuntimeService {
   Future<TwitchChannelPointsClaimResult> claimBonus({
     required String channelId,
     required String claimId,
-  }) {
-    return channelPointsApi.claimBonus(
-      channelId: channelId,
-      claimId: claimId,
-    );
+  }) async {
+    try {
+      return await channelPointsApi.claimBonus(
+        channelId: channelId,
+        claimId: claimId,
+      );
+    } catch (error) {
+      // Twitch's community-points bonus claim is effectively idempotent from a
+      // UI perspective: the claim can disappear server-side even when the
+      // response path reports an error such as already claimed / not found / no
+      // longer available. StreamNook-style handling treats these as a consumed
+      // claim and lets the caller refresh the snapshot instead of keeping the
+      // gift button around until the user reopens the stream.
+      if (_looksLikeConsumedClaimError(error)) {
+        return TwitchChannelPointsClaimResult(
+          ok: true,
+          pointsEarned: 50,
+          raw: <String, dynamic>{
+            'bestEffort': true,
+            'source': 'runtime-consumed-claim-error',
+            'error': error.toString(),
+          },
+        );
+      }
+
+      rethrow;
+    }
+  }
+
+  bool _looksLikeConsumedClaimError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('already_claimed') ||
+        text.contains('already claimed') ||
+        text.contains('claim_not_found') ||
+        text.contains('claim not found') ||
+        text.contains('claim_not_available') ||
+        text.contains('claim not available') ||
+        text.contains('claim_unavailable') ||
+        text.contains('claim unavailable') ||
+        text.contains('not_found') ||
+        text.contains('not found') ||
+        text.contains('unavailable');
   }
 
   Future<TwitchChannelRewardRedeemResult> redeemReward({
