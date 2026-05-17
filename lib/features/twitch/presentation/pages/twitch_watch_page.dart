@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage187c_port_scope_adapters
+// PATCH VERSION: twitch_watch_page_stage187f_internal_cleanup
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -6,43 +6,26 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
-import '../../api/channel/twitch_private_gql_relationship_api_service_v1.dart';
-import '../../api/chat/twitch_chat_startup_api_service.dart';
 import '../../api/chat/twitch_irc_api_service.dart';
 import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
-import '../../api/core/twitch_gql_api_service.dart';
-import '../../api/core/twitch_web_gql_persisted_api_service.dart';
-import '../../api/engagement/twitch_channel_points_api_service.dart';
-import '../../api/engagement/twitch_drops_prediction_api_service.dart';
-import '../../api/engagement/twitch_pinned_chat_api_service.dart';
-import '../../api/engagement/twitch_prediction_api_service.dart';
-import '../../api/engagement/twitch_subscribe_api_service_v1.dart';
-import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/engagement/twitch_prediction.dart';
-import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
-import '../../services/chat/twitch_official_emote_cache_service.dart';
-import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
-import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
 import '../dialogs/twitch_subscribe_webview_dialog_v1.dart';
-import '../sheets/twitch_channel_points_sheet.dart';
-import '../sheets/twitch_emote_picker_sheet.dart';
-import '../sheets/twitch_prediction_bet_sheet.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
+import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
 import '../watch/twitch_watch_port_scope.dart';
 import '../watch/twitch_watch_scope.dart';
@@ -156,25 +139,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   late final TwitchDropsAuthService _dropsAuthService;
   late final TwitchWebGqlAuthService _webGqlAuthService;
   late final TwitchAuthApiService _authApi;
-  late final TwitchGqlApiService _publicGqlApi;
-  late final TwitchWebGqlPersistedApiService _publicWebGqlApi;
-  late final TwitchPlaybackApiService _playbackApi;
-  late final TwitchPlaylistPlayerRuntime _playerRuntime;
-  late final TwitchChatStartupApiService _chatStartupApi;
   late final TwitchRecentMessagesApiService _recentMessagesApi;
-  late final TwitchThirdPartyEmoteCacheService _thirdPartyEmotes;
-  late final TwitchOfficialEmoteCacheService _officialEmotes;
-  late final TwitchChannelPointsApiService _channelPointsApi;
-  late final TwitchPrivateGqlRelationshipApiServiceV1 _relationshipApi;
-  late final TwitchSubscribeApiServiceV1 _subscribeApi;
-  late final TwitchChannelPointsRuntimeService _channelPointsRuntimeService;
-  late final TwitchPinnedChatApiService _pinnedChatApi;
-  late final TwitchPredictionApiService _publicPredictionApi;
-  late final TwitchDropsPredictionApiService _dropsPredictionApi;
   late final TwitchMediaKitPlayerSession _playerSession;
 
   Player get _player => _playerSession.player;
-  VideoController get _videoController => _playerSession.videoController;
 
   StreamSubscription<double>? _playerVolumeSubscription;
   Timer? _volumePreferenceSaveDebounce;
@@ -220,6 +188,24 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   TwitchPredictionSnapshot? _prediction;
   List<dynamic> _pinnedMessages = const <dynamic>[];
 
+  TwitchWatchSheetPortLauncher get _sheetLauncher => TwitchWatchSheetPortLauncher(
+        emotes: _watchPorts.emotes,
+        engagement: _watchPorts.engagement,
+        showMessage: _showSnack,
+        insertMessageText: _insertMessageText,
+        refreshEngagement: _refreshEngagement,
+        refreshEmotes: _loadThirdPartyEmotes,
+        channelLogin: () => _channelLogin,
+        channelId: () => _channelId,
+        channelPointsSnapshot: () => _channelPointsSnapshot,
+        predictionSnapshot: () => _prediction,
+        loadingEmotes: () => _loadingEmotes,
+        emoteBootstrapping: () => _emoteBootstrapping,
+        loadingEngagement: () => _loadingEngagement,
+        engagementBootstrapping: () => _engagementBootstrapping,
+        enableChannelPointEmoteMenu: _enableChannelPointEmoteMenu,
+      );
+
   @override
   void initState() {
     super.initState();
@@ -237,21 +223,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     _dropsAuthService = _watchServices.dropsAuthService;
     _webGqlAuthService = _watchServices.webGqlAuthService;
     _authApi = _watchServices.authApi;
-    _publicGqlApi = _watchServices.publicGqlApi;
-    _publicWebGqlApi = _watchServices.publicWebGqlApi;
-    _playbackApi = _watchServices.playbackApi;
-    _playerRuntime = _watchServices.playerRuntime;
-    _chatStartupApi = _watchServices.chatStartupApi;
     _recentMessagesApi = _watchServices.recentMessagesApi;
-    _thirdPartyEmotes = _watchServices.thirdPartyEmotes;
-    _officialEmotes = _watchServices.officialEmotes;
-    _channelPointsApi = _watchServices.channelPointsApi;
-    _relationshipApi = _watchServices.relationshipApi;
-    _subscribeApi = _watchServices.subscribeApi;
-    _channelPointsRuntimeService = _watchServices.channelPointsRuntimeService;
-    _pinnedChatApi = _watchServices.pinnedChatApi;
-    _publicPredictionApi = _watchServices.publicPredictionApi;
-    _dropsPredictionApi = _watchServices.dropsPredictionApi;
     _playerSession = _watchServices.playerSession;
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -276,7 +248,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       unawaited(chatRuntime.disposeRuntime());
     }
 
-    _playerRuntime.dispose();
+    unawaited(_watchPorts.player.disposeRuntime());
     _volumePreferenceSaveDebounce?.cancel();
     _chatWidthPreferenceSaveDebounce?.cancel();
     unawaited(_saveVolumePreference());
@@ -593,34 +565,13 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     });
 
     try {
-      final uri = await _watchPorts.player.loadLivePlaylist(channelLogin: channel);
-      if (uri == null) throw StateError('播放清單載入失敗，沒有 playlist uri。');
       await _applyPlayerVolume();
-      await _playerSession.openOrResume(uri: uri.toString(), play: true);
+      await _watchPorts.player.openLive(channelLogin: channel);
       await _applyPlayerVolume();
       await _waitForInitialPlaybackSettle();
     } catch (error) {
       _playerError = error.toString();
       rethrow;
-    } finally {
-      if (mounted) setState(() => _loadingPlayer = false);
-    }
-  }
-
-  Future<void> _selectPlayerQuality(TwitchM3u8Variant variant) async {
-    if (_loadingPlayer) return;
-    setState(() {
-      _loadingPlayer = true;
-      _playerError = null;
-    });
-
-    try {
-      await _watchPorts.player.switchQuality(variant);
-      await _applyPlayerVolume();
-      await _waitForInitialPlaybackSettle();
-    } catch (error) {
-      _playerError = error.toString();
-      _showSnack('切換畫質失敗：$error');
     } finally {
       if (mounted) setState(() => _loadingPlayer = false);
     }
@@ -1007,130 +958,16 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     }
   }
 
-  Future<void> _openEmotePicker() async {
-    await showTwitchEmotePickerSheet(
-      context: context,
-      cache: _watchPorts.emotes.thirdParty,
-      officialCache: _watchPorts.emotes.official,
-      loading: _watchPorts.emotes.thirdParty.loading ||
-          _watchPorts.emotes.official.loading ||
-          _loadingEmotes ||
-          _emoteBootstrapping,
-      onRefresh: () => _loadThirdPartyEmotes(forceRefresh: true),
-      onEmoteSelected: (emoteText) {
-        final clean = emoteText.trim();
-        if (clean.isEmpty) return;
-        _insertMessageText('$clean ');
-      },
-    );
+  Future<void> _openEmotePicker() {
+    return _sheetLauncher.openEmotePicker(context);
   }
 
-  Future<void> _openChannelPointsSheet() async {
-    await showTwitchChannelPointsSheet(
-      context: context,
-      snapshot: _channelPointsSnapshot,
-      loading: _loadingEngagement || _engagementBootstrapping,
-      onRefresh: () => _refreshEngagement(showSnackOnError: true),
-      onClaim: _claimCommunityPoints,
-      onRedeemReward: _redeemChannelPointReward,
-      onLoadChannelPointEmotes: _enableChannelPointEmoteMenu
-          ? (_) => _loadChannelPointModifiableEmotes()
-          : null,
-    );
+  Future<void> _openChannelPointsSheet() {
+    return _sheetLauncher.openChannelPointsSheet(context);
   }
 
-  Future<List<TwitchChannelPointEmoteOption>> _loadChannelPointModifiableEmotes() async {
-    try {
-      return await _watchPorts.engagement.loadChannelPointEmotes(
-        channelLogin: _channelLogin,
-        channelId: _channelPointsSnapshot?.channelId ?? _channelId,
-      );
-    } catch (error) {
-      _showSnack('載入忠誠點數 emote 失敗：$error');
-      return const <TwitchChannelPointEmoteOption>[];
-    }
-  }
-
-  Future<void> _claimCommunityPoints(String claimId) async {
-    final channelId = _channelPointsSnapshot?.channelId ?? _channelId;
-    if (channelId == null || channelId.isEmpty) {
-      _showSnack('沒有 channelId，不能領取忠誠點數。');
-      return;
-    }
-
-    try {
-      final result = await _watchPorts.engagement.claimCommunityPoints(
-        channelId: channelId,
-        claimId: claimId,
-      );
-      _showSnack('已送出領取忠誠點數：+${result.pointsEarned}');
-      await _refreshEngagement(showSnackOnError: false);
-    } catch (error) {
-      _showSnack('領取失敗：$error');
-    }
-  }
-
-  Future<void> _redeemChannelPointReward(
-    Map<String, dynamic> reward,
-    String textInput,
-  ) async {
-    final channelId = _channelPointsSnapshot?.channelId ?? _channelId;
-    if (channelId == null || channelId.isEmpty) {
-      _showSnack('沒有 channelId，不能兌換忠誠點數獎勵。');
-      return;
-    }
-
-    try {
-      final result = await _watchPorts.engagement.redeemReward(
-        channelId: channelId,
-        reward: reward,
-        textInput: textInput,
-      );
-      _showSnack('已兌換：${result.title}');
-      await _refreshEngagement(showSnackOnError: false);
-    } catch (error) {
-      _showSnack('兌換失敗：$error');
-    }
-  }
-
-  Future<void> _openPredictionBetSheet() async {
-    final prediction = _prediction;
-    if (prediction == null || !prediction.hasPrediction) {
-      _showSnack('目前沒有賭盤。');
-      return;
-    }
-
-    await showTwitchPredictionBetSheet(
-      context: context,
-      prediction: prediction,
-      onBet: _placePredictionBet,
-      onRefreshPrediction: () => _watchPorts.engagement.refreshPrediction(
-        channelLogin: _channelLogin,
-      ),
-    );
-  }
-
-  Future<void> _placePredictionBet(
-    TwitchPredictionOutcome outcome,
-    int points,
-  ) async {
-    final prediction = _prediction;
-    if (prediction == null || !prediction.hasPrediction) {
-      _showSnack('目前沒有可下注的賭盤。');
-      return;
-    }
-
-    try {
-      final result = await _watchPorts.engagement.placePredictionBet(
-        prediction: prediction,
-        outcome: outcome,
-        points: points,
-      );
-      _showSnack('已送出下注：${result.outcomeTitle} · ${result.points} 點');
-      await _refreshEngagement(showSnackOnError: false);
-    } catch (error) {
-      _showSnack('下注失敗：$error');
-    }
+  Future<void> _openPredictionBetSheet() {
+    return _sheetLauncher.openPredictionBetSheet(context);
   }
 
   void _insertMessageText(String text) {
