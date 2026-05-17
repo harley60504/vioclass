@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_chat_engagement_strip_streamnook_pinned_stage143
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -47,24 +49,23 @@ class TwitchChatEngagementStrip extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
       decoration: const BoxDecoration(
         color: Color(0xFF111116),
-        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
+        border: Border(bottom: BorderSide(color: Color(0xFF25252C))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (firstPinned != null) ...[
             _PinnedCard(message: firstPinned),
-            const SizedBox(height: 4),
+            if (hasPrediction) const SizedBox(height: 5),
           ],
-          if (hasPrediction) ...[
+          if (hasPrediction)
             _PredictionCard(
               prediction: currentPrediction,
               onOpen: onOpenPrediction,
             ),
-          ],
           if (error != null && error!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
@@ -91,66 +92,116 @@ class _PinnedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sender = message.sender?.displayName ?? message.pinnedBy?.displayName ?? 'Pinned';
+    final sender = _cleanName(message.sender?.displayName) ??
+        _cleanName(message.pinnedBy?.displayName) ??
+        'Pinned';
+    final pinnedBy = _cleanName(message.pinnedBy?.displayName);
+    final senderColor = _parseUserColor(message.sender?.chatColor) ??
+        _parseUserColor(message.pinnedBy?.chatColor) ??
+        const Color(0xFFBF94FF);
+    final metaText = pinnedBy == null || pinnedBy == sender
+        ? 'PINNED MESSAGE'
+        : 'PINNED BY $pinnedBy';
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+      padding: const EdgeInsets.fromLTRB(9, 7, 9, 7),
       decoration: BoxDecoration(
-        color: const Color(0xFF2A2315),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFFD166).withOpacity(0.35)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 12,
-            offset: Offset(0, 4),
-          ),
-        ],
+        color: const Color(0xFF17171D),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Colors.white.withOpacity(0.07)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.push_pin_rounded, color: Color(0xFFFFD166), size: 14),
-              SizedBox(width: 7),
-              Text(
-                '置頂留言',
-                style: TextStyle(
-                  color: Color(0xFFFFD166),
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF9146FF).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF9146FF).withOpacity(0.26),
               ),
-            ],
-          ),
-          const SizedBox(height: 3),
-          Text(
-            message.text,
-            maxLines: 4,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFFFE3A3),
-              fontSize: 13,
-              height: 1.35,
-              fontWeight: FontWeight.w800,
+            ),
+            child: const Icon(
+              Icons.push_pin_rounded,
+              color: Color(0xFFBF94FF),
+              size: 14,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Pinned by $sender',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white38,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        sender,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: senderColor,
+                          fontSize: 12.5,
+                          height: 1.1,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 7),
+                    Flexible(
+                      child: Text(
+                        metaText,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white38,
+                          fontSize: 9.5,
+                          height: 1.1,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message.text,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFF2F2F4),
+                    fontSize: 13,
+                    height: 1.24,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String? _cleanName(String? value) {
+    final text = value?.trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
+  }
+
+  Color? _parseUserColor(String? value) {
+    final text = value?.trim();
+    if (text == null || text.isEmpty) return null;
+    if (!text.startsWith('#') || text.length != 7) return null;
+    final parsed = int.tryParse(text.substring(1), radix: 16);
+    if (parsed == null) return null;
+    return Color(0xFF000000 | parsed);
   }
 }
 
@@ -447,210 +498,10 @@ class _PredictionSplitBar extends StatelessWidget {
   }
 }
 
-enum _OutcomeSide { left, right }
-
-class _OutcomeSummary extends StatelessWidget {
-  final TwitchPredictionOutcome outcome;
-  final int totalPoints;
-  final int totalUsers;
-  final _OutcomeSide side;
-
-  const _OutcomeSummary({
-    required this.outcome,
-    required this.totalPoints,
-    required this.totalUsers,
-    required this.side,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = side == _OutcomeSide.left
-        ? const Color(0xFF5BA1FF)
-        : const Color(0xFFFF6B85);
-    final total = totalPoints <= 0 ? outcome.points : totalPoints;
-    final odds = outcome.points <= 0 || total <= 0 ? null : total / outcome.points;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      decoration: BoxDecoration(
-        color: accent.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: outcome.isWinner
-              ? Colors.greenAccent.withOpacity(0.62)
-              : accent.withOpacity(0.34),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  outcome.title.isEmpty ? 'Outcome' : outcome.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (outcome.isWinner)
-                const _TinyOutcomeBadge(label: 'WIN', color: Colors.greenAccent),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _TinyOutcomeBadge(
-                label: '${_formatCompact(outcome.points)} 點',
-                color: accent,
-              ),
-              _TinyOutcomeBadge(
-                label: '${_formatCompact(outcome.users)} 人',
-                color: const Color(0xFFD9E4FF),
-              ),
-              if (odds != null)
-                _TinyOutcomeBadge(
-                  label: '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x',
-                  color: const Color(0xFFBFA8FF),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SingleOutcomeBar extends StatelessWidget {
-  final TwitchPredictionOutcome outcome;
-  final int totalPoints;
-
-  const _SingleOutcomeBar({
-    required this.outcome,
-    required this.totalPoints,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final odds =
-        outcome.points <= 0 || totalPoints <= 0 ? null : totalPoints / outcome.points;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1A1C24),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              outcome.title.isEmpty ? 'Outcome' : outcome.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              _TinyOutcomeBadge(
-                label: '${_formatCompact(outcome.points)} 點',
-                color: const Color(0xFF8A68FF),
-              ),
-              _TinyOutcomeBadge(
-                label: '${_formatCompact(outcome.users)} 人',
-                color: const Color(0xFF5BA1FF),
-              ),
-              if (odds != null)
-                _TinyOutcomeBadge(
-                  label: '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x',
-                  color: const Color(0xFFFF6B85),
-                ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TinyOutcomeBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _TinyOutcomeBadge({
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.36)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 9,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final String label;
-
-  const _MiniStat({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
 DateTime? _effectiveLocksAt(TwitchPredictionSnapshot prediction) {
   final explicit = prediction.locksAt;
   if (explicit != null) return explicit;
 
-  // StreamNook-style fallback: prediction lock time is created_at plus the
-  // prediction_window_seconds payload value from the realtime/GQL snapshot.
   final createdAt = prediction.createdAt ??
       _readDateFromRaw(prediction.rawPrediction, const <String>[
         'created_at',
@@ -690,23 +541,6 @@ int? _readIntFromRaw(Map<String, dynamic>? raw, List<String> keys) {
     if (parsed != null) return parsed;
   }
   return null;
-}
-
-String _formatCompact(int value) {
-  final absValue = value.abs();
-  if (absValue >= 1000000000) {
-    final v = value / 1000000000;
-    return '${v.toStringAsFixed(v.abs() >= 10 ? 1 : 2)}B';
-  }
-  if (absValue >= 1000000) {
-    final v = value / 1000000;
-    return '${v.toStringAsFixed(v.abs() >= 10 ? 1 : 2)}M';
-  }
-  if (absValue >= 1000) {
-    final v = value / 1000;
-    return '${v.toStringAsFixed(v.abs() >= 10 ? 1 : 2)}k';
-  }
-  return value.toString();
 }
 
 String _formatLockCountdown(Duration duration) {
