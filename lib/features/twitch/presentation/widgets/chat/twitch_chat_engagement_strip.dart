@@ -1,10 +1,9 @@
-// PATCH VERSION: twitch_chat_engagement_strip_prediction_extracted_stage151
+// PATCH VERSION: twitch_chat_engagement_strip_stage192_floating_cards
 
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
-import '../../theme/twitch_ui_tokens.dart';
 import 'cards/twitch_pinned_message_banner.dart';
 import 'cards/twitch_prediction_banner.dart';
 
@@ -58,10 +57,12 @@ class TwitchChatEngagementStrip extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
-      decoration: const BoxDecoration(
-        color: TwitchUiColors.surfaceAlt,
-        border: Border(bottom: BorderSide(color: TwitchUiColors.border)),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withOpacity(0.035)),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -74,7 +75,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
               fallbackUserId: fallbackUserId,
               fallbackLogin: fallbackLogin,
             ),
-            if (hasPrediction) const SizedBox(height: 5),
+            if (hasPrediction) const SizedBox(height: 8),
           ],
           if (hasPrediction)
             TwitchPredictionBanner(
@@ -82,15 +83,24 @@ class TwitchChatEngagementStrip extends StatelessWidget {
               onOpen: onOpenPrediction,
             ),
           if (error != null && error!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              error!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.orangeAccent,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.orangeAccent.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.orangeAccent.withOpacity(0.26)),
+              ),
+              child: Text(
+                error!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ],
