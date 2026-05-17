@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_pinned_message_banner_stage193_expand_copy
+// PATCH VERSION: twitch_pinned_message_banner_stage194_no_outer_shadow
 //
 // Extracted pinned-message UI component. Keep pinned card visuals here instead
 // of embedding style decisions inside the engagement strip.
@@ -67,10 +67,14 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
 
     return Material(
       color: Colors.transparent,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
       borderRadius: BorderRadius.circular(19),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(19),
+        splashColor: TwitchUiColors.primary.withOpacity(0.10),
+        highlightColor: TwitchUiColors.primary.withOpacity(0.06),
         onTap: () => setState(() => _expanded = !_expanded),
         onLongPress: _copyPinnedMessage,
         child: Ink(
@@ -85,14 +89,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
               ],
             ),
             borderRadius: BorderRadius.circular(19),
-            border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.25)),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: TwitchUiColors.primary.withOpacity(0.12),
-                blurRadius: 12,
-                offset: const Offset(0, 5),
-              ),
-            ],
+            border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.28)),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
