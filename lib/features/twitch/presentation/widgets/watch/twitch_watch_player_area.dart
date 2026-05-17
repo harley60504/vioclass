@@ -1,8 +1,10 @@
-// PATCH VERSION: watch_player_area_stage189a_glass_ui
+// PATCH VERSION: watch_player_area_stage201_transparent_player_background
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
 // Stage 189A: player chrome uses shared glass surfaces.
+// Stage 201: player area no longer paints a full black background, allowing the
+// WatchPage purple gradient background to show around letterboxed video.
 
 library twitch_watch_player_area;
 
@@ -121,8 +123,8 @@ class TwitchWatchPlayerArea extends StatelessWidget {
         final effectiveOnQualityChanged =
             onQualityChanged ?? onQualitySelected;
 
-        return Container(
-          color: Colors.black,
+        return ColoredBox(
+          color: Colors.black.withOpacity(0.18),
           child: Stack(
             children: [
               Positioned.fill(
