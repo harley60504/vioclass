@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_engagement_strip_streamnook_pinned_avatar_stage144
+// PATCH VERSION: twitch_chat_engagement_strip_extracted_ui_stage145
 
 import 'dart:async';
 
@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
-import '../shared/twitch_cached_image_layer.dart';
+import '../../theme/twitch_ui_tokens.dart';
+import 'cards/twitch_pinned_message_banner.dart';
 
 class TwitchChatEngagementStrip extends StatelessWidget {
   final List<TwitchPinnedChatMessage> pinnedMessages;
@@ -17,6 +18,10 @@ class TwitchChatEngagementStrip extends StatelessWidget {
   final VoidCallback onOpenPrediction;
   final bool showPinned;
   final bool showPrediction;
+  final String fallbackProfileImageUrl;
+  final String fallbackDisplayName;
+  final String fallbackUserId;
+  final String fallbackLogin;
 
   const TwitchChatEngagementStrip({
     super.key,
@@ -30,6 +35,10 @@ class TwitchChatEngagementStrip extends StatelessWidget {
     required this.onOpenPrediction,
     this.showPinned = true,
     this.showPrediction = true,
+    this.fallbackProfileImageUrl = '',
+    this.fallbackDisplayName = '',
+    this.fallbackUserId = '',
+    this.fallbackLogin = '',
   });
 
   @override
@@ -52,14 +61,20 @@ class TwitchChatEngagementStrip extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
       decoration: const BoxDecoration(
-        color: Color(0xFF111116),
-        border: Border(bottom: BorderSide(color: Color(0xFF25252C))),
+        color: TwitchUiColors.surfaceAlt,
+        border: Border(bottom: BorderSide(color: TwitchUiColors.border)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (firstPinned != null) ...[
-            _PinnedCard(message: firstPinned),
+            TwitchPinnedMessageBanner(
+              message: firstPinned,
+              fallbackProfileImageUrl: fallbackProfileImageUrl,
+              fallbackDisplayName: fallbackDisplayName,
+              fallbackUserId: fallbackUserId,
+              fallbackLogin: fallbackLogin,
+            ),
             if (hasPrediction) const SizedBox(height: 5),
           ],
           if (hasPrediction)
@@ -81,195 +96,6 @@ class TwitchChatEngagementStrip extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _PinnedCard extends StatelessWidget {
-  final TwitchPinnedChatMessage message;
-
-  const _PinnedCard({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    final senderUser = message.sender ?? message.pinnedBy;
-    final sender = _cleanName(senderUser?.displayName) ?? 'Pinned';
-    final pinnedBy = _cleanName(message.pinnedBy?.displayName);
-    final senderColor = _parseUserColor(senderUser?.chatColor) ?? const Color(0xFFBF94FF);
-    final avatarUrl = senderUser?.profileImageUrl.trim() ?? '';
-    final metaText = pinnedBy == null || pinnedBy == sender
-        ? 'PINNED MESSAGE'
-        : 'PINNED BY $pinnedBy';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(9, 7, 9, 7),
-      decoration: BoxDecoration(
-        color: const Color(0xFF17171D),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: Colors.white.withOpacity(0.07)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _PinnedAvatar(
-            imageUrl: avatarUrl,
-            displayName: sender,
-            color: senderColor,
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.push_pin_rounded,
-                      color: Color(0xFF9AA4B2),
-                      size: 12,
-                    ),
-                    const SizedBox(width: 5),
-                    Flexible(
-                      child: Text(
-                        sender,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: senderColor,
-                          fontSize: 12.5,
-                          height: 1.1,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        metaText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white38,
-                          fontSize: 9.5,
-                          height: 1.1,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message.text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFF2F2F4),
-                    fontSize: 13,
-                    height: 1.24,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String? _cleanName(String? value) {
-    final text = value?.trim();
-    if (text == null || text.isEmpty) return null;
-    return text;
-  }
-
-  Color? _parseUserColor(String? value) {
-    final text = value?.trim();
-    if (text == null || text.isEmpty) return null;
-    if (!text.startsWith('#') || text.length != 7) return null;
-    final parsed = int.tryParse(text.substring(1), radix: 16);
-    if (parsed == null) return null;
-    return Color(0xFF000000 | parsed);
-  }
-}
-
-class _PinnedAvatar extends StatelessWidget {
-  final String imageUrl;
-  final String displayName;
-  final Color color;
-
-  const _PinnedAvatar({
-    required this.imageUrl,
-    required this.displayName,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const size = 32.0;
-    final fallback = _fallbackText(displayName);
-
-    return SizedBox(
-      width: size,
-      height: size,
-      child: ClipOval(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.25),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                color.withOpacity(0.85),
-                const Color(0xFF23232B),
-              ],
-            ),
-          ),
-          child: imageUrl.isEmpty
-              ? _PinnedAvatarFallback(text: fallback)
-              : TwitchCachedImageLayer(
-                  imageUrl: imageUrl,
-                  width: size,
-                  height: size,
-                  cacheWidth: 64,
-                  cacheHeight: 64,
-                  fit: BoxFit.cover,
-                  fallbackColor: Colors.transparent,
-                  errorWidget: _PinnedAvatarFallback(text: fallback),
-                ),
-        ),
-      ),
-    );
-  }
-
-  String _fallbackText(String value) {
-    final text = value.trim();
-    if (text.isEmpty) return '?';
-    return String.fromCharCode(text.runes.first).toUpperCase();
-  }
-}
-
-class _PinnedAvatarFallback extends StatelessWidget {
-  final String text;
-
-  const _PinnedAvatarFallback({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          height: 1,
-          fontWeight: FontWeight.w900,
-        ),
       ),
     );
   }
@@ -301,22 +127,16 @@ class _PredictionCard extends StatelessWidget {
     final effectiveLocksAt = _effectiveLocksAt(prediction);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
       onTap: onOpen,
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
         decoration: BoxDecoration(
           color: const Color(0xE61A1328),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.42)),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x33000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
+          border: Border.all(color: TwitchUiColors.primary.withOpacity(0.42)),
+          boxShadow: TwitchUiShadows.soft,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -327,10 +147,10 @@ class _PredictionCard extends StatelessWidget {
                   width: 25,
                   height: 25,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF9146FF).withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(8),
+                    color: TwitchUiColors.primary.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
                     border: Border.all(
-                      color: const Color(0xFFBF94FF).withOpacity(0.32),
+                      color: TwitchUiColors.primarySoft.withOpacity(0.32),
                     ),
                   ),
                   child: Icon(
@@ -339,7 +159,7 @@ class _PredictionCard extends StatelessWidget {
                         : resolved
                             ? Icons.emoji_events_rounded
                             : Icons.how_to_vote_rounded,
-                    color: canceled ? Colors.orangeAccent : const Color(0xFFBF94FF),
+                    color: canceled ? Colors.orangeAccent : TwitchUiColors.primarySoft,
                     size: 13,
                   ),
                 ),
@@ -351,9 +171,9 @@ class _PredictionCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Color(0xFFF0E8FF),
-                      fontSize: 13,
+                      fontSize: TwitchUiFontSize.cardTitle,
                       height: 1.16,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: TwitchUiFontWeight.heavy,
                     ),
                   ),
                 ),
@@ -432,9 +252,7 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
   void _syncTimer() {
     _timer?.cancel();
     _timer = null;
-
     if (!_shouldTick) return;
-
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       if (!_shouldTick) {
@@ -476,13 +294,13 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
             ? Colors.greenAccent
             : urgent
                 ? Colors.orangeAccent
-                : const Color(0xFFBF94FF);
+                : TwitchUiColors.primarySoft;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: color.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
         border: Border.all(color: color.withOpacity(0.34)),
       ),
       child: Text(
@@ -491,8 +309,8 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: color,
-          fontSize: 10.5,
-          fontWeight: FontWeight.w900,
+          fontSize: TwitchUiFontSize.chip,
+          fontWeight: TwitchUiFontWeight.heavy,
         ),
       ),
     );
@@ -517,11 +335,9 @@ class _PredictionSplitBar extends StatelessWidget {
         ? 0.5
         : (left.points / total).clamp(0.0, 1.0).toDouble();
     final rightPercent = (1.0 - leftPercent).clamp(0.0, 1.0).toDouble();
-    final leftLabel = '${(leftPercent * 100).round()}%';
-    final rightLabel = '${(rightPercent * 100).round()}%';
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
+      borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
       child: SizedBox(
         height: 30,
         child: Row(
@@ -530,33 +346,33 @@ class _PredictionSplitBar extends StatelessWidget {
               flex: (leftPercent * 1000).round().clamp(1, 999).toInt(),
               child: Container(
                 height: 30,
-                color: const Color(0xFF2B7FFF).withOpacity(left.isWinner ? 0.96 : 0.78),
+                color: TwitchUiColors.blue.withOpacity(left.isWinner ? 0.96 : 0.78),
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.only(left: 10),
                 child: Text(
-                  leftLabel,
+                  '${(leftPercent * 100).round()}%',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: TwitchUiColors.textPrimary,
                     fontSize: 10,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: TwitchUiFontWeight.heavy,
                   ),
                 ),
               ),
             ),
-            Container(width: 1, color: const Color(0xFF111116)),
+            Container(width: 1, color: TwitchUiColors.surfaceAlt),
             Expanded(
               flex: (rightPercent * 1000).round().clamp(1, 999).toInt(),
               child: Container(
                 height: 30,
-                color: const Color(0xFFFF4B6E).withOpacity(right.isWinner ? 0.96 : 0.78),
+                color: TwitchUiColors.red.withOpacity(right.isWinner ? 0.96 : 0.78),
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 10),
                 child: Text(
-                  rightLabel,
+                  '${(rightPercent * 100).round()}%',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: TwitchUiColors.textPrimary,
                     fontSize: 10,
-                    fontWeight: FontWeight.w900,
+                    fontWeight: TwitchUiFontWeight.heavy,
                   ),
                 ),
               ),
@@ -618,11 +434,7 @@ String _formatLockCountdown(Duration duration) {
   final hours = safeSeconds ~/ 3600;
   final minutes = (safeSeconds % 3600) ~/ 60;
   final seconds = safeSeconds % 60;
-
   String two(int value) => value.toString().padLeft(2, '0');
-
-  if (hours > 0) {
-    return '$hours:${two(minutes)}:${two(seconds)}';
-  }
+  if (hours > 0) return '$hours:${two(minutes)}:${two(seconds)}';
   return '$minutes:${two(seconds)}';
 }
