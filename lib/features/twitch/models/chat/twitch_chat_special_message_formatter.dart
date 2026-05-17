@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_special_message_formatter_stage159
+// PATCH VERSION: twitch_chat_special_message_formatter_stage168_watch_streak
 //
 // Localizes Twitch IRC USERNOTICE / special message system text from msg-id and
 // msg-param-* tags. This keeps detailed special-message text out of the UI layer.
@@ -31,10 +31,18 @@ String? formatLocalizedTwitchSpecialSystemMessage({
       return _formatSub(actor: actor, tags: tags, resub: true);
     case 'subgift':
     case 'anonsubgift':
-      return _formatSubGift(actor: actor, tags: tags, anonymous: normalizedMsgId.startsWith('anon'));
+      return _formatSubGift(
+        actor: actor,
+        tags: tags,
+        anonymous: normalizedMsgId.startsWith('anon'),
+      );
     case 'submysterygift':
     case 'anonsubmysterygift':
-      return _formatSubMysteryGift(actor: actor, tags: tags, anonymous: normalizedMsgId.startsWith('anon'));
+      return _formatSubMysteryGift(
+        actor: actor,
+        tags: tags,
+        anonymous: normalizedMsgId.startsWith('anon'),
+      );
     case 'giftpaidupgrade':
       return _formatGiftPaidUpgrade(actor: actor, tags: tags, anonymous: false);
     case 'anongiftpaidupgrade':
@@ -47,6 +55,14 @@ String? formatLocalizedTwitchSpecialSystemMessage({
       return _formatBitsBadgeTier(actor: actor, tags: tags);
     case 'announcement':
       return null;
+  }
+
+  final localizedFallback = _formatKnownFallbackSystemMessage(
+    fallbackSystemMessage,
+    fallbackActor: actor,
+  );
+  if (localizedFallback != null && localizedFallback.isNotEmpty) {
+    return localizedFallback;
   }
 
   return _decodeTwitchTagText(fallbackSystemMessage);
@@ -201,6 +217,47 @@ String _formatBitsBadgeTier({
     return '$actor 獲得了 $threshold Bits 徽章';
   }
   return '$actor 獲得了新的 Bits 徽章';
+}
+
+String? _formatKnownFallbackSystemMessage(
+  String? fallbackSystemMessage, {
+  required String fallbackActor,
+}) {
+  final text = _decodeTwitchTagText(fallbackSystemMessage)?.trim();
+  if (text == null || text.isEmpty) return null;
+
+  final watchStreak = RegExp(
+    r'^(.+?) watched ([0-9,]+) consecutive streams and sparked a watch streak!?$',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (watchStreak != null) {
+    final actor = _cleanFallbackActor(watchStreak.group(1), fallbackActor);
+    final count = watchStreak.group(2)?.replaceAll(',', '') ?? '';
+    if (count.isNotEmpty) {
+      return '$actor 已連續觀看 $count 場直播，點燃了觀看連勝';
+    }
+    return '$actor 點燃了觀看連勝';
+  }
+
+  final watchStreakGeneric = RegExp(
+    r'^(.+?) watched ([0-9,]+) consecutive streams.*watch streak!?$',
+    caseSensitive: false,
+  ).firstMatch(text);
+  if (watchStreakGeneric != null) {
+    final actor = _cleanFallbackActor(watchStreakGeneric.group(1), fallbackActor);
+    final count = watchStreakGeneric.group(2)?.replaceAll(',', '') ?? '';
+    if (count.isNotEmpty) {
+      return '$actor 已連續觀看 $count 場直播，達成觀看連勝';
+    }
+  }
+
+  return null;
+}
+
+String _cleanFallbackActor(String? value, String fallbackActor) {
+  final clean = _decodeTwitchTagText(value)?.trim() ?? '';
+  if (clean.isNotEmpty) return clean;
+  return fallbackActor.trim().isEmpty ? '某位觀眾' : fallbackActor;
 }
 
 String _formatSubPlan(String value) {
