@@ -136,37 +136,37 @@ class TwitchChatMessageMetadata {
       case TwitchChatSpecialMessageKind.normal:
         return '';
       case TwitchChatSpecialMessageKind.action:
-        return 'Action';
+        return '動作訊息';
       case TwitchChatSpecialMessageKind.channelPointReward:
-        return 'Channel Points';
+        return '忠誠點數兌換';
       case TwitchChatSpecialMessageKind.bits:
-        return hasBits ? '${bitsAmount!} Bits' : 'Bits';
+        return hasBits ? '歡呼 ${bitsAmount!} Bits' : 'Bits 歡呼';
       case TwitchChatSpecialMessageKind.sub:
-        return 'Subscription';
+        return '訂閱';
       case TwitchChatSpecialMessageKind.resub:
-        return 'Resub';
+        return '重新訂閱';
       case TwitchChatSpecialMessageKind.subGift:
-        return 'Gift Sub';
+        return '贈送訂閱';
       case TwitchChatSpecialMessageKind.subMysteryGift:
-        return 'Gift Bomb';
+        return '大量贈訂';
       case TwitchChatSpecialMessageKind.giftPaidUpgrade:
-        return 'Gift Upgrade';
+        return '贈訂升級';
       case TwitchChatSpecialMessageKind.raid:
-        return 'Raid';
+        return '揪團襲來';
       case TwitchChatSpecialMessageKind.ritual:
-        return 'Ritual';
+        return '特殊互動';
       case TwitchChatSpecialMessageKind.bitsBadgeTier:
-        return 'Bits Badge';
+        return 'Bits 徽章';
       case TwitchChatSpecialMessageKind.announcement:
-        return 'Announcement';
+        return '公告';
       case TwitchChatSpecialMessageKind.notice:
-        return 'Notice';
+        return '系統提示';
       case TwitchChatSpecialMessageKind.clearChat:
-        return 'Chat Clear';
+        return '清除聊天室';
       case TwitchChatSpecialMessageKind.clearMsg:
-        return 'Message Deleted';
+        return '訊息已刪除';
       case TwitchChatSpecialMessageKind.system:
-        return 'System';
+        return '系統訊息';
     }
   }
 
