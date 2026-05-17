@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_engagement_strip_stage192_floating_cards
+// PATCH VERSION: twitch_chat_engagement_strip_stage193_no_outer_block
 
 import 'package:flutter/material.dart';
 
@@ -55,15 +55,8 @@ class TwitchChatEngagementStrip extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.035)),
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
