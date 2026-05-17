@@ -1,13 +1,15 @@
-// PATCH VERSION: twitch_watch_chat_resize_handle_stage209_gap_hitbox
+// PATCH VERSION: twitch_watch_chat_resize_handle_stage210_drag_start_callback
 
 import 'package:flutter/material.dart';
 
 class TwitchWatchChatResizeHandle extends StatefulWidget {
+  final ValueChanged<DragStartDetails>? onDragStart;
   final ValueChanged<DragUpdateDetails> onDragUpdate;
   final VoidCallback? onDragEnd;
 
   const TwitchWatchChatResizeHandle({
     super.key,
+    this.onDragStart,
     required this.onDragUpdate,
     this.onDragEnd,
   });
@@ -31,7 +33,10 @@ class _TwitchWatchChatResizeHandleState extends State<TwitchWatchChatResizeHandl
       onExit: (_) => setState(() => _hovering = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (_) => setState(() => _dragging = true),
+        onHorizontalDragStart: (details) {
+          widget.onDragStart?.call(details);
+          setState(() => _dragging = true);
+        },
         onHorizontalDragUpdate: widget.onDragUpdate,
         onHorizontalDragEnd: (_) {
           setState(() => _dragging = false);
