@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_stream_card_shared_cached_image_layer_stage109
+// PATCH VERSION: twitch_stream_card_stage189b_obvious_glass_cards
 
 import 'dart:math' as math;
 
@@ -68,55 +68,91 @@ class TwitchStreamCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = _StreamCardColors.fromContext(context);
-    final radius = BorderRadius.circular(18);
+    final radius = BorderRadius.circular(22);
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: <BoxShadow>[
           BoxShadow(
+            color: colors.purpleGlow,
+            blurRadius: 28,
+            spreadRadius: -8,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
             color: colors.shadow,
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
       child: Material(
-        color: colors.card,
+        color: Colors.transparent,
         borderRadius: radius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
-          child: Container(
+          child: Ink(
             decoration: BoxDecoration(
               borderRadius: radius,
-              border: Border.all(color: colors.border),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  colors.cardTop,
+                  colors.cardMiddle,
+                  colors.cardBottom,
+                ],
+              ),
+              border: Border.all(color: colors.border, width: 1.15),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                _StreamThumbnail(
-                  stream: stream,
-                  colors: colors,
-                ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxHeight < 130;
-                      return Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          12,
-                          compact ? 7 : 10,
-                          12,
-                          compact ? 8 : 11,
-                        ),
-                        child: _StreamInfo(
-                          stream: stream,
-                          colors: colors,
-                        ),
-                      );
-                    },
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 0,
+                  height: 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[
+                          const Color(0xFF9146FF).withOpacity(0.0),
+                          const Color(0xFFBF94FF).withOpacity(0.70),
+                          const Color(0xFF9146FF).withOpacity(0.0),
+                        ],
+                      ),
+                    ),
                   ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _StreamThumbnail(
+                      stream: stream,
+                      colors: colors,
+                    ),
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxHeight < 130;
+                          return Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              13,
+                              compact ? 8 : 11,
+                              13,
+                              compact ? 9 : 12,
+                            ),
+                            child: _StreamInfo(
+                              stream: stream,
+                              colors: colors,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -180,8 +216,9 @@ class _StreamThumbnail extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: <Color>[
-                      Colors.black.withValues(alpha: 0.08),
-                      Colors.black.withValues(alpha: 0.22),
+                      Colors.black.withOpacity(0.06),
+                      Colors.black.withOpacity(0.18),
+                      Colors.black.withOpacity(0.42),
                     ],
                   ),
                 ),
@@ -216,15 +253,16 @@ class _LiveBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFFE91916),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFFE91916).withValues(alpha: 0.32),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: const Color(0xFFE91916).withOpacity(0.48),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -253,11 +291,18 @@ class _ViewerBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+        color: Colors.black.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Text(
         '${_formatViewerCount(viewerCount)} viewers',
@@ -311,6 +356,12 @@ class _StreamInfo extends StatelessWidget {
                 fontSize: titleFontSize,
                 height: 1.13,
                 fontWeight: FontWeight.w900,
+                shadows: <Shadow>[
+                  Shadow(
+                    color: Colors.black.withOpacity(0.35),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
             ),
             SizedBox(height: gapAfterTitle),
@@ -369,15 +420,22 @@ class _GameBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: compact ? 26 : 30,
+      height: compact ? 27 : 31,
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 9,
+        horizontal: compact ? 8 : 10,
         vertical: compact ? 4 : 6,
       ),
       decoration: BoxDecoration(
         color: colors.gameBadge,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: colors.gameBorder),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: colors.gameBorder, width: 1.1),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: const Color(0xFF9146FF).withOpacity(0.20),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -421,12 +479,12 @@ class _LanguageBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: compact ? 26 : 30,
+      height: compact ? 27 : 31,
       alignment: Alignment.center,
-      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 8),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9),
       decoration: BoxDecoration(
         color: colors.softFill,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(11),
         border: Border.all(color: colors.border),
       ),
       child: Text(
@@ -461,7 +519,7 @@ class _StreamerFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final avatarSize = compact ? 26.0 : 30.0;
+    final avatarSize = compact ? 27.0 : 31.0;
 
     return Row(
       children: [
@@ -470,7 +528,7 @@ class _StreamerFooter extends StatelessWidget {
           colors: colors,
           size: avatarSize,
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 9),
         Expanded(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -530,6 +588,12 @@ class _Avatar extends StatelessWidget {
         color: colors.softFill,
         shape: BoxShape.circle,
         border: Border.all(color: colors.border),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: const Color(0xFF9146FF).withOpacity(0.20),
+            blurRadius: 12,
+          ),
+        ],
       ),
       child: TwitchCachedImageLayer.avatar(
         imageUrl: imageUrl,
@@ -545,9 +609,12 @@ class _Avatar extends StatelessWidget {
 }
 
 class _StreamCardColors {
-  final Color card;
+  final Color cardTop;
+  final Color cardMiddle;
+  final Color cardBottom;
   final Color border;
   final Color shadow;
+  final Color purpleGlow;
   final Color thumbnailFallback;
   final Color softFill;
   final Color primaryText;
@@ -559,9 +626,12 @@ class _StreamCardColors {
   final Color gameText;
 
   const _StreamCardColors({
-    required this.card,
+    required this.cardTop,
+    required this.cardMiddle,
+    required this.cardBottom,
     required this.border,
     required this.shadow,
+    required this.purpleGlow,
     required this.thumbnailFallback,
     required this.softFill,
     required this.primaryText,
@@ -577,18 +647,21 @@ class _StreamCardColors {
     const twitchPurple = Color(0xFF9146FF);
 
     return _StreamCardColors(
-      card: const Color(0xFF18181F),
-      border: Colors.white.withValues(alpha: 0.085),
-      shadow: Colors.black.withValues(alpha: 0.40),
+      cardTop: const Color(0xFF23202D).withOpacity(0.98),
+      cardMiddle: const Color(0xFF191922).withOpacity(0.96),
+      cardBottom: const Color(0xFF15151C).withOpacity(0.98),
+      border: twitchPurple.withOpacity(0.24),
+      shadow: Colors.black.withOpacity(0.50),
+      purpleGlow: twitchPurple.withOpacity(0.20),
       thumbnailFallback: const Color(0xFF111116),
-      softFill: Colors.white.withValues(alpha: 0.055),
+      softFill: Colors.white.withOpacity(0.075),
       primaryText: Colors.white,
-      secondaryText: Colors.white.withValues(alpha: 0.74),
-      mutedText: Colors.white.withValues(alpha: 0.42),
+      secondaryText: Colors.white.withOpacity(0.78),
+      mutedText: Colors.white.withOpacity(0.46),
       accent: const Color(0xFFBF94FF),
-      gameBadge: twitchPurple.withValues(alpha: 0.18),
-      gameBorder: twitchPurple.withValues(alpha: 0.42),
-      gameText: const Color(0xFFE4D3FF),
+      gameBadge: twitchPurple.withOpacity(0.26),
+      gameBorder: twitchPurple.withOpacity(0.58),
+      gameText: const Color(0xFFF0E7FF),
     );
   }
 }
