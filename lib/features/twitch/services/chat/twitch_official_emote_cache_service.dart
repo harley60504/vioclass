@@ -94,6 +94,36 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     return output;
   }
 
+  /// Usable official emotes that are not Twitch global emotes.
+  ///
+  /// This is intended for the normal emote picker tab「我的可用」:
+  /// - keep subscription / owned / channel-unlocked official emotes
+  /// - exclude all Twitch global emotes by normalized id/name key
+  ///
+  /// Do not use this getter for Channel Points emote-ID rewards; those pickers
+  /// can need a different source mix depending on the reward type.
+  List<TwitchOfficialEmote> get nonGlobalUsableEmotes {
+    final globalKeys = _globalEmotes.map(_key).toSet();
+    final byKey = <String, TwitchOfficialEmote>{};
+
+    for (final emote in _channelEmotes.where((emote) => emote.unlocked)) {
+      final key = _key(emote);
+      if (globalKeys.contains(key)) continue;
+      byKey[key] = emote;
+    }
+
+    for (final emote in _userEmotes) {
+      final key = _key(emote);
+      if (globalKeys.contains(key)) continue;
+      byKey[key] = emote;
+    }
+
+    final output = byKey.values.toList(growable: false)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    return output;
+  }
+
   int get visibleCount {
     return usableEmotes.length + _lockedChannelEmotes.length;
   }
@@ -562,6 +592,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       'userCount': userEmotes.length,
       'lockedCount': lockedChannelEmotes.length,
       'usableCount': usableEmotes.length,
+      'nonGlobalUsableCount': nonGlobalUsableEmotes.length,
       'favoriteCount': favoriteCount,
       'favoritesLoaded': favoritesLoaded,
       'recentCount': recentCount,
