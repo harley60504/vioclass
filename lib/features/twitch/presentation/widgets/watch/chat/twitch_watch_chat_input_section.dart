@@ -1,6 +1,7 @@
-// PATCH VERSION: twitch_watch_chat_input_section_stage191_unified_glass
+// PATCH VERSION: twitch_watch_chat_input_section_stage199_translucent_inner
 //
-// Bottom input chrome for Watch chat. Keeps the panel as composition only.
+// Stage 199: gradients live on the main chat background only. Input section is
+// a translucent overlay surface.
 
 import 'package:flutter/material.dart';
 
@@ -41,24 +42,10 @@ class TwitchWatchChatInputSection extends StatelessWidget {
       bottom: true,
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[
-              const Color(0xFF181020).withOpacity(0.94),
-              const Color(0xFF0F0F15).withOpacity(0.98),
-            ],
-          ),
+          color: Colors.white.withOpacity(0.030),
           border: Border(
-            top: BorderSide(color: const Color(0xFF9146FF).withOpacity(0.20)),
+            top: BorderSide(color: Colors.white.withOpacity(0.060)),
           ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: Colors.black.withOpacity(0.30),
-              blurRadius: 18,
-              offset: const Offset(0, -8),
-            ),
-          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
