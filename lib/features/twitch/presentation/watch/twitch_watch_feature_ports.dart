@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage186f_player_port_operations
+// PATCH VERSION: twitch_watch_feature_ports_stage186g_chat_emote_ports
 //
 // Feature-facing ports for Watch composition.
 //
@@ -9,9 +9,13 @@
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../api/engagement/twitch_channel_points_api_service.dart';
+import '../../models/chat/twitch_chat_startup.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
+import '../../services/chat/twitch_official_emote_cache_service.dart';
+import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_feature_services.dart';
@@ -91,9 +95,23 @@ class TwitchWatchChatPort {
 
   const TwitchWatchChatPort({required this.services});
 
-  Future<dynamic> fetchStartupSnapshot({required String channelLogin}) {
+  Future<TwitchChatStartupSnapshot> fetchStartupSnapshot({
+    required String channelLogin,
+  }) {
     return services.chatStartupApi.fetchParsedStartupSnapshot(
       channelLogin: channelLogin,
+    );
+  }
+
+  Future<TwitchRecentMessagesResult> fetchRecentMessages({
+    required String channelLogin,
+    int limit = 100,
+    bool includeClearchat = false,
+  }) {
+    return services.recentMessagesApi.getRecentMessages(
+      channelLogin: channelLogin,
+      limit: limit,
+      includeClearchat: includeClearchat,
     );
   }
 }
@@ -102,6 +120,9 @@ class TwitchWatchEmotePort {
   final TwitchWatchEmoteServices services;
 
   const TwitchWatchEmotePort({required this.services});
+
+  TwitchThirdPartyEmoteCacheService get thirdParty => services.thirdPartyEmotes;
+  TwitchOfficialEmoteCacheService get official => services.officialEmotes;
 
   Future<void> loadForChannel({
     required String channelId,
@@ -120,6 +141,19 @@ class TwitchWatchEmotePort {
         forceRefresh: forceRefresh,
       ),
     ]);
+  }
+
+  Future<void> refreshForChannel({
+    required String channelId,
+    required String channelLogin,
+    required String viewerId,
+  }) {
+    return loadForChannel(
+      channelId: channelId,
+      channelLogin: channelLogin,
+      viewerId: viewerId,
+      forceRefresh: true,
+    );
   }
 
   void clear() {
