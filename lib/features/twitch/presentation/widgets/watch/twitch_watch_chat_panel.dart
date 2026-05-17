@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage189a_glass_panel
+// PATCH VERSION: twitch_watch_chat_panel_stage195_unified_panel_background
 
 import 'dart:async';
 
@@ -143,7 +143,14 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.36),
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Color(0xFF111018),
+            Color(0xFF0E0E10),
+          ],
+        ),
         border: Border(
           left: BorderSide(color: Colors.white.withOpacity(0.08)),
         ),
