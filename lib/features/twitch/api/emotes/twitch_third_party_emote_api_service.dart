@@ -97,6 +97,8 @@ class TwitchThirdPartyEmoteApiService {
           : 'https://cdn.betterttv.net/emote/$id/2x',
       provider: TwitchThirdPartyEmoteProvider.bttv,
       isZeroWidth: json['modifier'] == true,
+      width: _readInt(json['width']),
+      height: _readInt(json['height']),
     );
   }
 
@@ -151,6 +153,8 @@ class TwitchThirdPartyEmoteApiService {
       for (final item in emoticons.whereType<Map<String, dynamic>>()) {
         final id = item['id']?.toString() ?? '';
         final name = item['name']?.toString() ?? '';
+        final width = _readInt(item['width']);
+        final height = _readInt(item['height']);
         final urls = item['urls'];
 
         String imageUrl = '';
@@ -167,6 +171,8 @@ class TwitchThirdPartyEmoteApiService {
             name: name,
             imageUrl: imageUrl,
             provider: TwitchThirdPartyEmoteProvider.ffz,
+            width: width,
+            height: height,
           ),
         );
       }
@@ -216,6 +222,8 @@ class TwitchThirdPartyEmoteApiService {
       final hostMap = host is Map<String, dynamic> ? host : <String, dynamic>{};
 
       var imageUrl = '';
+      int? selectedWidth;
+      int? selectedHeight;
 
       final files = hostMap['files'];
       if (files is List && files.isNotEmpty) {
@@ -230,6 +238,9 @@ class TwitchThirdPartyEmoteApiService {
           (file) => (file['format']?.toString().toLowerCase() ?? '') == 'webp',
           orElse: () => candidates.first,
         );
+
+        selectedWidth = _readInt(selected['width']);
+        selectedHeight = _readInt(selected['height']);
 
         final fileName = selected['name']?.toString() ?? '';
         final url = hostMap['url']?.toString() ?? '';
@@ -250,6 +261,8 @@ class TwitchThirdPartyEmoteApiService {
           imageUrl: imageUrl,
           provider: TwitchThirdPartyEmoteProvider.sevenTv,
           isZeroWidth: (flags & 256) != 0,
+          width: selectedWidth,
+          height: selectedHeight,
         ),
       );
     }
