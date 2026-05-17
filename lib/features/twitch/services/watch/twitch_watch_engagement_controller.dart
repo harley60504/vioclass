@@ -1,12 +1,12 @@
-// PATCH VERSION: twitch_watch_engagement_controller_stage186
+// PATCH VERSION: twitch_watch_engagement_controller_stage186_fix_emote_option_type
 //
-// Moves WatchPage engagement API orchestration behind a controller. This is the
-// first step toward letting feature widgets/controllers talk to feature services
-// directly instead of routing every API call through TwitchWatchPage.
+// Engagement-only controller for Watch composition. This owns Channel Points,
+// Prediction, and pinned-message API orchestration so WatchPage can become a
+// composition layer instead of the only API gateway.
 
+import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
-import '../../api/engagement/twitch_channel_points_api_service.dart';
 import 'twitch_watch_services.dart';
 
 class TwitchWatchEngagementSnapshot {
@@ -98,10 +98,10 @@ class TwitchWatchEngagementController {
     );
   }
 
-  Future<TwitchChannelPointEmoteOptions> loadChannelPointEmotes({
+  Future<List<TwitchChannelPointEmoteOption>> loadChannelPointEmotes({
     required String channelLogin,
     required String? channelId,
-  }) async {
+  }) {
     return services.channelPointsApi.getModifiableEmotes(
       channelLogin: channelLogin,
       channelId: channelId,
