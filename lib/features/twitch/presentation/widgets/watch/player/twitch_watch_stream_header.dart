@@ -20,26 +20,22 @@ class _WatchCompactAvatarTile extends StatelessWidget {
 
     return Tooltip(
       message: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
-      child: Container(
-        width: tileSize,
-        height: tileSize,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: const Color(0xDD0E0E10),
-          borderRadius: BorderRadius.circular(tiny ? 12 : 14),
-          border: Border.all(color: Colors.white.withOpacity(0.10)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.20),
-              blurRadius: 10,
-              offset: const Offset(0, 6),
+      child: TwitchGlassSurface(
+        borderRadius: BorderRadius.circular(tiny ? 14 : 16),
+        backgroundColor: Colors.black.withOpacity(0.36),
+        borderColor: Colors.white.withOpacity(0.10),
+        blurSigma: 18,
+        boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.20),
+        child: SizedBox(
+          width: tileSize,
+          height: tileSize,
+          child: Center(
+            child: _WatchChannelAvatar(
+              imageUrl: profileImageUrl,
+              channelLogin: channelLogin,
+              size: size,
             ),
-          ],
-        ),
-        child: _WatchChannelAvatar(
-          imageUrl: profileImageUrl,
-          channelLogin: channelLogin,
-          size: size,
+          ),
         ),
       ),
     );
@@ -68,105 +64,102 @@ class _WatchStreamHeaderCard extends StatelessWidget {
 
     final avatarSize = compact ? 34.0 : 44.0;
 
-    return Container(
-      height: height,
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 16,
-        vertical: compact ? 5 : 9,
-      ),
-      decoration: BoxDecoration(
-        color: const Color(0xDD0E0E10),
-        borderRadius: BorderRadius.circular(compact ? 15 : 18),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.22),
-            blurRadius: compact ? 12 : 18,
-            offset: const Offset(0, 8),
+    return TwitchGlassSurface(
+      borderRadius: BorderRadius.circular(compact ? 16 : 20),
+      backgroundColor: Colors.black.withOpacity(0.38),
+      borderColor: Colors.white.withOpacity(0.11),
+      blurSigma: 18,
+      boxShadow: TwitchGlassPanelShadow.soft(opacity: compact ? 0.24 : 0.30),
+      child: SizedBox(
+        height: height,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 16,
+            vertical: compact ? 5 : 9,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          _WatchChannelAvatar(
-            imageUrl: profileImageUrl,
-            channelLogin: channelLogin,
-            size: avatarSize,
-          ),
-          SizedBox(width: compact ? 8 : 10),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          child: Row(
+            children: [
+              _WatchChannelAvatar(
+                imageUrl: profileImageUrl,
+                channelLogin: channelLogin,
+                size: avatarSize,
+              ),
+              SizedBox(width: compact ? 8 : 10),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Tooltip(
-                        message: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Tooltip(
+                            message: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
+                            child: Text(
+                              channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: compact ? 13.5 : 17,
+                                fontWeight: FontWeight.w900,
+                                height: 1.05,
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (viewerCount != null && viewerCount > 0) ...[
+                          SizedBox(width: compact ? 5 : 7),
+                          _WatchInfoPill(
+                            icon: Icons.visibility_rounded,
+                            label: _formatViewerCount(viewerCount),
+                            compact: compact,
+                          ),
+                        ],
+                        if (gameName.isNotEmpty) ...[
+                          SizedBox(width: compact ? 5 : 7),
+                          _WatchInfoPill(
+                            icon: Icons.sports_esports_rounded,
+                            label: gameName,
+                            copyText: gameName,
+                            compact: compact,
+                          ),
+                        ],
+                        if (language.isNotEmpty) ...[
+                          SizedBox(width: compact ? 5 : 7),
+                          _WatchInfoPill(
+                            icon: Icons.translate_rounded,
+                            label: language,
+                            copyText: metadata.language.trim(),
+                            compact: compact,
+                            maxWidth: compact ? 62 : 72,
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (streamTitle.isNotEmpty) ...[
+                      SizedBox(height: compact ? 3 : 4),
+                      Tooltip(
+                        message: streamTitle,
                         child: Text(
-                          channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
+                          streamTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white,
-                            fontSize: compact ? 13.5 : 17,
-                            fontWeight: FontWeight.w900,
+                            color: Colors.white70,
+                            fontSize: compact ? 11.5 : 13,
+                            fontWeight: FontWeight.w800,
                             height: 1.05,
                           ),
                         ),
                       ),
-                    ),
-                    if (viewerCount != null && viewerCount > 0) ...[
-                      SizedBox(width: compact ? 5 : 7),
-                      _WatchInfoPill(
-                        icon: Icons.visibility_rounded,
-                        label: _formatViewerCount(viewerCount),
-                        compact: compact,
-                      ),
-                    ],
-                    if (gameName.isNotEmpty) ...[
-                      SizedBox(width: compact ? 5 : 7),
-                      _WatchInfoPill(
-                        icon: Icons.sports_esports_rounded,
-                        label: gameName,
-                        copyText: gameName,
-                        compact: compact,
-                      ),
-                    ],
-                    if (language.isNotEmpty) ...[
-                      SizedBox(width: compact ? 5 : 7),
-                      _WatchInfoPill(
-                        icon: Icons.translate_rounded,
-                        label: language,
-                        copyText: metadata.language.trim(),
-                        compact: compact,
-                        maxWidth: compact ? 62 : 72,
-                      ),
                     ],
                   ],
                 ),
-                if (streamTitle.isNotEmpty) ...[
-                  SizedBox(height: compact ? 3 : 4),
-                  Tooltip(
-                    message: streamTitle,
-                    child: Text(
-                      streamTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: compact ? 11.5 : 13,
-                        fontWeight: FontWeight.w800,
-                        height: 1.05,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -283,7 +276,7 @@ class _WatchInfoPill extends StatelessWidget {
     return Tooltip(
       message: canCopy ? '點擊複製：$label' : label,
       child: Material(
-        color: Colors.white.withOpacity(0.07),
+        color: Colors.white.withOpacity(0.075),
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           borderRadius: BorderRadius.circular(999),
@@ -302,7 +295,7 @@ class _WatchInfoPill extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white.withOpacity(0.11)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
