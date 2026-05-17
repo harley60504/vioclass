@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage149_wired_extracted_ui
+// PATCH VERSION: twitch_watch_chat_panel_stage150_composed_sections
 
 import 'dart:async';
 
@@ -12,12 +12,11 @@ import '../../../services/engagement/twitch_channel_points_runtime_service.dart'
 import '../../settings/twitch_chat_appearance_controller.dart';
 import '../../sheets/twitch_chat_appearance_sheet.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
-import '../chat/twitch_chat_empty_view.dart';
-import '../chat/twitch_chat_engagement_strip.dart';
-import '../chat/twitch_chat_input_bar.dart';
-import '../chat/twitch_chat_message_list.dart';
+import 'chat/twitch_watch_chat_engagement_area.dart';
 import 'chat/twitch_watch_chat_header_bar.dart';
-import 'chat/twitch_watch_chat_utility_bar.dart';
+import 'chat/twitch_watch_chat_input_section.dart';
+import 'chat/twitch_watch_chat_layout_metrics.dart';
+import 'chat/twitch_watch_chat_message_area.dart';
 
 class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchChatRuntime? runtime;
@@ -143,41 +142,18 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     final prediction = widget.prediction;
 
     return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF111116),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF111116)),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final media = MediaQuery.of(context);
-          final keyboardVisible = media.viewInsets.bottom > 0;
-          final verticalCompact = constraints.maxHeight < 520 ||
-              (media.orientation == Orientation.landscape &&
-                  constraints.maxHeight < 620) ||
-              keyboardVisible;
-          final ultraVerticalCompact = constraints.maxHeight < 410;
-          final compactWidth = constraints.maxWidth < 300;
-          final maxEngagementHeight = ultraVerticalCompact
-              ? (constraints.maxHeight * 0.34).clamp(110.0, 180.0).toDouble()
-              : verticalCompact
-                  ? (constraints.maxHeight * 0.38).clamp(130.0, 230.0).toDouble()
-                  : (constraints.maxHeight * 0.42).clamp(160.0, 320.0).toDouble();
-          final headerHeight = verticalCompact ? 42.0 : 54.0;
-          final utilityBarHeight = (compactWidth || verticalCompact) ? 41.0 : 48.0;
-          final inputBarHeight = verticalCompact ? 48.0 : 54.0;
-          final fixedChromeHeight = headerHeight + utilityBarHeight + inputBarHeight;
-          final minMessageListHeight = keyboardVisible ? 84.0 : 56.0;
-          final maxUsableEngagementHeight = (constraints.maxHeight -
-                  fixedChromeHeight -
-                  minMessageListHeight)
-              .clamp(0.0, maxEngagementHeight)
-              .toDouble();
-          final minScrollableEngagementHeight = verticalCompact ? 72.0 : 88.0;
-          final hideOptionalEngagement =
-              keyboardVisible || maxUsableEngagementHeight < minScrollableEngagementHeight;
+          final metrics = TwitchWatchChatLayoutMetrics.resolve(
+            constraints: constraints,
+            media: MediaQuery.of(context),
+          );
           final predictionHasData = prediction != null && prediction.hasPrediction;
-          final effectiveShowPinned = showPinned && !hideOptionalEngagement;
-          final effectiveShowPrediction =
-              showPrediction && !hideOptionalEngagement && predictionHasData;
+          final effectiveShowPinned = showPinned && !metrics.hideOptionalEngagement;
+          final effectiveShowPrediction = showPrediction &&
+              !metrics.hideOptionalEngagement &&
+              predictionHasData;
 
           return Column(
             children: [
@@ -186,10 +162,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 showPinned: effectiveShowPinned,
                 showPrediction: showPrediction,
                 predictionVisible: effectiveShowPrediction,
-                hasPinned: pinned.isNotEmpty && !hideOptionalEngagement,
+                hasPinned: pinned.isNotEmpty && !metrics.hideOptionalEngagement,
                 hasPrediction: predictionHasData,
                 loading: widget.loadingEngagement,
-                compact: verticalCompact,
+                compact: metrics.verticalCompact,
                 onTogglePinned: () {
                   setState(() => showPinned = !showPinned);
                 },
@@ -202,84 +178,48 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                   controller: _appearanceController,
                 ),
               ),
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxUsableEngagementHeight),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.zero,
-                  physics: const ClampingScrollPhysics(),
-                  child: TwitchChatEngagementStrip(
-                    channelPoints: widget.channelPoints,
-                    pinnedMessages: pinned,
-                    prediction: effectiveShowPrediction ? prediction : null,
-                    loading: widget.loadingEngagement,
-                    error: widget.engagementError,
-                    onRefresh: widget.onRefreshEngagement,
-                    onOpenChannelPoints: widget.onOpenChannelPoints,
-                    onOpenPrediction: widget.onOpenPrediction,
-                    showPinned: effectiveShowPinned,
-                    showPrediction: effectiveShowPrediction,
-                    fallbackProfileImageUrl: widget.fallbackProfileImageUrl,
-                    fallbackDisplayName: widget.fallbackDisplayName,
-                    fallbackUserId: widget.fallbackUserId,
-                    fallbackLogin: widget.fallbackLogin,
-                  ),
-                ),
+              TwitchWatchChatEngagementArea(
+                maxHeight: metrics.maxUsableEngagementHeight,
+                channelPoints: widget.channelPoints,
+                pinnedMessages: pinned,
+                prediction: effectiveShowPrediction ? prediction : null,
+                loading: widget.loadingEngagement,
+                error: widget.engagementError,
+                showPinned: effectiveShowPinned,
+                showPrediction: effectiveShowPrediction,
+                fallbackProfileImageUrl: widget.fallbackProfileImageUrl,
+                fallbackDisplayName: widget.fallbackDisplayName,
+                fallbackUserId: widget.fallbackUserId,
+                fallbackLogin: widget.fallbackLogin,
+                onRefresh: widget.onRefreshEngagement,
+                onOpenChannelPoints: widget.onOpenChannelPoints,
+                onOpenPrediction: widget.onOpenPrediction,
               ),
               Expanded(
-                child: currentRuntime == null
-                    ? const TwitchChatEmptyView()
-                    : AnimatedBuilder(
-                        animation: Listenable.merge([
-                          currentRuntime,
-                          _appearanceController,
-                        ]),
-                        builder: (context, _) {
-                          return TwitchChatMessageList(
-                            runtime: currentRuntime,
-                            thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
-                            fontScale: _appearanceController.fontScale,
-                            compact: verticalCompact,
-                            onOpenMessageContext: (message) =>
-                                showTwitchChatMessageContextSheet(
-                              context: context,
-                              selectedMessage: message,
-                              messages: currentRuntime.messages,
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              SafeArea(
-                left: false,
-                right: false,
-                top: false,
-                bottom: true,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF111116),
-                    border: Border(top: BorderSide(color: Color(0xFF2D2D35))),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TwitchWatchChatUtilityBar(
-                        channelPoints: widget.channelPoints,
-                        loadingEmotes: widget.loadingEmotes,
-                        compact: compactWidth || verticalCompact,
-                        onOpenChannelPoints: widget.onOpenChannelPoints,
-                        onOpenEmotes: widget.onOpenEmotes,
-                      ),
-                      TwitchChatInputBar(
-                        controller: widget.messageController,
-                        enabled: currentRuntime?.connected ?? false,
-                        sending: widget.sending,
-                        compact: verticalCompact,
-                        onSend: widget.onSend,
-                        onOpenEmotes: widget.onOpenEmotes,
-                      ),
-                    ],
+                child: TwitchWatchChatMessageArea(
+                  runtime: currentRuntime,
+                  thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
+                  appearanceListenable: _appearanceController,
+                  fontScale: _appearanceController.fontScale,
+                  compact: metrics.verticalCompact,
+                  onOpenMessageContext: (message) =>
+                      showTwitchChatMessageContextSheet(
+                    context: context,
+                    selectedMessage: message,
+                    messages: currentRuntime?.messages ?? const [],
                   ),
                 ),
+              ),
+              TwitchWatchChatInputSection(
+                channelPoints: widget.channelPoints,
+                messageController: widget.messageController,
+                loadingEmotes: widget.loadingEmotes,
+                compact: metrics.compactUtilityBar,
+                enabled: currentRuntime?.connected ?? false,
+                sending: widget.sending,
+                onOpenChannelPoints: widget.onOpenChannelPoints,
+                onOpenEmotes: widget.onOpenEmotes,
+                onSend: widget.onSend,
               ),
             ],
           );
