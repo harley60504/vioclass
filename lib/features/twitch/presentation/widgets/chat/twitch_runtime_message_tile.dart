@@ -1,13 +1,16 @@
-// PATCH VERSION: twitch_runtime_message_tile_wired_helpers_stage153
+// PATCH VERSION: twitch_runtime_message_tile_stage154_extracted_helpers
 
 import 'package:flutter/material.dart';
 
-import '../../../models/chat/twitch_chat_message_metadata.dart';
 import '../../../models/chat/twitch_chat_render_segment.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../models/emotes/twitch_third_party_emote.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../shared/twitch_cached_image_layer.dart';
+import 'message/twitch_chat_message_chips.dart';
+import 'message/twitch_chat_message_reply_preview.dart';
+import 'message/twitch_chat_message_special_style.dart';
+import 'message/twitch_chat_message_timestamp.dart';
 import 'message/twitch_chat_message_user_style.dart';
 import 'message/twitch_chat_message_visual_metrics.dart';
 
@@ -37,7 +40,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     );
     final displayNameText = formatTwitchChatDisplayName(message);
     final metrics = TwitchChatMessageVisualMetrics(fontScale, compact: compact);
-    final style = _SpecialMessageStyle.fromMetadata(message.metadata);
+    final style = TwitchChatSpecialMessageStyle.fromMetadata(message.metadata);
 
     if (style != null) {
       return _SpecialMessageCard(
@@ -124,7 +127,7 @@ class _SpecialMessageCard extends StatelessWidget {
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final Color displayColor;
   final String displayNameText;
-  final _SpecialMessageStyle style;
+  final TwitchChatSpecialMessageStyle style;
   final bool showTimestamp;
   final TwitchChatMessageVisualMetrics metrics;
   final VoidCallback? onOpenContext;
@@ -203,7 +206,7 @@ class _SpecialMessageCard extends StatelessWidget {
                           ),
                           if (showTimestamp) ...[
                             const SizedBox(width: 7),
-                            _TimestampChip(
+                            TwitchChatTimestampChip(
                               time: message.receivedAt,
                               metrics: metrics,
                             ),
@@ -211,7 +214,7 @@ class _SpecialMessageCard extends StatelessWidget {
                           if (metadata.msgId != null &&
                               metadata.msgId!.trim().isNotEmpty) ...[
                             const SizedBox(width: 6),
-                            _SmallChip(
+                            TwitchChatSmallChip(
                               label: metadata.msgId!,
                               metrics: metrics,
                             ),
@@ -286,7 +289,7 @@ class _MessageContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (message.metadata.hasReply)
-          _ReplyPreview(message: message, metrics: metrics),
+          TwitchChatMessageReplyPreview(message: message, metrics: metrics),
         if (showSystemMessage && message.metadata.isSystemLike)
           Padding(
             padding: const EdgeInsets.only(bottom: 3),
@@ -309,7 +312,7 @@ class _MessageContent extends StatelessWidget {
             runSpacing: 3,
             children: [
               if (showTimestamp)
-                _TimestampText(time: message.receivedAt, metrics: metrics),
+                TwitchChatTimestampText(time: message.receivedAt, metrics: metrics),
               for (final badge in message.resolvedBadges)
                 if (badge.image1x.isNotEmpty)
                   Tooltip(
@@ -342,6 +345,8 @@ class _MessageContent extends StatelessWidget {
                       : FontStyle.normal,
                 ),
               ),
+              if (message.metadata.isFirstMessage)
+                TwitchChatFirstMessageChip(metrics: metrics),
               Text(
                 ':',
                 style: TextStyle(
@@ -367,183 +372,16 @@ class _MessageContent extends StatelessWidget {
                     metrics: metrics,
                   ),
               if (message.metadata.hasBits)
-                _BitsChip(bits: message.metadata.bitsAmount!, metrics: metrics),
+                TwitchChatBitsChip(
+                  bits: message.metadata.bitsAmount!,
+                  metrics: metrics,
+                ),
               if (message.metadata.isRewardRedemption)
-                _SmallChip(label: 'reward', metrics: metrics),
-              if (message.metadata.isFirstMessage)
-                _SmallChip(label: 'first', metrics: metrics),
+                TwitchChatSmallChip(label: 'reward', metrics: metrics),
             ],
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SpecialMessageStyle {
-  final Color accentColor;
-  final Color backgroundColor;
-  final Color borderColor;
-  final IconData icon;
-
-  const _SpecialMessageStyle({
-    required this.accentColor,
-    required this.backgroundColor,
-    required this.borderColor,
-    required this.icon,
-  });
-
-  static _SpecialMessageStyle? fromMetadata(TwitchChatMessageMetadata metadata) {
-    switch (metadata.specialKind) {
-      case TwitchChatSpecialMessageKind.channelPointReward:
-        return _style(
-          accent: const Color(0xFFB778FF),
-          icon: Icons.diamond_rounded,
-        );
-      case TwitchChatSpecialMessageKind.bits:
-      case TwitchChatSpecialMessageKind.bitsBadgeTier:
-        return _style(
-          accent: const Color(0xFFFFC857),
-          icon: Icons.auto_awesome_rounded,
-        );
-      case TwitchChatSpecialMessageKind.sub:
-      case TwitchChatSpecialMessageKind.resub:
-        return _style(
-          accent: const Color(0xFFFF75B7),
-          icon: Icons.star_rounded,
-        );
-      case TwitchChatSpecialMessageKind.subGift:
-      case TwitchChatSpecialMessageKind.subMysteryGift:
-      case TwitchChatSpecialMessageKind.giftPaidUpgrade:
-        return _style(
-          accent: const Color(0xFFFF9D5C),
-          icon: Icons.card_giftcard_rounded,
-        );
-      case TwitchChatSpecialMessageKind.raid:
-        return _style(
-          accent: const Color(0xFFFF5C5C),
-          icon: Icons.groups_rounded,
-        );
-      case TwitchChatSpecialMessageKind.announcement:
-        return _style(
-          accent: const Color(0xFF5CC8FF),
-          icon: Icons.campaign_rounded,
-        );
-      case TwitchChatSpecialMessageKind.notice:
-      case TwitchChatSpecialMessageKind.clearChat:
-      case TwitchChatSpecialMessageKind.clearMsg:
-      case TwitchChatSpecialMessageKind.system:
-        return _style(
-          accent: const Color(0xFFFFC857),
-          icon: Icons.info_outline_rounded,
-        );
-      case TwitchChatSpecialMessageKind.ritual:
-        return _style(
-          accent: const Color(0xFF7EE787),
-          icon: Icons.auto_awesome_rounded,
-        );
-      case TwitchChatSpecialMessageKind.normal:
-      case TwitchChatSpecialMessageKind.action:
-        return null;
-    }
-  }
-
-  static _SpecialMessageStyle _style({
-    required Color accent,
-    required IconData icon,
-  }) {
-    return _SpecialMessageStyle(
-      accentColor: accent,
-      backgroundColor: Color.alphaBlend(
-        accent.withOpacity(0.14),
-        const Color(0xFF191922),
-      ),
-      borderColor: accent.withOpacity(0.46),
-      icon: icon,
-    );
-  }
-}
-
-class _TimestampText extends StatelessWidget {
-  final DateTime time;
-  final TwitchChatMessageVisualMetrics metrics;
-
-  const _TimestampText({required this.time, required this.metrics});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      _formatTime(time),
-      style: TextStyle(
-        color: Colors.white38,
-        fontSize: metrics.metaFontSize,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
-
-class _TimestampChip extends StatelessWidget {
-  final DateTime time;
-  final TwitchChatMessageVisualMetrics metrics;
-
-  const _TimestampChip({required this.time, required this.metrics});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.09),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text(
-        _formatTime(time),
-        style: TextStyle(
-          color: Colors.white60,
-          fontSize: metrics.chipFontSize,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
-String _formatTime(DateTime time) {
-  final local = time.toLocal();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
-}
-
-class _ReplyPreview extends StatelessWidget {
-  final TwitchChatRuntimeMessage message;
-  final TwitchChatMessageVisualMetrics metrics;
-
-  const _ReplyPreview({required this.message, required this.metrics});
-
-  @override
-  Widget build(BuildContext context) {
-    final reply = message.metadata.replyInfo;
-    if (reply == null) return const SizedBox.shrink();
-
-    final name = reply.parentDisplayName.isEmpty
-        ? reply.parentUserLogin
-        : reply.parentDisplayName;
-    final body = reply.parentMsgBody;
-
-    return Padding(
-      padding: const EdgeInsets.only(left: 2, bottom: 3),
-      child: Text(
-        name.isEmpty && body.isEmpty ? 'reply' : '$name: $body',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.left,
-        style: TextStyle(
-          color: Colors.white38,
-          fontSize: metrics.metaFontSize,
-        ),
-      ),
     );
   }
 }
@@ -679,7 +517,9 @@ class _TextOrThirdPartyEmote extends StatelessWidget {
     final height = item.isZeroWidth
         ? metrics.zeroWidthEmoteSize
         : metrics.thirdPartyEmoteSize;
-    final width = (height * item.aspectRatio).clamp(height * 0.5, height * 4.0).toDouble();
+    final width = (height * item.aspectRatio)
+        .clamp(height * 0.5, height * 4.0)
+        .toDouble();
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final cacheWidth = (width * devicePixelRatio).round().clamp(32, 160).toInt();
     final cacheHeight = (height * devicePixelRatio).round().clamp(32, 96).toInt();
@@ -795,45 +635,6 @@ class _CheermoteSegment extends StatelessWidget {
         color: const Color(0xFFFFC857),
         fontWeight: FontWeight.w900,
         fontSize: metrics.messageFontSize,
-      ),
-    );
-  }
-}
-
-class _BitsChip extends StatelessWidget {
-  final int bits;
-  final TwitchChatMessageVisualMetrics metrics;
-
-  const _BitsChip({required this.bits, required this.metrics});
-
-  @override
-  Widget build(BuildContext context) {
-    return _SmallChip(label: '$bits bits', metrics: metrics);
-  }
-}
-
-class _SmallChip extends StatelessWidget {
-  final String label;
-  final TwitchChatMessageVisualMetrics metrics;
-
-  const _SmallChip({required this.label, required this.metrics});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: const Color(0xFF9146FF).withOpacity(0.22),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.35)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: const Color(0xFFBF94FF),
-          fontSize: metrics.chipFontSize,
-          fontWeight: FontWeight.w800,
-        ),
       ),
     );
   }
