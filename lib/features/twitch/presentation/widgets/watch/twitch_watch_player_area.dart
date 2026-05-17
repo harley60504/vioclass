@@ -1,13 +1,15 @@
-// PATCH VERSION: watch_player_area_stage205_restore_contain_fit
+// PATCH VERSION: watch_player_area_stage211_pane_edge_controls
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
 // Stage 189A: player chrome uses shared glass surfaces.
 // Stage 201: player area no longer paints a full black background, allowing the
-// WatchPage purple gradient background to show around letterboxed video.
+// WatchPage purple background to show around the video.
 // Stage 205: restore BoxFit.contain. BoxFit.cover can make media_kit's native
 // video surface appear clipped/overflowed outside the intended player region on
-// Windows. The no-black-bar work now belongs to responsive layout sizing.
+// Windows.
+// Stage 211: keep the video itself centered at 16:9, but move Watch controls to
+// the full player pane edges instead of the 16:9 video box edges.
 
 library twitch_watch_player_area;
 
@@ -37,6 +39,8 @@ part 'player/twitch_player_more_actions_button.dart';
 part 'player/twitch_player_quality_button.dart';
 part 'player/twitch_player_common_buttons.dart';
 part 'player/twitch_player_error_card.dart';
+
+const double _watchVideoAspectRatio = 16 / 9;
 
 class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -129,51 +133,90 @@ class TwitchWatchPlayerArea extends StatelessWidget {
         return ColoredBox(
           color: Colors.transparent,
           child: Stack(
+            clipBehavior: Clip.hardEdge,
             children: [
               Positioned.fill(
-                child: Video(
+                child: _WatchCenteredVideoSurface(
                   controller: videoController,
-                  fit: BoxFit.contain,
-                  // v37: 把 Watch Page 的控制列放進 media_kit Video.controls。
-                  // Windows 上原生 video surface 有時會蓋住 Flutter Stack overlay，
-                  // 造成「有聲音但黑畫面、控制列出不來」。放進 controls layer
-                  // 可避免控制列被 video surface 壓在下面。
-                  //
-                  // Stage 205: keep Video itself safe/contained. Avoid cover here
-                  // because native video surfaces may ignore Flutter clipping on
-                  // Windows and appear outside the player shell.
-                  controls: (_) => _WatchControlsOverlay(
-                    loading: loading ||
-                        playerRuntime.loading ||
-                        playerRuntime.switchingQuality,
-                    error: error,
-                    runtimeError: playerRuntime.error,
-                    metadata: metadata,
-                    isFollowing: isFollowing,
-                    followBusy: effectiveFollowBusy,
-                    onBack: onBack,
-                    onToggleFollow: onToggleFollow,
-                    onSubscribe: onSubscribe,
-                    onReload: onReload,
-                    onStop: onStop,
-                    player: player,
-                    playerRuntime: playerRuntime,
-                    muted: muted,
-                    volume: volume,
-                    fullscreen: effectiveFullscreen,
-                    chatVisible: effectiveChatVisible,
-                    showFullscreenButton: showFullscreenButton,
-                    onToggleMute: onToggleMute,
-                    onVolumeChanged: onVolumeChanged,
-                    qualityVariants: effectiveQualityVariants,
-                    currentVariant: effectiveCurrentVariant,
-                    onQualityChanged: effectiveOnQualityChanged,
-                    onToggleChat: onToggleChat,
-                    onToggleFullscreen: onToggleFullscreen,
-                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: _WatchControlsOverlay(
+                  loading: loading ||
+                      playerRuntime.loading ||
+                      playerRuntime.switchingQuality,
+                  error: error,
+                  runtimeError: playerRuntime.error,
+                  metadata: metadata,
+                  isFollowing: isFollowing,
+                  followBusy: effectiveFollowBusy,
+                  onBack: onBack,
+                  onToggleFollow: onToggleFollow,
+                  onSubscribe: onSubscribe,
+                  onReload: onReload,
+                  onStop: onStop,
+                  player: player,
+                  playerRuntime: playerRuntime,
+                  muted: muted,
+                  volume: volume,
+                  fullscreen: effectiveFullscreen,
+                  chatVisible: effectiveChatVisible,
+                  showFullscreenButton: showFullscreenButton,
+                  onToggleMute: onToggleMute,
+                  onVolumeChanged: onVolumeChanged,
+                  qualityVariants: effectiveQualityVariants,
+                  currentVariant: effectiveCurrentVariant,
+                  onQualityChanged: effectiveOnQualityChanged,
+                  onToggleChat: onToggleChat,
+                  onToggleFullscreen: onToggleFullscreen,
                 ),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WatchCenteredVideoSurface extends StatelessWidget {
+  final VideoController controller;
+
+  const _WatchCenteredVideoSurface({
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+
+        if (maxWidth <= 0 || maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        var width = maxWidth;
+        var height = width / _watchVideoAspectRatio;
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * _watchVideoAspectRatio;
+        }
+
+        width = width.clamp(1.0, maxWidth).toDouble();
+        height = height.clamp(1.0, maxHeight).toDouble();
+
+        return Center(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Video(
+              controller: controller,
+              fit: BoxFit.contain,
+              controls: NoVideoControls,
+            ),
           ),
         );
       },
