@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage133_pipeline_startup_mask
+// PATCH VERSION: twitch_watch_page_stage140_unblock_after_chat
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -350,18 +350,13 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         _loadingWatch ||
         _loadingPlayer ||
         _chatBootstrapping ||
-        _engagementBootstrapping ||
-        _emoteBootstrapping ||
-        _relationshipBootstrapping;
+        _connectingChat;
   }
 
   String get _startupMaskTitle {
     if (_loadingAuth) return '正在準備 Twitch 工作階段...';
     if (_loadingPlayer || _loadingWatch) return '正在載入直播...';
     if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
-    if (_engagementBootstrapping || _loadingEngagement) return '正在載入互動資料...';
-    if (_emoteBootstrapping || _loadingEmotes) return '正在整理貼圖資料...';
-    if (_relationshipBootstrapping || _checkingRelationship) return '正在同步頻道狀態...';
     return '正在載入...';
   }
 
@@ -1375,7 +1370,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
             Positioned.fill(
               child: _WatchBlockingStartupOverlay(
                 title: _startupMaskTitle,
-                subtitle: '正在分階段啟動播放器、聊天室與互動資料，請稍候。',
+                subtitle: '正在啟動播放器與聊天室，互動資料會在背景載入。',
               ),
             ),
         ],
