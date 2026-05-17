@@ -86,6 +86,12 @@ class TwitchMediaKitPlayerHost {
     }
   }
 
+  static Future<void> pauseShared() async {
+    final player = _player;
+    if (player == null) return;
+    await player.pause();
+  }
+
   static Future<void> pauseCurrent(TwitchMediaKitPlayerSession session) async {
     if (session.generation != _generation) return;
     await session.player.pause();
