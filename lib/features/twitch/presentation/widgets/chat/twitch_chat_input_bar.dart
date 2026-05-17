@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_chat_input_bar_stage191_unified_glass
+
 import 'package:flutter/material.dart';
 
 class TwitchChatInputBar extends StatelessWidget {
@@ -113,13 +115,22 @@ class _SelfDrawnInputField extends StatelessWidget {
         height: height,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1A24),
+          color: Colors.white.withOpacity(0.060),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: enabled
-                ? Colors.white.withOpacity(0.12)
-                : Colors.white.withOpacity(0.06),
+                ? const Color(0xFFBF94FF).withOpacity(0.22)
+                : Colors.white.withOpacity(0.065),
           ),
+          boxShadow: enabled
+              ? <BoxShadow>[
+                  BoxShadow(
+                    color: const Color(0xFF9146FF).withOpacity(0.10),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : const <BoxShadow>[],
         ),
         child: TextField(
           controller: controller,
@@ -174,7 +185,12 @@ class _SelfDrawnSendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = enabled ? Colors.white : Colors.white38;
-    final background = enabled ? const Color(0xFF5B3A86) : const Color(0xFF2A2236);
+    final background = enabled
+        ? const Color(0xFF9146FF).withOpacity(0.38)
+        : Colors.white.withOpacity(0.070);
+    final borderColor = enabled
+        ? const Color(0xFFBF94FF).withOpacity(0.46)
+        : Colors.white.withOpacity(0.085);
 
     return Material(
       color: background,
@@ -190,7 +206,16 @@ class _SelfDrawnSendButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.42)),
+            border: Border.all(color: borderColor),
+            boxShadow: enabled
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: const Color(0xFF9146FF).withOpacity(0.22),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : const <BoxShadow>[],
           ),
           child: sending
               ? SizedBox(
