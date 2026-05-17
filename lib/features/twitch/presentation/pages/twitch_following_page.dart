@@ -1,5 +1,8 @@
-// PATCH VERSION: twitch_following_page_stage105_fixed_project_paths
+// PATCH VERSION: twitch_following_page_stage213_soft_refresh_cards
 // Uses the same discovery template as BrowsePage and the actual project models/services.
+// Stage 213: refresh / re-enter updates stream cards in-place without clearing
+// the grid, so switching back to this page or pressing refresh does not cause a
+// full loading rebuild.
 
 import 'dart:async';
 
@@ -41,6 +44,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   bool loadingFirstPage = true;
   bool loadingMore = false;
   bool hasMore = true;
+
+  int _refreshGeneration = 0;
 
   static const List<Map<String, String>> languageFilters = <Map<String, String>>[
     {'label': '全部語言', 'value': ''},
@@ -99,32 +104,56 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     }
   }
 
-  Future<void> refreshStreams() async {
+  Future<void> refreshStreams({
+    bool clearExisting = false,
+    bool jumpToTop = false,
+  }) async {
     if (!mounted) return;
+
+    final generation = ++_refreshGeneration;
+    final hadExistingStreams = loadedStreams.isNotEmpty && !clearExisting;
+
     setState(() {
-      loadingFirstPage = true;
+      loadingFirstPage = !hadExistingStreams;
       errorText = null;
       paginationError = null;
-      nextCursor = null;
-      hasMore = true;
-      loadedStreams = const <TwitchLiveStream>[];
+      if (clearExisting) {
+        nextCursor = null;
+        hasMore = true;
+        loadedStreams = const <TwitchLiveStream>[];
+      }
     });
 
     try {
       final page = await widget.discoveryService.fetchFollowedStreams(first: 100);
       final streamsWithProfiles = await _attachProfileImages(page.streams);
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
+
       setState(() {
-        loadedStreams = streamsWithProfiles;
+        loadedStreams = hadExistingStreams
+            ? _mergeFirstPageStreams(
+                existing: loadedStreams,
+                firstPage: streamsWithProfiles,
+              )
+            : streamsWithProfiles;
         nextCursor = page.cursor;
         hasMore = page.hasMore;
         loadingFirstPage = false;
+        errorText = null;
+        paginationError = null;
       });
-      _jumpToTop();
+
+      if (jumpToTop || clearExisting) {
+        _jumpToTop();
+      }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       setState(() {
-        errorText = error.toString();
+        if (loadedStreams.isEmpty || clearExisting) {
+          errorText = error.toString();
+        } else {
+          paginationError = error.toString();
+        }
         loadingFirstPage = false;
       });
     }
@@ -151,9 +180,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       final streamsWithProfiles = await _attachProfileImages(page.streams);
       if (!mounted) return;
 
-      final existingIds = loadedStreams.map((stream) => stream.id).toSet();
+      final existingIds = loadedStreams.map(_streamIdentity).toSet();
       final uniqueNewStreams = streamsWithProfiles
-          .where((stream) => !existingIds.contains(stream.id))
+          .where((stream) => !existingIds.contains(_streamIdentity(stream)))
           .toList(growable: false);
 
       setState(() {
@@ -200,6 +229,34 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     } catch (_) {
       return streams;
     }
+  }
+
+  List<TwitchLiveStream> _mergeFirstPageStreams({
+    required List<TwitchLiveStream> existing,
+    required List<TwitchLiveStream> firstPage,
+  }) {
+    if (existing.isEmpty) return firstPage;
+
+    final firstPageIds = firstPage.map(_streamIdentity).toSet();
+    final existingTail = existing
+        .skip(firstPage.length)
+        .where((stream) => !firstPageIds.contains(_streamIdentity(stream)))
+        .toList(growable: false);
+
+    return <TwitchLiveStream>[
+      ...firstPage,
+      ...existingTail,
+    ];
+  }
+
+  String _streamIdentity(TwitchLiveStream stream) {
+    final id = stream.id.trim();
+    if (id.isNotEmpty) return 'id:$id';
+
+    final login = stream.channelLogin.trim().toLowerCase();
+    if (login.isNotEmpty) return 'login:$login';
+
+    return 'fallback:${stream.userName.trim().toLowerCase()}|${stream.title.trim()}';
   }
 
   void _jumpToTop() {
@@ -367,7 +424,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           statusText: message,
           loading: loadingFirstPage,
           onLoginPressed: () => unawaited(widget.onLoginPressed()),
-          onRetryPressed: () => unawaited(refreshStreams()),
+          onRetryPressed: () => unawaited(refreshStreams(clearExisting: true)),
         );
       }
 
@@ -375,7 +432,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         icon: Icons.error_outline_rounded,
         title: '追隨直播讀取失敗',
         message: message,
-        onRetry: () => unawaited(refreshStreams()),
+        onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
 
@@ -384,7 +441,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         icon: Icons.favorite_border_rounded,
         title: '目前追隨頻道沒有直播',
         message: '稍後重新整理，或切到瀏覽頁探索其他直播。',
-        onRetry: () => unawaited(refreshStreams()),
+        onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
 
