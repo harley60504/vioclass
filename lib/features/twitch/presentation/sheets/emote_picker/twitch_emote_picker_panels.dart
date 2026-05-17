@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_panels_stage176
+// PATCH VERSION: twitch_emote_picker_panels_stage179_official_category_filter
 //
 // Main content panels for the Twitch emote picker sheet.
 
@@ -289,11 +289,20 @@ class TwitchOfficialEmotePanel extends StatelessWidget {
       return TwitchEmotePickerEmptyState(text: emptyText);
     }
 
-    final global = filterOfficialEmotes(source: service.globalEmotes, query: query);
-    final usable = filterOfficialEmotes(source: service.usableEmotes, query: query)
-        .where((emote) => emote.source != TwitchOfficialEmoteSource.global)
-        .toList(growable: false);
-    final channel = filterOfficialEmotes(source: service.lockedChannelEmotes, query: query);
+    final global = filterOfficialEmotes(
+      source: service.globalEmotes,
+      query: query,
+    );
+    final usable = filterOfficialEmotes(
+      source: service.usableEmotes
+          .where((emote) => emote.source != TwitchOfficialEmoteSource.global)
+          .toList(growable: false),
+      query: query,
+    );
+    final channel = filterOfficialEmotes(
+      source: service.lockedChannelEmotes,
+      query: query,
+    );
 
     if (loading && service.visibleCount == 0) {
       return const Center(child: CircularProgressIndicator());
