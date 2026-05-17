@@ -1,5 +1,6 @@
 import './twitch_chat_message.dart';
 import './twitch_chat_reply_info.dart';
+import './twitch_chat_special_message_formatter.dart';
 
 enum TwitchChatSpecialMessageKind {
   normal,
@@ -66,9 +67,26 @@ class TwitchChatMessageMetadata {
         tags['source-broadcaster-id'];
     final bitsAmount = int.tryParse(tags['bits'] ?? '');
     final msgId = _emptyToNull(tags['msg-id']);
-    final systemMessage = _emptyToNull(tags['system-msg']);
+    final rawSystemMessage = _emptyToNull(tags['system-msg']);
     final customRewardId = _emptyToNull(tags['custom-reward-id']);
     final isAction = _isActionMessage(message);
+    final specialKind = _resolveSpecialKind(
+      message: message,
+      isAction: isAction,
+      bitsAmount: bitsAmount,
+      msgId: msgId,
+      customRewardId: customRewardId,
+      systemMessage: rawSystemMessage,
+    );
+    final localizedSystemMessage = _emptyToNull(
+      formatLocalizedTwitchSpecialSystemMessage(
+        message: message,
+        msgId: msgId,
+        bitsAmount: bitsAmount,
+        customRewardId: customRewardId,
+        fallbackSystemMessage: rawSystemMessage,
+      ),
+    );
 
     return TwitchChatMessageMetadata(
       command: message.command,
@@ -80,20 +98,13 @@ class TwitchChatMessageMetadata {
       isTurbo: tags['turbo'] == '1',
       bitsAmount: bitsAmount,
       msgId: msgId,
-      systemMessage: systemMessage,
+      systemMessage: localizedSystemMessage,
       customRewardId: customRewardId,
       replyInfo: reply.hasValue ? reply : null,
       sourceRoomId: _emptyToNull(sourceRoomId),
       isFromSharedChat: sourceRoomId != null && sourceRoomId.isNotEmpty,
       source: message.source,
-      specialKind: _resolveSpecialKind(
-        message: message,
-        isAction: isAction,
-        bitsAmount: bitsAmount,
-        msgId: msgId,
-        customRewardId: customRewardId,
-        systemMessage: systemMessage,
-      ),
+      specialKind: specialKind,
     );
   }
 
@@ -221,7 +232,11 @@ class TwitchChatMessageMetadata {
           return TwitchChatSpecialMessageKind.resub;
         case 'subgift':
           return TwitchChatSpecialMessageKind.subGift;
+        case 'anonsubgift':
+          return TwitchChatSpecialMessageKind.subGift;
         case 'submysterygift':
+          return TwitchChatSpecialMessageKind.subMysteryGift;
+        case 'anonsubmysterygift':
           return TwitchChatSpecialMessageKind.subMysteryGift;
         case 'giftpaidupgrade':
         case 'anongiftpaidupgrade':
