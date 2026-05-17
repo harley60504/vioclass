@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../api/engagement/twitch_channel_points_api_service.dart';
@@ -8,6 +6,7 @@ import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../widgets/channel_points/twitch_channel_points_emote_overlay.dart';
 import '../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import 'channel_points/twitch_channel_points_emote_overlay_state.dart';
 import 'channel_points/twitch_channel_points_redeem_payload_builder.dart';
 import 'channel_points/twitch_channel_points_sheet_body.dart';
 import 'channel_points/twitch_channel_points_sheet_models.dart';
@@ -79,15 +78,9 @@ class TwitchChannelPointsSheet extends StatefulWidget {
 }
 
 class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
-  ChannelPointEmoteOverlayMode? _emoteOverlayMode;
-  Map<String, dynamic>? _emoteOverlayReward;
-  List<TwitchChannelPointEmoteOption> _emoteOverlayEmotes = const <TwitchChannelPointEmoteOption>[];
-  TwitchChannelPointEmoteOption? _selectedBaseEmote;
-  bool _emoteOverlayLoading = false;
-  String? _emoteOverlayError;
-  String _emoteSearchQuery = '';
-
-  bool get _isEmoteOverlayVisible => _emoteOverlayMode != null;
+  TwitchChannelPointsEmoteOverlayState _emoteOverlay =
+      const TwitchChannelPointsEmoteOverlayState.hidden();
+  TwitchChannelPointEmoteCompleter? _emoteCompleter;
 
   @override
   Widget build(BuildContext context) {
@@ -122,27 +115,28 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
               onRewardTap: (reward) => _handleRewardTap(context, reward),
             ),
           ),
-          if (_isEmoteOverlayVisible)
+          if (_emoteOverlay.isVisible)
             Positioned.fill(
               child: ChannelPointEmoteMenuOverlay(
-                mode: _emoteOverlayMode!,
-                rewardTitle: channelPointRewardTitle(_emoteOverlayReward ?? const <String, dynamic>{}),
-                emotes: _visibleOverlayEmotes(),
-                selectedBaseEmote: _selectedBaseEmote,
-                loading: _emoteOverlayLoading,
-                error: _emoteOverlayError,
-                query: _emoteSearchQuery,
+                mode: _emoteOverlay.mode!,
+                rewardTitle: channelPointRewardTitle(
+                  _emoteOverlay.reward ?? const <String, dynamic>{},
+                ),
+                emotes: _emoteOverlay.visibleEmotes(),
+                selectedBaseEmote: _emoteOverlay.selectedBaseEmote,
+                loading: _emoteOverlay.loading,
+                error: _emoteOverlay.error,
+                query: _emoteOverlay.query,
                 onQueryChanged: (value) {
                   setState(() {
-                    _emoteSearchQuery = value.trim().toLowerCase();
+                    _emoteOverlay = _emoteOverlay.withQuery(value);
                   });
                 },
-                onBack: _selectedBaseEmote == null
+                onBack: _emoteOverlay.selectedBaseEmote == null
                     ? null
                     : () {
                         setState(() {
-                          _selectedBaseEmote = null;
-                          _emoteSearchQuery = '';
+                          _emoteOverlay = _emoteOverlay.clearBaseEmote();
                         });
                       },
                 onClose: _closeEmoteOverlay,
@@ -153,15 +147,6 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
             ),
         ],
       ),
-    );
-  }
-
-  List<TwitchChannelPointEmoteOption> _visibleOverlayEmotes() {
-    return filterChannelPointOverlayEmotes(
-      mode: _emoteOverlayMode,
-      emotes: _emoteOverlayEmotes,
-      selectedBaseEmote: _selectedBaseEmote,
-      query: _emoteSearchQuery,
     );
   }
 
@@ -211,59 +196,44 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     final completer = _emoteCompleter = TwitchChannelPointEmoteCompleter();
 
     setState(() {
-      _emoteOverlayMode = mode;
-      _emoteOverlayReward = reward;
-      _selectedBaseEmote = null;
-      _emoteSearchQuery = '';
-      _emoteOverlayEmotes = const <TwitchChannelPointEmoteOption>[];
-      _emoteOverlayError = null;
-      _emoteOverlayLoading = true;
+      _emoteOverlay = _emoteOverlay.opened(mode: mode, reward: reward);
     });
 
     try {
       final loaded = await loader(reward);
       if (!mounted || completer.isCompleted) return completer.future;
       setState(() {
-        _emoteOverlayEmotes = loaded;
-        _emoteOverlayLoading = false;
+        _emoteOverlay = _emoteOverlay.loaded(loaded);
       });
     } catch (error) {
       if (!mounted || completer.isCompleted) return completer.future;
       setState(() {
-        _emoteOverlayLoading = false;
-        _emoteOverlayError = error.toString();
+        _emoteOverlay = _emoteOverlay.failed(error);
       });
     }
 
     return completer.future;
   }
 
-  TwitchChannelPointEmoteCompleter? _emoteCompleter;
-
   Future<void> _reloadEmoteOverlay() async {
-    final reward = _emoteOverlayReward;
+    final reward = _emoteOverlay.reward;
     final loader = widget.onLoadChannelPointEmotes;
     if (reward == null || loader == null) return;
 
     setState(() {
-      _emoteOverlayLoading = true;
-      _emoteOverlayError = null;
-      _emoteOverlayEmotes = const <TwitchChannelPointEmoteOption>[];
-      _selectedBaseEmote = null;
+      _emoteOverlay = _emoteOverlay.reloading();
     });
 
     try {
       final loaded = await loader(reward);
       if (!mounted) return;
       setState(() {
-        _emoteOverlayEmotes = loaded;
-        _emoteOverlayLoading = false;
+        _emoteOverlay = _emoteOverlay.loaded(loaded);
       });
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _emoteOverlayLoading = false;
-        _emoteOverlayError = error.toString();
+        _emoteOverlay = _emoteOverlay.failed(error);
       });
     }
   }
@@ -276,23 +246,16 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
 
     setState(() {
       _emoteCompleter = null;
-      _emoteOverlayMode = null;
-      _emoteOverlayReward = null;
-      _emoteOverlayEmotes = const <TwitchChannelPointEmoteOption>[];
-      _selectedBaseEmote = null;
-      _emoteSearchQuery = '';
-      _emoteOverlayLoading = false;
-      _emoteOverlayError = null;
+      _emoteOverlay = const TwitchChannelPointsEmoteOverlayState.hidden();
     });
   }
 
   void _completeChooseEmote(TwitchChannelPointEmoteOption emote) {
-    final mode = _emoteOverlayMode;
+    final mode = _emoteOverlay.mode;
 
     if (mode == ChannelPointEmoteOverlayMode.modify) {
       setState(() {
-        _selectedBaseEmote = emote;
-        _emoteSearchQuery = '';
+        _emoteOverlay = _emoteOverlay.selectBaseEmote(emote);
       });
       return;
     }
@@ -304,13 +267,7 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
 
     setState(() {
       _emoteCompleter = null;
-      _emoteOverlayMode = null;
-      _emoteOverlayReward = null;
-      _emoteOverlayEmotes = const <TwitchChannelPointEmoteOption>[];
-      _selectedBaseEmote = null;
-      _emoteSearchQuery = '';
-      _emoteOverlayLoading = false;
-      _emoteOverlayError = null;
+      _emoteOverlay = const TwitchChannelPointsEmoteOverlayState.hidden();
     });
   }
 
@@ -327,13 +284,7 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
 
     setState(() {
       _emoteCompleter = null;
-      _emoteOverlayMode = null;
-      _emoteOverlayReward = null;
-      _emoteOverlayEmotes = const <TwitchChannelPointEmoteOption>[];
-      _selectedBaseEmote = null;
-      _emoteSearchQuery = '';
-      _emoteOverlayLoading = false;
-      _emoteOverlayError = null;
+      _emoteOverlay = const TwitchChannelPointsEmoteOverlayState.hidden();
     });
   }
 }
