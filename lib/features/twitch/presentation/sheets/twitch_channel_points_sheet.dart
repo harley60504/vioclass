@@ -11,6 +11,7 @@ import '../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../dialogs/twitch_channel_points_text_input_dialog.dart';
 import 'channel_points/twitch_channel_points_sheet_body.dart';
+import 'channel_points/twitch_channel_points_sheet_models.dart';
 
 Future<void> showTwitchChannelPointsSheet({
   required BuildContext context,
@@ -36,31 +37,6 @@ Future<void> showTwitchChannelPointsSheet({
     ),
   );
 }
-
-class TwitchChannelPointsModifiedEmoteSelection {
-  /// For Modify a Single Emote this should be the final modified emote id
-  /// returned by the Channel Points emote source, for example `1022569_BW`.
-  final String emoteId;
-
-  /// UI metadata only. The API sends [emoteId] as the mutation emoteID.
-  final String modifierId;
-
-  const TwitchChannelPointsModifiedEmoteSelection({
-    required this.emoteId,
-    required this.modifierId,
-  });
-
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'emoteId': emoteId,
-      'modifierId': modifierId,
-    };
-  }
-}
-
-typedef TwitchChannelPointEmoteLoader = Future<List<TwitchChannelPointEmoteOption>> Function(
-  Map<String, dynamic> reward,
-);
 
 class TwitchChannelPointsSheet extends StatefulWidget {
   final TwitchChannelPointsRuntimeSnapshot? snapshot;
@@ -182,23 +158,12 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
   }
 
   List<TwitchChannelPointEmoteOption> _visibleOverlayEmotes() {
-    final mode = _emoteOverlayMode;
-    final query = _emoteSearchQuery;
-
-    Iterable<TwitchChannelPointEmoteOption> output = _emoteOverlayEmotes;
-
-    if (mode == ChannelPointEmoteOverlayMode.modify && _selectedBaseEmote == null) {
-      output = output.where((emote) => emote.modifications.isNotEmpty);
-    }
-
-    if (query.isNotEmpty) {
-      output = output.where((emote) {
-        return emote.id.toLowerCase().contains(query) ||
-            emote.token.toLowerCase().contains(query);
-      });
-    }
-
-    return output.take(240).toList(growable: false);
+    return filterChannelPointOverlayEmotes(
+      mode: _emoteOverlayMode,
+      emotes: _emoteOverlayEmotes,
+      selectedBaseEmote: _selectedBaseEmote,
+      query: _emoteSearchQuery,
+    );
   }
 
   Future<void> _handleRewardTap(
@@ -303,7 +268,7 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
       return null;
     }
 
-    final completer = _emoteCompleter = _ChannelPointEmoteCompleter();
+    final completer = _emoteCompleter = TwitchChannelPointEmoteCompleter();
 
     setState(() {
       _emoteOverlayMode = mode;
@@ -333,7 +298,7 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     return completer.future;
   }
 
-  _ChannelPointEmoteCompleter? _emoteCompleter;
+  TwitchChannelPointEmoteCompleter? _emoteCompleter;
 
   Future<void> _reloadEmoteOverlay() async {
     final reward = _emoteOverlayReward;
@@ -431,12 +396,4 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
       _emoteOverlayError = null;
     });
   }
-}
-
-class _ChannelPointEmoteCompleter {
-  final Completer<Object?> _completer = Completer<Object?>();
-
-  bool get isCompleted => _completer.isCompleted;
-  Future<Object?> get future => _completer.future;
-  void complete(Object? value) => _completer.complete(value);
 }
