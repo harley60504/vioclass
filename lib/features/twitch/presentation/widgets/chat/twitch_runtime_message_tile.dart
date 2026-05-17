@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_runtime_message_tile_fixed_height_emotes_stage142
+// PATCH VERSION: twitch_runtime_message_tile_wired_helpers_stage153
 
 import 'package:flutter/material.dart';
 
@@ -8,6 +8,8 @@ import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../models/emotes/twitch_third_party_emote.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../shared/twitch_cached_image_layer.dart';
+import 'message/twitch_chat_message_user_style.dart';
+import 'message/twitch_chat_message_visual_metrics.dart';
 
 class TwitchRuntimeMessageTile extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
@@ -29,10 +31,12 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayColor =
-        _parseColor(message.color) ?? _fallbackUserColor(message.userLogin);
-    final displayNameText = _formatDisplayName(message);
-    final metrics = _ChatMessageVisualMetrics(fontScale, compact: compact);
+    final displayColor = parseTwitchChatUserColorOrFallback(
+      color: message.color,
+      login: message.userLogin,
+    );
+    final displayNameText = formatTwitchChatDisplayName(message);
+    final metrics = TwitchChatMessageVisualMetrics(fontScale, compact: compact);
     final style = _SpecialMessageStyle.fromMetadata(message.metadata);
 
     if (style != null) {
@@ -58,84 +62,6 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
       onOpenContext: onOpenContext,
     );
   }
-
-  String _formatDisplayName(TwitchChatRuntimeMessage message) {
-    final displayName = message.displayName.trim();
-    final login = message.userLogin.trim();
-
-    if (displayName.isEmpty) return login;
-    if (login.isEmpty) return displayName;
-    if (displayName.toLowerCase() == login.toLowerCase()) return displayName;
-
-    return '$displayName ($login)';
-  }
-
-  Color _fallbackUserColor(String login) {
-    const palette = <Color>[
-      Color(0xFFFF0000),
-      Color(0xFF0000FF),
-      Color(0xFF008000),
-      Color(0xFFB22222),
-      Color(0xFFFF7F50),
-      Color(0xFF9ACD32),
-      Color(0xFFFF4500),
-      Color(0xFF2E8B57),
-      Color(0xFFDAA520),
-      Color(0xFFD2691E),
-      Color(0xFF5F9EA0),
-      Color(0xFF1E90FF),
-      Color(0xFFFF69B4),
-      Color(0xFF8A2BE2),
-      Color(0xFF00FF7F),
-    ];
-
-    final clean = login.trim().toLowerCase();
-    if (clean.isEmpty) return const Color(0xFFBF94FF);
-
-    var hash = 0;
-    for (final codeUnit in clean.codeUnits) {
-      hash = (hash * 31 + codeUnit) & 0x7fffffff;
-    }
-
-    return palette[hash % palette.length];
-  }
-
-  Color? _parseColor(String value) {
-    final text = value.trim();
-    if (!text.startsWith('#') || text.length != 7) return null;
-
-    final parsed = int.tryParse(text.substring(1), radix: 16);
-    if (parsed == null) return null;
-
-    return Color(0xFF000000 | parsed);
-  }
-}
-
-class _ChatMessageVisualMetrics {
-  final double scale;
-  final bool compact;
-
-  const _ChatMessageVisualMetrics(double rawScale, {this.compact = false})
-      : scale = rawScale < 0.82
-            ? 0.82
-            : rawScale > 1.45
-                ? 1.45
-                : rawScale;
-
-  double get _compactFactor => compact ? 0.92 : 1.0;
-
-  double get messageFontSize => 13 * scale * _compactFactor;
-  double get compactMessageFontSize => 12.4 * scale * _compactFactor;
-  double get nameFontSize => 13 * scale * _compactFactor;
-  double get compactNameFontSize => 12.2 * scale * _compactFactor;
-  double get metaFontSize => 10.5 * scale * _compactFactor;
-  double get chipFontSize => 10 * scale * _compactFactor;
-  double get badgeSize => 18 * scale * _compactFactor;
-  double get compactBadgeSize => 16 * scale * _compactFactor;
-  double get emoteSize => 28 * scale * _compactFactor;
-  double get thirdPartyEmoteSize => 28 * scale * _compactFactor;
-  double get zeroWidthEmoteSize => 24 * scale * _compactFactor;
-  double get lineHeight => compact ? 1.18 : 1.25;
 }
 
 class _NormalMessageCard extends StatelessWidget {
@@ -144,7 +70,7 @@ class _NormalMessageCard extends StatelessWidget {
   final Color displayColor;
   final String displayNameText;
   final bool showTimestamp;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
   final VoidCallback? onOpenContext;
 
   const _NormalMessageCard({
@@ -200,7 +126,7 @@ class _SpecialMessageCard extends StatelessWidget {
   final String displayNameText;
   final _SpecialMessageStyle style;
   final bool showTimestamp;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
   final VoidCallback? onOpenContext;
 
   const _SpecialMessageCard({
@@ -339,7 +265,7 @@ class _MessageContent extends StatelessWidget {
   final bool showSystemMessage;
   final bool showTimestamp;
   final bool compact;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _MessageContent({
     required this.message,
@@ -540,7 +466,7 @@ class _SpecialMessageStyle {
 
 class _TimestampText extends StatelessWidget {
   final DateTime time;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _TimestampText({required this.time, required this.metrics});
 
@@ -559,7 +485,7 @@ class _TimestampText extends StatelessWidget {
 
 class _TimestampChip extends StatelessWidget {
   final DateTime time;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _TimestampChip({required this.time, required this.metrics});
 
@@ -592,7 +518,7 @@ String _formatTime(DateTime time) {
 
 class _ReplyPreview extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _ReplyPreview({required this.message, required this.metrics});
 
@@ -625,7 +551,7 @@ class _ReplyPreview extends StatelessWidget {
 class _MessageSegmentView extends StatelessWidget {
   final TwitchChatRenderSegment segment;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _MessageSegmentView({
     required this.segment,
@@ -657,7 +583,7 @@ class _MessageSegmentView extends StatelessWidget {
 class _TextSegment extends StatelessWidget {
   final TwitchChatRenderSegment segment;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _TextSegment({
     required this.segment,
@@ -727,7 +653,7 @@ class _TextSegment extends StatelessWidget {
 class _TextOrThirdPartyEmote extends StatelessWidget {
   final String text;
   final TwitchThirdPartyEmote? emote;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _TextOrThirdPartyEmote({
     required this.text,
@@ -782,7 +708,7 @@ class _TextOrThirdPartyEmote extends StatelessWidget {
 
 class _LinkSegment extends StatelessWidget {
   final TwitchChatRenderSegment segment;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _LinkSegment({required this.segment, required this.metrics});
 
@@ -803,7 +729,7 @@ class _LinkSegment extends StatelessWidget {
 
 class _EmoteSegment extends StatelessWidget {
   final TwitchChatRenderSegment segment;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _EmoteSegment({required this.segment, required this.metrics});
 
@@ -857,7 +783,7 @@ class _EmoteSegment extends StatelessWidget {
 
 class _CheermoteSegment extends StatelessWidget {
   final TwitchChatRenderSegment segment;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _CheermoteSegment({required this.segment, required this.metrics});
 
@@ -876,7 +802,7 @@ class _CheermoteSegment extends StatelessWidget {
 
 class _BitsChip extends StatelessWidget {
   final int bits;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _BitsChip({required this.bits, required this.metrics});
 
@@ -888,7 +814,7 @@ class _BitsChip extends StatelessWidget {
 
 class _SmallChip extends StatelessWidget {
   final String label;
-  final _ChatMessageVisualMetrics metrics;
+  final TwitchChatMessageVisualMetrics metrics;
 
   const _SmallChip({required this.label, required this.metrics});
 
