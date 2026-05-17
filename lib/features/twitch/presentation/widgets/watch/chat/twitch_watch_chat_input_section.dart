@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_input_section_stage150
+// PATCH VERSION: twitch_watch_chat_input_section_stage191_unified_glass
 //
 // Bottom input chrome for Watch chat. Keeps the panel as composition only.
 
@@ -40,9 +40,25 @@ class TwitchWatchChatInputSection extends StatelessWidget {
       top: false,
       bottom: true,
       child: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF111116),
-          border: Border(top: BorderSide(color: Color(0xFF2D2D35))),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              const Color(0xFF181020).withOpacity(0.94),
+              const Color(0xFF0F0F15).withOpacity(0.98),
+            ],
+          ),
+          border: Border(
+            top: BorderSide(color: const Color(0xFF9146FF).withOpacity(0.20)),
+          ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withOpacity(0.30),
+              blurRadius: 18,
+              offset: const Offset(0, -8),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
