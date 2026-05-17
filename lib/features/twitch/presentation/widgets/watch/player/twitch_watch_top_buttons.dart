@@ -21,35 +21,43 @@ class _FollowButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final visualHeight = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
     final size = visualHeight;
-    final radius = tiny ? 13.0 : compact ? 15.0 : 18.0;
+    final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
 
     return Tooltip(
       message: followed ? '取消追隨' : '追隨',
       child: Material(
-        color: const Color(0xDD18181B),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: busy ? null : onPressed,
-          child: Container(
-            width: size,
-            height: visualHeight,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+          child: TwitchGlassSurface(
+            borderRadius: BorderRadius.circular(radius),
+            backgroundColor: followed
+                ? Colors.pinkAccent.withOpacity(0.20)
+                : Colors.black.withOpacity(0.34),
+            borderColor: followed
+                ? Colors.pinkAccent.withOpacity(0.34)
+                : Colors.white.withOpacity(0.10),
+            blurSigma: 16,
+            boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.18),
+            child: SizedBox(
+              width: size,
+              height: visualHeight,
+              child: Center(
+                child: busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        followed ? Icons.favorite : Icons.favorite_border,
+                        color: followed ? Colors.pinkAccent : Colors.white,
+                        size: tiny ? 20 : compact ? 23 : 32,
+                      ),
+              ),
             ),
-            child: busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(
-                    followed ? Icons.favorite : Icons.favorite_border,
-                    color: followed ? Colors.pinkAccent : Colors.white,
-                    size: tiny ? 20 : compact ? 23 : 32,
-                  ),
           ),
         ),
       ),
@@ -73,40 +81,46 @@ class _SubscribeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visualHeight = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
-    final radius = tiny ? 13.0 : compact ? 15.0 : 18.0;
+    final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
 
     return Material(
-      color: const Color(0xDD18181B),
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        child: Container(
-          height: visualHeight,
-          width: compact ? visualHeight : null,
-          padding: compact ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 22),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
-          ),
-          child: compact
-              ? Icon(Icons.auto_awesome, color: Colors.white, size: tiny ? 19 : 22)
-              : const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Subscribe',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
+        child: TwitchGlassSurface(
+          borderRadius: BorderRadius.circular(radius),
+          backgroundColor: const Color(0xFF9146FF).withOpacity(0.22),
+          borderColor: const Color(0xFFBF94FF).withOpacity(0.30),
+          blurSigma: 16,
+          boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.20),
+          child: SizedBox(
+            height: visualHeight,
+            width: compact ? visualHeight : null,
+            child: Padding(
+              padding: compact ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 22),
+              child: Center(
+                child: compact
+                    ? Icon(Icons.auto_awesome, color: Colors.white, size: tiny ? 19 : 22)
+                    : const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Subscribe',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Icon(Icons.auto_awesome, color: Colors.white, size: 19),
+                        ],
                       ),
-                    ),
-                    SizedBox(width: 8),
-                    Icon(Icons.auto_awesome, color: Colors.white, size: 19),
-                  ],
-                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
