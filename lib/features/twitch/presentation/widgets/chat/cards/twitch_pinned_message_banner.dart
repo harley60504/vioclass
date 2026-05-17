@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_pinned_message_banner_stage194_no_outer_shadow
+// PATCH VERSION: twitch_pinned_message_banner_stage198_font_scale
 //
 // Extracted pinned-message UI component. Keep pinned card visuals here instead
 // of embedding style decisions inside the engagement strip.
@@ -12,6 +12,7 @@ import '../../shared/twitch_ui_avatar.dart';
 
 class TwitchPinnedMessageBanner extends StatefulWidget {
   final TwitchPinnedChatMessage message;
+  final double fontScale;
   final String fallbackProfileImageUrl;
   final String fallbackDisplayName;
   final String fallbackUserId;
@@ -20,6 +21,7 @@ class TwitchPinnedMessageBanner extends StatefulWidget {
   const TwitchPinnedMessageBanner({
     super.key,
     required this.message,
+    this.fontScale = 1.0,
     this.fallbackProfileImageUrl = '',
     this.fallbackDisplayName = '',
     this.fallbackUserId = '',
@@ -34,6 +36,8 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
   bool _expanded = false;
 
   TwitchPinnedChatMessage get message => widget.message;
+
+  double get _safeFontScale => widget.fontScale.clamp(0.82, 1.36).toDouble();
 
   Future<void> _copyPinnedMessage() async {
     final text = message.text.trim();
@@ -64,6 +68,15 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
         ? 'PINNED MESSAGE'
         : 'PINNED BY $pinnedBy';
     final cleanText = message.text.trim();
+    final scale = _safeFontScale;
+
+    final nameFontSize = (TwitchUiFontSize.chatName + 0.8) * scale;
+    final metaFontSize = (TwitchUiFontSize.chatMeta + 0.6) * scale;
+    final bodyFontSize = (TwitchUiFontSize.cardBody + 1.2) * scale;
+    final hintFontSize = 10.8 * scale;
+    final iconSize = (12.0 * scale).clamp(12.0, 16.0).toDouble();
+    final pinBoxSize = (20.0 * scale).clamp(20.0, 26.0).toDouble();
+    final avatarSize = (33.0 * scale).clamp(33.0, 43.0).toDouble();
 
     return Material(
       color: Colors.transparent,
@@ -92,17 +105,22 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
             border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.28)),
           ),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            padding: EdgeInsets.fromLTRB(
+              10,
+              8 * scale,
+              10,
+              8 * scale,
+            ),
             child: Row(
               crossAxisAlignment: _expanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
                 TwitchUiAvatar(
                   imageUrl: avatarUrl,
                   displayName: sender,
-                  size: 33,
+                  size: avatarSize,
                   accentColor: senderColor,
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10 * scale),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,8 +129,8 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                       Row(
                         children: [
                           Container(
-                            width: 20,
-                            height: 20,
+                            width: pinBoxSize,
+                            height: pinBoxSize,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: TwitchUiColors.primary.withOpacity(0.18),
@@ -121,13 +139,13 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                                 color: TwitchUiColors.primarySoft.withOpacity(0.28),
                               ),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.push_pin_rounded,
                               color: TwitchUiColors.primarySoft,
-                              size: 12,
+                              size: iconSize,
                             ),
                           ),
-                          const SizedBox(width: 7),
+                          SizedBox(width: 7 * scale),
                           Flexible(
                             child: Text(
                               sender,
@@ -135,38 +153,38 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: senderColor,
-                                fontSize: TwitchUiFontSize.chatName,
+                                fontSize: nameFontSize,
                                 height: 1.1,
                                 fontWeight: TwitchUiFontWeight.heavy,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 7),
+                          SizedBox(width: 7 * scale),
                           Flexible(
                             child: Text(
                               metaText,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: TwitchUiColors.textMuted,
-                                fontSize: TwitchUiFontSize.chatMeta,
+                                fontSize: metaFontSize,
                                 height: 1.1,
                                 fontWeight: TwitchUiFontWeight.heavy,
                                 letterSpacing: 0.35,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6 * scale),
                           Icon(
                             _expanded
                                 ? Icons.keyboard_arrow_up_rounded
                                 : Icons.keyboard_arrow_down_rounded,
                             color: Colors.white38,
-                            size: 18,
+                            size: (18.0 * scale).clamp(18.0, 23.0).toDouble(),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6 * scale),
                       AnimatedSize(
                         duration: const Duration(milliseconds: 150),
                         curve: Curves.easeOutCubic,
@@ -175,23 +193,23 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                           cleanText,
                           maxLines: _expanded ? 12 : 2,
                           overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFFF5F0FF),
-                            fontSize: TwitchUiFontSize.cardBody,
+                          style: TextStyle(
+                            color: const Color(0xFFF5F0FF),
+                            fontSize: bodyFontSize,
                             height: 1.24,
                             fontWeight: TwitchUiFontWeight.body,
                           ),
                         ),
                       ),
                       if (_expanded) ...[
-                        const SizedBox(height: 7),
-                        const Text(
+                        SizedBox(height: 7 * scale),
+                        Text(
                           '點一下收合 · 長按複製',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: Colors.white38,
-                            fontSize: 10.5,
+                            fontSize: hintFontSize,
                             height: 1.1,
                             fontWeight: FontWeight.w800,
                           ),
