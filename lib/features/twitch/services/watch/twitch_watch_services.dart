@@ -1,8 +1,9 @@
-// PATCH VERSION: twitch_watch_services_stage186
+// PATCH VERSION: twitch_watch_services_stage186a_feature_groups
 //
-// Owns the WatchPage API/service dependency graph. WatchPage should assemble UI
-// and route lifecycle; feature services should live behind this container and
-// can later be passed directly to feature controllers/widgets.
+// Owns the Watch composition dependency graph. WatchPage should assemble UI and
+// route lifecycle; feature services are exposed as small groups so Player,
+// Chat, Emote, Engagement, and Relationship components can receive their own
+// dependency object instead of routing every API call through WatchPage.
 
 import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/channel/twitch_private_gql_relationship_api_service_v1.dart';
@@ -28,6 +29,7 @@ import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
+import 'twitch_watch_feature_services.dart';
 
 class TwitchWatchServices {
   final TwitchApiClient apiClient;
@@ -52,6 +54,14 @@ class TwitchWatchServices {
   final TwitchDropsPredictionApiService dropsPredictionApi;
   final TwitchMediaKitPlayerSession playerSession;
 
+  final TwitchWatchCoreServices core;
+  final TwitchWatchAuthServices auth;
+  final TwitchWatchPlayerServices player;
+  final TwitchWatchChatServices chat;
+  final TwitchWatchEmoteServices emotes;
+  final TwitchWatchEngagementServices engagement;
+  final TwitchWatchRelationshipServices relationship;
+
   const TwitchWatchServices({
     required this.apiClient,
     required this.authService,
@@ -74,6 +84,13 @@ class TwitchWatchServices {
     required this.publicPredictionApi,
     required this.dropsPredictionApi,
     required this.playerSession,
+    required this.core,
+    required this.auth,
+    required this.player,
+    required this.chat,
+    required this.emotes,
+    required this.engagement,
+    required this.relationship,
   });
 
   factory TwitchWatchServices.create({
@@ -147,6 +164,42 @@ class TwitchWatchServices {
     );
     final playerSession = TwitchMediaKitPlayerHost.acquire(title: playerTitle);
 
+    final core = TwitchWatchCoreServices(
+      apiClient: apiClient,
+      publicGqlApi: publicGqlApi,
+      publicWebGqlApi: publicWebGqlApi,
+    );
+    final auth = TwitchWatchAuthServices(
+      authService: authService,
+      dropsAuthService: dropsAuthService,
+      webGqlAuthService: webGqlAuthService,
+      authApi: authApi,
+    );
+    final player = TwitchWatchPlayerServices(
+      playbackApi: playbackApi,
+      playerRuntime: playerRuntime,
+      playerSession: playerSession,
+    );
+    final chat = TwitchWatchChatServices(
+      chatStartupApi: chatStartupApi,
+      recentMessagesApi: recentMessagesApi,
+    );
+    final emotes = TwitchWatchEmoteServices(
+      thirdPartyEmotes: thirdPartyEmotes,
+      officialEmotes: officialEmotes,
+    );
+    final engagement = TwitchWatchEngagementServices(
+      channelPointsApi: channelPointsApi,
+      channelPointsRuntimeService: channelPointsRuntimeService,
+      pinnedChatApi: pinnedChatApi,
+      publicPredictionApi: publicPredictionApi,
+      dropsPredictionApi: dropsPredictionApi,
+    );
+    final relationship = TwitchWatchRelationshipServices(
+      relationshipApi: relationshipApi,
+      subscribeApi: subscribeApi,
+    );
+
     return TwitchWatchServices(
       apiClient: apiClient,
       authService: authService,
@@ -169,6 +222,13 @@ class TwitchWatchServices {
       publicPredictionApi: publicPredictionApi,
       dropsPredictionApi: dropsPredictionApi,
       playerSession: playerSession,
+      core: core,
+      auth: auth,
+      player: player,
+      chat: chat,
+      emotes: emotes,
+      engagement: engagement,
+      relationship: relationship,
     );
   }
 }
