@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_watch_top_action_bar_stage214_tinted_actions
+
 part of twitch_watch_player_area;
 
 class _WatchTopActionBar extends StatelessWidget {
@@ -70,6 +72,10 @@ class _WatchTopActionBar extends StatelessWidget {
           _RoundIconButton(
             tooltip: '重新載入',
             icon: Icons.refresh,
+            iconColor: const Color(0xFFA78BFA),
+            backgroundColor: const Color(0xFF4C1D95).withOpacity(0.22),
+            borderColor: const Color(0xFFA78BFA).withOpacity(0.24),
+            glowOpacity: 0.20,
             compact: compact,
             tiny: actionTiny,
             height: controlHeight,
@@ -79,7 +85,10 @@ class _WatchTopActionBar extends StatelessWidget {
           _RoundIconButton(
             tooltip: '停止',
             icon: Icons.close,
-            iconColor: Colors.redAccent,
+            iconColor: const Color(0xFFFF6B81),
+            backgroundColor: const Color(0xFF7F1D1D).withOpacity(0.24),
+            borderColor: const Color(0xFFFF6B81).withOpacity(0.26),
+            glowOpacity: 0.20,
             compact: compact,
             tiny: actionTiny,
             height: controlHeight,
@@ -98,6 +107,10 @@ class _WatchTopActionBar extends StatelessWidget {
               _RoundIconButton(
                 tooltip: '返回',
                 icon: Icons.arrow_back,
+                iconColor: const Color(0xFF93C5FD),
+                backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.20),
+                borderColor: const Color(0xFF93C5FD).withOpacity(0.22),
+                glowOpacity: 0.18,
                 compact: true,
                 tiny: actionTiny,
                 height: controlHeight,
@@ -122,6 +135,10 @@ class _WatchTopActionBar extends StatelessWidget {
               _RoundIconButton(
                 tooltip: '返回',
                 icon: Icons.arrow_back,
+                iconColor: const Color(0xFF93C5FD),
+                backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.20),
+                borderColor: const Color(0xFF93C5FD).withOpacity(0.22),
+                glowOpacity: 0.18,
                 height: controlHeight,
                 onPressed: () => unawaited(_pauseThenBack()),
               ),
