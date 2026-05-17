@@ -6,6 +6,7 @@ import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import 'prediction_bet/twitch_prediction_bet_sheet_widgets.dart';
 
 Future<void> showTwitchPredictionBetSheet({
   required BuildContext context,
@@ -203,7 +204,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
               ),
               child: Column(
                 children: [
-                  _PredictionMetaRow(
+                  TwitchPredictionBetMetaRow(
                     status: prediction.status,
                     totalPoints: totalPoints,
                     totalUsers: totalUsers,
@@ -237,7 +238,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                     child: ListView.separated(
                       padding: const EdgeInsets.only(bottom: 12),
                       itemCount: prediction.outcomes.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 8),
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final outcome = prediction.outcomes[index];
                         final outcomeIdentity = _outcomeIdentity(outcome);
@@ -251,7 +252,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                             isActive &&
                             !lockedByViewerChoice;
 
-                        return _PredictionOutcomeBetCard(
+                        return TwitchPredictionOutcomeBetCard(
                           outcome: outcome,
                           totalPoints: totalPoints,
                           totalUsers: totalUsers,
@@ -345,228 +346,6 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         setState(() => _refreshingGqlFallback = false);
       }
     }
-  }
-}
-
-class _PredictionMetaRow extends StatelessWidget {
-  final String status;
-  final int totalPoints;
-  final int totalUsers;
-  final TwitchPredictionOutcome? viewerChoice;
-  final String? timeLabel;
-  final bool refreshingGqlFallback;
-
-  const _PredictionMetaRow({
-    required this.status,
-    required this.totalPoints,
-    required this.totalUsers,
-    this.viewerChoice,
-    this.timeLabel,
-    this.refreshingGqlFallback = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final choice = viewerChoice;
-
-    return Wrap(
-      spacing: 7,
-      runSpacing: 7,
-      children: [
-        _PredictionChip(label: status.isEmpty ? 'ACTIVE' : status.toUpperCase()),
-        if (timeLabel != null)
-          _PredictionChip(
-            label: timeLabel!,
-            color: Colors.orangeAccent,
-          ),
-        _PredictionChip(label: '${_formatCompact(totalPoints)} 點'),
-        _PredictionChip(label: '${_formatCompact(totalUsers)} 人'),
-        if (choice != null)
-          _PredictionChip(
-            label: '已下注 ${choice.title.isEmpty ? '此邊' : choice.title}',
-            color: Colors.greenAccent,
-          ),
-        if (refreshingGqlFallback)
-          const _PredictionChip(
-            label: '同步中',
-            color: Color(0xFF8AB4F8),
-          ),
-      ],
-    );
-  }
-}
-
-class _PredictionOutcomeBetCard extends StatelessWidget {
-  final TwitchPredictionOutcome outcome;
-  final int totalPoints;
-  final int totalUsers;
-  final bool enabled;
-  final bool submitting;
-  final bool selectedByViewer;
-  final bool lockedByViewerChoice;
-  final VoidCallback onTap;
-
-  const _PredictionOutcomeBetCard({
-    required this.outcome,
-    required this.totalPoints,
-    required this.totalUsers,
-    required this.enabled,
-    required this.submitting,
-    required this.selectedByViewer,
-    required this.lockedByViewerChoice,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final total = totalPoints <= 0 ? outcome.points : totalPoints;
-    final percent = total <= 0 ? 0.0 : (outcome.points / total).clamp(0.0, 1.0);
-    final odds = outcome.points <= 0 || total <= 0 ? null : total / outcome.points;
-    final borderColor = outcome.isWinner
-        ? Colors.greenAccent.withOpacity(0.55)
-        : selectedByViewer
-            ? Colors.greenAccent.withOpacity(0.55)
-            : lockedByViewerChoice
-                ? Colors.white.withOpacity(0.10)
-                : const Color(0xFF9146FF).withOpacity(0.26);
-    final cardColor = lockedByViewerChoice
-        ? const Color(0xFF17171D)
-        : selectedByViewer
-            ? const Color(0xFF1A2A22)
-            : const Color(0xFF1F1F27);
-
-    return Material(
-      color: cardColor,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: enabled ? onTap : null,
-        child: Opacity(
-          opacity: lockedByViewerChoice ? 0.62 : 1.0,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: borderColor),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        outcome.title.isEmpty ? 'Outcome' : outcome.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    if (outcome.isWinner)
-                      const _PredictionChip(
-                        label: 'WIN',
-                        color: Colors.greenAccent,
-                      ),
-                    if (selectedByViewer)
-                      const _PredictionChip(
-                        label: '已下注',
-                        color: Colors.greenAccent,
-                      ),
-                    if (lockedByViewerChoice)
-                      const _PredictionChip(
-                        label: '已鎖住',
-                        color: Colors.white54,
-                      ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      selectedByViewer
-                          ? Icons.check_circle_rounded
-                          : enabled
-                              ? Icons.arrow_forward_ios_rounded
-                              : Icons.lock_rounded,
-                      color: selectedByViewer
-                          ? Colors.greenAccent
-                          : enabled
-                              ? Colors.white38
-                              : Colors.white24,
-                      size: 15,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 9),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: percent,
-                    minHeight: 8,
-                    backgroundColor: Colors.white.withOpacity(0.08),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      outcome.isWinner || selectedByViewer
-                          ? Colors.greenAccent
-                          : const Color(0xFF9146FF),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 9),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    _PredictionChip(label: '${(percent * 100).round()}%'),
-                    _PredictionChip(label: '${_formatCompact(outcome.points)} 點'),
-                    _PredictionChip(label: '${_formatCompact(outcome.users)} 人'),
-                    if (outcome.viewerPoints > 0)
-                      _PredictionChip(
-                        label: '我的 ${_formatCompact(outcome.viewerPoints)} 點',
-                        color: Colors.greenAccent,
-                      ),
-                    if (odds != null)
-                      _PredictionChip(
-                        label: '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x 賠率',
-                        color: const Color(0xFFBFA8FF),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PredictionChip extends StatelessWidget {
-  final String label;
-  final Color color;
-
-  const _PredictionChip({
-    required this.label,
-    this.color = const Color(0xFFBF94FF),
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.34)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
   }
 }
 
@@ -726,5 +505,7 @@ String _formatCompact(int value) {
 }
 
 String _trimTrailingZero(String text) {
-  return text.replaceFirst(RegExp(r'\.0+$'), '').replaceFirst(RegExp(r'(\.\d*[1-9])0+$'), r'$1');
+  return text
+      .replaceFirst(RegExp(r'\.0+$'), '')
+      .replaceFirst(RegExp(r'(\.\d*[1-9])0+$'), r'$1');
 }
