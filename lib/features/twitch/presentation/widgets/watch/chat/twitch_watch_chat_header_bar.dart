@@ -1,11 +1,14 @@
-// PATCH VERSION: twitch_watch_chat_header_bar_stage191_unified_glass
+// PATCH VERSION: twitch_watch_chat_header_bar_stage199_translucent_inner
 //
-// Unified Watch chat header UI. Keeps the main TwitchWatchChatPanel focused on
-// composition and data wiring.
+// Stage 199: keep gradients on the main background only. Chat header and its
+// inner controls now use translucent surfaces instead of their own gradients.
 
 import 'package:flutter/material.dart';
 
 import '../../../theme/twitch_ui_tokens.dart';
+
+const Color _softAccent = Color(0xFF8F7CC0);
+const Color _softAccentText = Color(0xFFC9BDEC);
 
 class TwitchWatchChatHeaderBar extends StatelessWidget {
   final bool connected;
@@ -45,24 +48,10 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
       height: headerHeight,
       padding: EdgeInsets.fromLTRB(12, compact ? 5 : 8, 10, compact ? 5 : 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            const Color(0xFF21142F).withOpacity(0.92),
-            const Color(0xFF111116).withOpacity(0.96),
-          ],
-        ),
+        color: Colors.white.withOpacity(0.028),
         border: Border(
-          bottom: BorderSide(color: TwitchUiColors.primary.withOpacity(0.22)),
+          bottom: BorderSide(color: Colors.white.withOpacity(0.060)),
         ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withOpacity(0.32),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -140,11 +129,9 @@ class _ConnectionBadge extends StatelessWidget {
       height: compact ? 25 : 28,
       padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 8),
       decoration: BoxDecoration(
-        color: connected
-            ? TwitchUiColors.green.withOpacity(0.12)
-            : Colors.white.withOpacity(0.045),
+        color: connected ? color.withOpacity(0.10) : Colors.white.withOpacity(0.042),
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        border: Border.all(color: color.withOpacity(connected ? 0.36 : 0.18)),
+        border: Border.all(color: color.withOpacity(connected ? 0.30 : 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -158,8 +145,8 @@ class _ConnectionBadge extends StatelessWidget {
               boxShadow: connected
                   ? <BoxShadow>[
                       BoxShadow(
-                        color: color.withOpacity(0.55),
-                        blurRadius: 8,
+                        color: color.withOpacity(0.38),
+                        blurRadius: 6,
                       ),
                     ]
                   : const <BoxShadow>[],
@@ -208,9 +195,9 @@ class _HeaderIconButton extends StatelessWidget {
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white.withOpacity(0.052),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(color: Colors.white.withOpacity(0.085)),
+            border: Border.all(color: Colors.white.withOpacity(0.080)),
           ),
           child: loading
               ? const SizedBox(
@@ -221,7 +208,7 @@ class _HeaderIconButton extends StatelessWidget {
               : Icon(
                   icon,
                   size: 17,
-                  color: onTap == null ? Colors.white24 : TwitchUiColors.primarySoft,
+                  color: onTap == null ? Colors.white24 : _softAccentText,
                 ),
         ),
       ),
@@ -246,7 +233,7 @@ class _HeaderToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? TwitchUiColors.primarySoft : Colors.white38;
+    final color = active ? _softAccentText : Colors.white38;
 
     return Tooltip(
       message: tooltip,
@@ -259,22 +246,14 @@ class _HeaderToggleButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? TwitchUiColors.primary.withOpacity(0.24)
-                : Colors.white.withOpacity(0.055),
+                ? _softAccent.withOpacity(0.18)
+                : Colors.white.withOpacity(0.052),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: active
-                  ? TwitchUiColors.primarySoft.withOpacity(0.38)
-                  : Colors.white.withOpacity(0.085),
+                  ? _softAccentText.withOpacity(0.28)
+                  : Colors.white.withOpacity(0.080),
             ),
-            boxShadow: active
-                ? <BoxShadow>[
-                    BoxShadow(
-                      color: TwitchUiColors.primary.withOpacity(0.20),
-                      blurRadius: 12,
-                    ),
-                  ]
-                : const <BoxShadow>[],
           ),
           child: Icon(icon, size: 16, color: enabled ? color : Colors.white24),
         ),
