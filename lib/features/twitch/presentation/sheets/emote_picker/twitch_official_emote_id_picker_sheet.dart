@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage183_restore_id_picker_grouping
+// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage185_common_progressive_grid_import
 //
 // Twitch official emote ID picker used by Channel Points emote rewards.
 // This picker intentionally keeps its own grouping because Channel Points
@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/emotes/twitch_official_emote.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
+import '../../widgets/common/twitch_progressive_grid_view.dart';
 import '../../widgets/responsive/twitch_responsive_sheet.dart';
 import 'twitch_emote_picker_models.dart';
 import 'twitch_emote_picker_widgets.dart';
