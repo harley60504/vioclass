@@ -22,24 +22,30 @@ class _RoundIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
-    final radius = tiny ? 13.0 : compact ? 15.0 : 18.0;
+    final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: const Color(0xDD18181B),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onPressed,
-          child: Container(
-            width: size,
-            height: size,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+          child: TwitchGlassSurface(
+            borderRadius: BorderRadius.circular(radius),
+            backgroundColor: Colors.black.withOpacity(0.34),
+            borderColor: Colors.white.withOpacity(0.10),
+            blurSigma: 16,
+            boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.18),
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Icon(
+                icon,
+                color: iconColor,
+                size: tiny ? 20 : compact ? 23 : 30,
+              ),
             ),
-            child: Icon(icon, color: iconColor, size: tiny ? 20 : compact ? 23 : 30),
           ),
         ),
       ),
