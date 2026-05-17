@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_prediction_banner_stage151
+// PATCH VERSION: twitch_prediction_banner_stage192_glass_card
 //
 // Extracted prediction banner UI from TwitchChatEngagementStrip. Keep the
 // prediction card, countdown pill and split bar here so engagement strip remains
@@ -37,78 +37,100 @@ class TwitchPredictionBanner extends StatelessWidget {
     final active = status == 'ACTIVE' || status == 'OPEN';
     final effectiveLocksAt = _effectiveLocksAt(prediction);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
-      onTap: onOpen,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-        decoration: BoxDecoration(
-          color: const Color(0xE61A1328),
-          borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
-          border: Border.all(color: TwitchUiColors.primary.withOpacity(0.42)),
-          boxShadow: TwitchUiShadows.soft,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 25,
-                  height: 25,
-                  decoration: BoxDecoration(
-                    color: TwitchUiColors.primary.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
-                    border: Border.all(
-                      color: TwitchUiColors.primarySoft.withOpacity(0.32),
-                    ),
-                  ),
-                  child: Icon(
-                    canceled
-                        ? Icons.remove_circle_outline_rounded
-                        : resolved
-                            ? Icons.emoji_events_rounded
-                            : Icons.how_to_vote_rounded,
-                    color: canceled ? Colors.orangeAccent : TwitchUiColors.primarySoft,
-                    size: 13,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    prediction.title.isEmpty ? '賭盤預測' : prediction.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Color(0xFFF0E8FF),
-                      fontSize: TwitchUiFontSize.cardTitle,
-                      height: 1.16,
-                      fontWeight: TwitchUiFontWeight.heavy,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _PredictionStatusPill(
-                  label: status,
-                  locksAt: effectiveLocksAt,
-                  active: active,
-                  resolved: resolved,
-                  canceled: canceled,
-                ),
-                const SizedBox(width: 2),
-                const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onOpen,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                const Color(0xFF251640).withOpacity(0.97),
+                const Color(0xFF171420).withOpacity(0.98),
               ],
             ),
-            if (left != null && right != null) ...[
-              const SizedBox(height: 9),
-              _PredictionSplitBar(
-                left: left,
-                right: right,
-                totalPoints: totalPoints,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: TwitchUiColors.primary.withOpacity(0.44)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: TwitchUiColors.primary.withOpacity(0.20),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.32),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
               ),
             ],
-          ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: TwitchUiColors.primary.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: TwitchUiColors.primarySoft.withOpacity(0.38),
+                      ),
+                    ),
+                    child: Icon(
+                      canceled
+                          ? Icons.remove_circle_outline_rounded
+                          : resolved
+                              ? Icons.emoji_events_rounded
+                              : Icons.how_to_vote_rounded,
+                      color: canceled ? Colors.orangeAccent : TwitchUiColors.primarySoft,
+                      size: 15,
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      prediction.title.isEmpty ? '賭盤預測' : prediction.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFF3EAFE),
+                        fontSize: TwitchUiFontSize.cardTitle,
+                        height: 1.16,
+                        fontWeight: TwitchUiFontWeight.heavy,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _PredictionStatusPill(
+                    label: status,
+                    locksAt: effectiveLocksAt,
+                    active: active,
+                    resolved: resolved,
+                    canceled: canceled,
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                ],
+              ),
+              if (left != null && right != null) ...[
+                const SizedBox(height: 10),
+                _PredictionSplitBar(
+                  left: left,
+                  right: right,
+                  totalPoints: totalPoints,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -210,9 +232,15 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
+        color: color.withOpacity(0.16),
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        border: Border.all(color: color.withOpacity(0.34)),
+        border: Border.all(color: color.withOpacity(0.40)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: color.withOpacity(0.14),
+            blurRadius: 10,
+          ),
+        ],
       ),
       child: Text(
         displayLabel,
@@ -249,15 +277,20 @@ class _PredictionSplitBar extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-      child: SizedBox(
-        height: 30,
+      child: Container(
+        height: 31,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+          border: Border.all(color: Colors.white.withOpacity(0.10)),
+        ),
         child: Row(
           children: [
             Expanded(
               flex: (leftPercent * 1000).round().clamp(1, 999).toInt(),
               child: Container(
-                height: 30,
-                color: TwitchUiColors.blue.withOpacity(left.isWinner ? 0.96 : 0.78),
+                height: 31,
+                color: TwitchUiColors.blue.withOpacity(left.isWinner ? 0.96 : 0.82),
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.only(left: 10),
                 child: Text(
@@ -270,12 +303,12 @@ class _PredictionSplitBar extends StatelessWidget {
                 ),
               ),
             ),
-            Container(width: 1, color: TwitchUiColors.surfaceAlt),
+            Container(width: 1, color: Colors.black.withOpacity(0.30)),
             Expanded(
               flex: (rightPercent * 1000).round().clamp(1, 999).toInt(),
               child: Container(
-                height: 30,
-                color: TwitchUiColors.red.withOpacity(right.isWinner ? 0.96 : 0.78),
+                height: 31,
+                color: TwitchUiColors.red.withOpacity(right.isWinner ? 0.96 : 0.82),
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 10),
                 child: Text(
