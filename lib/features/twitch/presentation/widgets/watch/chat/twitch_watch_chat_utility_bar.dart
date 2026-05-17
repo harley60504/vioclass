@@ -1,6 +1,7 @@
-// PATCH VERSION: twitch_watch_chat_utility_bar_stage191_unified_glass
+// PATCH VERSION: twitch_watch_chat_utility_bar_stage199_translucent_inner
 //
-// Unified WatchPage chat utility row: channel points shortcut + emote picker.
+// Stage 199: inner widgets use translucent surfaces; the main chat background
+// owns the gradient.
 
 import 'package:flutter/material.dart';
 
@@ -9,6 +10,9 @@ import '../../../theme/twitch_ui_tokens.dart';
 import '../../channel_points/twitch_channel_points_sheet_utils.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import '../../shared/twitch_default_channel_points_icon.dart';
+
+const Color _softAccent = Color(0xFF8F7CC0);
+const Color _softAccentText = Color(0xFFC9BDEC);
 
 class TwitchWatchChatUtilityBar extends StatelessWidget {
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
@@ -34,9 +38,9 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.025),
+        color: Colors.white.withOpacity(0.018),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.045)),
+          top: BorderSide(color: Colors.white.withOpacity(0.040)),
         ),
       ),
       padding: EdgeInsets.fromLTRB(10, compact ? 7 : 9, 10, compact ? 4 : 5),
@@ -93,22 +97,14 @@ class _ChannelPointsCompactButton extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 0, compact ? 9 : 12, 0),
           decoration: BoxDecoration(
             color: hasClaim
-                ? TwitchUiColors.primary.withOpacity(0.20)
-                : Colors.white.withOpacity(0.060),
+                ? _softAccent.withOpacity(0.16)
+                : Colors.white.withOpacity(0.055),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: hasClaim
-                  ? TwitchUiColors.primarySoft.withOpacity(0.42)
-                  : Colors.white.withOpacity(0.09),
+                  ? _softAccentText.withOpacity(0.30)
+                  : Colors.white.withOpacity(0.085),
             ),
-            boxShadow: hasClaim
-                ? <BoxShadow>[
-                    BoxShadow(
-                      color: TwitchUiColors.primary.withOpacity(0.20),
-                      blurRadius: 14,
-                    ),
-                  ]
-                : const <BoxShadow>[],
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -122,7 +118,7 @@ class _ChannelPointsCompactButton extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: hasClaim ? const Color(0xFFE7D8FF) : Colors.white70,
+                    color: hasClaim ? const Color(0xFFE2DAF7) : Colors.white70,
                     fontSize: compact ? 11 : 12.5,
                     fontWeight: TwitchUiFontWeight.heavy,
                   ),
@@ -167,7 +163,7 @@ class _ChannelPointsIcon extends StatelessWidget {
     if (hasClaim) {
       return const Icon(
         Icons.card_giftcard_rounded,
-        color: TwitchUiColors.primarySoft,
+        color: _softAccentText,
         size: 17,
       );
     }
@@ -204,19 +200,19 @@ class _UtilityButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? TwitchUiColors.primary.withOpacity(0.18)
-                : Colors.white.withOpacity(0.060),
+                ? _softAccent.withOpacity(0.15)
+                : Colors.white.withOpacity(0.055),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: active
-                  ? TwitchUiColors.primarySoft.withOpacity(0.38)
-                  : Colors.white.withOpacity(0.09),
+                  ? _softAccentText.withOpacity(0.28)
+                  : Colors.white.withOpacity(0.085),
             ),
           ),
           child: Icon(
             icon,
             size: compact ? 15 : 17,
-            color: active ? TwitchUiColors.primarySoft : Colors.white60,
+            color: active ? _softAccentText : Colors.white60,
           ),
         ),
       ),
