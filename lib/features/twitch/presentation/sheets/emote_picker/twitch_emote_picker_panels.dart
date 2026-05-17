@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_panels_stage179_official_category_filter
+// PATCH VERSION: twitch_emote_picker_panels_stage181_progressive_grid
 //
 // Main content panels for the Twitch emote picker sheet.
 
@@ -76,12 +76,13 @@ class TwitchRecentEmotePanel extends StatelessWidget {
               emote.name.toLowerCase().contains(lowerQuery) ||
               emote.id.toLowerCase().contains(lowerQuery))
           .map(TwitchMixedEmoteEntry.thirdParty),
-    ].take(twitchCombinedGridLimit).toList(growable: false);
+    ].toList(growable: false);
 
     if (entries.isEmpty) return TwitchEmotePickerEmptyState(text: emptyText);
 
     return TwitchMixedEmoteGrid(
       entries: entries,
+      resetKey: 'recent:$lowerQuery:${entries.length}',
       thirdPartyCache: thirdPartyCache,
       officialCache: officialCache,
       onInsertThirdParty: onInsertThirdParty,
@@ -138,11 +139,11 @@ class TwitchFavoriteEmotePanel extends StatelessWidget {
       ...official,
     ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-    final visibleEntries = entries.take(twitchCombinedGridLimit).toList(growable: false);
-    if (visibleEntries.isEmpty) return TwitchEmotePickerEmptyState(text: emptyText);
+    if (entries.isEmpty) return TwitchEmotePickerEmptyState(text: emptyText);
 
     return TwitchMixedEmoteGrid(
-      entries: visibleEntries,
+      entries: entries,
+      resetKey: 'favorites:$lowerQuery:${entries.length}',
       thirdPartyCache: thirdPartyCache,
       officialCache: officialCache,
       onInsertThirdParty: onInsertThirdParty,
@@ -154,6 +155,7 @@ class TwitchFavoriteEmotePanel extends StatelessWidget {
 
 class TwitchMixedEmoteGrid extends StatelessWidget {
   final List<TwitchMixedEmoteEntry> entries;
+  final String resetKey;
   final TwitchThirdPartyEmoteCacheService thirdPartyCache;
   final TwitchOfficialEmoteCacheService? officialCache;
   final ValueChanged<TwitchThirdPartyEmote> onInsertThirdParty;
@@ -163,6 +165,7 @@ class TwitchMixedEmoteGrid extends StatelessWidget {
   const TwitchMixedEmoteGrid({
     super.key,
     required this.entries,
+    required this.resetKey,
     required this.thirdPartyCache,
     required this.officialCache,
     required this.onInsertThirdParty,
@@ -172,7 +175,11 @@ class TwitchMixedEmoteGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
+    return TwitchProgressiveGridView<TwitchMixedEmoteEntry>(
+      items: entries,
+      resetKey: resetKey,
+      initialItemCount: 48,
+      pageSize: 48,
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 120,
@@ -180,10 +187,7 @@ class TwitchMixedEmoteGrid extends StatelessWidget {
         crossAxisSpacing: 8,
         childAspectRatio: 1.08,
       ),
-      itemCount: entries.length,
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-
+      itemBuilder: (context, entry, index) {
         if (entry.thirdParty != null) {
           final emote = entry.thirdParty!;
           return TwitchThirdPartyEmoteGridCard(
@@ -234,7 +238,11 @@ class TwitchThirdPartyProviderEmoteGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     if (emotes.isEmpty) return TwitchEmotePickerEmptyState(text: emptyText);
 
-    return GridView.builder(
+    return TwitchProgressiveGridView<TwitchThirdPartyEmote>(
+      items: emotes,
+      resetKey: 'third:${emptyText.hashCode}:${emotes.length}',
+      initialItemCount: 48,
+      pageSize: 48,
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 120,
@@ -242,9 +250,7 @@ class TwitchThirdPartyProviderEmoteGrid extends StatelessWidget {
         crossAxisSpacing: 8,
         childAspectRatio: 1.08,
       ),
-      itemCount: emotes.length,
-      itemBuilder: (context, index) {
-        final emote = emotes[index];
+      itemBuilder: (context, emote, index) {
         return TwitchThirdPartyEmoteGridCard(
           emote: emote,
           favorite: cache.isFavorite(emote),
@@ -320,6 +326,7 @@ class TwitchOfficialEmotePanel extends StatelessWidget {
       TwitchOfficialEmoteSubFilter.channel => '目前沒有實況主頻道貼圖。',
       TwitchOfficialEmoteSubFilter.global => '目前沒有 Twitch 共用貼圖。',
     };
+    final resetKey = 'official:${subFilter.name}:${query.trim().toLowerCase()}:${selected.length}';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -380,17 +387,19 @@ class TwitchOfficialEmotePanel extends StatelessWidget {
                       ? emptyText
                       : currentEmptyText,
                 )
-              : GridView.builder(
+              : TwitchProgressiveGridView<TwitchOfficialEmote>(
+                  items: selected,
+                  resetKey: resetKey,
+                  initialItemCount: 48,
+                  pageSize: 48,
                   padding: const EdgeInsets.fromLTRB(12, 2, 12, 16),
-                  itemCount: selected.length,
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                     maxCrossAxisExtent: 116,
                     mainAxisSpacing: 8,
                     crossAxisSpacing: 8,
                     childAspectRatio: 1.02,
                   ),
-                  itemBuilder: (context, index) {
-                    final emote = selected[index];
+                  itemBuilder: (context, emote, index) {
                     return TwitchOfficialEmoteGridCard(
                       emote: emote,
                       locked: selectedLocked || emote.locked,
