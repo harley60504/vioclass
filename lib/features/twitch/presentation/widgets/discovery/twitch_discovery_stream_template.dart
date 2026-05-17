@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_discovery_stream_template_stage135_watch_route_guard
+// PATCH VERSION: twitch_discovery_stream_template_stage189c_gradient_background
 // Shared discovery stream grid for FollowingPage and BrowsePage.
 
 import 'dart:async';
@@ -35,47 +35,83 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
         final width = constraints.maxWidth;
         final mainAxisExtent = twitchStreamCardGridMainAxisExtent(width);
 
-        return CustomScrollView(
-          key: PageStorageKey<String>('twitch_discovery_grid_$sectionTitle'),
-          controller: controller,
-          cacheExtent: 840,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: <Widget>[
-            SliverToBoxAdapter(
-              child: TwitchDiscoverySectionHeader(
-                icon: sectionIcon,
-                title: sectionTitle,
-                count: streamCount,
-              ),
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment(-0.72, -0.92),
+              radius: 1.35,
+              colors: <Color>[
+                Color(0xFF24133A),
+                Color(0xFF14121E),
+                Color(0xFF0A0A0F),
+              ],
+              stops: <double>[0.0, 0.46, 1.0],
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(18, 10, 18, 22),
-              sliver: SliverGrid(
-                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
-                  mainAxisExtent: mainAxisExtent,
-                  crossAxisSpacing: twitchStreamCardGridSpacing,
-                  mainAxisSpacing: twitchStreamCardGridSpacing,
+          ),
+          child: Stack(
+            children: <Widget>[
+              const Positioned(
+                left: -140,
+                top: -180,
+                width: 520,
+                height: 520,
+                child: _DiscoveryGlowOrb(
+                  color: Color(0x559146FF),
                 ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final stream = streams[index];
-                    return RepaintBoundary(
-                      child: TwitchStreamCard(
-                        stream: stream,
-                        onTap: () => _openWatchPage(context, stream),
+              ),
+              const Positioned(
+                right: -220,
+                bottom: -240,
+                width: 620,
+                height: 620,
+                child: _DiscoveryGlowOrb(
+                  color: Color(0x335B2D91),
+                ),
+              ),
+              CustomScrollView(
+                key: PageStorageKey<String>('twitch_discovery_grid_$sectionTitle'),
+                controller: controller,
+                cacheExtent: 840,
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: <Widget>[
+                  SliverToBoxAdapter(
+                    child: TwitchDiscoverySectionHeader(
+                      icon: sectionIcon,
+                      title: sectionTitle,
+                      count: streamCount,
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
+                        mainAxisExtent: mainAxisExtent,
+                        crossAxisSpacing: twitchStreamCardGridSpacing,
+                        mainAxisSpacing: twitchStreamCardGridSpacing,
                       ),
-                    );
-                  },
-                  childCount: streams.length,
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  addSemanticIndexes: false,
-                ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final stream = streams[index];
+                          return RepaintBoundary(
+                            child: TwitchStreamCard(
+                              stream: stream,
+                              onTap: () => _openWatchPage(context, stream),
+                            ),
+                          );
+                        },
+                        childCount: streams.length,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
+                        addSemanticIndexes: false,
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(child: footer),
+                ],
               ),
-            ),
-            SliverToBoxAdapter(child: footer),
-          ],
+            ],
+          ),
         );
       },
     );
@@ -86,6 +122,29 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
       MaterialPageRoute<void>(
         builder: (_) => TwitchWatchRouteGuard(
           initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoveryGlowOrb extends StatelessWidget {
+  final Color color;
+
+  const _DiscoveryGlowOrb({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: <Color>[
+              color,
+              color.withOpacity(0.0),
+            ],
+          ),
         ),
       ),
     );
@@ -107,11 +166,28 @@ class TwitchDiscoverySectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 12),
+      padding: const EdgeInsets.fromLTRB(26, 24, 26, 14),
       child: Row(
         children: <Widget>[
-          Icon(icon, color: const Color(0xFF9146FF), size: 22),
-          const SizedBox(width: 10),
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFF9146FF).withOpacity(0.18),
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.28)),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: const Color(0xFF9146FF).withOpacity(0.26),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: const Color(0xFFBF94FF), size: 19),
+          ),
+          const SizedBox(width: 11),
           Expanded(
             child: Text(
               count > 0 ? '$title · $count' : title,
