@@ -1,8 +1,8 @@
-// PATCH VERSION: watch_player_area_stage140_full_player_split
+// PATCH VERSION: watch_player_area_stage189a_glass_ui
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
-// Stage 140: player UI internals are split into small part files under watch/player/.
+// Stage 189A: player chrome uses shared glass surfaces.
 
 library twitch_watch_player_area;
 
@@ -19,6 +19,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../shared/twitch_glass.dart';
 
 part 'player/twitch_watch_controls_overlay.dart';
 part 'player/twitch_watch_top_action_bar.dart';
