@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
@@ -9,7 +8,7 @@ import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../widgets/channel_points/twitch_channel_points_emote_overlay.dart';
 import '../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
-import '../dialogs/twitch_channel_points_text_input_dialog.dart';
+import 'channel_points/twitch_channel_points_redeem_payload_builder.dart';
 import 'channel_points/twitch_channel_points_sheet_body.dart';
 import 'channel_points/twitch_channel_points_sheet_models.dart';
 
@@ -185,73 +184,14 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
       return;
     }
 
-    final payload = await _buildRedeemPayload(context, reward);
+    final payload = await buildTwitchChannelPointRedeemPayload(
+      context: context,
+      reward: reward,
+      openEmoteOverlay: _openEmoteOverlay,
+    );
     if (payload == null) return;
 
     await widget.onRedeemReward!(reward, payload);
-  }
-
-  Future<String?> _buildRedeemPayload(
-    BuildContext context,
-    Map<String, dynamic> reward,
-  ) async {
-    if (requiresChannelPointModifiedEmoteSelection(reward)) {
-      final selection = await _openEmoteOverlay(
-        context: context,
-        reward: reward,
-        mode: ChannelPointEmoteOverlayMode.modify,
-      );
-
-      if (selection is! TwitchChannelPointsModifiedEmoteSelection) return null;
-      return jsonEncode(selection.toJson());
-    }
-
-    if (requiresChannelPointOfficialEmoteSelection(reward)) {
-      final emoteId = await _openEmoteOverlay(
-        context: context,
-        reward: reward,
-        mode: ChannelPointEmoteOverlayMode.choose,
-      );
-
-      final text = emoteId?.toString().trim();
-      if (text == null || text.isEmpty) return null;
-      return text;
-    }
-
-    if (requiresChannelPointMessageInput(reward)) {
-      final text = await askChannelPointTextInput(
-        context: context,
-        title: channelPointRewardTitle(reward),
-        label: '聊天室訊息',
-        hintText: '輸入要送出的訊息',
-        confirmLabel: '送出兌換',
-        minLines: 2,
-        maxLines: 4,
-      );
-
-      final trimmed = text?.trim();
-      if (trimmed == null || trimmed.isEmpty) return null;
-      return trimmed;
-    }
-
-    if (readChannelPointBool(reward['isUserInputRequired'])) {
-      final prompt = reward['prompt']?.toString().trim();
-      final text = await askChannelPointTextInput(
-        context: context,
-        title: channelPointRewardTitle(reward),
-        label: prompt == null || prompt.isEmpty ? '兌換內容' : prompt,
-        hintText: '輸入兌換內容',
-        confirmLabel: '送出兌換',
-        minLines: 2,
-        maxLines: 4,
-      );
-
-      final trimmed = text?.trim();
-      if (trimmed == null || trimmed.isEmpty) return null;
-      return trimmed;
-    }
-
-    return '';
   }
 
   Future<Object?> _openEmoteOverlay({
