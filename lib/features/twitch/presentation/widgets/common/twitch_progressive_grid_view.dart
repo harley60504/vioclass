@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_progressive_grid_view_stage185
+// PATCH VERSION: twitch_progressive_grid_view_stage185_simplified_tile
 //
 // Generic progressive grid renderer. It keeps the full data set intact but only
 // exposes an initial batch of widgets, then reveals more as the user scrolls or
@@ -174,37 +174,27 @@ class TwitchProgressiveGridLoadMoreTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.34)),
           ),
-          child: const Column(
+          child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
+              const Icon(
                 Icons.expand_more_rounded,
                 color: Color(0xFFBF94FF),
                 size: 22,
               ),
-              SizedBox(height: 6),
-              _TwitchProgressiveGridLoadMoreLabelPlaceholder(),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFBF94FF),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _TwitchProgressiveGridLoadMoreLabelPlaceholder extends StatelessWidget {
-  const _TwitchProgressiveGridLoadMoreLabelPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final parent = context.findAncestorWidgetOfExactType<TwitchProgressiveGridLoadMoreTile>();
-    return Text(
-      parent?.label ?? '載入更多',
-      textAlign: TextAlign.center,
-      style: const TextStyle(
-        color: Color(0xFFBF94FF),
-        fontSize: 10.5,
-        fontWeight: FontWeight.w900,
       ),
     );
   }
