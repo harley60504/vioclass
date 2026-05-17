@@ -1,7 +1,8 @@
-// PATCH VERSION: twitch_watch_chat_input_section_stage199_translucent_inner
+// PATCH VERSION: twitch_watch_chat_input_section_stage209_single_translucent_layer
 //
-// Stage 199: gradients live on the main chat background only. Input section is
-// a translucent overlay surface.
+// Stage 209: remove the extra translucent shell layer around utility/input.
+// The whole chat panel is already translucent, so inner sections should not
+// stack another panel background.
 
 import 'package:flutter/material.dart';
 
@@ -40,33 +41,30 @@ class TwitchWatchChatInputSection extends StatelessWidget {
       right: false,
       top: false,
       bottom: true,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.030),
-          border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.060)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withOpacity(0.055),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TwitchWatchChatUtilityBar(
-              channelPoints: channelPoints,
-              loadingEmotes: loadingEmotes,
-              compact: compact,
-              onOpenChannelPoints: onOpenChannelPoints,
-              onOpenEmotes: onOpenEmotes,
-            ),
-            TwitchChatInputBar(
-              controller: messageController,
-              enabled: enabled,
-              sending: sending,
-              compact: compact,
-              onSend: onSend,
-              onOpenEmotes: onOpenEmotes,
-            ),
-          ],
-        ),
+          TwitchWatchChatUtilityBar(
+            channelPoints: channelPoints,
+            loadingEmotes: loadingEmotes,
+            compact: compact,
+            onOpenChannelPoints: onOpenChannelPoints,
+            onOpenEmotes: onOpenEmotes,
+          ),
+          TwitchChatInputBar(
+            controller: messageController,
+            enabled: enabled,
+            sending: sending,
+            compact: compact,
+            onSend: onSend,
+            onOpenEmotes: onOpenEmotes,
+          ),
+        ],
       ),
     );
   }
