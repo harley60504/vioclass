@@ -101,7 +101,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
     return showDialog<T>(
       context: context,
       useSafeArea: false,
-      barrierColor: Colors.black.withOpacity(0.62),
+      barrierColor: Colors.black.withOpacity(0.66),
       builder: (dialogContext) {
         return SafeArea(
           left: false,
@@ -119,7 +119,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
                   ),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(22),
                   child: Material(
                     color: backgroundColor,
                     child: builder(dialogContext),
@@ -155,7 +155,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
                 maxHeight: viewportSize.height * resolvedSize.portraitHeightFactor,
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
                 child: Material(
                   color: backgroundColor,
                   child: builder(sheetContext),
@@ -251,27 +251,47 @@ class TwitchUnifiedSheetScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final refreshHandler = onRefresh;
 
-    return SizedBox.expand(
-      child: Column(
-        children: [
-          TwitchUnifiedSheetHeader(
-            title: title,
-            subtitle: subtitle,
-            icon: icon,
-            iconImageUrl: iconImageUrl,
-            loading: loading,
-            onRefresh: refreshHandler == null
-                ? null
-                : () {
-                    refreshHandler();
-                  },
-            onClose: onClose,
-            showRefresh: showRefresh,
-            showClose: showClose,
-            trailing: trailing,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFF231336).withOpacity(0.98),
+            const Color(0xFF101016).withOpacity(0.99),
+          ],
+        ),
+        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.20)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: const Color(0xFF9146FF).withOpacity(0.16),
+            blurRadius: 24,
+            offset: const Offset(0, -8),
           ),
-          Expanded(child: child),
         ],
+      ),
+      child: SizedBox.expand(
+        child: Column(
+          children: [
+            TwitchUnifiedSheetHeader(
+              title: title,
+              subtitle: subtitle,
+              icon: icon,
+              iconImageUrl: iconImageUrl,
+              loading: loading,
+              onRefresh: refreshHandler == null
+                  ? null
+                  : () {
+                      refreshHandler();
+                    },
+              onClose: onClose,
+              showRefresh: showRefresh,
+              showClose: showClose,
+              trailing: trailing,
+            ),
+            Expanded(child: child),
+          ],
+        ),
       ),
     );
   }
@@ -309,11 +329,18 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
     final iconUrl = iconImageUrl?.trim() ?? '';
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF18181B),
+      padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFF2A1740).withOpacity(0.92),
+            const Color(0xFF15141C).withOpacity(0.96),
+          ],
+        ),
         border: Border(
-          bottom: BorderSide(color: Color(0xFF2A2A2D)),
+          bottom: BorderSide(color: const Color(0xFF9146FF).withOpacity(0.22)),
         ),
       ),
       child: Row(
@@ -322,7 +349,7 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
             icon: icon,
             imageUrl: iconUrl,
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -346,7 +373,7 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white54,
+                      color: Colors.white60,
                       fontSize: 11,
                       height: 1.1,
                       fontWeight: FontWeight.w700,
@@ -362,27 +389,66 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
           ],
           if (showRefresh) ...[
             const SizedBox(width: 4),
-            IconButton(
-              visualDensity: VisualDensity.compact,
+            _SheetHeaderIconButton(
               tooltip: '重新整理',
+              loading: loading,
+              icon: Icons.refresh_rounded,
               onPressed: loading ? null : onRefresh,
-              icon: loading
-                  ? const SizedBox(
-                      width: 17,
-                      height: 17,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.refresh_rounded, size: 20),
             ),
           ],
           if (showClose)
-            IconButton(
-              visualDensity: VisualDensity.compact,
+            _SheetHeaderIconButton(
               tooltip: '關閉',
+              icon: Icons.close_rounded,
               onPressed: onClose ?? () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.close_rounded, size: 20),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _SheetHeaderIconButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final bool loading;
+  final VoidCallback? onPressed;
+
+  const _SheetHeaderIconButton({
+    required this.tooltip,
+    required this.icon,
+    this.loading = false,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onPressed,
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.060),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withOpacity(0.10)),
+          ),
+          child: loading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  icon,
+                  color: onPressed == null ? Colors.white24 : const Color(0xFFBF94FF),
+                  size: 19,
+                ),
+        ),
       ),
     );
   }
@@ -400,17 +466,27 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (imageUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(999),
-        child: Image.network(
-          imageUrl,
-          width: 24,
-          height: 24,
-          cacheWidth: 48,
-          cacheHeight: 48,
-          filterQuality: FilterQuality.low,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallbackIcon(),
+      return Container(
+        width: 28,
+        height: 28,
+        padding: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: const Color(0xFF9146FF).withOpacity(0.18),
+          shape: BoxShape.circle,
+          border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.30)),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: Image.network(
+            imageUrl,
+            width: 24,
+            height: 24,
+            cacheWidth: 48,
+            cacheHeight: 48,
+            filterQuality: FilterQuality.low,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _fallbackIcon(),
+          ),
         ),
       );
     }
@@ -420,15 +496,15 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
 
   Widget _fallbackIcon() {
     return Container(
-      width: 24,
-      height: 24,
+      width: 28,
+      height: 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF9146FF).withOpacity(0.18),
+        color: const Color(0xFF9146FF).withOpacity(0.20),
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.36)),
+        border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.36)),
       ),
-      child: Icon(icon, color: const Color(0xFFBF94FF), size: 16),
+      child: Icon(icon, color: const Color(0xFFBF94FF), size: 17),
     );
   }
 }
