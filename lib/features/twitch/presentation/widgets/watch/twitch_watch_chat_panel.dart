@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage197_unified_neutral_background
+// PATCH VERSION: twitch_watch_chat_panel_stage198_pinned_font_scale
 
 import 'dart:async';
 
@@ -176,6 +176,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
           final showFloatingEngagement = effectiveShowPinned ||
               effectiveShowPrediction ||
               (widget.engagementError != null && widget.engagementError!.isNotEmpty);
+          final chatFontScale = _appearanceController.fontScale;
 
           return Column(
             children: [
@@ -209,7 +210,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                         runtime: currentRuntime,
                         thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
                         appearanceListenable: _appearanceController,
-                        fontScale: _appearanceController.fontScale,
+                        fontScale: chatFontScale,
                         compact: metrics.verticalCompact,
                         onOpenMessageContext: (message) =>
                             showTwitchChatMessageContextSheet(
@@ -233,6 +234,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                           error: widget.engagementError,
                           showPinned: effectiveShowPinned,
                           showPrediction: effectiveShowPrediction,
+                          fontScale: chatFontScale,
                           fallbackProfileImageUrl: widget.fallbackProfileImageUrl,
                           fallbackDisplayName: widget.fallbackDisplayName,
                           fallbackUserId: widget.fallbackUserId,
