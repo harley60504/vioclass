@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage207_flat_lavender_square_shell
+// PATCH VERSION: twitch_watch_responsive_body_stage209_control_edges_and_drag_gap
 
 import 'package:flutter/material.dart';
 
@@ -74,9 +74,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                       child: _WatchSurface(child: player),
                     )
                   else
-                    Expanded(
-                      child: _WatchAspectSurface(child: player),
-                    ),
+                    Expanded(child: _WatchSurface(child: player)),
                   if (chatVisible) SizedBox(height: shellGap),
                   if (chatVisible)
                     Expanded(
@@ -94,37 +92,27 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
               children: [
                 Expanded(
                   flex: layout.isPhoneLandscape ? 10 : 1,
-                  child: _WatchAspectSurface(child: player),
+                  child: _WatchSurface(child: player),
                 ),
-                if (chatVisible) SizedBox(width: shellGap),
+                if (chatVisible)
+                  SizedBox(
+                    width: shellGap,
+                    child: TwitchWatchChatResizeHandle(
+                      onDragUpdate: (delta) {
+                        final currentChatWidth =
+                            chatPanelWidth > 0 ? chatPanelWidth : effectiveChatWidth;
+                        onSetChatPanelWidthForViewport(
+                          viewportWidth: layout.width,
+                          value: currentChatWidth - delta.delta.dx,
+                        );
+                      },
+                      onDragEnd: onPersistChatPanelWidth,
+                    ),
+                  ),
                 if (chatVisible)
                   SizedBox(
                     width: effectiveChatWidth,
-                    child: _WatchSurface(
-                      child: Stack(
-                        children: [
-                          Positioned.fill(child: chat),
-                          Positioned(
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: 10,
-                            child: TwitchWatchChatResizeHandle(
-                              onDragUpdate: (delta) {
-                                final currentChatWidth = chatPanelWidth > 0
-                                    ? chatPanelWidth
-                                    : effectiveChatWidth;
-                                onSetChatPanelWidthForViewport(
-                                  viewportWidth: layout.width,
-                                  value: currentChatWidth - delta.delta.dx,
-                                );
-                              },
-                              onDragEnd: onPersistChatPanelWidth,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    child: _WatchSurface(child: chat),
                   ),
               ],
             ),
@@ -170,45 +158,6 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
   }
 }
 
-class _WatchAspectSurface extends StatelessWidget {
-  final Widget child;
-
-  const _WatchAspectSurface({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        final maxHeight = constraints.maxHeight;
-
-        if (maxWidth <= 0 || maxHeight <= 0) {
-          return const SizedBox.shrink();
-        }
-
-        var width = maxWidth;
-        var height = width / TwitchWatchResponsiveBody._playerAspectRatio;
-
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * TwitchWatchResponsiveBody._playerAspectRatio;
-        }
-
-        width = width.clamp(1.0, maxWidth).toDouble();
-        height = height.clamp(1.0, maxHeight).toDouble();
-
-        return Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: _WatchSurface(child: child),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _WatchSurface extends StatelessWidget {
   final Widget child;
 
@@ -218,15 +167,8 @@ class _WatchSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.16),
-        border: Border.all(color: Colors.white.withOpacity(0.055)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withOpacity(0.22),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: Colors.black.withOpacity(0.12),
+        border: Border.all(color: Colors.white.withOpacity(0.045)),
       ),
       child: child,
     );
