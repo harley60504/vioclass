@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage190_rollover_freeze_fix
+// PATCH VERSION: chat_message_list_stage197_transparent_background
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 190:
@@ -8,6 +8,11 @@
 //   unchanged and the UI can stop syncing.
 // - This version also tracks the newest message fingerprint so rollover updates
 //   still refresh the visible list.
+//
+// Stage 197:
+// - Chat list no longer paints its own solid #0E0E10 background, so Watch chat
+//   panel has one unified background instead of stacked dark blocks.
+// - Purple accents are reduced to softer blue-purple tones.
 
 import 'package:flutter/material.dart';
 
@@ -311,8 +316,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       );
     }
 
-    return Container(
-      color: const Color(0xFF0E0E10),
+    return ColoredBox(
+      color: Colors.transparent,
       child: Stack(
         children: [
           NotificationListener<ScrollNotification>(
@@ -398,28 +403,28 @@ class _LiveMessageDivider extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       child: Row(
         children: [
-          Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.08))),
+          Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.07))),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 8),
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFF9146FF).withOpacity(0.16),
+              color: const Color(0xFF7C6AA8).withOpacity(0.14),
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.32)),
+              border: Border.all(color: const Color(0xFF8F7CC0).withOpacity(0.24)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
                   Icons.flash_on_rounded,
-                  color: Color(0xFFBF94FF),
+                  color: Color(0xFFB6A4E2),
                   size: 14,
                 ),
                 const SizedBox(width: 5),
                 Text(
                   '以下是即時訊息',
                   style: TextStyle(
-                    color: const Color(0xFFD8C3FF),
+                    color: const Color(0xFFC9BDEC),
                     fontSize: 11 * scale,
                     fontWeight: FontWeight.w900,
                   ),
@@ -427,7 +432,7 @@ class _LiveMessageDivider extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.08))),
+          Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.07))),
         ],
       ),
     );
@@ -457,7 +462,7 @@ class _ScrollResumePill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF9146FF),
+            color: const Color(0xFF6D5A9E),
             borderRadius: BorderRadius.circular(999),
             boxShadow: const [
               BoxShadow(
