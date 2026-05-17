@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_panels_stage181_progressive_grid
+// PATCH VERSION: twitch_emote_picker_panels_stage183_service_owned_official_categories
 //
 // Main content panels for the Twitch emote picker sheet.
 
@@ -300,9 +300,7 @@ class TwitchOfficialEmotePanel extends StatelessWidget {
       query: query,
     );
     final usable = filterOfficialEmotes(
-      source: service.usableEmotes
-          .where((emote) => emote.source != TwitchOfficialEmoteSource.global)
-          .toList(growable: false),
+      source: service.nonGlobalUsableEmotes,
       query: query,
     );
     final channel = filterOfficialEmotes(
@@ -322,7 +320,7 @@ class TwitchOfficialEmotePanel extends StatelessWidget {
 
     final selectedLocked = subFilter == TwitchOfficialEmoteSubFilter.channel;
     final currentEmptyText = switch (subFilter) {
-      TwitchOfficialEmoteSubFilter.usable => '目前沒有我的可用 Twitch 貼圖。',
+      TwitchOfficialEmoteSubFilter.usable => '目前沒有訂閱或擁有的 Twitch 官方貼圖。',
       TwitchOfficialEmoteSubFilter.channel => '目前沒有實況主頻道貼圖。',
       TwitchOfficialEmoteSubFilter.global => '目前沒有 Twitch 共用貼圖。',
     };
