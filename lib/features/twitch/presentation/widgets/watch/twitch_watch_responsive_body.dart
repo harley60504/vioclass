@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage209_control_edges_and_drag_gap
+// PATCH VERSION: twitch_watch_responsive_body_stage210_restore_16x9_with_fast_drag
 
 import 'package:flutter/material.dart';
 
@@ -74,7 +74,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                       child: _WatchSurface(child: player),
                     )
                   else
-                    Expanded(child: _WatchSurface(child: player)),
+                    Expanded(child: _WatchAspectSurface(child: player)),
                   if (chatVisible) SizedBox(height: shellGap),
                   if (chatVisible)
                     Expanded(
@@ -86,24 +86,34 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
           }
 
           final effectiveChatWidth = _effectiveChatPanelWidthForViewport(layout);
+          final horizontalPadding = shellPadding.horizontal;
+          final usableWidth = (layout.width - horizontalPadding - shellGap)
+              .clamp(1.0, layout.width)
+              .toDouble();
+          var dragStartWidth = effectiveChatWidth;
+          var accumulatedDx = 0.0;
+
           return Padding(
             padding: shellPadding,
             child: Row(
               children: [
                 Expanded(
                   flex: layout.isPhoneLandscape ? 10 : 1,
-                  child: _WatchSurface(child: player),
+                  child: _WatchAspectSurface(child: player),
                 ),
                 if (chatVisible)
                   SizedBox(
                     width: shellGap,
                     child: TwitchWatchChatResizeHandle(
+                      onDragStart: (_) {
+                        dragStartWidth = effectiveChatWidth;
+                        accumulatedDx = 0.0;
+                      },
                       onDragUpdate: (delta) {
-                        final currentChatWidth =
-                            chatPanelWidth > 0 ? chatPanelWidth : effectiveChatWidth;
+                        accumulatedDx += delta.delta.dx;
                         onSetChatPanelWidthForViewport(
-                          viewportWidth: layout.width,
-                          value: currentChatWidth - delta.delta.dx,
+                          viewportWidth: usableWidth,
+                          value: dragStartWidth - accumulatedDx,
                         );
                       },
                       onDragEnd: onPersistChatPanelWidth,
@@ -155,6 +165,45 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
+  }
+}
+
+class _WatchAspectSurface extends StatelessWidget {
+  final Widget child;
+
+  const _WatchAspectSurface({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+
+        if (maxWidth <= 0 || maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        var width = maxWidth;
+        var height = width / TwitchWatchResponsiveBody._playerAspectRatio;
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * TwitchWatchResponsiveBody._playerAspectRatio;
+        }
+
+        width = width.clamp(1.0, maxWidth).toDouble();
+        height = height.clamp(1.0, maxHeight).toDouble();
+
+        return Center(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: _WatchSurface(child: child),
+          ),
+        );
+      },
+    );
   }
 }
 
