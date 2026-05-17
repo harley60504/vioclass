@@ -1,6 +1,7 @@
-// PATCH VERSION: twitch_emote_picker_widgets_stage185_progressive_grid_moved
+// PATCH VERSION: twitch_emote_picker_widgets_stage216_transparent_cards
 //
 // Shared visual widgets for Twitch emote picker sheets.
+// Stage 216: make emote grid cards translucent instead of solid dark blocks.
 
 import 'package:flutter/material.dart';
 
@@ -165,12 +166,12 @@ class TwitchThirdPartyEmoteGridCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color(0xFF242429),
+            color: Colors.white.withOpacity(0.052),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: emote.isZeroWidth
-                  ? const Color(0xFFEAB308).withOpacity(0.55)
-                  : Colors.white.withOpacity(0.08),
+                  ? const Color(0xFFEAB308).withOpacity(0.42)
+                  : Colors.white.withOpacity(0.095),
             ),
           ),
           child: Stack(
@@ -262,12 +263,12 @@ class TwitchOfficialEmoteGridCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF242429),
+              color: Colors.white.withOpacity(0.052),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: locked
-                    ? const Color(0xFFFFD166).withOpacity(0.32)
-                    : Colors.white.withOpacity(0.08),
+                    ? const Color(0xFFFFD166).withOpacity(0.26)
+                    : Colors.white.withOpacity(0.095),
               ),
             ),
             child: Stack(
