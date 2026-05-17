@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage197_transparent_background
+// PATCH VERSION: chat_message_list_stage200_live_divider_boundary_fix
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 190:
@@ -13,6 +13,12 @@
 // - Chat list no longer paints its own solid #0E0E10 background, so Watch chat
 //   panel has one unified background instead of stacked dark blocks.
 // - Purple accents are reduced to softer blue-purple tones.
+//
+// Stage 200:
+// - Moves the live divider from the first live message to the last old/history
+//   message. This keeps the divider at the same visual boundary, but prevents
+//   the first live IRC message tile from owning the divider and appearing twice
+//   in some rollover / rebuild cases.
 
 import 'package:flutter/material.dart';
 
@@ -270,18 +276,18 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         source == TwitchChatMessageSource.localEcho;
   }
 
-  bool _shouldShowLiveDivider(
+  bool _shouldShowLiveDividerAfter(
     List<TwitchChatRuntimeMessage> messages,
     int chronologicalIndex,
   ) {
-    if (chronologicalIndex <= 0 || chronologicalIndex >= messages.length) {
+    if (chronologicalIndex < 0 || chronologicalIndex >= messages.length - 1) {
       return false;
     }
 
     final current = messages[chronologicalIndex];
-    final previous = messages[chronologicalIndex - 1];
+    final next = messages[chronologicalIndex + 1];
 
-    return _isLiveMessage(current) && !_isLiveMessage(previous);
+    return !_isLiveMessage(current) && _isLiveMessage(next);
   }
 
   void _openContextSheet(TwitchChatRuntimeMessage message) {
@@ -337,7 +343,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
               itemBuilder: (context, index) {
                 final chronologicalIndex = visibleMessages.length - 1 - index;
                 final message = visibleMessages[chronologicalIndex];
-                final showLiveDivider = _shouldShowLiveDivider(
+                final showLiveDividerAfter = _shouldShowLiveDividerAfter(
                   visibleMessages,
                   chronologicalIndex,
                 );
@@ -345,8 +351,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (showLiveDivider)
-                      _LiveMessageDivider(fontScale: widget.fontScale),
                     TwitchRuntimeMessageTile(
                       message: message,
                       thirdPartyEmotes: widget.thirdPartyEmoteCache,
@@ -355,6 +359,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                       compact: widget.compact,
                       onOpenContext: () => _openContextSheet(message),
                     ),
+                    if (showLiveDividerAfter)
+                      _LiveMessageDivider(fontScale: widget.fontScale),
                   ],
                 );
               },
