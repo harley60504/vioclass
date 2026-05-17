@@ -1,7 +1,9 @@
-// PATCH VERSION: twitch_channel_points_sheet_models_stage171
+// PATCH VERSION: twitch_channel_points_sheet_models_stage171_async_import
 //
 // Small non-widget helpers and model types used by TwitchChannelPointsSheet.
 // Keep these outside the sheet file so the sheet can focus on state flow.
+
+import 'dart:async';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../widgets/channel_points/twitch_channel_points_emote_overlay.dart';
