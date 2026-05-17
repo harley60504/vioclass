@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage150_composed_sections
+// PATCH VERSION: twitch_watch_chat_panel_stage189a_glass_panel
 
 import 'dart:async';
 
@@ -142,7 +142,19 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     final prediction = widget.prediction;
 
     return Container(
-      decoration: const BoxDecoration(color: Color(0xFF111116)),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.36),
+        border: Border(
+          left: BorderSide(color: Colors.white.withOpacity(0.08)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.24),
+            blurRadius: 18,
+            offset: const Offset(-8, 0),
+          ),
+        ],
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final metrics = TwitchWatchChatLayoutMetrics.resolve(
