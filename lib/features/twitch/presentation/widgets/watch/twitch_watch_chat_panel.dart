@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage208_translucent_chat_panel
+// PATCH VERSION: twitch_watch_chat_panel_stage219e_embedded_emote_panel
 
 import 'dart:async';
 
@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
+import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../settings/twitch_chat_appearance_controller.dart';
@@ -17,6 +18,7 @@ import 'chat/twitch_watch_chat_header_bar.dart';
 import 'chat/twitch_watch_chat_input_section.dart';
 import 'chat/twitch_watch_chat_layout_metrics.dart';
 import 'chat/twitch_watch_chat_message_area.dart';
+import 'chat/twitch_watch_embedded_emote_panel.dart';
 
 class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchChatRuntime? runtime;
@@ -27,6 +29,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final String fallbackUserId;
   final String fallbackLogin;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService officialEmoteCache;
   final int emoteCount;
   final bool loadingEmotes;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
@@ -53,6 +56,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     this.fallbackUserId = '',
     this.fallbackLogin = '',
     required this.thirdPartyEmoteCache,
+    required this.officialEmoteCache,
     required this.emoteCount,
     required this.loadingEmotes,
     required this.channelPoints,
@@ -80,6 +84,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   bool showPinned = true;
   bool showPrediction = true;
+  bool showEmotePanel = false;
 
   String? lastPredictionId;
 
@@ -133,6 +138,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     return status != 'ACTIVE' && status != 'OPEN';
   }
 
+  void _toggleEmotePanel() {
+    setState(() => showEmotePanel = !showEmotePanel);
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentRuntime = widget.runtime;
@@ -163,6 +172,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
               effectiveShowPrediction ||
               (widget.engagementError != null && widget.engagementError!.isNotEmpty);
           final chatFontScale = _appearanceController.fontScale;
+          final panelHeight = (constraints.maxHeight *
+                  (MediaQuery.of(context).orientation == Orientation.portrait ? 0.34 : 0.46))
+              .clamp(150.0, 310.0)
+              .toDouble();
 
           return Column(
             children: [
@@ -233,6 +246,22 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                   ],
                 ),
               ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                height: showEmotePanel ? panelHeight : 0,
+                child: ClipRect(
+                  child: showEmotePanel
+                      ? TwitchWatchEmbeddedEmotePanel(
+                          thirdPartyCache: widget.thirdPartyEmoteCache,
+                          officialCache: widget.officialEmoteCache,
+                          loading: widget.loadingEmotes,
+                          messageController: widget.messageController,
+                          onRefresh: widget.onRefreshEmotes,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ),
               TwitchWatchChatInputSection(
                 channelPoints: widget.channelPoints,
                 messageController: widget.messageController,
@@ -241,7 +270,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 enabled: currentRuntime?.connected ?? false,
                 sending: widget.sending,
                 onOpenChannelPoints: widget.onOpenChannelPoints,
-                onOpenEmotes: widget.onOpenEmotes,
+                onOpenEmotes: _toggleEmotePanel,
                 onSend: widget.onSend,
               ),
             ],
