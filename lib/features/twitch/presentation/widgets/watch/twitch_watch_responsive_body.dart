@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage202_visible_gradient_shell
+// PATCH VERSION: twitch_watch_responsive_body_stage204_chat_min_width_plus18
 
 import 'package:flutter/material.dart';
 
@@ -6,6 +6,8 @@ import '../responsive/twitch_responsive_layout.dart';
 import 'twitch_watch_chat_resize_handle.dart';
 
 class TwitchWatchResponsiveBody extends StatelessWidget {
+  static const double _chatMinWidthVisualBoost = 18.0;
+
   final bool chatVisible;
   final double chatPanelWidth;
   final double chatPanelRatio;
@@ -195,8 +197,11 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .toDouble();
     final ratioWidth = usableWidth * chatPanelRatio;
     final minByViewport = usableWidth * minChatPanelRatio;
+    final boostedMinChatPanelWidth = minChatPanelWidth + _chatMinWidthVisualBoost;
+    final boostedMaxEffectiveMinChatPanelWidth =
+        maxEffectiveMinChatPanelWidth + _chatMinWidthVisualBoost;
     final minWidth = minByViewport
-        .clamp(minChatPanelWidth, maxEffectiveMinChatPanelWidth)
+        .clamp(boostedMinChatPanelWidth, boostedMaxEffectiveMinChatPanelWidth)
         .toDouble();
     final maxWidth = maxChatPanelWidth
         .clamp(minWidth, usableWidth - 120.0)
