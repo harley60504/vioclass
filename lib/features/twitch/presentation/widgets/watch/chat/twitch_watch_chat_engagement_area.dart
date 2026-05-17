@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_engagement_area_stage150
+// PATCH VERSION: twitch_watch_chat_engagement_area_stage198_font_scale
 //
 // Pinned message / prediction engagement section used by Watch chat.
 
@@ -18,6 +18,7 @@ class TwitchWatchChatEngagementArea extends StatelessWidget {
   final String? error;
   final bool showPinned;
   final bool showPrediction;
+  final double fontScale;
   final String fallbackProfileImageUrl;
   final String fallbackDisplayName;
   final String fallbackUserId;
@@ -36,6 +37,7 @@ class TwitchWatchChatEngagementArea extends StatelessWidget {
     required this.error,
     required this.showPinned,
     required this.showPrediction,
+    this.fontScale = 1.0,
     required this.fallbackProfileImageUrl,
     required this.fallbackDisplayName,
     required this.fallbackUserId,
@@ -63,6 +65,7 @@ class TwitchWatchChatEngagementArea extends StatelessWidget {
           onOpenPrediction: onOpenPrediction,
           showPinned: showPinned,
           showPrediction: showPrediction,
+          fontScale: fontScale,
           fallbackProfileImageUrl: fallbackProfileImageUrl,
           fallbackDisplayName: fallbackDisplayName,
           fallbackUserId: fallbackUserId,
