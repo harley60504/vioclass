@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage186c_real_ports
+// PATCH VERSION: twitch_watch_feature_ports_stage186f_player_port_operations
 //
 // Feature-facing ports for Watch composition.
 //
@@ -6,10 +6,14 @@
 // a UI feature needs so components can depend on their own interface instead of
 // depending on TwitchWatchPage callbacks.
 
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
+
 import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_feature_services.dart';
 import '../../services/watch/twitch_watch_services.dart';
 
@@ -18,12 +22,62 @@ class TwitchWatchPlayerPort {
 
   const TwitchWatchPlayerPort({required this.services});
 
+  TwitchPlaylistPlayerRuntime get runtime => services.playerRuntime;
+  Player get player => services.playerSession.player;
+  VideoController get videoController => services.playerSession.videoController;
+  List<TwitchM3u8Variant> get qualityVariants => services.playerRuntime.variants;
+  TwitchM3u8Variant? get currentVariant => services.playerRuntime.currentVariant;
+  bool get busy => services.playerRuntime.busy;
+  Object? get error => services.playerRuntime.error;
+
   Future<Uri?> loadLivePlaylist({required String channelLogin}) {
     return services.playerRuntime.loadLivePlaylist(channelLogin: channelLogin);
   }
 
+  Future<void> openLive({
+    required String channelLogin,
+    bool play = true,
+  }) async {
+    final uri = await loadLivePlaylist(channelLogin: channelLogin);
+    if (uri == null) {
+      throw StateError('播放清單載入失敗，沒有 playlist uri。');
+    }
+
+    await services.playerSession.openOrResume(
+      uri: uri.toString(),
+      play: play,
+    );
+  }
+
   Future<Uri?> startProxyForVariant(TwitchM3u8Variant variant) {
     return services.playerRuntime.startProxyForVariant(variant);
+  }
+
+  Future<void> switchQuality(
+    TwitchM3u8Variant variant, {
+    bool play = true,
+  }) async {
+    final uri = await startProxyForVariant(variant);
+    if (uri == null) {
+      throw StateError('切換畫質失敗：runtime 沒有回傳 playlist uri。');
+    }
+
+    await services.playerSession.openOrResume(
+      uri: uri.toString(),
+      play: play,
+    );
+  }
+
+  Future<void> pause() {
+    return services.playerSession.pauseCurrent();
+  }
+
+  Future<void> stop() {
+    return services.playerSession.stopCurrent();
+  }
+
+  void releaseSession() {
+    services.playerSession.release();
   }
 
   Future<void> disposeRuntime() {
