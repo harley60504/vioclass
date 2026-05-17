@@ -1,6 +1,9 @@
-// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage182_split_usable_global
+// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage183_restore_id_picker_grouping
 //
 // Twitch official emote ID picker used by Channel Points emote rewards.
+// This picker intentionally keeps its own grouping because Channel Points
+// emote rewards need emote IDs, not the same UX categories as the normal chat
+// emote picker.
 
 import 'dart:async';
 
@@ -64,11 +67,8 @@ class _TwitchOfficialEmoteIdPickerSheetState
   Widget build(BuildContext context) {
     final cache = widget.officialCache;
     final query = _query.trim().toLowerCase();
-    final usableSource = cache.usableEmotes
-        .where((emote) => emote.source != TwitchOfficialEmoteSource.global)
-        .toList(growable: false);
     final usable = widget.includeUnlockedEmotes
-        ? filterOfficialEmotes(source: usableSource, query: query)
+        ? filterOfficialEmotes(source: cache.usableEmotes, query: query)
         : const <TwitchOfficialEmote>[];
     final locked = widget.includeLockedChannelEmotes
         ? filterOfficialEmotes(source: cache.lockedChannelEmotes, query: query)
@@ -129,21 +129,21 @@ class _TwitchOfficialEmoteIdPickerSheetState
                       children: [
                         if (locked.isNotEmpty)
                           OfficialEmoteIdPickerSection(
-                            title: '實況主 / 可解鎖',
+                            title: '此頻道可解鎖',
                             emotes: locked,
                             badge: 'LOCKED',
                             resetKey: 'locked:$query:${locked.length}',
                           ),
                         if (usable.isNotEmpty)
                           OfficialEmoteIdPickerSection(
-                            title: '我的可用',
+                            title: '我的可用 / 此頻道',
                             emotes: usable,
                             badge: 'OWNED',
-                            resetKey: 'usable-nonglobal:$query:${usable.length}',
+                            resetKey: 'usable:$query:${usable.length}',
                           ),
                         if (global.isNotEmpty)
                           OfficialEmoteIdPickerSection(
-                            title: '全部共用',
+                            title: 'Twitch 共用',
                             emotes: global,
                             badge: 'GLOBAL',
                             resetKey: 'global:$query:${global.length}',
