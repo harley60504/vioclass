@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage177
+// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage181_progressive_sections
 //
 // Twitch official emote ID picker used by Channel Points emote rewards.
 
@@ -65,25 +65,13 @@ class _TwitchOfficialEmoteIdPickerSheetState
     final cache = widget.officialCache;
     final query = _query.trim().toLowerCase();
     final usable = widget.includeUnlockedEmotes
-        ? filterOfficialEmotes(
-            source: cache.usableEmotes,
-            query: query,
-            limit: twitchOfficialIdGridLimit,
-          )
+        ? filterOfficialEmotes(source: cache.usableEmotes, query: query)
         : const <TwitchOfficialEmote>[];
     final locked = widget.includeLockedChannelEmotes
-        ? filterOfficialEmotes(
-            source: cache.lockedChannelEmotes,
-            query: query,
-            limit: twitchOfficialIdGridLimit,
-          )
+        ? filterOfficialEmotes(source: cache.lockedChannelEmotes, query: query)
         : const <TwitchOfficialEmote>[];
     final global = widget.includeGlobalEmotes
-        ? filterOfficialEmotes(
-            source: cache.globalEmotes,
-            query: query,
-            limit: twitchOfficialIdGridLimit,
-          )
+        ? filterOfficialEmotes(source: cache.globalEmotes, query: query)
         : const <TwitchOfficialEmote>[];
     final busy = widget.loading || cache.loading;
 
@@ -141,18 +129,21 @@ class _TwitchOfficialEmoteIdPickerSheetState
                             title: '此頻道可解鎖',
                             emotes: locked,
                             badge: 'LOCKED',
+                            resetKey: 'locked:$query:${locked.length}',
                           ),
                         if (usable.isNotEmpty)
                           OfficialEmoteIdPickerSection(
                             title: '我的可用 / 此頻道',
                             emotes: usable,
                             badge: 'OWNED',
+                            resetKey: 'usable:$query:${usable.length}',
                           ),
                         if (global.isNotEmpty)
                           OfficialEmoteIdPickerSection(
                             title: 'Twitch 共用',
                             emotes: global,
                             badge: 'GLOBAL',
+                            resetKey: 'global:$query:${global.length}',
                           ),
                         if (locked.isEmpty && usable.isEmpty && global.isEmpty)
                           const Padding(
@@ -182,12 +173,14 @@ class OfficialEmoteIdPickerSection extends StatelessWidget {
   final String title;
   final List<TwitchOfficialEmote> emotes;
   final String badge;
+  final String resetKey;
 
   const OfficialEmoteIdPickerSection({
     super.key,
     required this.title,
     required this.emotes,
     required this.badge,
+    required this.resetKey,
   });
 
   @override
@@ -208,18 +201,22 @@ class OfficialEmoteIdPickerSection extends StatelessWidget {
               ),
             ),
           ),
-          GridView.builder(
+          TwitchProgressiveGridView<TwitchOfficialEmote>(
+            items: emotes,
+            resetKey: resetKey,
+            initialItemCount: 36,
+            pageSize: 36,
             shrinkWrap: true,
+            autoLoadOnScroll: false,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: emotes.length,
+            padding: EdgeInsets.zero,
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 126,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
               childAspectRatio: 0.86,
             ),
-            itemBuilder: (context, index) {
-              final emote = emotes[index];
+            itemBuilder: (context, emote, index) {
               return OfficialEmoteIdGridCard(emote: emote, badge: badge);
             },
           ),
