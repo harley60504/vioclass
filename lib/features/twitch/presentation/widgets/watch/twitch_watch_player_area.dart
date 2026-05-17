@@ -1,10 +1,13 @@
-// PATCH VERSION: watch_player_area_stage201_transparent_player_background
+// PATCH VERSION: watch_player_area_stage203_cover_video_no_letterbox
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
 // Stage 189A: player chrome uses shared glass surfaces.
 // Stage 201: player area no longer paints a full black background, allowing the
 // WatchPage purple gradient background to show around letterboxed video.
+// Stage 203: use BoxFit.cover for WatchPage video so the player card does not
+// show top/bottom black letterbox bands when the available area is not exactly
+// 16:9.
 
 library twitch_watch_player_area;
 
@@ -124,17 +127,20 @@ class TwitchWatchPlayerArea extends StatelessWidget {
             onQualityChanged ?? onQualitySelected;
 
         return ColoredBox(
-          color: Colors.black.withOpacity(0.18),
+          color: Colors.transparent,
           child: Stack(
             children: [
               Positioned.fill(
                 child: Video(
                   controller: videoController,
-                  fit: BoxFit.contain,
+                  fit: BoxFit.cover,
                   // v37: 把 Watch Page 的控制列放進 media_kit Video.controls。
                   // Windows 上原生 video surface 有時會蓋住 Flutter Stack overlay，
                   // 造成「有聲音但黑畫面、控制列出不來」。放進 controls layer
                   // 可避免控制列被 video surface 壓在下面。
+                  //
+                  // Stage 203: cover 會裁掉少量左右/上下內容，但可以拔掉
+                  // 不同比例視窗下播放器內部的上下黑邊。
                   controls: (_) => _WatchControlsOverlay(
                     loading: loading ||
                         playerRuntime.loading ||
