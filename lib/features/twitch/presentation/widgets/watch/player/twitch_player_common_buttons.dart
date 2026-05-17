@@ -1,9 +1,14 @@
+// PATCH VERSION: twitch_player_common_buttons_stage214_tinted_round_buttons
+
 part of twitch_watch_player_area;
 
 class _RoundIconButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
   final Color iconColor;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final double glowOpacity;
   final VoidCallback? onPressed;
   final bool compact;
   final bool tiny;
@@ -13,6 +18,9 @@ class _RoundIconButton extends StatelessWidget {
     required this.tooltip,
     required this.icon,
     this.iconColor = Colors.white,
+    this.backgroundColor,
+    this.borderColor,
+    this.glowOpacity = 0.18,
     required this.onPressed,
     this.compact = false,
     this.tiny = false,
@@ -23,6 +31,9 @@ class _RoundIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
     final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
+    final effectiveBackgroundColor = backgroundColor ?? Colors.black.withOpacity(0.34);
+    final effectiveBorderColor = borderColor ?? Colors.white.withOpacity(0.10);
+
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -33,10 +44,10 @@ class _RoundIconButton extends StatelessWidget {
           onTap: onPressed,
           child: TwitchGlassSurface(
             borderRadius: BorderRadius.circular(radius),
-            backgroundColor: Colors.black.withOpacity(0.34),
-            borderColor: Colors.white.withOpacity(0.10),
+            backgroundColor: effectiveBackgroundColor,
+            borderColor: effectiveBorderColor,
             blurSigma: 16,
-            boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.18),
+            boxShadow: TwitchGlassPanelShadow.compact(opacity: glowOpacity),
             child: SizedBox(
               width: size,
               height: size,
