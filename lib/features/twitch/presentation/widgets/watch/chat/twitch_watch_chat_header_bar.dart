@@ -1,7 +1,7 @@
-// PATCH VERSION: twitch_watch_chat_header_bar_stage148
+// PATCH VERSION: twitch_watch_chat_header_bar_stage191_unified_glass
 //
-// Extracted WatchPage chat header UI. Keep visual style here so the main
-// TwitchWatchChatPanel can focus on composition and data wiring.
+// Unified Watch chat header UI. Keeps the main TwitchWatchChatPanel focused on
+// composition and data wiring.
 
 import 'package:flutter/material.dart';
 
@@ -39,21 +39,38 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final headerHeight = compact ? 44.0 : 56.0;
+
     return Container(
-      height: compact ? 42 : 54,
+      height: headerHeight,
       padding: EdgeInsets.fromLTRB(12, compact ? 5 : 8, 10, compact ? 5 : 8),
-      decoration: const BoxDecoration(
-        color: TwitchUiColors.surfaceAlt,
-        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFF21142F).withOpacity(0.92),
+            const Color(0xFF111116).withOpacity(0.96),
+          ],
+        ),
+        border: Border(
+          bottom: BorderSide(color: TwitchUiColors.primary.withOpacity(0.22)),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.32),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Row(
         children: [
-          Icon(
-            connected ? Icons.circle : Icons.circle_outlined,
-            size: 10,
-            color: connected ? Colors.greenAccent : Colors.white38,
+          _ConnectionBadge(
+            connected: connected,
+            compact: compact,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
               'STREAM CHAT',
@@ -63,7 +80,7 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
                 color: TwitchUiColors.textPrimary,
                 fontSize: compact ? 12 : 13,
                 fontWeight: TwitchUiFontWeight.heavy,
-                letterSpacing: 0.4,
+                letterSpacing: 0.45,
               ),
             ),
           ),
@@ -87,26 +104,126 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
             onTap: onTogglePrediction,
           ),
           const SizedBox(width: 5),
-          IconButton(
+          _HeaderIconButton(
             tooltip: '聊天室字體',
-            visualDensity: VisualDensity.compact,
-            onPressed: onOpenAppearance,
-            icon: const Icon(Icons.format_size_rounded, size: 19),
+            icon: Icons.format_size_rounded,
+            onTap: onOpenAppearance,
           ),
-          const SizedBox(width: 2),
-          IconButton(
+          const SizedBox(width: 5),
+          _HeaderIconButton(
             tooltip: '刷新互動',
-            visualDensity: VisualDensity.compact,
-            onPressed: loading ? null : onRefresh,
-            icon: loading
-                ? const SizedBox(
-                    width: 15,
-                    height: 15,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded, size: 19),
+            icon: Icons.refresh_rounded,
+            loading: loading,
+            onTap: loading ? null : onRefresh,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ConnectionBadge extends StatelessWidget {
+  final bool connected;
+  final bool compact;
+
+  const _ConnectionBadge({
+    required this.connected,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = connected ? TwitchUiColors.green : Colors.white38;
+    final label = connected ? 'LIVE' : 'OFF';
+
+    return Container(
+      height: compact ? 25 : 28,
+      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 8),
+      decoration: BoxDecoration(
+        color: connected
+            ? TwitchUiColors.green.withOpacity(0.12)
+            : Colors.white.withOpacity(0.045),
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+        border: Border.all(color: color.withOpacity(connected ? 0.36 : 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: connected
+                  ? <BoxShadow>[
+                      BoxShadow(
+                        color: color.withOpacity(0.55),
+                        blurRadius: 8,
+                      ),
+                    ]
+                  : const <BoxShadow>[],
+            ),
+          ),
+          if (!compact) ...[
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 10.5,
+                fontWeight: TwitchUiFontWeight.heavy,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _HeaderIconButton({
+    required this.tooltip,
+    required this.icon,
+    this.loading = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.055),
+            borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+            border: Border.all(color: Colors.white.withOpacity(0.085)),
+          ),
+          child: loading
+              ? const SizedBox(
+                  width: 15,
+                  height: 15,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(
+                  icon,
+                  size: 17,
+                  color: onTap == null ? Colors.white24 : TwitchUiColors.primarySoft,
+                ),
+        ),
       ),
     );
   }
@@ -142,14 +259,22 @@ class _HeaderToggleButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? TwitchUiColors.primary.withOpacity(0.20)
-                : const Color(0xFF1B1B22),
+                ? TwitchUiColors.primary.withOpacity(0.24)
+                : Colors.white.withOpacity(0.055),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: active
-                  ? TwitchUiColors.primary.withOpacity(0.38)
-                  : Colors.white.withOpacity(0.06),
+                  ? TwitchUiColors.primarySoft.withOpacity(0.38)
+                  : Colors.white.withOpacity(0.085),
             ),
+            boxShadow: active
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: TwitchUiColors.primary.withOpacity(0.20),
+                      blurRadius: 12,
+                    ),
+                  ]
+                : const <BoxShadow>[],
           ),
           child: Icon(icon, size: 16, color: enabled ? color : Colors.white24),
         ),
