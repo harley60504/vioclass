@@ -1,15 +1,16 @@
-// PATCH VERSION: twitch_pinned_message_banner_stage192_glass_card
+// PATCH VERSION: twitch_pinned_message_banner_stage193_expand_copy
 //
 // Extracted pinned-message UI component. Keep pinned card visuals here instead
 // of embedding style decisions inside the engagement strip.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_ui_avatar.dart';
 
-class TwitchPinnedMessageBanner extends StatelessWidget {
+class TwitchPinnedMessageBanner extends StatefulWidget {
   final TwitchPinnedChatMessage message;
   final String fallbackProfileImageUrl;
   final String fallbackDisplayName;
@@ -26,10 +27,34 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
   });
 
   @override
+  State<TwitchPinnedMessageBanner> createState() => _TwitchPinnedMessageBannerState();
+}
+
+class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
+  bool _expanded = false;
+
+  TwitchPinnedChatMessage get message => widget.message;
+
+  Future<void> _copyPinnedMessage() async {
+    final text = message.text.trim();
+    if (text.isEmpty) return;
+
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('已複製置頂留言'),
+        duration: Duration(milliseconds: 1100),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final senderUser = message.sender ?? message.pinnedBy;
     final sender = _cleanName(senderUser?.displayName) ??
-        _cleanName(fallbackDisplayName) ??
+        _cleanName(widget.fallbackDisplayName) ??
         'Pinned';
     final pinnedBy = _cleanName(message.pinnedBy?.displayName);
     final senderColor = _parseUserColor(senderUser?.chatColor) ??
@@ -38,115 +63,150 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
     final metaText = pinnedBy == null || pinnedBy == sender
         ? 'PINNED MESSAGE'
         : 'PINNED BY $pinnedBy';
+    final cleanText = message.text.trim();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            const Color(0xFF221530).withOpacity(0.96),
-            const Color(0xFF15151D).withOpacity(0.98),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.18)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: TwitchUiColors.primary.withOpacity(0.14),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(19),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(19),
+        onTap: () => setState(() => _expanded = !_expanded),
+        onLongPress: _copyPinnedMessage,
+        child: Ink(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                const Color(0xFF241538).withOpacity(0.96),
+                const Color(0xFF15131D).withOpacity(0.98),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(19),
+            border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.25)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: TwitchUiColors.primary.withOpacity(0.12),
+                blurRadius: 12,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.28),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          TwitchUiAvatar(
-            imageUrl: avatarUrl,
-            displayName: sender,
-            size: 33,
-            accentColor: senderColor,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Row(
+              crossAxisAlignment: _expanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: TwitchUiColors.primary.withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: TwitchUiColors.primarySoft.withOpacity(0.28),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.push_pin_rounded,
-                        color: TwitchUiColors.primarySoft,
-                        size: 12,
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        sender,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: senderColor,
-                          fontSize: TwitchUiFontSize.chatName,
-                          height: 1.1,
-                          fontWeight: TwitchUiFontWeight.heavy,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 7),
-                    Flexible(
-                      child: Text(
-                        metaText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: TwitchUiColors.textMuted,
-                          fontSize: TwitchUiFontSize.chatMeta,
-                          height: 1.1,
-                          fontWeight: TwitchUiFontWeight.heavy,
-                          letterSpacing: 0.35,
-                        ),
-                      ),
-                    ),
-                  ],
+                TwitchUiAvatar(
+                  imageUrl: avatarUrl,
+                  displayName: sender,
+                  size: 33,
+                  accentColor: senderColor,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  message.text,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFF5F0FF),
-                    fontSize: TwitchUiFontSize.cardBody,
-                    height: 1.24,
-                    fontWeight: TwitchUiFontWeight.body,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 20,
+                            height: 20,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: TwitchUiColors.primary.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: TwitchUiColors.primarySoft.withOpacity(0.28),
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.push_pin_rounded,
+                              color: TwitchUiColors.primarySoft,
+                              size: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              sender,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: senderColor,
+                                fontSize: TwitchUiFontSize.chatName,
+                                height: 1.1,
+                                fontWeight: TwitchUiFontWeight.heavy,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Flexible(
+                            child: Text(
+                              metaText,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: TwitchUiColors.textMuted,
+                                fontSize: TwitchUiFontSize.chatMeta,
+                                height: 1.1,
+                                fontWeight: TwitchUiFontWeight.heavy,
+                                letterSpacing: 0.35,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Icon(
+                            _expanded
+                                ? Icons.keyboard_arrow_up_rounded
+                                : Icons.keyboard_arrow_down_rounded,
+                            color: Colors.white38,
+                            size: 18,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 150),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        child: Text(
+                          cleanText,
+                          maxLines: _expanded ? 12 : 2,
+                          overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFF5F0FF),
+                            fontSize: TwitchUiFontSize.cardBody,
+                            height: 1.24,
+                            fontWeight: TwitchUiFontWeight.body,
+                          ),
+                        ),
+                      ),
+                      if (_expanded) ...[
+                        const SizedBox(height: 7),
+                        const Text(
+                          '點一下收合 · 長按複製',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white38,
+                            fontSize: 10.5,
+                            height: 1.1,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -159,7 +219,7 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
     // pinned GQL payload omits profileImageURL, reuse the WatchPage stream
     // metadata avatar flow that is already used by player header and discovery.
     if (_looksLikeFallbackUser(user)) {
-      final fallback = fallbackProfileImageUrl.trim();
+      final fallback = widget.fallbackProfileImageUrl.trim();
       if (fallback.isNotEmpty) return fallback;
     }
 
@@ -167,16 +227,16 @@ class TwitchPinnedMessageBanner extends StatelessWidget {
   }
 
   bool _looksLikeFallbackUser(TwitchPinnedChatUser? user) {
-    if (user == null) return fallbackProfileImageUrl.trim().isNotEmpty;
+    if (user == null) return widget.fallbackProfileImageUrl.trim().isNotEmpty;
 
-    final fallbackId = fallbackUserId.trim();
+    final fallbackId = widget.fallbackUserId.trim();
     if (fallbackId.isNotEmpty && user.id.trim() == fallbackId) return true;
 
-    final fallbackLoginText = fallbackLogin.trim().toLowerCase();
+    final fallbackLoginText = widget.fallbackLogin.trim().toLowerCase();
     final userLogin = user.login.trim().toLowerCase();
     if (fallbackLoginText.isNotEmpty && userLogin == fallbackLoginText) return true;
 
-    final fallbackName = fallbackDisplayName.trim().toLowerCase();
+    final fallbackName = widget.fallbackDisplayName.trim().toLowerCase();
     final displayName = user.displayName.trim().toLowerCase();
     if (fallbackName.isNotEmpty && displayName == fallbackName) return true;
 
