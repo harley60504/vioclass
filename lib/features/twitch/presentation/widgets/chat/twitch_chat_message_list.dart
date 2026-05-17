@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage217_touch_scroll_guard
+// PATCH VERSION: chat_message_list_stage217f_scroll_direction_import_fix
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 190:
@@ -23,8 +23,13 @@
 // Stage 217:
 // - Makes touch / fast scroll less likely to be pulled back to latest messages.
 // - Lowers the auto-follow threshold and adds a short user-scroll guard window.
+//
+// Stage 217F:
+// - Adds the missing rendering import for ScrollDirection used by
+//   UserScrollNotification.direction.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 
 import '../../../models/chat/twitch_chat_message.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
