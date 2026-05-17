@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_port_adapters_stage187d_cleanup
+// PATCH VERSION: twitch_watch_port_adapters_stage219e_embedded_emote_panel
 
 import 'dart:async';
 
@@ -168,6 +168,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       fallbackUserId: metadata.channelId,
       fallbackLogin: metadata.channelLogin,
       thirdPartyEmoteCache: emotes.thirdParty,
+      officialEmoteCache: emotes.official,
       emoteCount: emotes.thirdParty.count,
       loadingEmotes: loadingEmotes ||
           emotes.thirdParty.loading ||
