@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage201_purple_gradient_background
+// PATCH VERSION: twitch_watch_responsive_body_stage202_visible_gradient_shell
 
 import 'package:flutter/material.dart';
 
@@ -77,70 +77,92 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+                final shellPadding = _shellPaddingFor(layout);
+                final shellGap = _shellGapFor(layout);
 
                 if (layout.shouldUseBottomChat) {
+                  final availableWidth = layout.width - shellPadding.horizontal;
+                  final availableHeight = layout.height - shellPadding.vertical;
                   final preferredPlayerHeight =
-                      (layout.width * 9 / 16).clamp(160.0, 320.0).toDouble();
+                      (availableWidth * 9 / 16).clamp(150.0, 320.0).toDouble();
                   final maxPlayerHeightWithChat =
-                      (layout.height - 430.0).clamp(150.0, 320.0).toDouble();
+                      (availableHeight - 430.0).clamp(140.0, 320.0).toDouble();
                   final playerHeight = chatVisible
                       ? preferredPlayerHeight
-                          .clamp(150.0, maxPlayerHeightWithChat)
+                          .clamp(140.0, maxPlayerHeightWithChat)
                           .toDouble()
-                      : layout.height;
+                      : availableHeight;
 
-                  return Column(
-                    children: [
-                      SizedBox(
-                        height: playerHeight,
-                        width: double.infinity,
-                        child: player,
-                      ),
-                      if (chatVisible)
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: Colors.white.withOpacity(0.06),
+                  return Padding(
+                    padding: shellPadding,
+                    child: Column(
+                      children: [
+                        SizedBox(
+                          height: playerHeight,
+                          width: double.infinity,
+                          child: _WatchSurface(
+                            borderRadius: BorderRadius.circular(18),
+                            child: player,
+                          ),
                         ),
-                      if (chatVisible) Expanded(child: chat),
-                    ],
+                        if (chatVisible) SizedBox(height: shellGap),
+                        if (chatVisible)
+                          Expanded(
+                            child: _WatchSurface(
+                              borderRadius: BorderRadius.circular(18),
+                              child: chat,
+                            ),
+                          ),
+                      ],
+                    ),
                   );
                 }
 
                 final effectiveChatWidth = _effectiveChatPanelWidthForViewport(layout);
-                return Row(
-                  children: [
-                    Expanded(
-                      flex: layout.isPhoneLandscape ? 10 : 1,
-                      child: player,
-                    ),
-                    if (chatVisible)
-                      SizedBox(
-                        width: effectiveChatWidth,
-                        child: Stack(
-                          children: [
-                            Positioned.fill(child: chat),
-                            Positioned(
-                              left: 0,
-                              top: 0,
-                              bottom: 0,
-                              width: 10,
-                              child: TwitchWatchChatResizeHandle(
-                                onDragUpdate: (delta) {
-                                  final currentChatWidth =
-                                      chatPanelWidth > 0 ? chatPanelWidth : effectiveChatWidth;
-                                  onSetChatPanelWidthForViewport(
-                                    viewportWidth: layout.width,
-                                    value: currentChatWidth - delta.delta.dx,
-                                  );
-                                },
-                                onDragEnd: onPersistChatPanelWidth,
-                              ),
-                            ),
-                          ],
+                return Padding(
+                  padding: shellPadding,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: layout.isPhoneLandscape ? 10 : 1,
+                        child: _WatchSurface(
+                          borderRadius: BorderRadius.circular(20),
+                          child: player,
                         ),
                       ),
-                  ],
+                      if (chatVisible) SizedBox(width: shellGap),
+                      if (chatVisible)
+                        SizedBox(
+                          width: effectiveChatWidth,
+                          child: _WatchSurface(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Stack(
+                              children: [
+                                Positioned.fill(child: chat),
+                                Positioned(
+                                  left: 0,
+                                  top: 0,
+                                  bottom: 0,
+                                  width: 10,
+                                  child: TwitchWatchChatResizeHandle(
+                                    onDragUpdate: (delta) {
+                                      final currentChatWidth = chatPanelWidth > 0
+                                          ? chatPanelWidth
+                                          : effectiveChatWidth;
+                                      onSetChatPanelWidthForViewport(
+                                        viewportWidth: layout.width,
+                                        value: currentChatWidth - delta.delta.dx,
+                                      );
+                                    },
+                                    onDragEnd: onPersistChatPanelWidth,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -150,16 +172,68 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     );
   }
 
+  EdgeInsets _shellPaddingFor(TwitchResponsiveLayout layout) {
+    if (layout.isPhonePortrait) {
+      return const EdgeInsets.all(8);
+    }
+    if (layout.width < 900 || layout.isPhoneLandscape) {
+      return const EdgeInsets.all(10);
+    }
+    return const EdgeInsets.all(14);
+  }
+
+  double _shellGapFor(TwitchResponsiveLayout layout) {
+    if (layout.isPhonePortrait || layout.width < 900) return 8;
+    return 12;
+  }
+
   double _effectiveChatPanelWidthForViewport(TwitchResponsiveLayout layout) {
-    final ratioWidth = layout.width * chatPanelRatio;
-    final minByViewport = layout.width * minChatPanelRatio;
+    final horizontalPadding = _shellPaddingFor(layout).horizontal;
+    final gapWidth = chatVisible ? _shellGapFor(layout) : 0.0;
+    final usableWidth = (layout.width - horizontalPadding - gapWidth)
+        .clamp(1.0, layout.width)
+        .toDouble();
+    final ratioWidth = usableWidth * chatPanelRatio;
+    final minByViewport = usableWidth * minChatPanelRatio;
     final minWidth = minByViewport
         .clamp(minChatPanelWidth, maxEffectiveMinChatPanelWidth)
         .toDouble();
     final maxWidth = maxChatPanelWidth
-        .clamp(minWidth, layout.width - 120.0)
+        .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
+  }
+}
+
+class _WatchSurface extends StatelessWidget {
+  final Widget child;
+  final BorderRadius borderRadius;
+
+  const _WatchSurface({
+    required this.child,
+    required this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.18),
+        borderRadius: borderRadius,
+        border: Border.all(color: Colors.white.withOpacity(0.07)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 9),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: child,
+      ),
+    );
   }
 }
 
