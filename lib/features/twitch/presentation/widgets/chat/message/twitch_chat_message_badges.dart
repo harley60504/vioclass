@@ -1,16 +1,16 @@
-// PATCH VERSION: twitch_chat_message_badges_stage160
+// PATCH VERSION: twitch_chat_message_badges_stage161_fix_badge_type
 //
 // Badge renderer for runtime chat messages. Badge sizing is controlled by
 // TwitchChatMessageVisualMetrics, while this file owns badge image rendering.
 
 import 'package:flutter/material.dart';
 
-import '../../../../models/chat/twitch_resolved_badge.dart';
+import '../../../../models/chat/twitch_chat_badge.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
 class TwitchChatMessageBadgeRow extends StatelessWidget {
-  final List<TwitchResolvedBadge> badges;
+  final List<TwitchChatBadge> badges;
   final TwitchChatMessageVisualMetrics metrics;
   final bool compact;
 
@@ -46,7 +46,7 @@ class TwitchChatMessageBadgeRow extends StatelessWidget {
 }
 
 class TwitchChatMessageBadge extends StatelessWidget {
-  final TwitchResolvedBadge badge;
+  final TwitchChatBadge badge;
   final TwitchChatMessageVisualMetrics metrics;
   final bool compact;
 
