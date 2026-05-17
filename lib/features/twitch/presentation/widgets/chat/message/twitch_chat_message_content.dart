@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_content_stage157
+// PATCH VERSION: twitch_chat_message_content_stage160_badges_extracted
 //
 // Core message content composition: reply preview, system line, badges,
 // display name, first-message chip, rendered segments and small status chips.
@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
-import '../../shared/twitch_cached_image_layer.dart';
+import 'twitch_chat_message_badges.dart';
 import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_reply_preview.dart';
 import 'twitch_chat_message_segments.dart';
@@ -68,25 +68,11 @@ class TwitchChatMessageContent extends StatelessWidget {
             children: [
               if (showTimestamp)
                 TwitchChatTimestampText(time: message.receivedAt, metrics: metrics),
-              for (final badge in message.resolvedBadges)
-                if (badge.image1x.isNotEmpty)
-                  Tooltip(
-                    message: badge.title,
-                    child: TwitchCachedImageLayer(
-                      imageUrl: badge.image1x,
-                      width: compact
-                          ? metrics.compactBadgeSize
-                          : metrics.badgeSize,
-                      height: compact
-                          ? metrics.compactBadgeSize
-                          : metrics.badgeSize,
-                      cacheWidth: 36,
-                      cacheHeight: 36,
-                      fit: BoxFit.contain,
-                      fallbackColor: Colors.transparent,
-                      errorWidget: const SizedBox.shrink(),
-                    ),
-                  ),
+              TwitchChatMessageBadgeRow(
+                badges: message.resolvedBadges,
+                metrics: metrics,
+                compact: compact,
+              ),
               Text(
                 displayNameText,
                 style: TextStyle(
