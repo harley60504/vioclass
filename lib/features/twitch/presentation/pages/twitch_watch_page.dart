@@ -1234,13 +1234,14 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   @override
   Widget build(BuildContext context) {
     final runtime = _chatRuntime;
+    final metadata = widget.resolvedInitialMetadata.copyWith(channelLogin: _channelLogin);
 
     Widget buildPlayerArea() {
       return TwitchWatchPlayerArea(
         playerRuntime: _playerRuntime,
         player: _player,
         videoController: _videoController,
-        metadata: widget.resolvedInitialMetadata.copyWith(channelLogin: _channelLogin),
+        metadata: metadata,
         loading: _loadingPlayer,
         error: _playerError,
         qualityVariants: _playerRuntime.variants,
@@ -1272,6 +1273,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         runtime: runtime,
         viewerLogin: _viewerLogin,
         viewerId: _viewerId,
+        fallbackProfileImageUrl: metadata.profileImageUrl,
+        fallbackDisplayName: metadata.displayName,
+        fallbackUserId: metadata.channelId,
+        fallbackLogin: metadata.channelLogin,
         thirdPartyEmoteCache: _thirdPartyEmotes,
         emoteCount: _thirdPartyEmotes.count,
         loadingEmotes: _loadingEmotes || _thirdPartyEmotes.loading || _emoteBootstrapping,
