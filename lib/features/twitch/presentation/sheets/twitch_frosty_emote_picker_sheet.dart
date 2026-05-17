@@ -63,51 +63,48 @@ class _TwitchFrostyEmotePickerSheetState
   Widget build(BuildContext context) {
     final official = _official;
     final loading = widget.loading || (official?.loading ?? false);
-    final tabs = <_EmoteTab>[
-      _EmoteTab(
+    final tabs = <_OuterTab>[
+      _OuterTab(
         label: 'Recent',
-        entries: <_EmoteEntry>[
-          ...widget.cache.recentEmotes.map(_EmoteEntry.thirdParty),
-          ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
-              .map(_EmoteEntry.official),
+        pages: [
+          _InnerPage(
+            label: 'Recent',
+            entries: <_EmoteEntry>[
+              ...widget.cache.recentEmotes.map(_EmoteEntry.thirdParty),
+              ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
+                  .map(_EmoteEntry.official),
+            ],
+          ),
         ],
       ),
-      _EmoteTab(
+      _OuterTab(
         label: 'Favorite',
-        entries: <_EmoteEntry>[
-          ...widget.cache.favoriteEmotes.map(_EmoteEntry.thirdParty),
-          ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
-              .map(_EmoteEntry.official),
+        pages: [
+          _InnerPage(
+            label: 'Favorite',
+            entries: <_EmoteEntry>[
+              ...widget.cache.favoriteEmotes.map(_EmoteEntry.thirdParty),
+              ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
+                  .map(_EmoteEntry.official),
+            ],
+          ),
         ],
       ),
-      _EmoteTab(label: 'Twitch', entries: _officialEntries()),
-      _EmoteTab(
-        label: '7TV',
-        entries: widget.cache
-            .emotesForProvider(TwitchThirdPartyEmoteProvider.sevenTv)
-            .map(_EmoteEntry.thirdParty)
-            .toList(growable: false),
+      _OuterTab(
+        label: 'Twitch',
+        pages: [
+          _InnerPage(label: 'All', entries: _officialEntries()),
+        ],
       ),
-      _EmoteTab(
-        label: 'BTTV',
-        entries: widget.cache
-            .emotesForProvider(TwitchThirdPartyEmoteProvider.bttv)
-            .map(_EmoteEntry.thirdParty)
-            .toList(growable: false),
-      ),
-      _EmoteTab(
-        label: 'FFZ',
-        entries: widget.cache
-            .emotesForProvider(TwitchThirdPartyEmoteProvider.ffz)
-            .map(_EmoteEntry.thirdParty)
-            .toList(growable: false),
-      ),
+      _thirdPartyTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
+      _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
+      _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
     ];
 
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
         title: '貼圖',
-        subtitle: 'Frosty-style test',
+        subtitle: 'Frosty-like model｜provider tab + section page',
         icon: Icons.emoji_emotions_rounded,
         loading: loading,
         onRefresh: widget.onRefresh,
@@ -115,29 +112,16 @@ class _TwitchFrostyEmotePickerSheetState
           length: tabs.length,
           child: Column(
             children: [
-              TabBar(
-                isScrollable: true,
-                labelColor: const Color(0xFFD9C5FF),
-                unselectedLabelColor: Colors.white60,
-                indicatorColor: const Color(0xFF9146FF),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-                labelStyle: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-                tabs: [
-                  for (final tab in tabs) Tab(text: '${tab.label} ${tab.entries.length}'),
-                ],
-              ),
+              _MainTabBar(tabs: tabs),
               const Divider(height: 1),
               Expanded(
                 child: TabBarView(
                   children: [
                     for (final tab in tabs)
-                      _EmoteSection(
-                        key: PageStorageKey<String>('frosty-${tab.label}'),
-                        entries: tab.entries,
-                        emptyText: loading ? 'Loading emotes...' : 'No emotes',
+                      _ProviderPage(
+                        key: PageStorageKey<String>('provider-${tab.label}'),
+                        tab: tab,
+                        loading: loading,
                         onSelect: _selectEntry,
                         onLongPress: _toggleFavorite,
                       ),
@@ -148,6 +132,27 @@ class _TwitchFrostyEmotePickerSheetState
           ),
         ),
       ),
+    );
+  }
+
+  _OuterTab _thirdPartyTab(
+    String label,
+    TwitchThirdPartyEmoteProvider provider,
+  ) {
+    final entries = widget.cache
+        .emotesForProvider(provider)
+        .map(_EmoteEntry.thirdParty)
+        .toList(growable: false);
+
+    // The current third-party cache does not yet store channel/global source.
+    // Keep the UI model identical to Frosty by using nested pages; once scope is
+    // available from the API/cache layer, this can split into Channel and Global
+    // without changing the sheet structure again.
+    return _OuterTab(
+      label: label,
+      pages: [
+        _InnerPage(label: 'All', entries: entries),
+      ],
     );
   }
 
@@ -193,6 +198,91 @@ class _TwitchFrostyEmotePickerSheetState
   String _officialKey(TwitchOfficialEmote emote) {
     final id = emote.id.trim();
     return id.isNotEmpty ? 'id:$id' : 'name:${emote.name.trim().toLowerCase()}';
+  }
+}
+
+class _MainTabBar extends StatelessWidget {
+  final List<_OuterTab> tabs;
+
+  const _MainTabBar({required this.tabs});
+
+  @override
+  Widget build(BuildContext context) {
+    return TabBar(
+      isScrollable: true,
+      labelColor: const Color(0xFFD9C5FF),
+      unselectedLabelColor: Colors.white60,
+      indicatorColor: const Color(0xFF9146FF),
+      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+      tabs: [
+        for (final tab in tabs) Tab(text: '${tab.label} ${tab.totalCount}'),
+      ],
+    );
+  }
+}
+
+class _ProviderPage extends StatelessWidget {
+  final _OuterTab tab;
+  final bool loading;
+  final ValueChanged<_EmoteEntry> onSelect;
+  final ValueChanged<_EmoteEntry> onLongPress;
+
+  const _ProviderPage({
+    super.key,
+    required this.tab,
+    required this.loading,
+    required this.onSelect,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (tab.pages.length == 1) {
+      final page = tab.pages.first;
+      return _EmoteSection(
+        key: PageStorageKey<String>('section-${tab.label}-${page.label}'),
+        entries: page.entries,
+        emptyText: loading ? 'Loading emotes...' : 'No emotes',
+        onSelect: onSelect,
+        onLongPress: onLongPress,
+      );
+    }
+
+    return DefaultTabController(
+      length: tab.pages.length,
+      child: Column(
+        children: [
+          TabBar(
+            isScrollable: true,
+            labelColor: const Color(0xFFD9C5FF),
+            unselectedLabelColor: Colors.white54,
+            indicatorColor: const Color(0xFF9146FF),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            tabs: [
+              for (final page in tab.pages)
+                Tab(text: '${page.label} ${page.entries.length}'),
+            ],
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: TabBarView(
+              children: [
+                for (final page in tab.pages)
+                  _EmoteSection(
+                    key: PageStorageKey<String>('section-${tab.label}-${page.label}'),
+                    entries: page.entries,
+                    emptyText: loading ? 'Loading emotes...' : 'No emotes',
+                    onSelect: onSelect,
+                    onLongPress: onLongPress,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -335,10 +425,17 @@ class _EmoteTile extends StatelessWidget {
   }
 }
 
-class _EmoteTab {
+class _OuterTab {
+  final String label;
+  final List<_InnerPage> pages;
+  const _OuterTab({required this.label, required this.pages});
+  int get totalCount => pages.fold<int>(0, (sum, page) => sum + page.entries.length);
+}
+
+class _InnerPage {
   final String label;
   final List<_EmoteEntry> entries;
-  const _EmoteTab({required this.label, required this.entries});
+  const _InnerPage({required this.label, required this.entries});
 }
 
 class _EmoteEntry {
