@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_channel_points_sheet_widgets_stage192_glass_cards
+
 import 'package:flutter/material.dart';
 
 import '../../localization/twitch_reward_localizer.dart';
@@ -27,10 +29,17 @@ class ChannelPointsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-      decoration: const BoxDecoration(
-        color: Color(0xFF18181B),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            const Color(0xFF2A1740).withOpacity(0.92),
+            const Color(0xFF15141C).withOpacity(0.96),
+          ],
+        ),
         border: Border(
-          bottom: BorderSide(color: Color(0xFF2A2A2D)),
+          bottom: BorderSide(color: const Color(0xFF9146FF).withOpacity(0.22)),
         ),
       ),
       child: Row(
@@ -92,7 +101,7 @@ class ChannelPointsErrorBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.orangeAccent.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
       ),
       child: Text(
@@ -125,29 +134,37 @@ class ChannelPointsEmptyRewards extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(26),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.redeem_rounded, color: Colors.white38, size: 30),
-            const SizedBox(height: 10),
-            Text(
-              hasSnapshot ? '目前沒有可顯示的忠誠點數獎勵。' : '尚未載入忠誠點數資料。',
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              '請重新整理，或確認目前頻道是否有開放忠誠點數獎勵。',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white38, fontSize: 12),
-            ),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: loading ? null : onRefresh,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('重新整理'),
-            ),
-          ],
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.050),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.18)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.redeem_rounded, color: Color(0xFFBF94FF), size: 30),
+              const SizedBox(height: 10),
+              Text(
+                hasSnapshot ? '目前沒有可顯示的忠誠點數獎勵。' : '尚未載入忠誠點數資料。',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '請重新整理，或確認目前頻道是否有開放忠誠點數獎勵。',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: loading ? null : onRefresh,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('重新整理'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -180,126 +197,154 @@ class ChannelPointsRewardTile extends StatelessWidget {
     final enough = balance == null || balance! >= cost;
 
     return Opacity(
-      opacity: available ? 1 : 0.48,
-      child: Card(
-        color: const Color(0xFF242429),
-        margin: EdgeInsets.zero,
+      opacity: available ? 1 : 0.50,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: available
-                ? const Color(0xFF9146FF).withOpacity(0.24)
-                : Colors.white.withOpacity(0.06),
-          ),
-        ),
         child: InkWell(
           onTap: available ? onTap : null,
-          borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            children: [
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _CostChip(
-                  cost: cost,
-                  iconUrl: pointsIconUrl,
-                  enough: enough,
-                  compact: true,
-                ),
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  const Color(0xFF241632).withOpacity(0.96),
+                  const Color(0xFF15151D).withOpacity(0.99),
+                ],
               ),
-              if (!available)
-                const Positioned(
-                  right: 10,
-                  bottom: 10,
-                  child: Icon(
-                    Icons.lock_outline_rounded,
-                    color: Colors.white30,
-                    size: 18,
-                  ),
-                )
-              else
-                const Positioned(
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: available
+                    ? const Color(0xFF9146FF).withOpacity(0.34)
+                    : Colors.white.withOpacity(0.07),
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: available
+                      ? const Color(0xFF9146FF).withOpacity(0.15)
+                      : Colors.black.withOpacity(0.14),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: 8,
                   right: 8,
-                  bottom: 8,
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.white38,
-                    size: 20,
+                  child: _CostChip(
+                    cost: cost,
+                    iconUrl: pointsIconUrl,
+                    enough: enough,
+                    compact: true,
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 30, 10, 22),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 78,
-                        height: 78,
-                        decoration: BoxDecoration(
-                          color: color,
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: imageUrl.isEmpty
-                            ? const Center(
-                                child: Icon(
-                                  Icons.diamond_outlined,
-                                  color: Colors.white,
-                                  size: 38,
-                                ),
-                              )
-                            : Image.network(
-                                imageUrl,
-                                width: 78,
-                                height: 78,
-                                cacheWidth: 156,
-                                cacheHeight: 156,
-                                fit: BoxFit.cover,
-                                filterQuality: FilterQuality.low,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.diamond_outlined,
-                                  color: Colors.white,
-                                ),
+                if (!available)
+                  const Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: Icon(
+                      Icons.lock_outline_rounded,
+                      color: Colors.white30,
+                      size: 18,
+                    ),
+                  )
+                else
+                  const Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white38,
+                      size: 20,
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 30, 10, 22),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 80,
+                          height: 80,
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withOpacity(0.14)),
+                            boxShadow: <BoxShadow>[
+                              BoxShadow(
+                                color: color.withOpacity(0.28),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
                               ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        title,
-                        maxLines: 2,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 13,
-                          height: 1.12,
+                            ],
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: imageUrl.isEmpty
+                              ? const Center(
+                                  child: Icon(
+                                    Icons.diamond_outlined,
+                                    color: Colors.white,
+                                    size: 38,
+                                  ),
+                                )
+                              : Image.network(
+                                  imageUrl,
+                                  width: 78,
+                                  height: 78,
+                                  cacheWidth: 156,
+                                  cacheHeight: 156,
+                                  fit: BoxFit.cover,
+                                  filterQuality: FilterQuality.low,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.diamond_outlined,
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
-                      ),
-                      if (prompt.isNotEmpty) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 10),
                         Text(
-                          prompt,
+                          title,
                           maxLines: 2,
                           textAlign: TextAlign.center,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            height: 1.15,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                            height: 1.12,
                           ),
                         ),
+                        if (prompt.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            prompt,
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              height: 1.15,
+                            ),
+                          ),
+                        ],
+                        if (statusText != null && !available) ...[
+                          const SizedBox(height: 6),
+                          _StatusBadge(label: statusText, warning: true),
+                        ],
                       ],
-                      if (statusText != null && !available) ...[
-                        const SizedBox(height: 6),
-                        _StatusBadge(label: statusText, warning: true),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -322,16 +367,22 @@ class _CostChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = enough ? const Color(0xFFBF94FF) : Colors.redAccent;
     return Container(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 6 : 7,
-        vertical: compact ? 3 : 4,
+        horizontal: compact ? 7 : 8,
+        vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
-        color: enough
-            ? const Color(0xFF9146FF).withOpacity(0.18)
-            : Colors.redAccent.withOpacity(0.14),
+        color: color.withOpacity(0.18),
         borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: color.withOpacity(0.36)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: color.withOpacity(0.12),
+            blurRadius: 8,
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -341,7 +392,7 @@ class _CostChip extends StatelessWidget {
           Text(
             formatChannelPointFullNumber(cost),
             style: TextStyle(
-              color: enough ? const Color(0xFFBF94FF) : Colors.redAccent,
+              color: color,
               fontSize: 11,
               fontWeight: FontWeight.w900,
             ),
@@ -385,18 +436,18 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = warning ? Colors.orangeAccent : Colors.white54;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: warning
-            ? Colors.orangeAccent.withOpacity(0.15)
-            : Colors.white.withOpacity(0.08),
+        color: color.withOpacity(0.14),
         borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: color.withOpacity(0.26)),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: warning ? Colors.orangeAccent : Colors.white54,
+          color: color,
           fontSize: 11,
           fontWeight: FontWeight.w800,
         ),
@@ -418,17 +469,14 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = highlight ? const Color(0xFFBF94FF) : Colors.white70;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: highlight
-            ? const Color(0xFF9146FF).withOpacity(0.22)
-            : const Color(0xFF242429),
+        color: color.withOpacity(highlight ? 0.18 : 0.08),
         borderRadius: BorderRadius.circular(99),
         border: Border.all(
-          color: highlight
-              ? const Color(0xFF9146FF).withOpacity(0.5)
-              : Colors.white.withOpacity(0.08),
+          color: color.withOpacity(highlight ? 0.42 : 0.12),
         ),
       ),
       child: Row(
@@ -439,7 +487,7 @@ class _StatusChip extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: highlight ? const Color(0xFFBF94FF) : Colors.white70,
+              color: color,
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),
