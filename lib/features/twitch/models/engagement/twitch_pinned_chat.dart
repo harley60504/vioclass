@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_pinned_chat_model_avatar_stage144
+
 class TwitchPinnedChatMessage {
   final String pinId;
   final String type;
@@ -98,12 +100,14 @@ class TwitchPinnedChatUser {
   final String id;
   final String displayName;
   final String chatColor;
+  final String profileImageUrl;
   final List<TwitchPinnedChatBadge> displayBadges;
 
   const TwitchPinnedChatUser({
     required this.id,
     required this.displayName,
     this.chatColor = '',
+    this.profileImageUrl = '',
     this.displayBadges = const <TwitchPinnedChatBadge>[],
   });
 
@@ -114,8 +118,32 @@ class TwitchPinnedChatUser {
       id: value['id']?.toString() ?? '',
       displayName: value['displayName']?.toString() ?? '',
       chatColor: value['chatColor']?.toString() ?? '',
+      profileImageUrl: _readProfileImageUrl(value),
       displayBadges: TwitchPinnedChatBadge.listFromJson(value['displayBadges']),
     );
+  }
+
+  static String _readProfileImageUrl(Map<String, dynamic> value) {
+    final direct = value['profileImageURL'] ??
+        value['profileImageUrl'] ??
+        value['profile_image_url'] ??
+        value['avatarURL'] ??
+        value['avatarUrl'] ??
+        value['avatar_url'];
+    final directText = direct?.toString().trim() ?? '';
+    if (directText.isNotEmpty) return directText;
+
+    final profileImage = value['profileImage'];
+    if (profileImage is Map<String, dynamic>) {
+      final nested = profileImage['url'] ??
+          profileImage['url1x'] ??
+          profileImage['url2x'] ??
+          profileImage['url4x'];
+      final nestedText = nested?.toString().trim() ?? '';
+      if (nestedText.isNotEmpty) return nestedText;
+    }
+
+    return '';
   }
 
   Map<String, dynamic> toJson() {
@@ -123,6 +151,7 @@ class TwitchPinnedChatUser {
       'id': id,
       'displayName': displayName,
       'chatColor': chatColor,
+      'profileImageUrl': profileImageUrl,
       'displayBadges': displayBadges.map((badge) => badge.toJson()).toList(),
     };
   }
