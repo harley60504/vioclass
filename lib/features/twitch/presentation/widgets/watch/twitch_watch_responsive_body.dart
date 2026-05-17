@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage210_restore_16x9_with_fast_drag
+// PATCH VERSION: twitch_watch_responsive_body_stage212_full_player_pane_controls
 
 import 'package:flutter/material.dart';
 
@@ -74,7 +74,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                       child: _WatchSurface(child: player),
                     )
                   else
-                    Expanded(child: _WatchAspectSurface(child: player)),
+                    Expanded(child: _WatchSurface(child: player)),
                   if (chatVisible) SizedBox(height: shellGap),
                   if (chatVisible)
                     Expanded(
@@ -99,7 +99,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
               children: [
                 Expanded(
                   flex: layout.isPhoneLandscape ? 10 : 1,
-                  child: _WatchAspectSurface(child: player),
+                  child: _WatchSurface(child: player),
                 ),
                 if (chatVisible)
                   SizedBox(
@@ -165,45 +165,6 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
-  }
-}
-
-class _WatchAspectSurface extends StatelessWidget {
-  final Widget child;
-
-  const _WatchAspectSurface({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        final maxHeight = constraints.maxHeight;
-
-        if (maxWidth <= 0 || maxHeight <= 0) {
-          return const SizedBox.shrink();
-        }
-
-        var width = maxWidth;
-        var height = width / TwitchWatchResponsiveBody._playerAspectRatio;
-
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * TwitchWatchResponsiveBody._playerAspectRatio;
-        }
-
-        width = width.clamp(1.0, maxWidth).toDouble();
-        height = height.clamp(1.0, maxHeight).toDouble();
-
-        return Center(
-          child: SizedBox(
-            width: width,
-            height: height,
-            child: _WatchSurface(child: child),
-          ),
-        );
-      },
-    );
   }
 }
 
