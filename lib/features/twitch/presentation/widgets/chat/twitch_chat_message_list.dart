@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage200_live_divider_boundary_fix
+// PATCH VERSION: chat_message_list_stage217_touch_scroll_guard
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 190:
@@ -19,6 +19,10 @@
 //   message. This keeps the divider at the same visual boundary, but prevents
 //   the first live IRC message tile from owning the divider and appearing twice
 //   in some rollover / rebuild cases.
+//
+// Stage 217:
+// - Makes touch / fast scroll less likely to be pulled back to latest messages.
+// - Lowers the auto-follow threshold and adds a short user-scroll guard window.
 
 import 'package:flutter/material.dart';
 
@@ -52,13 +56,16 @@ class TwitchChatMessageList extends StatefulWidget {
 }
 
 class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
-  static const double _autoScrollThreshold = 120;
+  static const double _autoScrollThreshold = 36;
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
+  static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
 
   final ScrollController _scrollController = ScrollController();
 
   bool _autoScroll = true;
   bool _programmaticScrollActive = false;
+  bool _userScrollActive = false;
+  DateTime? _lastUserScrollAt;
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
   String _lastSourceNewestFingerprint = '';
@@ -137,7 +144,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     _lastSourceMessageCount = sourceCount;
     _lastSourceNewestFingerprint = sourceNewestFingerprint;
 
-    if (_autoScroll || _isNearLatest) {
+    final userRecentlyScrolled = _hasRecentUserScroll;
+    final shouldAutoFollow = !userRecentlyScrolled && (_autoScroll || _isNearLatest);
+
+    if (shouldAutoFollow) {
       _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
       _hiddenNewMessageCount = 0;
       _autoScroll = true;
@@ -200,12 +210,33 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     return _scrollController.offset <= _autoScrollThreshold;
   }
 
+  bool get _hasRecentUserScroll {
+    if (_userScrollActive) return true;
+    final lastUserScrollAt = _lastUserScrollAt;
+    if (lastUserScrollAt == null) return false;
+    return DateTime.now().difference(lastUserScrollAt) < _userScrollGuardDuration;
+  }
+
+  void _markUserScrollActive() {
+    if (_programmaticScrollActive) return;
+    _userScrollActive = true;
+    _lastUserScrollAt = DateTime.now();
+  }
+
+  void _markUserScrollEnded() {
+    if (_programmaticScrollActive) return;
+    _userScrollActive = false;
+    _lastUserScrollAt = DateTime.now();
+  }
+
   void _handleScrollChanged() {
     if (!_scrollController.hasClients || _programmaticScrollActive) return;
 
     final nearLatest = _isNearLatest;
+    final userRecentlyScrolled = _hasRecentUserScroll;
 
     if (nearLatest && !_autoScroll) {
+      if (userRecentlyScrolled) return;
       setState(() {
         _autoScroll = true;
         _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
@@ -250,7 +281,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         .whenComplete(() {
       _programmaticScrollActive = false;
       if (!mounted) return;
-      if (_isNearLatest && !_autoScroll) {
+      if (_isNearLatest && !_autoScroll && !_hasRecentUserScroll) {
         setState(() => _autoScroll = true);
       }
     });
@@ -259,6 +290,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   void _resumeLatest() {
     setState(() {
       _autoScroll = true;
+      _userScrollActive = false;
+      _lastUserScrollAt = null;
       _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
       _lastSourceMessageCount = runtime.messages.length;
       _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
@@ -328,8 +361,21 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         children: [
           NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification is UserScrollNotification ||
-                  notification is ScrollEndNotification) {
+              if (notification is ScrollStartNotification &&
+                  notification.dragDetails != null) {
+                _markUserScrollActive();
+              } else if (notification is ScrollUpdateNotification &&
+                  notification.dragDetails != null) {
+                _markUserScrollActive();
+              } else if (notification is UserScrollNotification) {
+                if (notification.direction == ScrollDirection.idle) {
+                  _markUserScrollEnded();
+                } else {
+                  _markUserScrollActive();
+                }
+                _handleScrollChanged();
+              } else if (notification is ScrollEndNotification) {
+                _markUserScrollEnded();
                 _handleScrollChanged();
               }
               return false;
