@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage196_floating_engagement_overlay
+// PATCH VERSION: twitch_watch_chat_panel_stage197_unified_neutral_background
 
 import 'dart:async';
 
@@ -147,18 +147,18 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: <Color>[
-            Color(0xFF111018),
+            Color(0xFF101014),
             Color(0xFF0E0E10),
           ],
         ),
         border: Border(
-          left: BorderSide(color: Colors.white.withOpacity(0.08)),
+          left: BorderSide(color: Colors.white.withOpacity(0.07)),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.24),
-            blurRadius: 18,
-            offset: const Offset(-8, 0),
+            color: Colors.black.withOpacity(0.22),
+            blurRadius: 16,
+            offset: const Offset(-7, 0),
           ),
         ],
       ),
