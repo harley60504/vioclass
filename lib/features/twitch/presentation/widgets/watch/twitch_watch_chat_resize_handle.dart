@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_watch_chat_resize_handle_stage209_gap_hitbox
+
 import 'package:flutter/material.dart';
 
 class TwitchWatchChatResizeHandle extends StatefulWidget {
@@ -22,6 +24,7 @@ class _TwitchWatchChatResizeHandleState extends State<TwitchWatchChatResizeHandl
   @override
   Widget build(BuildContext context) {
     final active = _hovering || _dragging;
+
     return MouseRegion(
       cursor: SystemMouseCursors.resizeColumn,
       onEnter: (_) => setState(() => _hovering = true),
@@ -40,19 +43,19 @@ class _TwitchWatchChatResizeHandleState extends State<TwitchWatchChatResizeHandl
         },
         child: Container(
           color: Colors.transparent,
-          alignment: Alignment.centerLeft,
+          alignment: Alignment.center,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 100),
-            width: active ? 2 : 1,
+            width: active ? 3 : 1,
             height: double.infinity,
             decoration: BoxDecoration(
               color: active
-                  ? const Color(0xFF9146FF)
-                  : Colors.white.withValues(alpha: 0.06),
+                  ? const Color(0xFF8F7CC0)
+                  : Colors.white.withOpacity(0.10),
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF9146FF).withValues(alpha: 0.45),
+                        color: const Color(0xFF8F7CC0).withOpacity(0.38),
                         blurRadius: 8,
                       ),
                     ]
