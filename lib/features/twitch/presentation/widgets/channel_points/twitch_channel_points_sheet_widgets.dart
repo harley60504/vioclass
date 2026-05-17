@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_channel_points_sheet_widgets_stage192_glass_cards
+// PATCH VERSION: twitch_channel_points_sheet_widgets_stage216_transparent_reward_cards
 
 import 'package:flutter/material.dart';
 
@@ -137,9 +137,9 @@ class ChannelPointsEmptyRewards extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.050),
+            color: Colors.white.withOpacity(0.040),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.18)),
+            border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.14)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -207,27 +207,20 @@ class ChannelPointsRewardTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: Ink(
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[
-                  const Color(0xFF241632).withOpacity(0.96),
-                  const Color(0xFF15151D).withOpacity(0.99),
-                ],
-              ),
+              color: Colors.white.withOpacity(0.038),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: available
-                    ? const Color(0xFF9146FF).withOpacity(0.34)
-                    : Colors.white.withOpacity(0.07),
+                    ? const Color(0xFF9146FF).withOpacity(0.26)
+                    : Colors.white.withOpacity(0.060),
               ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
                   color: available
-                      ? const Color(0xFF9146FF).withOpacity(0.15)
-                      : Colors.black.withOpacity(0.14),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
+                      ? const Color(0xFF9146FF).withOpacity(0.070)
+                      : Colors.black.withOpacity(0.080),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -274,14 +267,14 @@ class ChannelPointsRewardTile extends StatelessWidget {
                           height: 80,
                           padding: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
-                            color: color,
+                            color: color.withOpacity(0.82),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withOpacity(0.14)),
+                            border: Border.all(color: Colors.white.withOpacity(0.12)),
                             boxShadow: <BoxShadow>[
                               BoxShadow(
-                                color: color.withOpacity(0.28),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
+                                color: color.withOpacity(0.18),
+                                blurRadius: 12,
+                                offset: const Offset(0, 5),
                               ),
                             ],
                           ),
@@ -374,13 +367,13 @@ class _CostChip extends StatelessWidget {
         vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.18),
+        color: color.withOpacity(0.13),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withOpacity(0.36)),
+        border: Border.all(color: color.withOpacity(0.28)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: color.withOpacity(0.12),
-            blurRadius: 8,
+            color: color.withOpacity(0.08),
+            blurRadius: 7,
           ),
         ],
       ),
@@ -413,7 +406,7 @@ class _MiniBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
+        color: Colors.white.withOpacity(0.06),
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
@@ -440,9 +433,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
+        color: color.withOpacity(0.11),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withOpacity(0.26)),
+        border: Border.all(color: color.withOpacity(0.22)),
       ),
       child: Text(
         label,
@@ -473,10 +466,10 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(highlight ? 0.18 : 0.08),
+        color: color.withOpacity(highlight ? 0.13 : 0.06),
         borderRadius: BorderRadius.circular(99),
         border: Border.all(
-          color: color.withOpacity(highlight ? 0.42 : 0.12),
+          color: color.withOpacity(highlight ? 0.30 : 0.10),
         ),
       ),
       child: Row(
