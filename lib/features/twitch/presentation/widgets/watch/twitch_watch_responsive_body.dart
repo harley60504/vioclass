@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage204_chat_min_width_plus18
+// PATCH VERSION: twitch_watch_responsive_body_stage206_player_16x9_shell
 
 import 'package:flutter/material.dart';
 
@@ -7,6 +7,7 @@ import 'twitch_watch_chat_resize_handle.dart';
 
 class TwitchWatchResponsiveBody extends StatelessWidget {
   static const double _chatMinWidthVisualBoost = 18.0;
+  static const double _playerAspectRatio = 16 / 9;
 
   final bool chatVisible;
   final double chatPanelWidth;
@@ -86,27 +87,33 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                   final availableWidth = layout.width - shellPadding.horizontal;
                   final availableHeight = layout.height - shellPadding.vertical;
                   final preferredPlayerHeight =
-                      (availableWidth * 9 / 16).clamp(150.0, 320.0).toDouble();
+                      (availableWidth / _playerAspectRatio).clamp(150.0, 320.0).toDouble();
                   final maxPlayerHeightWithChat =
                       (availableHeight - 430.0).clamp(140.0, 320.0).toDouble();
-                  final playerHeight = chatVisible
-                      ? preferredPlayerHeight
-                          .clamp(140.0, maxPlayerHeightWithChat)
-                          .toDouble()
-                      : availableHeight;
+                  final playerHeight = preferredPlayerHeight
+                      .clamp(140.0, maxPlayerHeightWithChat)
+                      .toDouble();
 
                   return Padding(
                     padding: shellPadding,
                     child: Column(
                       children: [
-                        SizedBox(
-                          height: playerHeight,
-                          width: double.infinity,
-                          child: _WatchSurface(
-                            borderRadius: BorderRadius.circular(18),
-                            child: player,
+                        if (chatVisible)
+                          SizedBox(
+                            height: playerHeight,
+                            width: double.infinity,
+                            child: _WatchSurface(
+                              borderRadius: BorderRadius.circular(18),
+                              child: player,
+                            ),
+                          )
+                        else
+                          Expanded(
+                            child: _WatchAspectSurface(
+                              borderRadius: BorderRadius.circular(18),
+                              child: player,
+                            ),
                           ),
-                        ),
                         if (chatVisible) SizedBox(height: shellGap),
                         if (chatVisible)
                           Expanded(
@@ -127,7 +134,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                     children: [
                       Expanded(
                         flex: layout.isPhoneLandscape ? 10 : 1,
-                        child: _WatchSurface(
+                        child: _WatchAspectSurface(
                           borderRadius: BorderRadius.circular(20),
                           child: player,
                         ),
@@ -207,6 +214,52 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
+  }
+}
+
+class _WatchAspectSurface extends StatelessWidget {
+  final Widget child;
+  final BorderRadius borderRadius;
+
+  const _WatchAspectSurface({
+    required this.child,
+    required this.borderRadius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+
+        if (maxWidth <= 0 || maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
+
+        var width = maxWidth;
+        var height = width / TwitchWatchResponsiveBody._playerAspectRatio;
+
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * TwitchWatchResponsiveBody._playerAspectRatio;
+        }
+
+        width = width.clamp(1.0, maxWidth).toDouble();
+        height = height.clamp(1.0, maxHeight).toDouble();
+
+        return Center(
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: _WatchSurface(
+              borderRadius: borderRadius,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 
