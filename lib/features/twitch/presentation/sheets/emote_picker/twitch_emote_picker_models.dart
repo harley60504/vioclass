@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_models_stage175
+// PATCH VERSION: twitch_emote_picker_models_stage179_official_limits
 //
 // Shared enums, constants and non-widget helpers for Twitch emote picker sheets.
 
@@ -9,8 +9,8 @@ import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 
 const int twitchThirdPartyGridLimit = 96;
 const int twitchCombinedGridLimit = 120;
-const int twitchOfficialGridLimit = 72;
-const int twitchOfficialIdGridLimit = 96;
+const int twitchOfficialGridLimit = 180;
+const int twitchOfficialIdGridLimit = 240;
 const int twitchEmoteGridCacheSize = 96;
 const int twitchEmotePreviewCacheSize = 144;
 const Duration twitchEmoteSearchDebounceDuration = Duration(milliseconds: 180);
