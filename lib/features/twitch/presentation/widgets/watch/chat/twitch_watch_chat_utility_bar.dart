@@ -1,7 +1,9 @@
-// PATCH VERSION: twitch_watch_chat_utility_bar_stage209_single_translucent_layer
+// PATCH VERSION: twitch_watch_chat_utility_bar_stage215_more_transparent_chips
 //
 // Stage 209: remove the extra section background. Only the actual chips/buttons
 // keep translucent styling.
+// Stage 215: make channel-points and emote chips lighter / more transparent so
+// they blend with the translucent chat panel instead of looking like solid pills.
 
 import 'package:flutter/material.dart';
 
@@ -91,13 +93,13 @@ class _ChannelPointsCompactButton extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 0, compact ? 9 : 12, 0),
           decoration: BoxDecoration(
             color: hasClaim
-                ? _softAccent.withOpacity(0.14)
-                : Colors.white.withOpacity(0.048),
+                ? _softAccent.withOpacity(0.075)
+                : Colors.white.withOpacity(0.024),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: hasClaim
-                  ? _softAccentText.withOpacity(0.26)
-                  : Colors.white.withOpacity(0.075),
+                  ? _softAccentText.withOpacity(0.18)
+                  : Colors.white.withOpacity(0.050),
             ),
           ),
           child: Row(
@@ -112,7 +114,7 @@ class _ChannelPointsCompactButton extends StatelessWidget {
                 Text(
                   label,
                   style: TextStyle(
-                    color: hasClaim ? const Color(0xFFE2DAF7) : Colors.white70,
+                    color: hasClaim ? const Color(0xFFD8CEF2) : Colors.white60,
                     fontSize: compact ? 11 : 12.5,
                     fontWeight: TwitchUiFontWeight.heavy,
                   ),
@@ -194,19 +196,19 @@ class _UtilityButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? _softAccent.withOpacity(0.13)
-                : Colors.white.withOpacity(0.048),
+                ? _softAccent.withOpacity(0.070)
+                : Colors.white.withOpacity(0.024),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: active
-                  ? _softAccentText.withOpacity(0.24)
-                  : Colors.white.withOpacity(0.075),
+                  ? _softAccentText.withOpacity(0.17)
+                  : Colors.white.withOpacity(0.050),
             ),
           ),
           child: Icon(
             icon,
             size: compact ? 15 : 17,
-            color: active ? _softAccentText : Colors.white60,
+            color: active ? _softAccentText : Colors.white54,
           ),
         ),
       ),
