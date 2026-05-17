@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_engagement_strip_streamnook_pinned_stage143
+// PATCH VERSION: twitch_chat_engagement_strip_streamnook_pinned_avatar_stage144
 
 import 'dart:async';
 
@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
+import '../shared/twitch_cached_image_layer.dart';
 
 class TwitchChatEngagementStrip extends StatelessWidget {
   final List<TwitchPinnedChatMessage> pinnedMessages;
@@ -92,13 +93,11 @@ class _PinnedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sender = _cleanName(message.sender?.displayName) ??
-        _cleanName(message.pinnedBy?.displayName) ??
-        'Pinned';
+    final senderUser = message.sender ?? message.pinnedBy;
+    final sender = _cleanName(senderUser?.displayName) ?? 'Pinned';
     final pinnedBy = _cleanName(message.pinnedBy?.displayName);
-    final senderColor = _parseUserColor(message.sender?.chatColor) ??
-        _parseUserColor(message.pinnedBy?.chatColor) ??
-        const Color(0xFFBF94FF);
+    final senderColor = _parseUserColor(senderUser?.chatColor) ?? const Color(0xFFBF94FF);
+    final avatarUrl = senderUser?.profileImageUrl.trim() ?? '';
     final metaText = pinnedBy == null || pinnedBy == sender
         ? 'PINNED MESSAGE'
         : 'PINNED BY $pinnedBy';
@@ -114,24 +113,12 @@ class _PinnedCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFF9146FF).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: const Color(0xFF9146FF).withOpacity(0.26),
-              ),
-            ),
-            child: const Icon(
-              Icons.push_pin_rounded,
-              color: Color(0xFFBF94FF),
-              size: 14,
-            ),
+          _PinnedAvatar(
+            imageUrl: avatarUrl,
+            displayName: sender,
+            color: senderColor,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,6 +126,12 @@ class _PinnedCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
+                    const Icon(
+                      Icons.push_pin_rounded,
+                      color: Color(0xFF9AA4B2),
+                      size: 12,
+                    ),
+                    const SizedBox(width: 5),
                     Flexible(
                       child: Text(
                         sender,
@@ -202,6 +195,83 @@ class _PinnedCard extends StatelessWidget {
     final parsed = int.tryParse(text.substring(1), radix: 16);
     if (parsed == null) return null;
     return Color(0xFF000000 | parsed);
+  }
+}
+
+class _PinnedAvatar extends StatelessWidget {
+  final String imageUrl;
+  final String displayName;
+  final Color color;
+
+  const _PinnedAvatar({
+    required this.imageUrl,
+    required this.displayName,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 32.0;
+    final fallback = _fallbackText(displayName);
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: ClipOval(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.25),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                color.withOpacity(0.85),
+                const Color(0xFF23232B),
+              ],
+            ),
+          ),
+          child: imageUrl.isEmpty
+              ? _PinnedAvatarFallback(text: fallback)
+              : TwitchCachedImageLayer(
+                  imageUrl: imageUrl,
+                  width: size,
+                  height: size,
+                  cacheWidth: 64,
+                  cacheHeight: 64,
+                  fit: BoxFit.cover,
+                  fallbackColor: Colors.transparent,
+                  errorWidget: _PinnedAvatarFallback(text: fallback),
+                ),
+        ),
+      ),
+    );
+  }
+
+  String _fallbackText(String value) {
+    final text = value.trim();
+    if (text.isEmpty) return '?';
+    return String.fromCharCode(text.runes.first).toUpperCase();
+  }
+}
+
+class _PinnedAvatarFallback extends StatelessWidget {
+  final String text;
+
+  const _PinnedAvatarFallback({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 13,
+          height: 1,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
   }
 }
 
