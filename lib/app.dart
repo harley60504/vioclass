@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
 
 class NewTwitchApp extends StatelessWidget {
@@ -10,6 +11,7 @@ class NewTwitchApp extends StatelessWidget {
     return MaterialApp(
       title: 'new_twitch_app',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: <NavigatorObserver>[twitchRouteObserver],
       theme: ThemeData(
         brightness: Brightness.dark,
         colorSchemeSeed: const Color(0xFF9146FF),
