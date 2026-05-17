@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_route_guard_stage136_non_blocking_pop
+// PATCH VERSION: twitch_watch_route_guard_stage138_route_visible_pause_only
 //
 // A lightweight route-level guard for WatchPage.
 //
@@ -10,12 +10,12 @@
 //   must pause audio at the route boundary instead of waiting for player
 //   disposal.
 //
-// Stage 136:
-// - Do not block the first pop. Blocking PopScope with canPop=false caused the
-//   first Android back gesture to only pause/unlock and the second gesture to
-//   actually return.
-// - Let Navigator pop normally, and pause the shared player from PopScope,
-//   deactivate, dispose, and app lifecycle callbacks.
+// Stage 138:
+// - Pause only when WatchPage is actually leaving the screen: PopScope,
+//   deactivate, or dispose.
+// - Do not pause on AppLifecycleState.inactive/paused/hidden. On desktop,
+//   clicking another window can trigger lifecycle inactive even though the
+//   player is still visible, so lifecycle-driven pause was too aggressive.
 
 import 'dart:async';
 
@@ -53,40 +53,22 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   State<TwitchWatchRouteGuard> createState() => _TwitchWatchRouteGuardState();
 }
 
-class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
-    with WidgetsBindingObserver {
+class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard> {
   bool _pauseIssued = false;
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _pauseSharedPlayerOnce();
     super.dispose();
   }
 
   @override
   void deactivate() {
-    // deactivate catches more route transition cases than dispose, including
+    // deactivate catches route transition cases earlier than dispose, including
     // interactive back gestures where the old route starts leaving before the
     // widget tree is finally torn down.
     _pauseSharedPlayerOnce();
     super.deactivate();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached ||
-        state == AppLifecycleState.hidden) {
-      _pauseSharedPlayerOnce();
-    }
   }
 
   void _pauseSharedPlayerOnce() {
@@ -106,9 +88,8 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
     return PopScope<Object?>(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
-        // Let the route leave on the first back action. Audio is paused as soon
-        // as Flutter reports the pop attempt; deactivate/dispose are additional
-        // route-lifecycle safety nets.
+        // Let the route leave on the first back action. Audio is paused only
+        // when the WatchPage route is being popped or removed from the tree.
         _pauseSharedPlayerOnce();
       },
       child: TwitchWatchPage(
