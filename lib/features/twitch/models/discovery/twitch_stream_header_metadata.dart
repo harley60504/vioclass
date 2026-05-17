@@ -25,6 +25,21 @@ class TwitchStreamHeaderMetadata {
     String fallbackChannelLogin = 'roger9527',
   }) : this(channelLogin: fallbackChannelLogin);
 
+  /// Compatibility display name used by UI components that only need a
+  /// human-readable channel label.
+  ///
+  /// Twitch stream metadata currently carries [channelLogin] but not a separate
+  /// broadcaster display name. Keep this getter so UI components can avoid
+  /// depending on a specific discovery model shape.
+  String get displayName => channelLogin;
+
+  /// Compatibility channel id used by UI fallback APIs.
+  ///
+  /// Stream header metadata is created from Helix stream rows, which do not
+  /// always travel with a broadcaster id in this app's current model. Runtime
+  /// code should prefer the channel id resolved by chat startup when available.
+  String get channelId => '';
+
   factory TwitchStreamHeaderMetadata.fromLiveStream(TwitchLiveStream stream) {
     return TwitchStreamHeaderMetadata(
       channelLogin: stream.channelLogin,
