@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_engagement_strip_stage193_no_outer_block
+// PATCH VERSION: twitch_chat_engagement_strip_stage198_font_scale
 
 import 'package:flutter/material.dart';
 
@@ -16,6 +16,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
   final VoidCallback onOpenPrediction;
   final bool showPinned;
   final bool showPrediction;
+  final double fontScale;
   final String fallbackProfileImageUrl;
   final String fallbackDisplayName;
   final String fallbackUserId;
@@ -33,6 +34,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
     required this.onOpenPrediction,
     this.showPinned = true,
     this.showPrediction = true,
+    this.fontScale = 1.0,
     this.fallbackProfileImageUrl = '',
     this.fallbackDisplayName = '',
     this.fallbackUserId = '',
@@ -63,6 +65,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
           if (firstPinned != null) ...[
             TwitchPinnedMessageBanner(
               message: firstPinned,
+              fontScale: fontScale,
               fallbackProfileImageUrl: fallbackProfileImageUrl,
               fallbackDisplayName: fallbackDisplayName,
               fallbackUserId: fallbackUserId,
