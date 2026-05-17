@@ -1,12 +1,13 @@
-// PATCH VERSION: twitch_chat_message_content_stage160_badges_extracted
+// PATCH VERSION: twitch_chat_message_content_stage162_author_extracted
 //
 // Core message content composition: reply preview, system line, badges,
-// display name, first-message chip, rendered segments and small status chips.
+// author, rendered segments and small status chips.
 
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import 'twitch_chat_message_author.dart';
 import 'twitch_chat_message_badges.dart';
 import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_reply_preview.dart';
@@ -73,28 +74,13 @@ class TwitchChatMessageContent extends StatelessWidget {
                 metrics: metrics,
                 compact: compact,
               ),
-              Text(
-                displayNameText,
-                style: TextStyle(
-                  color: displayColor,
-                  fontWeight: FontWeight.w900,
-                  fontSize: compact
-                      ? metrics.compactNameFontSize
-                      : metrics.nameFontSize,
-                  fontStyle: message.metadata.isAction
-                      ? FontStyle.italic
-                      : FontStyle.normal,
-                ),
-              ),
-              if (message.metadata.isFirstMessage)
-                TwitchChatFirstMessageChip(metrics: metrics),
-              Text(
-                ':',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontWeight: FontWeight.w700,
-                  fontSize: metrics.messageFontSize,
-                ),
+              TwitchChatMessageAuthor(
+                displayNameText: displayNameText,
+                displayColor: displayColor,
+                isAction: message.metadata.isAction,
+                isFirstMessage: message.metadata.isFirstMessage,
+                compact: compact,
+                metrics: metrics,
               ),
               if (segments.isEmpty)
                 Text(
