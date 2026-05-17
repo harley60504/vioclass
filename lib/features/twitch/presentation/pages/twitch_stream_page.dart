@@ -1,5 +1,5 @@
-// PATCH VERSION: twitch_stream_page_stage106_login_load_guard
-// Prevents auth listener reload loops that can freeze the Windows app after first paint.
+// PATCH VERSION: twitch_stream_page_stage189d_outer_glass_shell
+// Strengthens the outer app chrome so the discovery glass UI is visible.
 
 import 'dart:async';
 
@@ -18,10 +18,10 @@ import '../widgets/responsive/twitch_responsive_layout.dart';
 
 const Color _kTwitchPurple = Color(0xFF9146FF);
 const Color _kTwitchPurpleLight = Color(0xFFBF94FF);
-const Color _kBackground = Color(0xFF0E0E10);
-const Color _kPanel = Color(0xFF18181B);
-const Color _kSoftPanel = Color(0xFF1F1F27);
-const Color _kBorder = Color(0xFF2D2D35);
+const Color _kBackground = Color(0xFF0A0A0F);
+const Color _kPanel = Color(0xCC15121F);
+const Color _kSoftPanel = Color(0xB8221B32);
+const Color _kBorder = Color(0xFF392A50);
 
 class TwitchStreamPage extends StatefulWidget {
   const TwitchStreamPage({super.key});
@@ -108,7 +108,6 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     apiClient.close(force: true);
     super.dispose();
   }
-
 
   Future<void> _loadLoginState({bool refreshPages = false}) async {
     if (!mounted || _loginStateLoadRunning) return;
@@ -224,43 +223,56 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kBackground,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final layout = TwitchResponsiveLayout.fromConstraints(constraints);
-            final useBottomNavigation = _shouldUseBottomNavigation(layout);
-            final useTwoRowToolbar = _shouldUseTwoRowToolbar(layout);
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: <Color>[
+              Color(0xFF25113C),
+              Color(0xFF11111A),
+              Color(0xFF07070B),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+              final useBottomNavigation = _shouldUseBottomNavigation(layout);
+              final useTwoRowToolbar = _shouldUseTwoRowToolbar(layout);
 
-            if (useBottomNavigation) {
-              return Column(
+              if (useBottomNavigation) {
+                return Column(
+                  children: <Widget>[
+                    _buildTopToolbar(
+                      layout: layout,
+                      twoRows: true,
+                    ),
+                    Expanded(child: _buildHomeContent()),
+                    _buildBottomNavigationBar(layout),
+                  ],
+                );
+              }
+
+              return Row(
                 children: <Widget>[
-                  _buildTopToolbar(
-                    layout: layout,
-                    twoRows: true,
+                  _buildSidebar(),
+                  Expanded(
+                    child: Column(
+                      children: <Widget>[
+                        _buildTopToolbar(
+                          layout: layout,
+                          twoRows: useTwoRowToolbar,
+                        ),
+                        Expanded(child: _buildHomeContent()),
+                      ],
+                    ),
                   ),
-                  Expanded(child: _buildHomeContent()),
-                  _buildBottomNavigationBar(layout),
                 ],
               );
-            }
-
-            return Row(
-              children: <Widget>[
-                _buildSidebar(),
-                Expanded(
-                  child: Column(
-                    children: <Widget>[
-                      _buildTopToolbar(
-                        layout: layout,
-                        twoRows: useTwoRowToolbar,
-                      ),
-                      Expanded(child: _buildHomeContent()),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
+            },
+          ),
         ),
       ),
     );
@@ -302,16 +314,43 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Widget _buildSidebar() {
     return Container(
       width: 132,
-      decoration: const BoxDecoration(
-        color: _kPanel,
-        border: Border(right: BorderSide(color: _kBorder)),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[
+            Color(0xFF2F1750),
+            Color(0xDD171322),
+            Color(0xEE0B0B10),
+          ],
+        ),
+        border: Border(right: BorderSide(color: _kTwitchPurple.withOpacity(0.28))),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: _kTwitchPurple.withOpacity(0.18),
+            blurRadius: 22,
+            offset: const Offset(8, 0),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Container(
             padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
-            color: _kTwitchPurple,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  _kTwitchPurple.withOpacity(0.95),
+                  const Color(0xFF6E2FD8).withOpacity(0.88),
+                ],
+              ),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withOpacity(0.18)),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -338,9 +377,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.20),
+                    color: Colors.black.withOpacity(0.22),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
+                    border: Border.all(color: Colors.white.withOpacity(0.26)),
                   ),
                   child: Text(
                     loadingLoginState ? '檢查中' : loginStatus,
@@ -375,7 +414,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     final selected = selectedSection == section;
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => selectSection(section),
@@ -383,11 +422,20 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           duration: const Duration(milliseconds: 160),
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           decoration: BoxDecoration(
-            color: selected ? _kTwitchPurple.withValues(alpha: 0.16) : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
+            color: selected ? _kTwitchPurple.withOpacity(0.24) : Colors.white.withOpacity(0.035),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: selected ? _kTwitchPurple.withValues(alpha: 0.32) : Colors.transparent,
+              color: selected ? _kTwitchPurpleLight.withOpacity(0.42) : Colors.white.withOpacity(0.06),
             ),
+            boxShadow: selected
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: _kTwitchPurple.withOpacity(0.24),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : const <BoxShadow>[],
           ),
           child: Row(
             children: <Widget>[
@@ -421,11 +469,25 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     final compact = twoRows || layout.width < 760;
 
     return Container(
-      height: twoRows ? null : 72,
-      padding: EdgeInsets.fromLTRB(14, twoRows ? 8 : 10, 14, twoRows ? 8 : 10),
-      decoration: const BoxDecoration(
-        color: _kBackground,
-        border: Border(bottom: BorderSide(color: _kBorder)),
+      height: twoRows ? null : 76,
+      padding: EdgeInsets.fromLTRB(18, twoRows ? 9 : 11, 18, twoRows ? 9 : 11),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.34),
+        border: Border(
+          bottom: BorderSide(color: _kTwitchPurple.withOpacity(0.24)),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withOpacity(0.36),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: _kTwitchPurple.withOpacity(0.10),
+            blurRadius: 26,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: twoRows
           ? Column(
@@ -457,14 +519,14 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               children: <Widget>[
                 Expanded(
                   child: _buildSearchField(
-                    height: 48,
+                    height: 50,
                     compact: false,
                   ),
                 ),
                 const SizedBox(width: 10),
-                ..._buildToolbarActionButtons(buttonSize: 48, spacing: 6),
-                const SizedBox(width: 6),
-                _buildAccountMenuButton(size: 48, compact: false),
+                ..._buildToolbarActionButtons(buttonSize: 50, spacing: 7),
+                const SizedBox(width: 7),
+                _buildAccountMenuButton(size: 50, compact: false),
               ],
             ),
     );
@@ -477,9 +539,16 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF121217),
+        color: Colors.white.withOpacity(0.055),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: _kTwitchPurple.withOpacity(0.10),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: TextField(
         controller: searchController,
@@ -588,13 +657,25 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     required double size,
     required bool compact,
   }) {
-    return SizedBox(
+    return Container(
       width: size,
       height: size,
+      decoration: BoxDecoration(
+        color: _kSoftPanel,
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withOpacity(0.13)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: _kTwitchPurple.withOpacity(0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
       child: PopupMenuButton<String>(
         tooltip: '帳號',
         padding: EdgeInsets.zero,
-        color: _kPanel,
+        color: const Color(0xFF191421),
         icon: Icon(
           Icons.account_circle_rounded,
           color: _kTwitchPurpleLight,
@@ -639,7 +720,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       decoration: BoxDecoration(
         color: _kSoftPanel,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
       child: Row(
         children: <Widget>[
@@ -691,9 +772,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     return Container(
       height: 64,
       padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
-      decoration: const BoxDecoration(
-        color: _kPanel,
-        border: Border(top: BorderSide(color: _kBorder)),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.42),
+        border: Border(top: BorderSide(color: _kTwitchPurple.withOpacity(0.24))),
       ),
       child: Row(
         children: <Widget>[
@@ -718,7 +799,6 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       ),
     );
   }
-
 }
 
 class _ToolbarIconButton extends StatelessWidget {
@@ -752,7 +832,14 @@ class _ToolbarIconButton extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+              border: Border.all(color: Colors.white.withOpacity(0.13)),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: _kTwitchPurple.withOpacity(0.16),
+                  blurRadius: 18,
+                  offset: const Offset(0, 7),
+                ),
+              ],
             ),
             child: Icon(
               icon,
@@ -782,7 +869,7 @@ class _BottomNavigationButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? _kTwitchPurple.withValues(alpha: 0.18) : Colors.transparent,
+      color: selected ? _kTwitchPurple.withOpacity(0.24) : Colors.white.withOpacity(0.035),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -794,7 +881,7 @@ class _BottomNavigationButton extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? _kTwitchPurple.withValues(alpha: 0.36) : Colors.transparent,
+              color: selected ? _kTwitchPurpleLight.withOpacity(0.40) : Colors.white.withOpacity(0.06),
             ),
           ),
           child: Row(
