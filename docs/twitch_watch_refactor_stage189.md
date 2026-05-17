@@ -1,8 +1,8 @@
-# Twitch Watch Refactor Stage 189A — Glass UI 第一版
+# Twitch Watch Refactor Stage 189A–189B — Glass UI 第一版與加強版
 
 ## 目標
 
-Stage 189A 的目標是先把 Watch Page 往半透明 Twitch dark UI 方向推進，但不再大幅改動架構。
+Stage 189 的目標是先把 Twitch App 往半透明 Twitch dark UI 方向推進，但不再大幅改動架構。
 
 本階段只處理 UI 外觀，不改：
 
@@ -12,7 +12,11 @@ Stage 189A 的目標是先把 Watch Page 往半透明 Twitch dark UI 方向推�
 - Channel Points / Prediction / Emote 的資料流
 - Sheet launcher 與 API 行為
 
-## 本階段新增
+---
+
+# Stage 189A — Watch Player Glass UI
+
+## 新增
 
 ### `lib/features/twitch/presentation/widgets/shared/twitch_glass.dart`
 
@@ -29,7 +33,7 @@ Stage 189A 的目標是先把 Watch Page 往半透明 Twitch dark UI 方向推�
 - 統一 blur / shadow 設定
 - 避免每個 player / chat widget 自己重複寫 glass decoration
 
-## 本階段修改
+## 修改
 
 ### Player area
 
@@ -97,24 +101,44 @@ Stage 189A 的目標是先把 Watch Page 往半透明 Twitch dark UI 方向推�
 - 不對整個 chat list 套 `BackdropFilter`，避免聊天訊息高頻更新時增加 GPU 壓力
 - 不改 header / engagement / message area / input section 的資料與互動流程
 
+---
+
+# Stage 189B — Discovery Cards 明顯化
+
+## 背景
+
+使用者截圖顯示目前畫面主要是 Following / Discovery 首頁，不是 WatchPage。Stage 189A 主要改 Watch player overlay，所以在這個頁面上效果不會很明顯。
+
+因此 Stage 189B 先加強首頁直播卡片的視覺感，讓目前截圖中的卡片更明顯有半透明 / purple accent / glass dark UI 風格。
+
+## 修改
+
+### Discovery stream card
+
+檔案：
+
+- `lib/features/twitch/presentation/widgets/discovery/twitch_stream_card.dart`
+
+變更：
+
+- patch version 更新為 `twitch_stream_card_stage189b_obvious_glass_cards`
+- 卡片背景改為深紫黑漸層
+- 加強紫色邊框與紫色 glow
+- 卡片頂部加入細紫色 highlight line
+- LIVE badge 加強亮度、白色邊框與紅色 glow
+- Viewer badge 加深半透明黑底與陰影
+- Game badge 加強紫色底、紫色邊框與 glow
+- Avatar 加入紫色柔光
+- Title 加入輕微文字陰影，提升暗背景可讀性
+
 ## 設計方向
 
-這版採用暗色磨砂玻璃感：
+這版不是只做很低調的透明感，而是刻意讓首頁卡片更容易看出變化：
 
-- 主色仍是 Twitch dark：`#0E0E10` / black translucent
-- 紫色只做 active / accent
-- 邊框使用低透明白色
-- 陰影偏柔，不做過強 neon
-- Blur 只放在 player chrome、小面板與按鈕，不包整個影片或整個聊天室 list
-
-## 下一步建議
-
-Stage 189B 可以繼續做：
-
-1. `TwitchWatchResponsiveBody` 背景與 player/chat 間距細修。
-2. Chat header / input section 改成更一致的 glass dark UI。
-3. Channel Points / Prediction / Emote sheets 統一成同一套 glass popup style。
-4. Following / Browse card UI 之後再獨立整理，不要跟 Watch UI 同一階段混在一起。
+- 卡片邊框更紫
+- 卡片陰影更強
+- 卡片背景不再是單純灰黑，而是紫黑漸層
+- LIVE / viewer / game pill 的層級更明顯
 
 ## 測試建議
 
@@ -125,9 +149,9 @@ git pull
 flutter analyze
 ```
 
-如果 Flutter SDK 對透明 / blur 沒問題，再實際開 WatchPage 看：
+如果 analyze 沒問題，再看：
 
-- top overlay 是否仍不 overflow
-- bottom control bar 在窄寬度是否仍可縮放
-- 聊天室訊息滾動是否沒有明顯掉幀
-- full screen / chat toggle / quality menu 是否正常
+- Following / Browse 首頁卡片是否變得更有 glass dark UI 感
+- WatchPage player overlay 是否正常顯示
+- card grid 是否沒有 overflow
+- 窄螢幕下直播卡片是否仍不截斷 streamer footer
