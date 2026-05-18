@@ -1,13 +1,8 @@
-// Stage 220A: Independent media_kit engine for Twitch player core.
+// Stage 220E: Independent media_kit engine using the PiliPlus-style
+// media_kit_video fork API.
 //
-// This engine owns the media_kit Player + VideoController pair. It intentionally
-// exposes only a small API so WatchPage can later depend on a controller instead
-// of directly owning media_kit objects.
-//
-// Stage 220B:
-// - Aligns construction with the media_kit API used by this project.
-// - The current dependency exposes Player(...) and VideoController(...), not
-//   PiliPlus fork-style Player.create() / VideoController.create().
+// This branch intentionally depends on bggRGjQaUbCoE/media-kit
+// media_kit_video@version_1.2.5 and media_kit 1.1.11 for testing.
 
 import 'dart:async';
 
@@ -59,15 +54,16 @@ class TwitchMediaKitPlayerEngine {
 
     MediaKit.ensureInitialized();
 
-    final player = Player(
+    final player = await Player.create(
       configuration: PlayerConfiguration(
         title: title,
         bufferSize: profile.bufferSize,
         logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
+        options: profile.mpvOptions,
       ),
     );
 
-    final controller = VideoController(
+    final controller = await VideoController.create(
       player,
       configuration: VideoControllerConfiguration(
         enableHardwareAcceleration: profile.enableHardwareAcceleration,
