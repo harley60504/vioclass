@@ -94,14 +94,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     return output;
   }
 
-  /// Usable official emotes that are not Twitch global emotes.
-  ///
-  /// This is intended for the normal emote picker tab「我的可用」:
-  /// - keep subscription / owned / channel-unlocked official emotes
-  /// - exclude all Twitch global emotes by normalized id/name key
-  ///
-  /// Do not use this getter for Channel Points emote-ID rewards; those pickers
-  /// can need a different source mix depending on the reward type.
   List<TwitchOfficialEmote> get nonGlobalUsableEmotes {
     final globalKeys = _globalEmotes.map(_key).toSet();
     final byKey = <String, TwitchOfficialEmote>{};
@@ -347,7 +339,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
           ).catchError((_) => <TwitchOfficialEmote>[]),
           _fetchUserEmotesSafe(
             userId: cleanViewerId,
-            broadcasterId: cleanChannelId,
             accessToken: accessToken,
             clientId: clientId,
           ),
@@ -366,14 +357,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         final key = _key(emote);
         final unlocked = globalKeys.contains(key) || userKeys.contains(key);
 
-        final normalized = TwitchOfficialEmote(
-          id: emote.id,
-          name: emote.name,
-          imageUrl: emote.imageUrl,
-          emoteType: emote.emoteType,
-          tier: emote.tier,
-          emoteSetId: emote.emoteSetId,
-          ownerId: emote.ownerId,
+        final normalized = emote.copyWith(
           source: TwitchOfficialEmoteSource.channel,
           unlocked: unlocked,
         );
@@ -412,7 +396,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
   Future<List<TwitchOfficialEmote>> _fetchUserEmotesSafe({
     required String userId,
-    required String broadcasterId,
     required String accessToken,
     required String clientId,
   }) async {
@@ -421,7 +404,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     try {
       return await api.fetchUserEmotes(
         userId: userId,
-        broadcasterId: broadcasterId,
         accessToken: accessToken,
         clientId: clientId,
       );
@@ -440,15 +422,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     for (final emote in source) {
       if (emote.name.trim().isEmpty || emote.imageUrl.trim().isEmpty) continue;
 
-      byKey[_key(emote)] = TwitchOfficialEmote(
-        id: emote.id,
-        name: emote.name,
-        imageUrl: emote.imageUrl,
-        emoteType: emote.emoteType,
-        tier: emote.tier,
-        emoteSetId: emote.emoteSetId,
-        ownerId: emote.ownerId,
-        source: emote.source,
+      byKey[_key(emote)] = emote.copyWith(
         unlocked: unlocked || emote.unlocked,
       );
     }
@@ -558,6 +532,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       tier: json['tier']?.toString() ?? '',
       emoteSetId: json['emoteSetId']?.toString() ?? '',
       ownerId: json['ownerId']?.toString() ?? '',
+      ownerDisplayName: json['ownerDisplayName']?.toString() ?? '',
       source: source,
       unlocked: json['unlocked'] == true,
     );
@@ -598,6 +573,15 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       'recentCount': recentCount,
       'recentLoaded': recentLoaded,
       'userEmotesUnavailable': userEmotesUnavailable,
+      'userOwnerSample': userEmotes
+          .take(20)
+          .map((emote) => <String, dynamic>{
+                'name': emote.name,
+                'ownerId': emote.ownerId,
+                'ownerDisplayName': emote.ownerDisplayName,
+                'emoteType': emote.emoteType,
+              })
+          .toList(growable: false),
     };
   }
 }
