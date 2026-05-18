@@ -99,6 +99,49 @@ class TwitchOfficialEmoteApiService {
     return output;
   }
 
+  Future<Map<String, String>> fetchUserDisplayNamesByIds({
+    required Iterable<String> userIds,
+    required String accessToken,
+    required String clientId,
+  }) async {
+    final ids = userIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (ids.isEmpty) return const <String, String>{};
+
+    final output = <String, String>{};
+
+    for (var index = 0; index < ids.length; index += 100) {
+      final chunk = ids.skip(index).take(100).toList(growable: false);
+      final raw = await client.getJson<Map<String, dynamic>>(
+        '${TwitchApiConstants.helixBaseUrl}/users',
+        queryParameters: <String, dynamic>{
+          'id': chunk,
+        },
+        headers: _headers(
+          accessToken: accessToken,
+          clientId: clientId,
+        ),
+      );
+
+      final data = raw['data'];
+      if (data is! List) continue;
+
+      for (final item in data.whereType<Map<String, dynamic>>()) {
+        final id = item['id']?.toString() ?? '';
+        final displayName = item['display_name']?.toString() ?? '';
+        final login = item['login']?.toString() ?? '';
+        if (id.trim().isEmpty) continue;
+        output[id] = displayName.trim().isNotEmpty ? displayName : login;
+      }
+    }
+
+    return output;
+  }
+
   List<TwitchOfficialEmote> _parseEmotes(
     Map<String, dynamic> raw, {
     required TwitchOfficialEmoteSource source,
