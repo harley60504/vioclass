@@ -56,9 +56,10 @@ class TwitchOfficialEmoteApiService {
 
   Future<List<TwitchOfficialEmote>> fetchUserEmotes({
     required String userId,
-    required String broadcasterId,
+    String broadcasterId = '',
     required String accessToken,
     required String clientId,
+    bool includeBroadcasterFilter = false,
   }) async {
     final cleanUserId = userId.trim();
     final cleanBroadcasterId = broadcasterId.trim();
@@ -73,7 +74,8 @@ class TwitchOfficialEmoteApiService {
         '${TwitchApiConstants.helixBaseUrl}/chat/emotes/user',
         queryParameters: <String, dynamic>{
           'user_id': cleanUserId,
-          if (cleanBroadcasterId.isNotEmpty) 'broadcaster_id': cleanBroadcasterId,
+          if (includeBroadcasterFilter && cleanBroadcasterId.isNotEmpty)
+            'broadcaster_id': cleanBroadcasterId,
           if (after != null && after!.isNotEmpty) 'after': after,
         },
         headers: _headers(
