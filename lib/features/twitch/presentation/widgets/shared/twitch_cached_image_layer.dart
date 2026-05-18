@@ -1,7 +1,8 @@
-// PATCH VERSION: twitch_cached_image_layer_cached_network_image_stage111
+// PATCH VERSION: twitch_cached_image_layer_stage219ad_optional_cache_manager
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Shared image layer for Twitch UI.
 ///
@@ -15,6 +16,7 @@ class TwitchCachedImageLayer extends StatelessWidget {
   final double height;
   final int? cacheWidth;
   final int? cacheHeight;
+  final BaseCacheManager? cacheManager;
   final BoxFit fit;
   final Alignment alignment;
   final FilterQuality filterQuality;
@@ -37,6 +39,7 @@ class TwitchCachedImageLayer extends StatelessWidget {
     required this.height,
     this.cacheWidth,
     this.cacheHeight,
+    this.cacheManager,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.low,
@@ -59,6 +62,7 @@ class TwitchCachedImageLayer extends StatelessWidget {
     required double size,
     this.cacheWidth = 64,
     this.cacheHeight = 64,
+    this.cacheManager,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.low,
@@ -91,6 +95,7 @@ class TwitchCachedImageLayer extends StatelessWidget {
         height: height,
         memCacheWidth: cacheWidth,
         memCacheHeight: cacheHeight,
+        cacheManager: cacheManager,
         fit: fit,
         alignment: alignment,
         filterQuality: filterQuality,
