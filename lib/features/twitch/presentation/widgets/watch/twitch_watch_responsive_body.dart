@@ -1,9 +1,14 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage212_full_player_pane_controls
+// PATCH VERSION: twitch_watch_responsive_body_stage219s_player_disabled_by_default
 
 import 'package:flutter/material.dart';
 
 import '../responsive/twitch_responsive_layout.dart';
 import 'twitch_watch_chat_resize_handle.dart';
+
+const bool _enableWatchPlayer = bool.fromEnvironment(
+  'TWITCH_ENABLE_WATCH_PLAYER',
+  defaultValue: false,
+);
 
 class TwitchWatchResponsiveBody extends StatelessWidget {
   static const double _chatMinWidthVisualBoost = 18.0;
@@ -51,6 +56,15 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
           final layout = TwitchResponsiveLayout.fromConstraints(constraints);
           final shellPadding = _shellPaddingFor(layout);
           final shellGap = _shellGapFor(layout);
+
+          if (!_enableWatchPlayer) {
+            return Padding(
+              padding: shellPadding,
+              child: _WatchSurface(
+                child: chatVisible ? chat : const _WatchPlayerDisabledPlaceholder(),
+              ),
+            );
+          }
 
           if (layout.shouldUseBottomChat) {
             final availableWidth = layout.width - shellPadding.horizontal;
@@ -181,6 +195,24 @@ class _WatchSurface extends StatelessWidget {
         border: Border.all(color: Colors.white.withOpacity(0.045)),
       ),
       child: child,
+    );
+  }
+}
+
+class _WatchPlayerDisabledPlaceholder extends StatelessWidget {
+  const _WatchPlayerDisabledPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Text(
+        '播放器已停用',
+        style: TextStyle(
+          color: Colors.white54,
+          fontSize: 13,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }
