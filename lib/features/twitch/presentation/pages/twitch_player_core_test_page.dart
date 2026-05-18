@@ -2,6 +2,11 @@
 //
 // This page intentionally does not use WatchPage. It tests the new
 // lib/features/twitch/player_core stack in isolation.
+//
+// Stage 220D:
+// - Fix overlay ParentDataWidget conflict. TwitchPlayerView already places the
+//   supplied overlay with Positioned.fill, so the overlay itself must not return
+//   another Positioned widget.
 
 import 'dart:async';
 
@@ -187,47 +192,48 @@ class _MinimalPlayerOverlay extends StatelessWidget {
       animation: controller,
       builder: (context, _) {
         final state = controller.state;
-        return Positioned(
-          left: 12,
-          right: 12,
-          bottom: 12,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xAA000000),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: state.playing ? 'Pause' : 'Play',
-                    onPressed: () => unawaited(controller.togglePlayPause()),
-                    icon: Icon(state.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
-                  ),
-                  IconButton(
-                    tooltip: state.muted ? 'Unmute' : 'Mute',
-                    onPressed: () => unawaited(controller.toggleMute()),
-                    icon: Icon(state.muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-                  ),
-                  Expanded(
-                    child: Slider(
-                      value: state.volume.clamp(0.0, 100.0).toDouble(),
-                      min: 0,
-                      max: 100,
-                      onChanged: (value) => unawaited(controller.setVolume(value)),
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xAA000000),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withOpacity(0.12)),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  children: [
+                    IconButton(
+                      tooltip: state.playing ? 'Pause' : 'Play',
+                      onPressed: () => unawaited(controller.togglePlayPause()),
+                      icon: Icon(state.playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
                     ),
-                  ),
-                  Text(
-                    '${state.volume.toStringAsFixed(0)}%',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                    IconButton(
+                      tooltip: state.muted ? 'Unmute' : 'Mute',
+                      onPressed: () => unawaited(controller.toggleMute()),
+                      icon: Icon(state.muted ? Icons.volume_off_rounded : Icons.volume_up_rounded),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: Slider(
+                        value: state.volume.clamp(0.0, 100.0).toDouble(),
+                        min: 0,
+                        max: 100,
+                        onChanged: (value) => unawaited(controller.setVolume(value)),
+                      ),
+                    ),
+                    Text(
+                      '${state.volume.toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
