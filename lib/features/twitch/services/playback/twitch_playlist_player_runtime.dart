@@ -30,7 +30,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   static const String _legacyQualityKey = 'twitch_fvp_proxy_preferred_quality';
   static const String _legacyQualityChannelPrefix =
       'twitch_fvp_proxy_preferred_quality_';
-  static const int _mobileStartupTargetHeight = 720;
+  // Stage 220G: use 1080p as the mobile startup target for player-core
+  // latency/performance testing. This makes Android comparable with the
+  // desktop/default Source-like path without immediately jumping to every
+  // channel's highest bitrate Source variant.
+  static const int _mobileStartupTargetHeight = 1080;
   static const int _mobileStartupMaxFps = 60;
 
   static TwitchStableHlsProxyRouter? _sharedProxy;
