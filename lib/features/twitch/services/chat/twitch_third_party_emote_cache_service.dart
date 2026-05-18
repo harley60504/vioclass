@@ -298,11 +298,18 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       orElse: () => TwitchThirdPartyEmoteProvider.sevenTv,
     );
 
+    final scopeName = json['scope']?.toString() ?? '';
+    final scope = TwitchThirdPartyEmoteScope.values.firstWhere(
+      (item) => item.name == scopeName,
+      orElse: () => TwitchThirdPartyEmoteScope.other,
+    );
+
     return TwitchThirdPartyEmote(
       id: id,
       name: name,
       imageUrl: imageUrl,
       provider: provider,
+      scope: scope,
       isZeroWidth: json['isZeroWidth'] == true,
       width: _readInt(json['width']),
       height: _readInt(json['height']),
@@ -399,11 +406,10 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       'bttvCount': countForProvider(TwitchThirdPartyEmoteProvider.bttv),
       'sevenTvCount': countForProvider(TwitchThirdPartyEmoteProvider.sevenTv),
       'ffzCount': countForProvider(TwitchThirdPartyEmoteProvider.ffz),
-      'sample': emotes.take(20).map((emote) => emote.toJson()).toList(),
+      'scopeSample': emotes.take(40).map((emote) => emote.toJson()).toList(),
     };
   }
 }
-
 
 class _CachedThirdPartyEmoteSet {
   final Map<String, TwitchThirdPartyEmote> byName;
