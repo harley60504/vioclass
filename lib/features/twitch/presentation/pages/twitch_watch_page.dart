@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage219x_staged_startup_pipeline
+// PATCH VERSION: twitch_watch_page_stage219af_player_reenabled_staged_startup
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -34,7 +34,7 @@ import '../widgets/watch/twitch_watch_responsive_body.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
-  defaultValue: false,
+  defaultValue: true,
 );
 
 class TwitchWatchPage extends StatefulWidget {
@@ -651,6 +651,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     if (!_isCurrentWatchTask(generation, channel)) return;
 
     if (_enableWatchPlayer) {
+      await _yieldToUi();
       await _loadPlayer(channel);
     }
   }
@@ -908,224 +909,3 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     if (login.isEmpty) return;
 
     setState(() {
-      _followBusy = true;
-      _relationshipError = null;
-    });
-
-    try {
-      final snapshot = _isFollowing
-          ? await _watchPorts.relationship.unfollowChannel(
-              channelLogin: login,
-              targetUserId: _channelId,
-              viewerUserId: _viewerId,
-            )
-          : await _watchPorts.relationship.followChannel(
-              channelLogin: login,
-              targetUserId: _channelId,
-              viewerUserId: _viewerId,
-            );
-      if (!mounted) return;
-      setState(() {
-        _isFollowing = snapshot.isFollowing;
-        if (snapshot.userId.trim().isNotEmpty) _channelId = snapshot.userId.trim();
-        _relationshipError = null;
-      });
-      _showSnack(_isFollowing ? '已追隨 $login' : '已取消追隨 $login');
-    } catch (error) {
-      if (mounted) {
-        setState(() => _relationshipError = error.toString());
-        _showSnack('追隨狀態更新失敗：$error');
-      }
-    } finally {
-      if (mounted) setState(() => _followBusy = false);
-    }
-  }
-
-  Future<void> _openSubscribePage() async {
-    try {
-      final uri = _watchPorts.relationship.buildSubscribeUri(_channelLogin);
-      await showTwitchSubscribeWebViewDialogV1(
-        context: context,
-        initialUri: uri,
-        channelLogin: _channelLogin,
-      );
-    } catch (error) {
-      _showSnack('開啟訂閱彈窗失敗：$error');
-    }
-  }
-
-  Future<void> _enterMobileImmersiveByDefault() async {
-    if (!TwitchFullscreenController.isMobilePlatform) return;
-    try {
-      await TwitchFullscreenController.setFullscreen(true);
-      _mobileImmersiveEntered = true;
-    } catch (_) {}
-  }
-
-  void _toggleChatVisibility() {
-    setState(() => _chatVisible = !_chatVisible);
-    unawaited(_saveChatVisiblePreference());
-  }
-
-  Future<void> _toggleFullscreenMode() async {
-    final next = !_fullscreenMode;
-    try {
-      await TwitchFullscreenController.setFullscreen(next);
-      if (!mounted) return;
-      setState(() => _fullscreenMode = next);
-    } catch (error) {
-      _showSnack('切換全螢幕失敗：$error');
-    }
-  }
-
-  Future<void> _sendMessage() async {
-    if (_sending) return;
-    final runtime = _chatRuntime;
-    if (runtime == null || !runtime.connected) {
-      _showSnack('聊天室尚未連線。');
-      return;
-    }
-
-    final message = _messageController.text.trim();
-    if (message.isEmpty) return;
-
-    setState(() => _sending = true);
-    try {
-      await runtime.sendMessage(message);
-      _messageController.clear();
-    } catch (error) {
-      _showSnack('發送失敗：$error');
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Future<void> _openEmotePicker() {
-    return _sheetLauncher.openEmotePicker(context);
-  }
-
-  Future<void> _openChannelPointsSheet() {
-    return _sheetLauncher.openChannelPointsSheet(context);
-  }
-
-  Future<void> _openPredictionBetSheet() {
-    return _sheetLauncher.openPredictionBetSheet(context);
-  }
-
-  void _insertMessageText(String text) {
-    final current = _messageController.text;
-    final selection = _messageController.selection;
-    final start = selection.start < 0 ? current.length : selection.start;
-    final end = selection.end < 0 ? current.length : selection.end;
-    final next = current.replaceRange(start, end, text);
-    _messageController.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: start + text.length),
-    );
-  }
-
-  void _showSnack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final runtime = _chatRuntime;
-    final metadata = widget.resolvedInitialMetadata.copyWith(channelLogin: _channelLogin);
-
-    final playerArea = TwitchWatchPlayerAreaPortAdapter(
-      metadata: metadata,
-      loading: _loadingPlayer,
-      error: _playerError,
-      isFollowing: _isFollowing,
-      relationshipBusy: _checkingRelationship || _followBusy || _relationshipBootstrapping,
-      relationshipError: _relationshipError,
-      onToggleFollow: _toggleFollowChannel,
-      onSubscribe: _openSubscribePage,
-      chatVisible: _chatVisible,
-      fullscreenMode: _fullscreenMode,
-      showFullscreenButton: TwitchFullscreenController.isDesktopPlatform,
-      onToggleChat: _toggleChatVisibility,
-      onToggleFullscreen: () => unawaited(_toggleFullscreenMode()),
-      muted: _isMuted,
-      volume: _volume,
-      onToggleMute: () => unawaited(_togglePlayerMute()),
-      onVolumeChanged: (value) => unawaited(_setPlayerVolume(value)),
-      onBack: () => Navigator.of(context).maybePop(),
-      onReload: _busy ? null : _loadWatch,
-      onStop: () => _stopCurrentSession(),
-      onError: (message) {
-        if (!mounted) return;
-        setState(() => _playerError = message);
-        _showSnack('播放器操作失敗：$message');
-      },
-    );
-
-    final chatPanel = TwitchWatchChatPanelPortAdapter(
-      runtime: runtime,
-      viewerLogin: _viewerLogin,
-      viewerId: _viewerId,
-      metadata: metadata,
-      channelPoints: _channelPointsSnapshot,
-      pinnedMessages: _pinnedMessages,
-      prediction: _prediction,
-      loadingEmotes: _loadingEmotes || _emoteBootstrapping,
-      loadingEngagement: _loadingEngagement || _engagementBootstrapping,
-      engagementError: _engagementError,
-      messageController: _messageController,
-      sending: _sending,
-      onSend: _sendMessage,
-      onOpenEmotes: _openEmotePicker,
-      onRefreshEmotes: () => _loadThirdPartyEmotes(forceRefresh: true),
-      onRefreshEngagement: () => _refreshEngagement(showSnackOnError: true),
-      onOpenChannelPoints: _openChannelPointsSheet,
-      onOpenPrediction: _openPredictionBetSheet,
-    );
-
-    final scaffold = Scaffold(
-      backgroundColor: const Color(0xFF0E0E10),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: TwitchWatchResponsiveBody(
-              chatVisible: _chatVisible,
-              chatPanelWidth: _chatPanelWidth,
-              chatPanelRatio: _chatPanelRatio,
-              minChatPanelWidth: _minChatPanelWidth,
-              maxEffectiveMinChatPanelWidth: _maxEffectiveMinChatPanelWidth,
-              maxChatPanelWidth: _maxChatPanelWidth,
-              minChatPanelRatio: _minChatPanelRatio,
-              minStoredChatPanelRatio: _minStoredChatPanelRatio,
-              maxChatPanelRatio: _maxChatPanelRatio,
-              player: playerArea,
-              chat: chatPanel,
-              onSetChatPanelWidthForViewport: _setChatPanelWidthForViewport,
-              onPersistChatPanelWidth: () {
-                _chatWidthPreferenceSaveDebounce?.cancel();
-                unawaited(_saveChatPanelWidthPreference());
-              },
-            ),
-          ),
-          if (_showBlockingStartupMask)
-            Positioned.fill(
-              child: TwitchWatchBlockingStartupOverlay(
-                title: _startupMaskTitle,
-                subtitle: _enableWatchPlayer
-                    ? '先預載頻道與互動資料，再啟動聊天室，最後載入播放器。'
-                    : '先預載頻道與互動資料，再啟動聊天室；播放器目前已停用。',
-              ),
-            ),
-        ],
-      ),
-    );
-
-    return TwitchWatchScope(
-      services: _watchServices,
-      child: TwitchWatchPortScope(
-        ports: _watchPorts,
-        child: scaffold,
-      ),
-    );
-  }
-}
