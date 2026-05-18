@@ -20,7 +20,8 @@ class TwitchPlayerController extends ChangeNotifier {
   final TwitchMediaKitPlayerEngine engine;
 
   TwitchPlayerState _state;
-  final List<StreamSubscription<dynamic>> _subscriptions = <StreamSubscription<dynamic>>[];
+  final List<StreamSubscription<dynamic>> _subscriptions =
+      <StreamSubscription<dynamic>>[];
 
   bool _disposed = false;
   bool _listenersAttached = false;
@@ -208,12 +209,12 @@ class TwitchPlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
-  @override
-  Future<void> dispose() async {
+  Future<void> disposeAsync() async {
     if (_disposed) return;
     _disposed = true;
 
-    for (final subscription in List<StreamSubscription<dynamic>>.from(_subscriptions)) {
+    for (final subscription
+        in List<StreamSubscription<dynamic>>.from(_subscriptions)) {
       try {
         await subscription.cancel();
       } catch (_) {}
@@ -221,6 +222,21 @@ class TwitchPlayerController extends ChangeNotifier {
     _subscriptions.clear();
 
     await engine.dispose();
+    super.dispose();
+  }
+
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+
+    for (final subscription
+        in List<StreamSubscription<dynamic>>.from(_subscriptions)) {
+      unawaited(subscription.cancel().catchError((_) {}));
+    }
+    _subscriptions.clear();
+
+    unawaited(engine.dispose());
     super.dispose();
   }
 }
