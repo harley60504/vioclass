@@ -220,8 +220,13 @@ class _TwitchWatchEmbeddedEmotePanelState
   }
 
   bool _isUnlockedOfficialEmote(TwitchOfficialEmote emote) {
+    final ownerId = emote.ownerId.trim();
+    final ownerDisplayName = emote.ownerDisplayName.trim();
+    final ownerIsMissing = ownerId.isEmpty && ownerDisplayName.isEmpty;
+
     final type = emote.emoteType.toLowerCase();
-    return type.contains('unlock') ||
+    return ownerIsMissing ||
+        type.contains('unlock') ||
         type.contains('unlocked') ||
         type.contains('hypetrain') ||
         type.contains('prime') ||
