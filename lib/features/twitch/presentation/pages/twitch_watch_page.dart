@@ -1,17 +1,20 @@
-// PATCH VERSION: twitch_watch_page_stage220k_split_shell_constants_library_scope
+// PATCH VERSION: twitch_watch_page_stage220l_split_shell_parts
 // Place at: lib/features/twitch/presentation/pages/twitch_watch_page.dart
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 //
 // Stage 220J:
-// - Split large WatchPage lifecycle/helper methods into a part file.
+// - Split large WatchPage lifecycle/helper methods into part files.
 // - Keep this file focused on fields, initialization, disposal, and build.
 // - Compatible with the PiliPlus media_kit fork: no direct stream.volume /
 //   stream.width usage remains in this shell.
 //
 // Stage 220K:
-// - Move preference/layout constants to library scope so the methods part can
+// - Move preference/layout constants to library scope so part files can
 //   reference them without unqualified static-member analyzer errors.
+//
+// Stage 220L:
+// - Split methods into preferences/startup/chat/engagement/relationship/ui.
 
 library twitch_watch_page;
 
@@ -46,6 +49,12 @@ import '../widgets/watch/twitch_watch_blocking_startup_overlay.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
 
 part 'watch/twitch_watch_page_methods.dart';
+part 'watch/twitch_watch_page_preferences.dart';
+part 'watch/twitch_watch_page_startup.dart';
+part 'watch/twitch_watch_page_chat.dart';
+part 'watch/twitch_watch_page_engagement.dart';
+part 'watch/twitch_watch_page_relationship.dart';
+part 'watch/twitch_watch_page_ui.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
