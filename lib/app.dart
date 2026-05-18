@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
 
-class NewTwitchApp extends StatelessWidget {
-  const NewTwitchApp({super.key});
+class VioClassApp extends StatelessWidget {
+  const VioClassApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'new_twitch_app',
+      title: 'VioClass',
       debugShowCheckedModeBanner: false,
       navigatorObservers: <NavigatorObserver>[twitchRouteObserver],
       theme: ThemeData(
@@ -66,7 +66,7 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
             ),
             SizedBox(height: 18),
             Text(
-              'Starting Twitch App...',
+              'Starting VioClass...',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 22,
