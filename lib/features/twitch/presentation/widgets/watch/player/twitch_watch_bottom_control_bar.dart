@@ -33,8 +33,8 @@ class _WatchBottomControlBar extends StatelessWidget {
     required this.onToggleFullscreen,
   });
 
-  bool get _useLowCostMobileControls {
-    switch (defaultTargetPlatform) {
+  bool _useLowCostMobileControls(BuildContext context) {
+    switch (Theme.of(context).platform) {
       case TargetPlatform.android:
       case TargetPlatform.iOS:
         return true;
@@ -56,7 +56,7 @@ class _WatchBottomControlBar extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final mobileLowCost = _useLowCostMobileControls;
+            final mobileLowCost = _useLowCostMobileControls(context);
             final veryNarrow = constraints.maxWidth < 430;
             final useCompactLayout = constraints.maxWidth < 700 || mobileLowCost;
             final collapseLivePlayback = veryNarrow || mobileLowCost;
