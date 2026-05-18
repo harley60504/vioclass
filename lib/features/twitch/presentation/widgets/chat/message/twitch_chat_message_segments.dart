@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_segments_stage219ac_repaint_isolated_emotes
+// PATCH VERSION: twitch_chat_message_segments_stage219ad_chat_emote_cache_manager
 //
 // Text / link / Twitch emote / third-party emote / cheermote segment renderers
 // for runtime chat messages.
@@ -15,14 +15,28 @@
 // - Wraps inline emote images with RepaintBoundary. This isolates animated WebP
 //   repaint work from the surrounding Text.rich paragraph as much as Flutter's
 //   WidgetSpan render path allows.
+//
+// Stage 219AD:
+// - Uses a dedicated long-lived cache manager for inline chat emotes, closer to
+//   Frosty's single custom cache manager path. This keeps emote cache behavior
+//   predictable and separate from avatars, thumbnails and channel point icons.
 
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../../../models/chat/twitch_chat_render_segment.dart';
 import '../../../../models/emotes/twitch_third_party_emote.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import 'twitch_chat_message_visual_metrics.dart';
+
+final CacheManager _chatInlineEmoteCacheManager = CacheManager(
+  Config(
+    'twitchChatInlineEmoteImageCache',
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 10000,
+  ),
+);
 
 List<InlineSpan> buildTwitchChatMessageSegmentSpans({
   required BuildContext context,
@@ -169,10 +183,12 @@ WidgetSpan _twitchEmoteSpan({
           imageUrl: imageUrl,
           width: size,
           height: size,
+          cacheManager: _chatInlineEmoteCacheManager,
           fit: BoxFit.contain,
           fallbackColor: Colors.transparent,
           fadeInDuration: Duration.zero,
           fadeOutDuration: Duration.zero,
+          placeholder: const SizedBox.shrink(),
           errorWidget: Text(
             segment.content.isEmpty ? '[emote]' : segment.content,
             style: _normalTextStyle(metrics),
@@ -208,10 +224,12 @@ class _ThirdPartyInlineEmoteImage extends StatelessWidget {
         imageUrl: emote.imageUrl,
         width: width,
         height: height,
+        cacheManager: _chatInlineEmoteCacheManager,
         fit: BoxFit.contain,
         fallbackColor: Colors.transparent,
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
+        placeholder: const SizedBox.shrink(),
         errorWidget: Text(
           emote.name,
           style: _normalTextStyle(metrics),
