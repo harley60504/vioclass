@@ -15,7 +15,6 @@ class TwitchMediaKitPlayerHost {
   static int _refCount = 0;
   static int _generation = 0;
   static String? _currentMediaUri;
-  static Future<void>? _creating;
 
   TwitchMediaKitPlayerHost._();
 
@@ -25,53 +24,21 @@ class TwitchMediaKitPlayerHost {
     String title = 'Twitch Raw Proxy',
   }) {
     MediaKit.ensureInitialized();
-    _refCount++;
 
-    final player = _player;
-    final controller = _videoController;
-    if (player != null && controller != null) {
-      return TwitchMediaKitPlayerSession._(
-        player: player,
-        videoController: controller,
-        generation: _generation,
-      );
-    }
+    var player = _player;
+    var controller = _videoController;
 
-    // PiliPlus media_kit fork exposes async Player.create / VideoController.create.
-    // The legacy host API is synchronous, so return a lazy session that creates
-    // the native player before first use. WatchPage accesses player/video only
-    // during build after services are constructed, so this keeps the branch
-    // compile-safe while the new player_core remains the main test target.
-    return TwitchMediaKitPlayerSession._lazy(
-      title: title,
-      generation: _generation,
-    );
-  }
-
-  static Future<void> _ensureCreated(String title) async {
-    if (_player != null && _videoController != null) return;
-    if (_creating != null) return _creating;
-
-    _creating = () async {
+    if (player == null || controller == null) {
       _generation++;
       _currentMediaUri = null;
-      final player = await Player.create(
+      player = Player(
         configuration: PlayerConfiguration(
           title: title,
           bufferSize: 16 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
-          options: const <String, String>{
-            'volume': '100',
-            'volume-max': '100',
-            'video-sync': 'audio',
-            'autosync': '30',
-            'force-seekable': 'yes',
-            'cache': 'yes',
-            'demuxer-seekable-cache': 'yes',
-          },
         ),
       );
-      final controller = await VideoController.create(
+      controller = VideoController(
         player,
         configuration: const VideoControllerConfiguration(
           enableHardwareAcceleration: true,
@@ -81,13 +48,15 @@ class TwitchMediaKitPlayerHost {
       );
       _player = player;
       _videoController = controller;
-    }();
-
-    try {
-      await _creating;
-    } finally {
-      _creating = null;
     }
+
+    _refCount++;
+
+    return TwitchMediaKitPlayerSession._(
+      player: player,
+      videoController: controller,
+      generation: _generation,
+    );
   }
 
   static Future<void> openOrResume(
@@ -104,10 +73,9 @@ class TwitchMediaKitPlayerHost {
       return;
     }
 
-    await session.ensureReady();
     if (session._released) return;
     if (session.generation != _generation) {
-      session._generation = _generation;
+      throw StateError('Stale Twitch media_kit player session.');
     }
 
     final safeUri = uri.trim();
@@ -138,13 +106,11 @@ class TwitchMediaKitPlayerHost {
   }
 
   static Future<void> pauseCurrent(TwitchMediaKitPlayerSession session) async {
-    await session.ensureReady();
     if (session.generation != _generation) return;
     await session.player.pause();
   }
 
   static Future<void> stopCurrent(TwitchMediaKitPlayerSession session) async {
-    await session.ensureReady();
     if (session.generation != _generation) return;
     await session.player.stop();
     _currentMediaUri = null;
@@ -153,10 +119,10 @@ class TwitchMediaKitPlayerHost {
   static void _release(TwitchMediaKitPlayerSession session) {
     if (session.generation != _generation) return;
 
-    final player = _player;
-    if (player != null) {
-      unawaited(player.pause().catchError((_) {}));
-    }
+    // Always pause when a WatchPage releases its session. This prevents audio
+    // from continuing on the home/discovery page when the native player is kept
+    // alive for reuse, and also protects against leaked/overlapping ref counts.
+    unawaited(session.player.pause().catchError((_) {}));
 
     _refCount = (_refCount - 1).clamp(0, 1 << 20).toInt();
     if (_refCount > 0) return;
@@ -191,54 +157,19 @@ class TwitchMediaKitPlayerHost {
 }
 
 class TwitchMediaKitPlayerSession {
-  final String _title;
-  Player? _player;
-  VideoController? _videoController;
-  int _generation;
+  final Player player;
+  final VideoController videoController;
+  final int generation;
 
   bool _released = false;
 
   TwitchMediaKitPlayerSession._({
-    required Player player,
-    required VideoController videoController,
-    required int generation,
-  })  : _player = player,
-        _videoController = videoController,
-        _generation = generation,
-        _title = 'Twitch Raw Proxy';
-
-  TwitchMediaKitPlayerSession._lazy({
-    required String title,
-    required int generation,
-  })  : _title = title,
-        _generation = generation;
-
-  Player get player {
-    final value = _player ?? TwitchMediaKitPlayerHost._player;
-    if (value == null) {
-      throw StateError('TwitchMediaKitPlayerSession is not ready. Call ensureReady() first.');
-    }
-    return value;
-  }
-
-  VideoController get videoController {
-    final value = _videoController ?? TwitchMediaKitPlayerHost._videoController;
-    if (value == null) {
-      throw StateError('TwitchMediaKitPlayerSession is not ready. Call ensureReady() first.');
-    }
-    return value;
-  }
-
-  int get generation => _generation;
+    required this.player,
+    required this.videoController,
+    required this.generation,
+  });
 
   String? get currentMediaUri => TwitchMediaKitPlayerHost.currentMediaUri;
-
-  Future<void> ensureReady() async {
-    await TwitchMediaKitPlayerHost._ensureCreated(_title);
-    _player = TwitchMediaKitPlayerHost._player;
-    _videoController = TwitchMediaKitPlayerHost._videoController;
-    _generation = TwitchMediaKitPlayerHost._generation;
-  }
 
   Future<void> openOrResume({
     required String uri,
