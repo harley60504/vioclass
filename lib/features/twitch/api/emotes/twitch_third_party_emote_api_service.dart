@@ -8,6 +8,8 @@ class TwitchThirdPartyEmoteApiService {
     required this.client,
   });
 
+  static const int _sevenTvPreferredChatWidth = 64;
+
   Future<List<TwitchThirdPartyEmote>> fetchAll({
     required String channelId,
     required String channelLogin,
@@ -261,16 +263,7 @@ class TwitchThirdPartyEmoteApiService {
       final files = hostMap['files'];
       if (files is List && files.isNotEmpty) {
         final candidates = files.whereType<Map<String, dynamic>>().toList();
-        candidates.sort((a, b) {
-          final aWidth = _readInt(a['width']) ?? 0;
-          final bWidth = _readInt(b['width']) ?? 0;
-          return bWidth.compareTo(aWidth);
-        });
-
-        final selected = candidates.firstWhere(
-          (file) => (file['format']?.toString().toLowerCase() ?? '') == 'webp',
-          orElse: () => candidates.first,
-        );
+        final selected = _selectSevenTvChatFile(candidates);
 
         selectedWidth = _readInt(selected['width']);
         selectedHeight = _readInt(selected['height']);
@@ -284,7 +277,7 @@ class TwitchThirdPartyEmoteApiService {
       }
 
       if (imageUrl.isEmpty && id.isNotEmpty) {
-        imageUrl = 'https://cdn.7tv.app/emote/$id/2x.avif';
+        imageUrl = 'https://cdn.7tv.app/emote/$id/2x.webp';
       }
 
       output.add(
@@ -304,6 +297,31 @@ class TwitchThirdPartyEmoteApiService {
     return output
         .where((emote) => emote.name.isNotEmpty && emote.imageUrl.isNotEmpty)
         .toList(growable: false);
+  }
+
+  Map<String, dynamic> _selectSevenTvChatFile(
+    List<Map<String, dynamic>> candidates,
+  ) {
+    if (candidates.isEmpty) return const <String, dynamic>{};
+
+    final webp = candidates.where((file) {
+      return (file['format']?.toString().toLowerCase() ?? '') == 'webp';
+    }).toList(growable: false);
+
+    final preferredPool = webp.isNotEmpty ? webp : candidates;
+    final sorted = preferredPool.toList(growable: false)
+      ..sort((a, b) {
+        final aWidth = _readInt(a['width']) ?? 1 << 20;
+        final bWidth = _readInt(b['width']) ?? 1 << 20;
+        return aWidth.compareTo(bWidth);
+      });
+
+    for (final file in sorted) {
+      final width = _readInt(file['width']) ?? 0;
+      if (width >= _sevenTvPreferredChatWidth) return file;
+    }
+
+    return sorted.last;
   }
 
   int? _readInt(Object? value) {
