@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage220j_split_shell
+// PATCH VERSION: twitch_watch_page_stage220k_split_shell_constants_library_scope
 // Place at: lib/features/twitch/presentation/pages/twitch_watch_page.dart
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
@@ -8,6 +8,10 @@
 // - Keep this file focused on fields, initialization, disposal, and build.
 // - Compatible with the PiliPlus media_kit fork: no direct stream.volume /
 //   stream.width usage remains in this shell.
+//
+// Stage 220K:
+// - Move preference/layout constants to library scope so the methods part can
+//   reference them without unqualified static-member analyzer errors.
 
 library twitch_watch_page;
 
@@ -47,6 +51,25 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
   defaultValue: true,
 );
+
+const bool _enableChannelPointEmoteMenu = true;
+
+const String _chatPanelWidthPreferenceKey = 'twitch_watch_v2_chat_panel_width';
+const String _chatPanelRatioPreferenceKey = 'twitch_watch_v3_chat_panel_ratio';
+const String _playerVolumePreferenceKey = 'twitch_watch_v2_player_volume';
+const String _playerMutedPreferenceKey = 'twitch_watch_v2_player_muted';
+const String _chatVisiblePreferenceKey = 'twitch_watch_v2_chat_visible';
+
+const String _legacyChatPanelWidthPreferenceKey = 'twitch_watch_chat_panel_width';
+const String _legacyPlayerVolumePreferenceKey = 'twitch_watch_player_volume';
+const String _legacyPlayerMutedPreferenceKey = 'twitch_watch_player_muted';
+
+const double _minChatPanelWidth = 180.0;
+const double _maxEffectiveMinChatPanelWidth = 280.0;
+const double _maxChatPanelWidth = 620.0;
+const double _minChatPanelRatio = 0.22;
+const double _minStoredChatPanelRatio = 0.08;
+const double _maxChatPanelRatio = 0.48;
 
 class TwitchWatchPage extends StatefulWidget {
   final TwitchStreamHeaderMetadata initialMetadata;
@@ -118,33 +141,6 @@ class TwitchWatchPage extends StatefulWidget {
 }
 
 class _TwitchWatchPageState extends State<TwitchWatchPage> {
-  static const bool _enableChannelPointEmoteMenu = true;
-
-  static const String _chatPanelWidthPreferenceKey =
-      'twitch_watch_v2_chat_panel_width';
-  static const String _chatPanelRatioPreferenceKey =
-      'twitch_watch_v3_chat_panel_ratio';
-  static const String _playerVolumePreferenceKey =
-      'twitch_watch_v2_player_volume';
-  static const String _playerMutedPreferenceKey =
-      'twitch_watch_v2_player_muted';
-  static const String _chatVisiblePreferenceKey =
-      'twitch_watch_v2_chat_visible';
-
-  static const String _legacyChatPanelWidthPreferenceKey =
-      'twitch_watch_chat_panel_width';
-  static const String _legacyPlayerVolumePreferenceKey =
-      'twitch_watch_player_volume';
-  static const String _legacyPlayerMutedPreferenceKey =
-      'twitch_watch_player_muted';
-
-  static const double _minChatPanelWidth = 180.0;
-  static const double _maxEffectiveMinChatPanelWidth = 280.0;
-  static const double _maxChatPanelWidth = 620.0;
-  static const double _minChatPanelRatio = 0.22;
-  static const double _minStoredChatPanelRatio = 0.08;
-  static const double _maxChatPanelRatio = 0.48;
-
   late final TextEditingController _channelController;
   late final TextEditingController _messageController;
 
