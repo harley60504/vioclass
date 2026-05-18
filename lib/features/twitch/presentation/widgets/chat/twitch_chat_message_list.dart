@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage219ab_frosty_buffered_render_with_stable_keys
+// PATCH VERSION: chat_message_list_stage221a_restore_latest_autofollow
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 219Z:
@@ -14,6 +14,11 @@
 // - Adds stable ValueKey for each message tile. This lets Flutter preserve the
 //   mounted tile/content state and its cached InlineSpan list across buffered
 //   list updates when the same message remains visible.
+//
+// Stage 221A:
+// - Restore auto-follow as soon as the scroll position is near latest. The
+//   previous user-scroll guard also blocked the "manually scroll to bottom and
+//   keep following new messages" behavior.
 
 import 'dart:async';
 
@@ -153,11 +158,13 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     _lastSourceMessageCount = sourceCount;
     _lastSourceNewestFingerprint = sourceNewestFingerprint;
 
-    final userRecentlyScrolled = _hasRecentUserScroll;
-    final shouldAutoFollow = !userRecentlyScrolled && (_autoScroll || _isNearLatest);
+    final nearLatest = _isNearLatest;
+    final shouldAutoFollow = _autoScroll || nearLatest;
 
     if (shouldAutoFollow) {
       _autoScroll = true;
+      _userScrollActive = false;
+      _lastUserScrollAt = null;
       _hiddenNewMessageCount = 0;
       _pendingBufferedSourceMessages = sourceMessages;
       _scheduleBufferedViewFlush();
@@ -263,12 +270,12 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (!_scrollController.hasClients || _programmaticScrollActive) return;
 
     final nearLatest = _isNearLatest;
-    final userRecentlyScrolled = _hasRecentUserScroll;
 
     if (nearLatest && !_autoScroll) {
-      if (userRecentlyScrolled) return;
       setState(() {
         _autoScroll = true;
+        _userScrollActive = false;
+        _lastUserScrollAt = null;
         _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
         _lastSourceMessageCount = runtime.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
