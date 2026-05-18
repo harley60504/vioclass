@@ -22,13 +22,11 @@ dependencies:
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
 
-  # Stage 220F: full PiliPlus-style media_kit fork stack.
-  # Do not merge this back until Windows + Android player_core tests pass.
-  media_kit:
-    git:
-      url: https://github.com/bggRGjQaUbCoE/media-kit.git
-      path: media_kit
-      ref: version_1.2.5
+  # Stage 220F: PiliPlus-style media_kit fork test.
+  # Keep normal hosted constraints here because media_kit_video's pubspec
+  # declares hosted media_kit dependencies. Actual fork sources are forced in
+  # dependency_overrides below to avoid Pub source conflicts.
+  media_kit: 1.1.11
   media_kit_video:
     git:
       url: https://github.com/bggRGjQaUbCoE/media-kit.git
@@ -45,9 +43,17 @@ dependencies:
   window_manager: ^0.5.1
 
 dependency_overrides:
+  # media_kit_video depends on hosted media_kit ^1.1.11. Override that hosted
+  # source to the same fork/ref so Player.create + PlayerConfiguration.options
+  # can be resolved consistently.
+  media_kit:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/media-kit.git
+      path: media_kit
+      ref: version_1.2.5
+
   # media_kit_libs_video depends on hosted media_kit_libs_android_video ^1.3.6.
-  # Keep the Android native libs on the same PiliPlus fork ref for this test
-  # branch by overriding the transitive hosted source.
+  # Keep Android native libs on the same fork/ref for this test branch.
   media_kit_libs_android_video:
     git:
       url: https://github.com/bggRGjQaUbCoE/media-kit.git
