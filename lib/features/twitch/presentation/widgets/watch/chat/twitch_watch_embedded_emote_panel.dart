@@ -205,17 +205,42 @@ class _TwitchWatchEmbeddedEmotePanelState
     String label,
     TwitchThirdPartyEmoteProvider provider,
   ) {
-    final entries = widget.thirdPartyCache
-        .emotesForProvider(provider)
+    final source = widget.thirdPartyCache.emotesForProvider(provider);
+    final channel = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.channel)
+        .map(_EmbeddedEmoteEntry.thirdParty)
+        .toList(growable: false);
+    final shared = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.shared)
+        .map(_EmbeddedEmoteEntry.thirdParty)
+        .toList(growable: false);
+    final global = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.global)
+        .map(_EmbeddedEmoteEntry.thirdParty)
+        .toList(growable: false);
+    final other = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.other)
         .map(_EmbeddedEmoteEntry.thirdParty)
         .toList(growable: false);
 
-    return _EmbeddedEmoteProviderTab(
-      label: label,
-      pages: [
-        _EmbeddedEmotePage(label: 'All', entries: entries),
-      ],
-    );
+    final channelLike = <_EmbeddedEmoteEntry>[
+      ...channel,
+      ...shared,
+      ...other,
+    ];
+
+    final pages = <_EmbeddedEmotePage>[
+      if (channelLike.isNotEmpty)
+        _EmbeddedEmotePage(label: 'Channel', entries: channelLike),
+      if (global.isNotEmpty)
+        _EmbeddedEmotePage(label: 'Global', entries: global),
+    ];
+
+    if (pages.isEmpty) {
+      pages.add(const _EmbeddedEmotePage(label: 'All', entries: <_EmbeddedEmoteEntry>[]));
+    }
+
+    return _EmbeddedEmoteProviderTab(label: label, pages: pages);
   }
 
   List<TwitchOfficialEmote> _uniqueOfficial(Iterable<TwitchOfficialEmote> source) {
