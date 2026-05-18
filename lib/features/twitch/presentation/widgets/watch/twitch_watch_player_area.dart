@@ -1,17 +1,9 @@
-// PATCH VERSION: watch_player_area_stage219ag_restore_video_attach_safe_rebuild
+// PATCH VERSION: watch_player_area_stage220i_nullable_media_session
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
-// Stage 189A: player chrome uses shared glass surfaces.
-// Stage 201: player area no longer paints a full black background, allowing the
-// WatchPage purple background to show around the video.
-// Stage 205: restore BoxFit.contain. BoxFit.cover can make media_kit's native
-// video surface appear clipped/overflowed outside the intended player region on
-// Windows.
-// Stage 211: keep the video itself centered at 16:9, but move Watch controls to
-// the full player pane edges instead of the 16:9 video box edges.
-// Stage 219AG: revert the experimental Video-surface split. On Windows/media_kit
-// it can leave audio playing while the native video surface does not attach.
+// Stage 220I: allow WatchPage to build before the lazy PiliPlus media_kit
+// session has finished creating Player / VideoController.
 
 library twitch_watch_player_area;
 
@@ -46,8 +38,8 @@ const double _watchVideoAspectRatio = 16 / 9;
 
 class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
-  final Player player;
-  final VideoController videoController;
+  final Player? player;
+  final VideoController? videoController;
   final TwitchStreamHeaderMetadata metadata;
   final bool loading;
   final String? error;
@@ -55,9 +47,6 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final VoidCallback? onReload;
   final VoidCallback onStop;
 
-  // Compatibility with current watch_page call site. These values are optional
-  // aliases because older WatchPage versions pass quality/relationship state
-  // directly instead of reading it from playerRuntime.
   final List<TwitchM3u8Variant>? qualityVariants;
   final TwitchM3u8Variant? currentVariant;
   final bool qualityBusy;
@@ -122,15 +111,15 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     return AnimatedBuilder(
       animation: playerRuntime,
       builder: (context, _) {
+        final currentPlayer = player;
+        final currentVideoController = videoController;
+        final playerReady = currentPlayer != null && currentVideoController != null;
         final effectiveFullscreen = fullscreen || fullscreenMode;
         final effectiveChatVisible = chatVisible;
         final effectiveFollowBusy = followBusy || relationshipBusy;
-        final effectiveQualityVariants =
-            qualityVariants ?? playerRuntime.variants;
-        final effectiveCurrentVariant =
-            currentVariant ?? playerRuntime.currentVariant;
-        final effectiveOnQualityChanged =
-            onQualityChanged ?? onQualitySelected;
+        final effectiveQualityVariants = qualityVariants ?? playerRuntime.variants;
+        final effectiveCurrentVariant = currentVariant ?? playerRuntime.currentVariant;
+        final effectiveOnQualityChanged = onQualityChanged ?? onQualitySelected;
 
         return ColoredBox(
           color: Colors.transparent,
@@ -138,41 +127,51 @@ class TwitchWatchPlayerArea extends StatelessWidget {
             clipBehavior: Clip.hardEdge,
             children: [
               Positioned.fill(
-                child: _WatchCenteredVideoSurface(
-                  controller: videoController,
-                ),
+                child: playerReady
+                    ? _WatchCenteredVideoSurface(controller: currentVideoController)
+                    : const _WatchPlayerWaitingSurface(),
               ),
-              Positioned.fill(
-                child: _WatchControlsOverlay(
-                  loading: loading ||
-                      playerRuntime.loading ||
-                      playerRuntime.switchingQuality,
-                  error: error,
-                  runtimeError: playerRuntime.error,
-                  metadata: metadata,
-                  isFollowing: isFollowing,
-                  followBusy: effectiveFollowBusy,
-                  onBack: onBack,
-                  onToggleFollow: onToggleFollow,
-                  onSubscribe: onSubscribe,
-                  onReload: onReload,
-                  onStop: onStop,
-                  player: player,
-                  playerRuntime: playerRuntime,
-                  muted: muted,
-                  volume: volume,
-                  fullscreen: effectiveFullscreen,
-                  chatVisible: effectiveChatVisible,
-                  showFullscreenButton: showFullscreenButton,
-                  onToggleMute: onToggleMute,
-                  onVolumeChanged: onVolumeChanged,
-                  qualityVariants: effectiveQualityVariants,
-                  currentVariant: effectiveCurrentVariant,
-                  onQualityChanged: effectiveOnQualityChanged,
-                  onToggleChat: onToggleChat,
-                  onToggleFullscreen: onToggleFullscreen,
+              if (playerReady)
+                Positioned.fill(
+                  child: _WatchControlsOverlay(
+                    loading: loading ||
+                        playerRuntime.loading ||
+                        playerRuntime.switchingQuality,
+                    error: error,
+                    runtimeError: playerRuntime.error,
+                    metadata: metadata,
+                    isFollowing: isFollowing,
+                    followBusy: effectiveFollowBusy,
+                    onBack: onBack,
+                    onToggleFollow: onToggleFollow,
+                    onSubscribe: onSubscribe,
+                    onReload: onReload,
+                    onStop: onStop,
+                    player: currentPlayer,
+                    playerRuntime: playerRuntime,
+                    muted: muted,
+                    volume: volume,
+                    fullscreen: effectiveFullscreen,
+                    chatVisible: effectiveChatVisible,
+                    showFullscreenButton: showFullscreenButton,
+                    onToggleMute: onToggleMute,
+                    onVolumeChanged: onVolumeChanged,
+                    qualityVariants: effectiveQualityVariants,
+                    currentVariant: effectiveCurrentVariant,
+                    onQualityChanged: effectiveOnQualityChanged,
+                    onToggleChat: onToggleChat,
+                    onToggleFullscreen: onToggleFullscreen,
+                  ),
+                )
+              else
+                Positioned.fill(
+                  child: _WatchControlsNotReadyOverlay(
+                    metadata: metadata,
+                    loading: loading || playerRuntime.loading,
+                    onBack: onBack,
+                    onReload: onReload,
+                  ),
                 ),
-              ),
             ],
           ),
         );
@@ -181,12 +180,107 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   }
 }
 
+class _WatchPlayerWaitingSurface extends StatelessWidget {
+  const _WatchPlayerWaitingSurface();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFF0E0E10),
+      child: Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 2.4),
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchControlsNotReadyOverlay extends StatelessWidget {
+  final TwitchStreamHeaderMetadata metadata;
+  final bool loading;
+  final VoidCallback onBack;
+  final VoidCallback? onReload;
+
+  const _WatchControlsNotReadyOverlay({
+    required this.metadata,
+    required this.loading,
+    required this.onBack,
+    required this.onReload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          left: 12,
+          right: 12,
+          top: 12,
+          child: TwitchGlassSurface(
+            borderRadius: BorderRadius.circular(18),
+            backgroundColor: Colors.black.withOpacity(0.34),
+            borderColor: Colors.white.withOpacity(0.10),
+            blurSigma: 18,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  _PlainIconButton(
+                    tooltip: '返回',
+                    icon: Icons.arrow_back,
+                    size: 24,
+                    onPressed: onBack,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      metadata.displayName.isNotEmpty
+                          ? metadata.displayName
+                          : metadata.channelLogin,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  _PlainIconButton(
+                    tooltip: '重新載入',
+                    icon: Icons.refresh,
+                    size: 24,
+                    onPressed: onReload,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (loading)
+          const Positioned.fill(
+            child: IgnorePointer(
+              child: Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _WatchCenteredVideoSurface extends StatelessWidget {
   final VideoController controller;
 
-  const _WatchCenteredVideoSurface({
-    required this.controller,
-  });
+  const _WatchCenteredVideoSurface({required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -195,9 +289,7 @@ class _WatchCenteredVideoSurface extends StatelessWidget {
         final maxWidth = constraints.maxWidth;
         final maxHeight = constraints.maxHeight;
 
-        if (maxWidth <= 0 || maxHeight <= 0) {
-          return const SizedBox.shrink();
-        }
+        if (maxWidth <= 0 || maxHeight <= 0) return const SizedBox.shrink();
 
         var width = maxWidth;
         var height = width / _watchVideoAspectRatio;
