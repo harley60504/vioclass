@@ -4,6 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
+const bool _enableWatchPlayer = bool.fromEnvironment(
+  'TWITCH_ENABLE_WATCH_PLAYER',
+  defaultValue: false,
+);
+
 class TwitchMediaKitPlayerHost {
   static Player? _player;
   static VideoController? _videoController;
@@ -60,6 +65,14 @@ class TwitchMediaKitPlayerHost {
     bool play = true,
     bool forceOpen = false,
   }) async {
+    if (!_enableWatchPlayer) {
+      _currentMediaUri = null;
+      if (!session._released) {
+        await session.player.stop();
+      }
+      return;
+    }
+
     if (session._released) return;
     if (session.generation != _generation) {
       throw StateError('Stale Twitch media_kit player session.');
