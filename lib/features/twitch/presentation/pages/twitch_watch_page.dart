@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage220l_split_shell_parts
+// PATCH VERSION: twitch_watch_page_stage221e_background_non_blocking
 // Place at: lib/features/twitch/presentation/pages/twitch_watch_page.dart
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
@@ -15,6 +15,10 @@
 //
 // Stage 220L:
 // - Split methods into preferences/startup/chat/engagement/relationship/ui.
+//
+// Stage 221E:
+// - Player starts first, chat second, engagement/emotes/relationship in the
+//   background. Background tasks must not show the blocking startup overlay.
 
 library twitch_watch_page;
 
@@ -238,17 +242,11 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       _loadingWatch ||
       _loadingPlayer ||
       _connectingChat ||
-      _chatBootstrapping ||
-      _engagementBootstrapping ||
-      _emoteBootstrapping ||
-      _relationshipBootstrapping;
+      _chatBootstrapping;
 
   bool get _showBlockingStartupMask {
     return _loadingAuth ||
         _loadingWatch ||
-        _relationshipBootstrapping ||
-        _engagementBootstrapping ||
-        _emoteBootstrapping ||
         _chatBootstrapping ||
         _connectingChat ||
         (_enableWatchPlayer && _loadingPlayer);
@@ -257,11 +255,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   String get _startupMaskTitle {
     if (_loadingAuth) return '正在準備 Twitch 工作階段...';
     if (_loadingWatch) return '正在準備觀看頁...';
-    if (_relationshipBootstrapping) return '正在準備頻道資料...';
-    if (_engagementBootstrapping) return '正在預載互動資料...';
-    if (_emoteBootstrapping) return '正在預載聊天室貼圖...';
-    if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
     if (_enableWatchPlayer && _loadingPlayer) return '正在啟動播放器...';
+    if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
     return '正在載入...';
   }
 
@@ -412,8 +407,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
               child: TwitchWatchBlockingStartupOverlay(
                 title: _startupMaskTitle,
                 subtitle: _enableWatchPlayer
-                    ? '先預載頻道與互動資料，再啟動聊天室，最後載入播放器。'
-                    : '先預載頻道與互動資料，再啟動聊天室；播放器目前已停用。',
+                    ? '先啟動播放器，再連線聊天室；互動資料與貼圖會在背景補上。'
+                    : '正在連線聊天室；互動資料與貼圖會在背景補上。',
               ),
             ),
         ],
