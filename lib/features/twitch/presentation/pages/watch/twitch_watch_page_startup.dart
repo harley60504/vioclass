@@ -121,35 +121,54 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     required String channel,
     required int generation,
   }) async {
+    // Stage 221E startup order:
+    // 1. Open player first for fastest watch-page first paint.
+    // 2. Connect chat second.
+    // 3. Resolve relationship / engagement / emotes in background.
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
-    setState(() => _relationshipBootstrapping = true);
-    await _prepareWatchBackgroundSnapshot(generation, channel);
-    if (!_isCurrentWatchTask(generation, channel)) return;
-    await _runDeferredRelationshipStartup(generation, channel);
-    await _yieldToUi();
-    if (!_isCurrentWatchTask(generation, channel)) return;
+    if (_enableWatchPlayer) {
+      try {
+        await _loadPlayer(channel);
+      } catch (error) {
+        if (!_isCurrentWatchTask(generation, channel)) return;
+        _showSnack('播放器載入失敗：$error');
+      }
+    }
 
-    setState(() => _engagementBootstrapping = true);
-    await _runDeferredEngagementStartup(generation, channel);
-    await _yieldToUi();
-    if (!_isCurrentWatchTask(generation, channel)) return;
-
-    setState(() => _emoteBootstrapping = true);
-    await _runDeferredEmoteStartup(generation, channel);
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
     setState(() => _chatBootstrapping = true);
     await _runDeferredChatStartup(channel, generation);
+
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
-    if (_enableWatchPlayer) {
-      await _yieldToUi();
-      await _loadPlayer(channel);
-    }
+    unawaited(_runWatchBackgroundStartup(channel: channel, generation: generation));
+  }
+
+  Future<void> _runWatchBackgroundStartup({
+    required String channel,
+    required int generation,
+  }) async {
+    if (!_isCurrentWatchTask(generation, channel)) return;
+
+    setState(() {
+      _relationshipBootstrapping = true;
+      _engagementBootstrapping = true;
+      _emoteBootstrapping = true;
+    });
+
+    await _prepareWatchBackgroundSnapshot(generation, channel);
+    if (!_isCurrentWatchTask(generation, channel)) return;
+
+    await Future.wait<void>([
+      _runDeferredRelationshipStartup(generation, channel),
+      _runDeferredEngagementStartup(generation, channel),
+      _runDeferredEmoteStartup(generation, channel),
+    ]);
   }
 
   Future<void> _yieldToUi() async {
