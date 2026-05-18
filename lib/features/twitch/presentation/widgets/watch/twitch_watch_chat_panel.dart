@@ -1,6 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage219e_embedded_emote_panel
-
-import 'dart:async';
+// PATCH VERSION: twitch_watch_chat_panel_stage219s_public_emote_sheet
 
 import 'package:flutter/material.dart';
 
@@ -18,7 +16,6 @@ import 'chat/twitch_watch_chat_header_bar.dart';
 import 'chat/twitch_watch_chat_input_section.dart';
 import 'chat/twitch_watch_chat_layout_metrics.dart';
 import 'chat/twitch_watch_chat_message_area.dart';
-import 'chat/twitch_watch_embedded_emote_panel.dart';
 
 class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchChatRuntime? runtime;
@@ -84,14 +81,13 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   bool showPinned = true;
   bool showPrediction = true;
-  bool showEmotePanel = false;
 
   String? lastPredictionId;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_appearanceController.load());
+    _appearanceController.load();
   }
 
   @override
@@ -138,10 +134,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     return status != 'ACTIVE' && status != 'OPEN';
   }
 
-  void _toggleEmotePanel() {
-    setState(() => showEmotePanel = !showEmotePanel);
-  }
-
   @override
   Widget build(BuildContext context) {
     final currentRuntime = widget.runtime;
@@ -172,10 +164,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
               effectiveShowPrediction ||
               (widget.engagementError != null && widget.engagementError!.isNotEmpty);
           final chatFontScale = _appearanceController.fontScale;
-          final panelHeight = (constraints.maxHeight *
-                  (MediaQuery.of(context).orientation == Orientation.portrait ? 0.34 : 0.46))
-              .clamp(150.0, 310.0)
-              .toDouble();
 
           return Column(
             children: [
@@ -246,22 +234,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                   ],
                 ),
               ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                curve: Curves.easeOutCubic,
-                height: showEmotePanel ? panelHeight : 0,
-                child: ClipRect(
-                  child: showEmotePanel
-                      ? TwitchWatchEmbeddedEmotePanel(
-                          thirdPartyCache: widget.thirdPartyEmoteCache,
-                          officialCache: widget.officialEmoteCache,
-                          loading: widget.loadingEmotes,
-                          messageController: widget.messageController,
-                          onRefresh: widget.onRefreshEmotes,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              ),
               TwitchWatchChatInputSection(
                 channelPoints: widget.channelPoints,
                 messageController: widget.messageController,
@@ -270,7 +242,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 enabled: currentRuntime?.connected ?? false,
                 sending: widget.sending,
                 onOpenChannelPoints: widget.onOpenChannelPoints,
-                onOpenEmotes: _toggleEmotePanel,
+                onOpenEmotes: widget.onOpenEmotes,
                 onSend: widget.onSend,
               ),
             ],
