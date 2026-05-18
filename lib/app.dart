@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
+import 'features/twitch/presentation/pages/twitch_emote_only_test_page.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
+
+const bool _emoteOnlyTestMode = bool.fromEnvironment(
+  'TWITCH_EMOTE_ONLY_TEST',
+  defaultValue: false,
+);
 
 class NewTwitchApp extends StatelessWidget {
   const NewTwitchApp({super.key});
@@ -18,7 +24,9 @@ class NewTwitchApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF0E0E10),
         useMaterial3: true,
       ),
-      home: const _StartupSafeHome(),
+      home: _emoteOnlyTestMode
+          ? const TwitchEmoteOnlyTestPage()
+          : const _StartupSafeHome(),
     );
   }
 }
