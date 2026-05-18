@@ -30,12 +30,13 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   static const String _legacyQualityKey = 'twitch_fvp_proxy_preferred_quality';
   static const String _legacyQualityChannelPrefix =
       'twitch_fvp_proxy_preferred_quality_';
-  // Stage 220G: use 1080p as the mobile startup target for player-core
-  // latency/performance testing. This makes Android comparable with the
-  // desktop/default Source-like path without immediately jumping to every
-  // channel's highest bitrate Source variant.
-  static const int _mobileStartupTargetHeight = 1080;
-  static const int _mobileStartupMaxFps = 60;
+
+  // First-run fallback only. User-selected quality always wins through
+  // _loadPreferredQualityName(). This keeps WatchPage behavior client-like:
+  // users decide their default quality, while the app only picks a reasonable
+  // startup quality when no preference exists yet.
+  static const int _firstRunMobileFallbackHeight = 1080;
+  static const int _firstRunMobileFallbackMaxFps = 60;
 
   static TwitchStableHlsProxyRouter? _sharedProxy;
   static int _sharedProxyRevision = 0;
@@ -189,7 +190,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
           'clean=${merged.where((v) => !v.hasAds).length}';
 
       final selected = preferredVariant == null
-          ? _findVariantByName(merged, wantedQuality) ??
+          ? _findVariantBySavedPreference(merged, wantedQuality) ??
               selectDefaultVariant(
                 merged,
                 allowMobileStartupSafeQuality: wantedQuality == null,
@@ -339,6 +340,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _lastPreferredQualityName = name;
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Save both global and channel-scoped preference. Channel-scoped wins on
+      // that channel; global is the user's app-wide default for new channels.
       await prefs.setString(_qualityKey, name);
       await prefs.setString(
         '$_qualityChannelPrefix${login.trim().toLowerCase()}',
@@ -470,8 +473,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       final safe = pool.where((v) {
         final fps = v.fpsRounded;
         return v.height > 0 &&
-            v.height <= _mobileStartupTargetHeight &&
-            (fps == 0 || fps <= _mobileStartupMaxFps);
+            v.height <= _firstRunMobileFallbackHeight &&
+            (fps == 0 || fps <= _firstRunMobileFallbackMaxFps);
       }).toList();
       if (safe.isNotEmpty) return _sortVariants(safe).first;
     }
@@ -499,16 +502,45 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return text.contains('source') || text.contains('chunked');
   }
 
-  TwitchM3u8Variant? _findVariantByName(
+  TwitchM3u8Variant? _findVariantBySavedPreference(
     List<TwitchM3u8Variant> variants,
-    String? name,
+    String? preference,
   ) {
-    final target = name?.trim();
+    final target = preference?.trim();
     if (target == null || target.isEmpty) return null;
-    final matches = variants
+
+    final exactMatches = variants
         .where((v) => v.name == target || v.displayName == target)
         .toList();
-    return matches.isEmpty ? null : _sortVariants(matches).first;
+    if (exactMatches.isNotEmpty) return _sortVariants(exactMatches).first;
+
+    final normalizedTarget = _normalizeQualityPreference(target);
+    if (normalizedTarget.isEmpty) return null;
+
+    if (normalizedTarget == 'source' || normalizedTarget == 'chunked') {
+      final source = variants.where(_isSourceLikeVariant).toList();
+      if (source.isNotEmpty) return _sortVariants(source).first;
+    }
+
+    final keyMatches = variants.where((v) {
+      return _normalizeQualityPreference(v.adAwareQualityKey) == normalizedTarget ||
+          _normalizeQualityPreference(v.name) == normalizedTarget ||
+          _normalizeQualityPreference(v.displayName) == normalizedTarget ||
+          _normalizeQualityPreference(v.videoGroupId ?? '') == normalizedTarget;
+    }).toList();
+    return keyMatches.isEmpty ? null : _sortVariants(keyMatches).first;
+  }
+
+  String _normalizeQualityPreference(String value) {
+    final text = value.trim().toLowerCase();
+    if (text.isEmpty) return '';
+    if (text.contains('source')) return 'source';
+    if (text.contains('chunked')) return 'chunked';
+    if (text.contains('audio')) return 'audio_only';
+    return text
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll('_', '')
+        .replaceAll('-', '');
   }
 
   TwitchM3u8Variant? _findMatchingMergedVariant(
