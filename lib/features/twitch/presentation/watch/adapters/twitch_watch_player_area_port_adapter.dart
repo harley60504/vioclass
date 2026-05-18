@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_port_adapters_stage219e_embedded_emote_panel
+// PATCH VERSION: twitch_watch_port_adapters_stage220i_nullable_player_handles
 
 import 'dart:async';
 
@@ -71,8 +71,8 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     final port = TwitchWatchPortScope.playerOf(context);
     return TwitchWatchPlayerArea(
       playerRuntime: port.runtime,
-      player: port.player,
-      videoController: port.videoController,
+      player: port.playerOrNull,
+      videoController: port.videoControllerOrNull,
       metadata: metadata,
       loading: loading,
       error: error,
