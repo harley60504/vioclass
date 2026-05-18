@@ -18,8 +18,8 @@ void main() {
   _installDebugLogFilter();
 
   final app = kDebugMode && _disableDebugSemantics
-      ? const ExcludeSemantics(child: NewTwitchApp())
-      : const NewTwitchApp();
+      ? const ExcludeSemantics(child: VioClassApp())
+      : const VioClassApp();
 
   runApp(app);
 }
