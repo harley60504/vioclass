@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
@@ -8,8 +9,14 @@ import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 const double _emoteSize = 30.0;
-const int _memCacheSize = 72;
-const int _diskCacheSize = 96;
+
+final CacheManager _sheetEmoteCacheManager = CacheManager(
+  Config(
+    'twitchPublicSheetEmoteImageCache',
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 10000,
+  ),
+);
 
 Future<void> showTwitchFrostyEmotePickerSheet({
   required BuildContext context,
@@ -90,12 +97,7 @@ class _TwitchFrostyEmotePickerSheetState
           ),
         ],
       ),
-      _OuterTab(
-        label: 'Twitch',
-        pages: [
-          _InnerPage(label: 'All', entries: _officialEntries()),
-        ],
-      ),
+      _officialTab(),
       _thirdPartyTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
       _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
       _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
@@ -104,7 +106,7 @@ class _TwitchFrostyEmotePickerSheetState
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
         title: '貼圖',
-        subtitle: 'Frosty-like model｜provider tab + section page',
+        subtitle: 'Frosty-like 分類｜Twitch / 7TV / BTTV / FFZ',
         icon: Icons.emoji_emotions_rounded,
         loading: loading,
         onRefresh: widget.onRefresh,
@@ -135,25 +137,161 @@ class _TwitchFrostyEmotePickerSheetState
     );
   }
 
+  _OuterTab _officialTab() {
+    final official = _official;
+    if (official == null) {
+      return const _OuterTab(
+        label: 'Twitch',
+        pages: [
+          _InnerPage(label: 'Channel', entries: <_EmoteEntry>[]),
+          _InnerPage(label: 'Global', entries: <_EmoteEntry>[]),
+          _InnerPage(label: 'Unlocked', entries: <_EmoteEntry>[]),
+        ],
+      );
+    }
+
+    final channel = _uniqueOfficial(official.channelEmotes);
+    final global = _uniqueOfficial(official.globalEmotes);
+    final user = _uniqueOfficial(official.userEmotes);
+
+    final channelKeys = channel.map(_officialKey).toSet();
+    final globalKeys = global.map(_officialKey).toSet();
+    final currentChannelId = official.channelId.trim();
+
+    final userOnly = user.where((emote) {
+      final key = _officialKey(emote);
+      if (channelKeys.contains(key)) return false;
+      if (globalKeys.contains(key)) return false;
+      if (currentChannelId.isNotEmpty && emote.ownerId.trim() == currentChannelId) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
+
+    final unlocked = _uniqueOfficial(
+      userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
+    );
+    final subscriptions = _uniqueOfficial(
+      userOnly.where((emote) => !_isUnlockedOfficialEmote(emote)),
+    );
+    final subscriptionGroups = _groupOfficialByOwner(subscriptions);
+
+    return _OuterTab(
+      label: 'Twitch',
+      pages: [
+        _InnerPage(
+          label: 'Channel',
+          entries: channel.map(_EmoteEntry.official).toList(growable: false),
+        ),
+        _InnerPage(
+          label: 'Global',
+          entries: global.map(_EmoteEntry.official).toList(growable: false),
+        ),
+        for (final group in subscriptionGroups.entries)
+          _InnerPage(
+            label: group.key,
+            entries: group.value.map(_EmoteEntry.official).toList(growable: false),
+          ),
+        _InnerPage(
+          label: 'Unlocked',
+          entries: unlocked.map(_EmoteEntry.official).toList(growable: false),
+        ),
+      ],
+    );
+  }
+
   _OuterTab _thirdPartyTab(
     String label,
     TwitchThirdPartyEmoteProvider provider,
   ) {
-    final entries = widget.cache
-        .emotesForProvider(provider)
+    final source = widget.cache.emotesForProvider(provider);
+    final channel = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.channel)
+        .map(_EmoteEntry.thirdParty)
+        .toList(growable: false);
+    final shared = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.shared)
+        .map(_EmoteEntry.thirdParty)
+        .toList(growable: false);
+    final global = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.global)
+        .map(_EmoteEntry.thirdParty)
+        .toList(growable: false);
+    final other = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.other)
         .map(_EmoteEntry.thirdParty)
         .toList(growable: false);
 
-    // The current third-party cache does not yet store channel/global source.
-    // Keep the UI model identical to Frosty by using nested pages; once scope is
-    // available from the API/cache layer, this can split into Channel and Global
-    // without changing the sheet structure again.
     return _OuterTab(
       label: label,
       pages: [
-        _InnerPage(label: 'All', entries: entries),
+        _InnerPage(
+          label: 'Channel',
+          entries: <_EmoteEntry>[...channel, ...shared, ...other],
+        ),
+        _InnerPage(label: 'Global', entries: global),
       ],
     );
+  }
+
+  Map<String, List<TwitchOfficialEmote>> _groupOfficialByOwner(
+    List<TwitchOfficialEmote> emotes,
+  ) {
+    final grouped = <String, List<TwitchOfficialEmote>>{};
+    for (final emote in emotes) {
+      final ownerLabel = _ownerLabel(emote);
+      grouped.putIfAbsent(ownerLabel, () => <TwitchOfficialEmote>[]).add(emote);
+    }
+
+    final keys = grouped.keys.toList(growable: false)
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return <String, List<TwitchOfficialEmote>>{
+      for (final key in keys)
+        key: _uniqueOfficial(grouped[key] ?? const <TwitchOfficialEmote>[]),
+    };
+  }
+
+  String _ownerLabel(TwitchOfficialEmote emote) {
+    final display = emote.ownerDisplayName.trim();
+    if (display.isNotEmpty) return display;
+
+    final ownerId = emote.ownerId.trim();
+    if (ownerId.isNotEmpty) return 'Sub $ownerId';
+
+    final setId = emote.emoteSetId.trim();
+    if (setId.isNotEmpty) return 'Sub $setId';
+
+    return 'Sub';
+  }
+
+  bool _isUnlockedOfficialEmote(TwitchOfficialEmote emote) {
+    final ownerId = emote.ownerId.trim();
+    final ownerDisplayName = emote.ownerDisplayName.trim();
+    final ownerIsMissing = ownerId.isEmpty && ownerDisplayName.isEmpty;
+
+    final type = emote.emoteType.toLowerCase();
+    return ownerIsMissing ||
+        type.contains('unlock') ||
+        type.contains('unlocked') ||
+        type.contains('hypetrain') ||
+        type.contains('prime') ||
+        type.contains('limitedtime');
+  }
+
+  List<TwitchOfficialEmote> _uniqueOfficial(Iterable<TwitchOfficialEmote> source) {
+    final byKey = <String, TwitchOfficialEmote>{};
+    for (final emote in source) {
+      byKey[_officialKey(emote)] = emote;
+    }
+    final output = byKey.values.toList(growable: false)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return output;
+  }
+
+  String _officialKey(TwitchOfficialEmote emote) {
+    final id = emote.id.trim();
+    return id.isNotEmpty ? 'id:$id' : 'name:${emote.name.trim().toLowerCase()}';
   }
 
   void _selectEntry(_EmoteEntry entry) {
@@ -179,26 +317,6 @@ class _TwitchFrostyEmotePickerSheetState
       setState(() {});
     }
   }
-
-  List<_EmoteEntry> _officialEntries() {
-    final official = _official;
-    if (official == null) return const <_EmoteEntry>[];
-    final byKey = <String, TwitchOfficialEmote>{};
-    for (final emote in official.usableEmotes) {
-      byKey[_officialKey(emote)] = emote;
-    }
-    for (final emote in official.lockedChannelEmotes) {
-      byKey.putIfAbsent(_officialKey(emote), () => emote);
-    }
-    final output = byKey.values.toList(growable: false)
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return output.map(_EmoteEntry.official).toList(growable: false);
-  }
-
-  String _officialKey(TwitchOfficialEmote emote) {
-    final id = emote.id.trim();
-    return id.isNotEmpty ? 'id:$id' : 'name:${emote.name.trim().toLowerCase()}';
-  }
 }
 
 class _MainTabBar extends StatelessWidget {
@@ -213,8 +331,10 @@ class _MainTabBar extends StatelessWidget {
       labelColor: const Color(0xFFD9C5FF),
       unselectedLabelColor: Colors.white60,
       indicatorColor: const Color(0xFF9146FF),
-      labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+      indicatorSize: TabBarIndicatorSize.label,
+      labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+      labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
+      unselectedLabelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
       tabs: [
         for (final tab in tabs) Tab(text: '${tab.label} ${tab.totalCount}'),
       ],
@@ -222,7 +342,7 @@ class _MainTabBar extends StatelessWidget {
   }
 }
 
-class _ProviderPage extends StatelessWidget {
+class _ProviderPage extends StatefulWidget {
   final _OuterTab tab;
   final bool loading;
   final ValueChanged<_EmoteEntry> onSelect;
@@ -237,33 +357,35 @@ class _ProviderPage extends StatelessWidget {
   });
 
   @override
+  State<_ProviderPage> createState() => _ProviderPageState();
+}
+
+class _ProviderPageState extends State<_ProviderPage>
+    with AutomaticKeepAliveClientMixin<_ProviderPage> {
+  @override
   Widget build(BuildContext context) {
-    if (tab.pages.length == 1) {
-      final page = tab.pages.first;
-      return _EmoteSection(
-        key: PageStorageKey<String>('section-${tab.label}-${page.label}'),
-        entries: page.entries,
-        emptyText: loading ? 'Loading emotes...' : 'No emotes',
-        onSelect: onSelect,
-        onLongPress: onLongPress,
-      );
-    }
+    super.build(context);
+    final tab = widget.tab;
 
     return DefaultTabController(
       length: tab.pages.length,
       child: Column(
         children: [
-          TabBar(
-            isScrollable: true,
-            labelColor: const Color(0xFFD9C5FF),
-            unselectedLabelColor: Colors.white54,
-            indicatorColor: const Color(0xFF9146FF),
-            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
-            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            tabs: [
-              for (final page in tab.pages)
-                Tab(text: '${page.label} ${page.entries.length}'),
-            ],
+          SizedBox(
+            height: 32,
+            child: TabBar(
+              isScrollable: true,
+              labelColor: const Color(0xFFD9C5FF),
+              unselectedLabelColor: Colors.white54,
+              indicatorColor: const Color(0xFF9146FF),
+              indicatorSize: TabBarIndicatorSize.label,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+              labelStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+              tabs: [
+                for (final page in tab.pages)
+                  Tab(text: '${page.label} ${page.entries.length}'),
+              ],
+            ),
           ),
           const Divider(height: 1),
           Expanded(
@@ -273,9 +395,9 @@ class _ProviderPage extends StatelessWidget {
                   _EmoteSection(
                     key: PageStorageKey<String>('section-${tab.label}-${page.label}'),
                     entries: page.entries,
-                    emptyText: loading ? 'Loading emotes...' : 'No emotes',
-                    onSelect: onSelect,
-                    onLongPress: onLongPress,
+                    emptyText: widget.loading ? 'Loading emotes...' : 'No emotes',
+                    onSelect: widget.onSelect,
+                    onLongPress: widget.onLongPress,
                   ),
               ],
             ),
@@ -284,6 +406,9 @@ class _ProviderPage extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }
 
 class _EmoteSection extends StatefulWidget {
@@ -323,11 +448,11 @@ class _EmoteSectionState extends State<_EmoteSection>
       context: context,
       removeTop: true,
       child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(6, 4, 6, 10),
+        padding: const EdgeInsets.fromLTRB(6, 3, 6, 10),
         addAutomaticKeepAlives: false,
         addRepaintBoundaries: true,
         addSemanticIndexes: false,
-        cacheExtent: 120,
+        cacheExtent: 90,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
           mainAxisSpacing: 0,
@@ -373,6 +498,13 @@ class _EmoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = entry.imageUrl.trim();
     final locked = entry.locked;
+    final width = entry.width == null || entry.width! <= 0
+        ? null
+        : entry.width!.toDouble().clamp(12.0, 96.0);
+    final height = entry.height == null || entry.height! <= 0
+        ? _emoteSize
+        : entry.height!.toDouble().clamp(12.0, 96.0);
+
     return InkWell(
       onTap: locked ? null : onTap,
       onLongPress: onLongPress,
@@ -391,17 +523,16 @@ class _EmoteTile extends StatelessWidget {
                     CachedNetworkImage(
                       imageUrl: imageUrl,
                       cacheKey: entry.stableKey,
-                      height: _emoteSize,
-                      width: _emoteSize,
+                      height: height,
+                      width: width,
                       fit: BoxFit.contain,
-                      memCacheWidth: _memCacheSize,
-                      memCacheHeight: _memCacheSize,
-                      maxWidthDiskCache: _diskCacheSize,
-                      maxHeightDiskCache: _diskCacheSize,
                       filterQuality: FilterQuality.low,
-                      fadeInDuration: Duration.zero,
-                      fadeOutDuration: Duration.zero,
-                      useOldImageOnUrlChange: true,
+                      fadeInDuration: const Duration(milliseconds: 500),
+                      fadeOutDuration: const Duration(milliseconds: 500),
+                      fadeInCurve: Curves.easeOut,
+                      fadeOutCurve: Curves.easeIn,
+                      useOldImageOnUrlChange: false,
+                      cacheManager: _sheetEmoteCacheManager,
                       color: locked ? Colors.white.withOpacity(0.42) : null,
                       colorBlendMode: locked ? BlendMode.modulate : null,
                       placeholder: (_, __) => const SizedBox.shrink(),
@@ -444,6 +575,8 @@ class _EmoteEntry {
   final String imageUrl;
   final String providerLabel;
   final bool locked;
+  final int? width;
+  final int? height;
   final TwitchThirdPartyEmote? thirdParty;
   final TwitchOfficialEmote? official;
 
@@ -453,6 +586,8 @@ class _EmoteEntry {
     required this.imageUrl,
     required this.providerLabel,
     required this.locked,
+    this.width,
+    this.height,
     this.thirdParty,
     this.official,
   });
@@ -464,6 +599,8 @@ class _EmoteEntry {
       imageUrl: emote.imageUrl,
       providerLabel: emote.providerLabel,
       locked: false,
+      width: emote.width,
+      height: emote.height,
       thirdParty: emote,
     );
   }
