@@ -71,12 +71,7 @@ class _TwitchWatchEmbeddedEmotePanelState
           ),
         ],
       ),
-      _EmbeddedEmoteProviderTab(
-        label: 'Twitch',
-        pages: [
-          _EmbeddedEmotePage(label: 'All', entries: _officialEntries()),
-        ],
-      ),
+      _officialProviderTab(),
       _thirdPartyProviderTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
       _thirdPartyProviderTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
       _thirdPartyProviderTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
@@ -143,6 +138,46 @@ class _TwitchWatchEmbeddedEmotePanelState
     );
   }
 
+  _EmbeddedEmoteProviderTab _officialProviderTab() {
+    final channelUsable = _uniqueOfficial(
+      widget.officialCache.channelEmotes.where((emote) => emote.unlocked),
+    );
+    final user = _uniqueOfficial(widget.officialCache.userEmotes);
+    final global = _uniqueOfficial(widget.officialCache.globalEmotes);
+    final locked = _uniqueOfficial(widget.officialCache.lockedChannelEmotes);
+
+    final pages = <_EmbeddedEmotePage>[
+      if (channelUsable.isNotEmpty)
+        _EmbeddedEmotePage(
+          label: 'Channel',
+          entries: channelUsable
+              .map(_EmbeddedEmoteEntry.official)
+              .toList(growable: false),
+        ),
+      if (user.isNotEmpty)
+        _EmbeddedEmotePage(
+          label: 'Unlocked',
+          entries: user.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+        ),
+      if (global.isNotEmpty)
+        _EmbeddedEmotePage(
+          label: 'Global',
+          entries: global.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+        ),
+      if (locked.isNotEmpty)
+        _EmbeddedEmotePage(
+          label: 'Locked',
+          entries: locked.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+        ),
+    ];
+
+    if (pages.isEmpty) {
+      pages.add(const _EmbeddedEmotePage(label: 'All', entries: <_EmbeddedEmoteEntry>[]));
+    }
+
+    return _EmbeddedEmoteProviderTab(label: 'Twitch', pages: pages);
+  }
+
   _EmbeddedEmoteProviderTab _thirdPartyProviderTab(
     String label,
     TwitchThirdPartyEmoteProvider provider,
@@ -160,19 +195,14 @@ class _TwitchWatchEmbeddedEmotePanelState
     );
   }
 
-  List<_EmbeddedEmoteEntry> _officialEntries() {
+  List<TwitchOfficialEmote> _uniqueOfficial(Iterable<TwitchOfficialEmote> source) {
     final byKey = <String, TwitchOfficialEmote>{};
-
-    for (final emote in widget.officialCache.usableEmotes) {
+    for (final emote in source) {
       byKey[_officialKey(emote)] = emote;
     }
-    for (final emote in widget.officialCache.lockedChannelEmotes) {
-      byKey.putIfAbsent(_officialKey(emote), () => emote);
-    }
-
     final output = byKey.values.toList(growable: false)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return output.map(_EmbeddedEmoteEntry.official).toList(growable: false);
+    return output;
   }
 
   String _officialKey(TwitchOfficialEmote emote) {
