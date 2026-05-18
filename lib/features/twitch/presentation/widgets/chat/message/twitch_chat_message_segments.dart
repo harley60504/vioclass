@@ -1,7 +1,13 @@
-// PATCH VERSION: twitch_chat_message_segments_stage156
+// PATCH VERSION: twitch_chat_message_segments_stage219r_lightweight_emote_images
 //
 // Text / link / Twitch emote / third-party emote / cheermote segment renderers
 // for runtime chat messages.
+//
+// Stage 219R:
+// - Removes Tooltip wrappers around inline emotes. Tooltips are useful on
+//   desktop hover, but they add many overlay/semantics targets to a busy chat.
+// - Disables resize-cache for inline emotes so chat uses a lighter image path
+//   closer to the emote picker's Frosty-like rendering.
 
 import 'package:flutter/material.dart';
 
@@ -146,26 +152,19 @@ class _TextOrThirdPartyEmote extends StatelessWidget {
     final width = (height * item.aspectRatio)
         .clamp(height * 0.5, height * 4.0)
         .toDouble();
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final cacheWidth = (width * devicePixelRatio).round().clamp(32, 160).toInt();
-    final cacheHeight = (height * devicePixelRatio).round().clamp(32, 96).toInt();
 
-    return Tooltip(
-      message: '${item.name} · ${item.providerLabel}',
-      child: TwitchCachedImageLayer(
-        imageUrl: item.imageUrl,
-        width: width,
-        height: height,
-        cacheWidth: cacheWidth,
-        cacheHeight: cacheHeight,
-        fit: BoxFit.contain,
-        fallbackColor: Colors.transparent,
-        errorWidget: Text(
-          item.name,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: metrics.messageFontSize,
-          ),
+    return TwitchCachedImageLayer(
+      imageUrl: item.imageUrl,
+      width: width,
+      height: height,
+      useResizeCache: false,
+      fit: BoxFit.contain,
+      fallbackColor: Colors.transparent,
+      errorWidget: Text(
+        item.name,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: metrics.messageFontSize,
         ),
       ),
     );
@@ -215,32 +214,19 @@ class _EmoteSegment extends StatelessWidget {
 
     final height = metrics.emoteSize;
     final width = height;
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final cacheSize = (height * devicePixelRatio)
-        .round()
-        .clamp(32, 96)
-        .toInt();
 
-    return Tooltip(
-      message: segment.content.isEmpty
-          ? (segment.emoteId == null
-              ? 'Twitch emote'
-              : 'Twitch emote ${segment.emoteId}')
-          : segment.content,
-      child: TwitchCachedImageLayer(
-        imageUrl: imageUrl,
-        width: width,
-        height: height,
-        cacheWidth: cacheSize,
-        cacheHeight: cacheSize,
-        fit: BoxFit.contain,
-        fallbackColor: Colors.transparent,
-        errorWidget: Text(
-          segment.content.isEmpty ? '[emote]' : segment.content,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: metrics.messageFontSize,
-          ),
+    return TwitchCachedImageLayer(
+      imageUrl: imageUrl,
+      width: width,
+      height: height,
+      useResizeCache: false,
+      fit: BoxFit.contain,
+      fallbackColor: Colors.transparent,
+      errorWidget: Text(
+        segment.content.isEmpty ? '[emote]' : segment.content,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: metrics.messageFontSize,
         ),
       ),
     );
