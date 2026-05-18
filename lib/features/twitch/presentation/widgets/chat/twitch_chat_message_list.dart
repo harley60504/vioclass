@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage219z_frosty_buffered_render_model
+// PATCH VERSION: chat_message_list_stage219ab_frosty_buffered_render_with_stable_keys
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 219Z:
@@ -9,6 +9,11 @@
 // - When the user scrolls away from latest, the full retained history is restored.
 // - Normal auto-follow uses jumpTo(0); only manual resume uses a short cheap
 //   animation when close enough.
+//
+// Stage 219AB:
+// - Adds stable ValueKey for each message tile. This lets Flutter preserve the
+//   mounted tile/content state and its cached InlineSpan list across buffered
+//   list updates when the same message remains visible.
 
 import 'dart:async';
 
@@ -201,6 +206,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     _messageFingerprintCache[message] = fingerprint;
     return fingerprint;
+  }
+
+  String _messageStableKey(TwitchChatRuntimeMessage message) {
+    return _messageFingerprint(message);
   }
 
   int _estimateAddedMessageCount({
@@ -418,6 +427,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                 final message = visibleMessages[chronologicalIndex];
 
                 return TwitchRuntimeMessageTile(
+                  key: ValueKey<String>(_messageStableKey(message)),
                   message: message,
                   thirdPartyEmotes: widget.thirdPartyEmoteCache,
                   showTimestamp: widget.showTimestamp,
