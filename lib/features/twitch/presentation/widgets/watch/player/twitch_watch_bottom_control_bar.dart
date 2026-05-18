@@ -33,19 +33,6 @@ class _WatchBottomControlBar extends StatelessWidget {
     required this.onToggleFullscreen,
   });
 
-  bool _useLowCostMobileControls(BuildContext context) {
-    switch (Theme.of(context).platform) {
-      case TargetPlatform.android:
-      case TargetPlatform.iOS:
-        return true;
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.macOS:
-      case TargetPlatform.windows:
-        return false;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
@@ -56,10 +43,12 @@ class _WatchBottomControlBar extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final mobileLowCost = _useLowCostMobileControls(context);
             final veryNarrow = constraints.maxWidth < 430;
-            final useCompactLayout = constraints.maxWidth < 700 || mobileLowCost;
-            final collapseLivePlayback = veryNarrow || mobileLowCost;
+            // Layout should be decided by available width, not platform.
+            // Tablets can keep the same desktop-like control layout while the
+            // control surfaces still stay low-cost by using no blur/shadow.
+            final useCompactLayout = constraints.maxWidth < 700;
+            final collapseLivePlayback = veryNarrow;
             final barHeight = useCompactLayout ? 58.0 : 72.0;
             final horizontalPadding = veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0;
 
