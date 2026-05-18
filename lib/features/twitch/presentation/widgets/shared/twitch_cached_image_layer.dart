@@ -1,21 +1,20 @@
-// PATCH VERSION: twitch_cached_image_layer_stage219r_optional_resize_cache
+// PATCH VERSION: twitch_cached_image_layer_cached_network_image_stage111
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 /// Shared image layer for Twitch UI.
 ///
-/// High-frequency images such as stream thumbnails, avatars, badges, emotes and
-/// channel point icons can explicitly control decode size. For chat emotes, the
-/// resize-cache path can be disabled to avoid repeated resize decode work while
-/// a busy chat list and the emote picker are both active.
+/// This mirrors the direction of PiliPlus' NetworkImgLayer: high-frequency
+/// images such as stream thumbnails, avatars, badges, emotes and channel point
+/// icons should all explicitly control decode size, filter quality, fallback
+/// UI, clipping behavior and cache behavior in one place.
 class TwitchCachedImageLayer extends StatelessWidget {
   final String? imageUrl;
   final double width;
   final double height;
   final int? cacheWidth;
   final int? cacheHeight;
-  final bool useResizeCache;
   final BoxFit fit;
   final Alignment alignment;
   final FilterQuality filterQuality;
@@ -38,7 +37,6 @@ class TwitchCachedImageLayer extends StatelessWidget {
     required this.height,
     this.cacheWidth,
     this.cacheHeight,
-    this.useResizeCache = true,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.low,
@@ -61,7 +59,6 @@ class TwitchCachedImageLayer extends StatelessWidget {
     required double size,
     this.cacheWidth = 64,
     this.cacheHeight = 64,
-    this.useResizeCache = true,
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.low,
@@ -92,8 +89,8 @@ class TwitchCachedImageLayer extends StatelessWidget {
         imageUrl: url,
         width: width,
         height: height,
-        memCacheWidth: useResizeCache ? cacheWidth : null,
-        memCacheHeight: useResizeCache ? cacheHeight : null,
+        memCacheWidth: cacheWidth,
+        memCacheHeight: cacheHeight,
         fit: fit,
         alignment: alignment,
         filterQuality: filterQuality,
