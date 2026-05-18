@@ -1,37 +1,14 @@
-// PATCH VERSION: chat_message_list_stage217f_scroll_direction_import_fix
+// PATCH VERSION: chat_message_list_stage219v_hide_live_divider
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
-// Stage 190:
-// - Fixes chat list freezing after the runtime reaches maxMessages.
-// - Previous logic only compared message count. Once TwitchChatRuntime hits the
-//   capped length, every new message removes one old message, so the count stays
-//   unchanged and the UI can stop syncing.
-// - This version also tracks the newest message fingerprint so rollover updates
-//   still refresh the visible list.
-//
-// Stage 197:
-// - Chat list no longer paints its own solid #0E0E10 background, so Watch chat
-//   panel has one unified background instead of stacked dark blocks.
-// - Purple accents are reduced to softer blue-purple tones.
-//
-// Stage 200:
-// - Moves the live divider from the first live message to the last old/history
-//   message. This keeps the divider at the same visual boundary, but prevents
-//   the first live IRC message tile from owning the divider and appearing twice
-//   in some rollover / rebuild cases.
-//
-// Stage 217:
-// - Makes touch / fast scroll less likely to be pulled back to latest messages.
-// - Lowers the auto-follow threshold and adds a short user-scroll guard window.
-//
-// Stage 217F:
-// - Adds the missing rendering import for ScrollDirection used by
-//   UserScrollNotification.direction.
+// Stage 219V:
+// - Hides the old/history to live IRC divider. The divider was useful during
+//   recent-message preload debugging, but in normal watching it stays visible
+//   too often and looks like repeated noise.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 
-import '../../../models/chat/twitch_chat_message.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
@@ -308,26 +285,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     });
   }
 
-  bool _isLiveMessage(TwitchChatRuntimeMessage message) {
-    final source = message.source.source;
-    return source == TwitchChatMessageSource.liveIrc ||
-        source == TwitchChatMessageSource.localEcho;
-  }
-
-  bool _shouldShowLiveDividerAfter(
-    List<TwitchChatRuntimeMessage> messages,
-    int chronologicalIndex,
-  ) {
-    if (chronologicalIndex < 0 || chronologicalIndex >= messages.length - 1) {
-      return false;
-    }
-
-    final current = messages[chronologicalIndex];
-    final next = messages[chronologicalIndex + 1];
-
-    return !_isLiveMessage(current) && _isLiveMessage(next);
-  }
-
   void _openContextSheet(TwitchChatRuntimeMessage message) {
     final externalHandler = widget.onOpenMessageContext;
     if (externalHandler != null) {
@@ -394,25 +351,14 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
               itemBuilder: (context, index) {
                 final chronologicalIndex = visibleMessages.length - 1 - index;
                 final message = visibleMessages[chronologicalIndex];
-                final showLiveDividerAfter = _shouldShowLiveDividerAfter(
-                  visibleMessages,
-                  chronologicalIndex,
-                );
 
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TwitchRuntimeMessageTile(
-                      message: message,
-                      thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                      showTimestamp: widget.showTimestamp,
-                      fontScale: widget.fontScale,
-                      compact: widget.compact,
-                      onOpenContext: () => _openContextSheet(message),
-                    ),
-                    if (showLiveDividerAfter)
-                      _LiveMessageDivider(fontScale: widget.fontScale),
-                  ],
+                return TwitchRuntimeMessageTile(
+                  message: message,
+                  thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                  showTimestamp: widget.showTimestamp,
+                  fontScale: widget.fontScale,
+                  compact: widget.compact,
+                  onOpenContext: () => _openContextSheet(message),
                 );
               },
             ),
@@ -435,61 +381,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LiveMessageDivider extends StatelessWidget {
-  final double fontScale;
-
-  const _LiveMessageDivider({
-    required this.fontScale,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scale = fontScale < 0.85
-        ? 0.85
-        : fontScale > 1.25
-            ? 1.25
-            : fontScale;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      child: Row(
-        children: [
-          Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.07))),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF7C6AA8).withOpacity(0.14),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: const Color(0xFF8F7CC0).withOpacity(0.24)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.flash_on_rounded,
-                  color: Color(0xFFB6A4E2),
-                  size: 14,
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  '以下是即時訊息',
-                  style: TextStyle(
-                    color: const Color(0xFFC9BDEC),
-                    fontSize: 11 * scale,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(child: Container(height: 1, color: Colors.white.withOpacity(0.07))),
         ],
       ),
     );
