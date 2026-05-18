@@ -23,7 +23,18 @@ const String _defaultEmoteTestChannelId = String.fromEnvironment(
 );
 
 class TwitchEmoteOnlyTestPage extends StatefulWidget {
-  const TwitchEmoteOnlyTestPage({super.key});
+  final String initialChannelLogin;
+  final String initialChannelId;
+  final String initialDisplayName;
+  final bool autoLoad;
+
+  const TwitchEmoteOnlyTestPage({
+    super.key,
+    this.initialChannelLogin = _defaultEmoteTestChannelLogin,
+    this.initialChannelId = _defaultEmoteTestChannelId,
+    this.initialDisplayName = '',
+    this.autoLoad = true,
+  });
 
   @override
   State<TwitchEmoteOnlyTestPage> createState() => _TwitchEmoteOnlyTestPageState();
@@ -36,12 +47,8 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
   late final TwitchThirdPartyEmoteCacheService thirdPartyCache;
   late final TwitchOfficialEmoteCacheService officialCache;
 
-  final TextEditingController channelLoginController = TextEditingController(
-    text: _defaultEmoteTestChannelLogin,
-  );
-  final TextEditingController channelIdController = TextEditingController(
-    text: _defaultEmoteTestChannelId,
-  );
+  late final TextEditingController channelLoginController;
+  late final TextEditingController channelIdController;
   final TextEditingController messageController = TextEditingController();
 
   String status = '輸入 channel login / id 後按 Load。這頁不建立 watch page、player、chat list。';
@@ -53,6 +60,16 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
   @override
   void initState() {
     super.initState();
+    channelLoginController = TextEditingController(
+      text: widget.initialChannelLogin.trim().isNotEmpty
+          ? widget.initialChannelLogin.trim().toLowerCase()
+          : _defaultEmoteTestChannelLogin,
+    );
+    channelIdController = TextEditingController(
+      text: widget.initialChannelId.trim().isNotEmpty
+          ? widget.initialChannelId.trim()
+          : _defaultEmoteTestChannelId,
+    );
     apiClient = TwitchApiClient();
     authService = TwitchAuthService(apiClient: apiClient);
     authApi = TwitchAuthApiService(client: apiClient);
@@ -105,8 +122,9 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
           : '已載入登入狀態 viewerId=$viewerId。';
     });
 
-    if (_defaultEmoteTestChannelLogin.trim().isNotEmpty ||
-        _defaultEmoteTestChannelId.trim().isNotEmpty) {
+    final hasInitialChannel = channelLoginController.text.trim().isNotEmpty ||
+        channelIdController.text.trim().isNotEmpty;
+    if (widget.autoLoad && hasInitialChannel) {
       await _loadEmotes();
     }
   }
@@ -166,7 +184,8 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
 
       if (!mounted) return;
       setState(() {
-        status = '載入完成：third-party=${thirdPartyCache.count}，official=${officialCache.visibleCount}。';
+        final label = activeChannelLogin.isEmpty ? activeChannelId : activeChannelLogin;
+        status = '載入完成：$label｜third-party=${thirdPartyCache.count}，official=${officialCache.visibleCount}。';
       });
     } catch (error) {
       if (!mounted) return;
@@ -240,6 +259,11 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
   }
 
   Widget _buildHeader() {
+    final displayName = widget.initialDisplayName.trim();
+    final subtitle = displayName.isEmpty
+        ? '不建立 watch page、player、chat list'
+        : '$displayName｜不建立 watch page、player、chat list';
+
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: BoxDecoration(
@@ -255,14 +279,30 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
             children: [
               const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFBF94FF)),
               const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Emote-only Test Page',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                  ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Emote-only Test Page',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               Text(
