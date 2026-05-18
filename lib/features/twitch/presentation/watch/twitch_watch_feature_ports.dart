@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage220k_nullable_player_handles
+// PATCH VERSION: twitch_watch_feature_ports_stage220n_force_reopen_channel
 //
 // Feature-facing ports for Watch composition.
 //
@@ -54,6 +54,10 @@ class TwitchWatchPlayerPort {
     await services.playerSession.openOrResume(
       uri: uri.toString(),
       play: play,
+      // The stable local proxy URL is intentionally reused across sources.
+      // For channel switches, force media_kit to reopen the same URL so mpv
+      // drops old stream state and reads the new proxy upstream immediately.
+      forceOpen: true,
     );
   }
 
