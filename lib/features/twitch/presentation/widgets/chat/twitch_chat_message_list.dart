@@ -1,18 +1,16 @@
-// PATCH VERSION: chat_message_list_stage219w_cached_fingerprint_and_smoother_latest
+// PATCH VERSION: chat_message_list_stage219z_frosty_buffered_render_model
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
-// Stage 219V:
-// - Hides the old/history to live IRC divider. The divider was useful during
-//   recent-message preload debugging, but in normal watching it stays visible
-//   too often and looks like repeated noise.
-//
-// Stage 219W:
-// - Adds a lightweight Expando cache for message fingerprints, avoiding repeated
-//   id/login/text/date string work while estimating capped-list rollovers.
-// - Coalesces auto-follow-to-latest scroll work so hot chat updates do not queue
-//   one animation per runtime notification.
-// - Uses jumpTo(0) for normal auto-follow and only animates manual "back to
-//   latest" when the distance is small enough to be cheap.
+// Stage 219Z:
+// - Ports Frosty's non-visual chat list model while keeping StreamNook's tile UI.
+// - Hot runtime updates are buffered into a 200ms view flush cadence instead of
+//   immediately changing the visible ListView on every IRC notification.
+// - When autoscroll is enabled, only the latest 100 messages are rendered.
+// - When the user scrolls away from latest, the full retained history is restored.
+// - Normal auto-follow uses jumpTo(0); only manual resume uses a short cheap
+//   animation when close enough.
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -48,6 +46,8 @@ class TwitchChatMessageList extends StatefulWidget {
 class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const double _autoScrollThreshold = 36;
   static const double _cheapResumeAnimationDistance = 420;
+  static const int _autoFollowRenderMessageLimit = 100;
+  static const Duration _bufferFlushInterval = Duration(milliseconds: 200);
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
 
@@ -64,6 +64,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
   String _lastSourceNewestFingerprint = '';
+
+  Timer? _bufferFlushTimer;
+  List<TwitchChatRuntimeMessage>? _pendingBufferedSourceMessages;
 
   List<TwitchChatRuntimeMessage> _visibleMessages = <TwitchChatRuntimeMessage>[];
 
@@ -85,6 +88,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.runtime != widget.runtime) {
+      _bufferFlushTimer?.cancel();
+      _pendingBufferedSourceMessages = null;
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
       _scheduleFollowLatest(animated: false);
       return;
@@ -95,6 +100,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
   @override
   void dispose() {
+    _bufferFlushTimer?.cancel();
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
     super.dispose();
@@ -102,11 +108,23 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
   void _resetVisibleMessagesFromRuntime({required bool forceAutoScroll}) {
     final sourceMessages = runtime.messages;
-    _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
+    if (forceAutoScroll) _autoScroll = true;
+    _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
     _lastSourceMessageCount = sourceMessages.length;
     _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
     _hiddenNewMessageCount = 0;
-    if (forceAutoScroll) _autoScroll = true;
+  }
+
+  List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
+    List<TwitchChatRuntimeMessage> sourceMessages,
+  ) {
+    if (!_autoScroll || sourceMessages.length <= _autoFollowRenderMessageLimit) {
+      return List<TwitchChatRuntimeMessage>.of(sourceMessages);
+    }
+
+    return sourceMessages
+        .sublist(sourceMessages.length - _autoFollowRenderMessageLimit)
+        .toList(growable: false);
   }
 
   void _syncVisibleMessagesFromRuntime() {
@@ -114,10 +132,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final sourceCount = sourceMessages.length;
     final sourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
 
-    // Count alone is not enough: runtime.messages is capped. When the cap is
-    // reached, a new incoming message removes the oldest item, so the total
-    // length stays unchanged. Without this fingerprint check, the chat UI can
-    // look frozen while IRC is still receiving messages.
     final sourceChanged = sourceCount != _lastSourceMessageCount ||
         sourceNewestFingerprint != _lastSourceNewestFingerprint;
 
@@ -138,16 +152,35 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final shouldAutoFollow = !userRecentlyScrolled && (_autoScroll || _isNearLatest);
 
     if (shouldAutoFollow) {
-      _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
-      _hiddenNewMessageCount = 0;
       _autoScroll = true;
-      _scheduleFollowLatest(animated: false);
+      _hiddenNewMessageCount = 0;
+      _pendingBufferedSourceMessages = sourceMessages;
+      _scheduleBufferedViewFlush();
       return;
     }
 
     if (estimatedAddedCount > 0) {
       _hiddenNewMessageCount += estimatedAddedCount;
     }
+  }
+
+  void _scheduleBufferedViewFlush() {
+    if (_bufferFlushTimer?.isActive ?? false) return;
+
+    _bufferFlushTimer = Timer(_bufferFlushInterval, () {
+      final sourceMessages = _pendingBufferedSourceMessages ?? runtime.messages;
+      _pendingBufferedSourceMessages = null;
+      if (!mounted) return;
+      if (!_autoScroll && !_isNearLatest) return;
+
+      setState(() {
+        _autoScroll = true;
+        _hiddenNewMessageCount = 0;
+        _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
+      });
+
+      _scheduleFollowLatest(animated: false);
+    });
   }
 
   String _newestMessageFingerprint(List<TwitchChatRuntimeMessage> messages) {
@@ -190,10 +223,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       messagesAfterPreviousNewest += 1;
     }
 
-    // The previous newest message is already outside the capped runtime list.
-    // This usually means a very active chat. Do not show a misleading huge
-    // number; just show that there are new messages and resume correctly when
-    // tapped.
     return 1;
   }
 
@@ -231,7 +260,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       if (userRecentlyScrolled) return;
       setState(() {
         _autoScroll = true;
-        _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
+        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
         _lastSourceMessageCount = runtime.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
@@ -241,8 +270,11 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     }
 
     if (!nearLatest && _autoScroll) {
+      _bufferFlushTimer?.cancel();
+      _pendingBufferedSourceMessages = null;
       setState(() {
         _autoScroll = false;
+        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       });
     }
   }
@@ -302,11 +334,14 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   }
 
   void _resumeLatest() {
+    _bufferFlushTimer?.cancel();
+    _pendingBufferedSourceMessages = null;
+
     setState(() {
       _autoScroll = true;
       _userScrollActive = false;
       _lastUserScrollAt = null;
-      _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
+      _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       _lastSourceMessageCount = runtime.messages.length;
       _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
       _hiddenNewMessageCount = 0;
