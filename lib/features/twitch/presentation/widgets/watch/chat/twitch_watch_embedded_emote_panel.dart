@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../../../models/emotes/twitch_official_emote.dart';
 import '../../../../models/emotes/twitch_third_party_emote.dart';
@@ -7,8 +8,14 @@ import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 
 const double _embeddedEmoteSize = 30.0;
-const int _embeddedMemCacheSize = 72;
-const int _embeddedDiskCacheSize = 96;
+
+final CacheManager _embeddedEmoteCacheManager = CacheManager(
+  Config(
+    'twitchEmbeddedEmoteImageCache',
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 10000,
+  ),
+);
 
 class TwitchWatchEmbeddedEmotePanel extends StatefulWidget {
   final TwitchThirdPartyEmoteCacheService thirdPartyCache;
@@ -125,7 +132,7 @@ class _TwitchWatchEmbeddedEmotePanelState
                       tab: tab,
                       loading: widget.loading,
                       onSelect: _insertEntry,
-                      onLongPress: _toggleFavorite,
+                      onLongPress: _showEntryDetails,
                     ),
                 ],
               ),
@@ -203,19 +210,13 @@ class _TwitchWatchEmbeddedEmotePanelState
     );
   }
 
-  void _toggleFavorite(_EmbeddedEmoteEntry entry) {
-    final thirdParty = entry.thirdParty;
-    if (thirdParty != null) {
-      widget.thirdPartyCache.toggleFavorite(thirdParty);
-      setState(() {});
-      return;
-    }
-
-    final official = entry.official;
-    if (official != null) {
-      widget.officialCache.toggleFavorite(official);
-      setState(() {});
-    }
+  void _showEntryDetails(_EmbeddedEmoteEntry entry) {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text('${entry.name} · ${entry.providerLabel}'),
+        duration: const Duration(milliseconds: 850),
+      ),
+    );
   }
 }
 
@@ -418,6 +419,12 @@ class _EmbeddedEmoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = entry.imageUrl.trim();
     final locked = entry.locked;
+    final width = entry.width == null || entry.width! <= 0
+        ? null
+        : entry.width!.toDouble().clamp(12.0, 96.0);
+    final height = entry.height == null || entry.height! <= 0
+        ? _embeddedEmoteSize
+        : entry.height!.toDouble().clamp(12.0, 96.0);
 
     return InkWell(
       onTap: locked ? null : onTap,
@@ -431,43 +438,27 @@ class _EmbeddedEmoteTile extends StatelessWidget {
                   color: Colors.white38,
                   size: 20,
                 )
-              : Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      cacheKey: entry.stableKey,
-                      height: _embeddedEmoteSize,
-                      width: _embeddedEmoteSize,
-                      fit: BoxFit.contain,
-                      memCacheWidth: _embeddedMemCacheSize,
-                      memCacheHeight: _embeddedMemCacheSize,
-                      maxWidthDiskCache: _embeddedDiskCacheSize,
-                      maxHeightDiskCache: _embeddedDiskCacheSize,
-                      filterQuality: FilterQuality.low,
-                      fadeInDuration: Duration.zero,
-                      fadeOutDuration: Duration.zero,
-                      useOldImageOnUrlChange: true,
-                      color: locked ? Colors.white.withOpacity(0.42) : null,
-                      colorBlendMode: locked ? BlendMode.modulate : null,
-                      placeholder: (_, __) => const SizedBox.shrink(),
-                      errorWidget: (_, __, ___) => const Icon(
-                        Icons.broken_image_rounded,
-                        color: Colors.white38,
-                        size: 20,
-                      ),
-                    ),
-                    if (locked)
-                      const Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Icon(
-                          Icons.lock_rounded,
-                          color: Color(0xFFFFD166),
-                          size: 13,
-                        ),
-                      ),
-                  ],
+              : CachedNetworkImage(
+                  imageUrl: imageUrl,
+                  cacheKey: entry.stableKey,
+                  height: height,
+                  width: width,
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.low,
+                  fadeInDuration: const Duration(milliseconds: 500),
+                  fadeOutDuration: const Duration(milliseconds: 500),
+                  fadeInCurve: Curves.easeOut,
+                  fadeOutCurve: Curves.easeIn,
+                  useOldImageOnUrlChange: false,
+                  cacheManager: _embeddedEmoteCacheManager,
+                  color: locked ? Colors.white.withOpacity(0.42) : null,
+                  colorBlendMode: locked ? BlendMode.modulate : null,
+                  placeholder: (_, __) => const SizedBox.shrink(),
+                  errorWidget: (_, __, ___) => const Icon(
+                    Icons.broken_image_rounded,
+                    color: Colors.white38,
+                    size: 20,
+                  ),
                 ),
         ),
       ),
@@ -503,6 +494,8 @@ class _EmbeddedEmoteEntry {
   final String imageUrl;
   final String providerLabel;
   final bool locked;
+  final int? width;
+  final int? height;
   final TwitchThirdPartyEmote? thirdParty;
   final TwitchOfficialEmote? official;
 
@@ -512,6 +505,8 @@ class _EmbeddedEmoteEntry {
     required this.imageUrl,
     required this.providerLabel,
     required this.locked,
+    this.width,
+    this.height,
     this.thirdParty,
     this.official,
   });
@@ -523,6 +518,8 @@ class _EmbeddedEmoteEntry {
       imageUrl: emote.imageUrl,
       providerLabel: emote.providerLabel,
       locked: false,
+      width: emote.width,
+      height: emote.height,
       thirdParty: emote,
     );
   }
