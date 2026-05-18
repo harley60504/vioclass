@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_segments_stage219aa_frosty_inline_spans
+// PATCH VERSION: twitch_chat_message_segments_stage219ac_repaint_isolated_emotes
 //
 // Text / link / Twitch emote / third-party emote / cheermote segment renderers
 // for runtime chat messages.
@@ -10,6 +10,11 @@
 //   Wrap/Widget segment nodes.
 // - Chat inline emotes intentionally avoid Tooltip, fade animation and explicit
 //   memCacheWidth/memCacheHeight to reduce jank on 7TV animated emote spam.
+//
+// Stage 219AC:
+// - Wraps inline emote images with RepaintBoundary. This isolates animated WebP
+//   repaint work from the surrounding Text.rich paragraph as much as Flutter's
+//   WidgetSpan render path allows.
 
 import 'package:flutter/material.dart';
 
@@ -111,15 +116,17 @@ void _appendThirdPartyEmoteSpan({
     if (previous is WidgetSpan) {
       spans[spans.length - 1] = WidgetSpan(
         alignment: PlaceholderAlignment.middle,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.center,
-          children: [
-            previous.child,
-            Positioned.fill(
-              child: IgnorePointer(child: image),
-            ),
-          ],
+        child: RepaintBoundary(
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              previous.child,
+              Positioned.fill(
+                child: IgnorePointer(child: image),
+              ),
+            ],
+          ),
         ),
       );
       return;
@@ -131,7 +138,7 @@ void _appendThirdPartyEmoteSpan({
       alignment: PlaceholderAlignment.middle,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: image,
+        child: RepaintBoundary(child: image),
       ),
     ),
   );
@@ -157,17 +164,19 @@ WidgetSpan _twitchEmoteSpan({
     alignment: PlaceholderAlignment.middle,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      child: TwitchCachedImageLayer(
-        imageUrl: imageUrl,
-        width: size,
-        height: size,
-        fit: BoxFit.contain,
-        fallbackColor: Colors.transparent,
-        fadeInDuration: Duration.zero,
-        fadeOutDuration: Duration.zero,
-        errorWidget: Text(
-          segment.content.isEmpty ? '[emote]' : segment.content,
-          style: _normalTextStyle(metrics),
+      child: RepaintBoundary(
+        child: TwitchCachedImageLayer(
+          imageUrl: imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          fallbackColor: Colors.transparent,
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
+          errorWidget: Text(
+            segment.content.isEmpty ? '[emote]' : segment.content,
+            style: _normalTextStyle(metrics),
+          ),
         ),
       ),
     ),
@@ -333,9 +342,11 @@ class _TextOrThirdPartyEmote extends StatelessWidget {
       );
     }
 
-    return _ThirdPartyInlineEmoteImage(
-      emote: item,
-      metrics: metrics,
+    return RepaintBoundary(
+      child: _ThirdPartyInlineEmoteImage(
+        emote: item,
+        metrics: metrics,
+      ),
     );
   }
 }
