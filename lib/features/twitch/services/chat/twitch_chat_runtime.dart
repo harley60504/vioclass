@@ -9,6 +9,7 @@ import '../../models/chat/twitch_chat_message.dart';
 import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../parsers/chat/twitch_chat_message_normalizer.dart';
 import './twitch_badge_cache_service.dart';
+import './twitch_chat_runtime_notify_batcher.dart';
 
 class TwitchChatRuntime extends ChangeNotifier {
   /// Main IRC connection.
@@ -32,15 +33,17 @@ class TwitchChatRuntime extends ChangeNotifier {
     this.recentMessagesApi,
     this.writeIrcApi,
     this.maxMessages = 350,
-    this.notifyDebounce = const Duration(milliseconds: 50),
-  });
+    this.notifyDebounce = const Duration(milliseconds: 200),
+  }) : _notifyBatcher = TwitchChatRuntimeNotifyBatcher(
+          interval: notifyDebounce,
+        );
 
   /// 手機上聊天室最怕無限制累積 + 每則訊息都重建。
   ///
   /// 預設 350 則足夠保留上下文，也能避免熱門台長時間觀看後記憶體與 layout 成本暴增。
   final int maxMessages;
 
-  /// 熱門聊天室一秒可能多則訊息；用 debounce 合併 notify，避免每則訊息都重建 UI。
+  /// 熱門聊天室一秒可能多則訊息；用 runtime 層 batch 合併 notify，避免每則訊息都重建 UI。
   final Duration notifyDebounce;
   static const Duration initialUserStateWait = Duration(milliseconds: 1500);
   static const Duration sendUserStateWait = Duration(milliseconds: 900);
@@ -56,11 +59,11 @@ class TwitchChatRuntime extends ChangeNotifier {
   final Set<String> _seenMessageIds = <String>{};
   final Set<String> _deletedMessageIds = <String>{};
   final Map<String, String> _ownUserStateTags = <String, String>{};
+  final TwitchChatRuntimeNotifyBatcher _notifyBatcher;
 
   StreamSubscription<TwitchChatMessage>? _messageSubscription;
   StreamSubscription<TwitchChatMessage>? _writeMessageSubscription;
   StreamSubscription<String>? _rawSubscription;
-  Timer? _notifyDebounceTimer;
 
   String _channelLogin = '';
   String _viewerLogin = '';
@@ -141,6 +144,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     _serverEchoReplaceCount = 0;
     _rejectedOutgoingCount = 0;
 
+    _notifyBatcher.cancel();
     _messages.clear();
     _pendingOutgoingMessages.clear();
     _seenMessageIds.clear();
@@ -652,17 +656,8 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   void _requestUiNotify() {
-    if (notifyDebounce <= Duration.zero) {
-      notifyListeners();
-      return;
-    }
-
-    if (_notifyDebounceTimer?.isActive ?? false) return;
-
-    _notifyDebounceTimer = Timer(notifyDebounce, () {
-      if (hasListeners) {
-        notifyListeners();
-      }
+    _notifyBatcher.request(() {
+      if (hasListeners) notifyListeners();
     });
   }
 
@@ -859,6 +854,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _notifyBatcher.cancel();
     await _messageSubscription?.cancel();
     await _writeMessageSubscription?.cancel();
     await _rawSubscription?.cancel();
@@ -890,7 +886,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   Future<void> disposeRuntime() async {
-    _notifyDebounceTimer?.cancel();
+    _notifyBatcher.dispose();
     await disconnect();
     await ircApi.dispose();
     await writeIrcApi?.dispose();
@@ -920,6 +916,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       'writeCurrentUserStateTags': writeIrcApi?.currentUserStateTags,
       'messageCount': messages.length,
       'maxMessages': maxMessages,
+      'notifyDebounceMs': notifyDebounce.inMilliseconds,
       'messages': messages.map((message) => message.toJson()).toList(),
       'badgeCache': badgeCache.toJson(),
     };

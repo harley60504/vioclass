@@ -12,6 +12,7 @@ class TwitchOfficialEmote {
   final String tier;
   final String emoteSetId;
   final String ownerId;
+  final String ownerDisplayName;
   final TwitchOfficialEmoteSource source;
   final bool unlocked;
 
@@ -23,6 +24,7 @@ class TwitchOfficialEmote {
     required this.tier,
     required this.emoteSetId,
     required this.ownerId,
+    this.ownerDisplayName = '',
     required this.source,
     required this.unlocked,
   });
@@ -57,8 +59,38 @@ class TwitchOfficialEmote {
       tier: json['tier']?.toString() ?? '',
       emoteSetId: json['emote_set_id']?.toString() ?? '',
       ownerId: json['owner_id']?.toString() ?? '',
+      ownerDisplayName: json['owner_name']?.toString() ??
+          json['owner_display_name']?.toString() ??
+          json['owner_login']?.toString() ??
+          '',
       source: source,
       unlocked: unlocked,
+    );
+  }
+
+  TwitchOfficialEmote copyWith({
+    String? id,
+    String? name,
+    String? imageUrl,
+    String? emoteType,
+    String? tier,
+    String? emoteSetId,
+    String? ownerId,
+    String? ownerDisplayName,
+    TwitchOfficialEmoteSource? source,
+    bool? unlocked,
+  }) {
+    return TwitchOfficialEmote(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      imageUrl: imageUrl ?? this.imageUrl,
+      emoteType: emoteType ?? this.emoteType,
+      tier: tier ?? this.tier,
+      emoteSetId: emoteSetId ?? this.emoteSetId,
+      ownerId: ownerId ?? this.ownerId,
+      ownerDisplayName: ownerDisplayName ?? this.ownerDisplayName,
+      source: source ?? this.source,
+      unlocked: unlocked ?? this.unlocked,
     );
   }
 
@@ -80,7 +112,9 @@ class TwitchOfficialEmote {
       case TwitchOfficialEmoteSource.channel:
         return 'Channel';
       case TwitchOfficialEmoteSource.user:
-        return 'Unlocked';
+        return ownerDisplayName.trim().isNotEmpty
+            ? ownerDisplayName.trim()
+            : 'Unlocked';
     }
   }
 
@@ -93,6 +127,7 @@ class TwitchOfficialEmote {
       'tier': tier,
       'emoteSetId': emoteSetId,
       'ownerId': ownerId,
+      'ownerDisplayName': ownerDisplayName,
       'source': source.name,
       'unlocked': unlocked,
     };

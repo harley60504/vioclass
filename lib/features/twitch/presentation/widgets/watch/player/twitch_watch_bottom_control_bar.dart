@@ -44,6 +44,9 @@ class _WatchBottomControlBar extends StatelessWidget {
         return LayoutBuilder(
           builder: (context, constraints) {
             final veryNarrow = constraints.maxWidth < 430;
+            // Layout should be decided by available width, not platform.
+            // Tablets can keep the same desktop-like control layout while the
+            // control surfaces still stay low-cost by using no blur/shadow.
             final useCompactLayout = constraints.maxWidth < 700;
             final collapseLivePlayback = veryNarrow;
             final barHeight = useCompactLayout ? 58.0 : 72.0;
@@ -202,10 +205,10 @@ class _WatchBottomControlBar extends StatelessWidget {
 
             return TwitchGlassSurface(
               borderRadius: BorderRadius.circular(24),
-              backgroundColor: Colors.black.withOpacity(0.42),
+              backgroundColor: Colors.black.withOpacity(0.56),
               borderColor: Colors.white.withOpacity(0.12),
-              blurSigma: 20,
-              boxShadow: TwitchGlassPanelShadow.soft(opacity: 0.36),
+              blurSigma: 0,
+              boxShadow: const <BoxShadow>[],
               child: SizedBox(
                 height: barHeight,
                 child: barContent,
@@ -246,10 +249,10 @@ class _LivePlaybackSheetButton extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: TwitchGlassSurface(
               borderRadius: BorderRadius.circular(22),
-              backgroundColor: Colors.black.withOpacity(0.50),
+              backgroundColor: Colors.black.withOpacity(0.56),
               borderColor: Colors.white.withOpacity(0.13),
-              blurSigma: 22,
-              boxShadow: TwitchGlassPanelShadow.soft(opacity: 0.45),
+              blurSigma: 0,
+              boxShadow: const <BoxShadow>[],
               child: SizedBox(
                 width: sheetWidth,
                 child: Padding(

@@ -1,12 +1,11 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage208_translucent_chat_panel
-
-import 'dart:async';
+// PATCH VERSION: twitch_watch_chat_panel_stage219s_public_emote_sheet
 
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
+import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../settings/twitch_chat_appearance_controller.dart';
@@ -27,6 +26,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final String fallbackUserId;
   final String fallbackLogin;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService officialEmoteCache;
   final int emoteCount;
   final bool loadingEmotes;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
@@ -53,6 +53,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     this.fallbackUserId = '',
     this.fallbackLogin = '',
     required this.thirdPartyEmoteCache,
+    required this.officialEmoteCache,
     required this.emoteCount,
     required this.loadingEmotes,
     required this.channelPoints,
@@ -86,7 +87,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   @override
   void initState() {
     super.initState();
-    unawaited(_appearanceController.load());
+    _appearanceController.load();
   }
 
   @override

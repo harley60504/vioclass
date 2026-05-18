@@ -1,6 +1,11 @@
-// PATCH VERSION: twitch_watch_chat_message_area_stage150
+// PATCH VERSION: twitch_watch_chat_message_area_stage219ae_runtime_batched_direct_listener
 //
 // Runtime message list area for Watch chat.
+//
+// Stage 219AE:
+// - Runtime-level notify batching now lives inside TwitchChatRuntime.
+// - This widget returns to a direct AnimatedBuilder listener so there is only
+//   one batching layer and no extra 200ms UI bridge delay.
 
 import 'package:flutter/material.dart';
 

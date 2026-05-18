@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_top_action_bar_stage214_tinted_actions
+// PATCH VERSION: twitch_watch_top_action_bar_stage219f_player_stop_only
 
 part of twitch_watch_player_area;
 
@@ -30,6 +30,16 @@ class _WatchTopActionBar extends StatelessWidget {
       await player.pause();
     } catch (_) {}
     onBack();
+  }
+
+  Future<void> _stopPlaybackOnly() async {
+    try {
+      await player.stop();
+    } catch (_) {
+      try {
+        await player.pause();
+      } catch (_) {}
+    }
   }
 
   @override
@@ -83,7 +93,7 @@ class _WatchTopActionBar extends StatelessWidget {
           ),
           SizedBox(width: actionGap),
           _RoundIconButton(
-            tooltip: '停止',
+            tooltip: '停止播放',
             icon: Icons.close,
             iconColor: const Color(0xFFFF6B81),
             backgroundColor: const Color(0xFF7F1D1D).withOpacity(0.24),
@@ -92,7 +102,7 @@ class _WatchTopActionBar extends StatelessWidget {
             compact: compact,
             tiny: actionTiny,
             height: controlHeight,
-            onPressed: onStop,
+            onPressed: () => unawaited(_stopPlaybackOnly()),
           ),
         ];
 

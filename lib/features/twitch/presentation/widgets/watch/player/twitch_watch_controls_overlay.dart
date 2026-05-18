@@ -60,8 +60,13 @@ class _WatchControlsOverlay extends StatefulWidget {
 }
 
 class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
+  static const Duration _fadeDuration = Duration(milliseconds: 180);
+  static const Duration _unmountDelay = Duration(milliseconds: 220);
+
   bool _visible = true;
+  bool _controlsMounted = true;
   Timer? _hideTimer;
+  Timer? _unmountTimer;
 
   @override
   void initState() {
@@ -80,6 +85,7 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _unmountTimer?.cancel();
     super.dispose();
   }
 
@@ -89,19 +95,35 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
     _hideTimer = Timer(const Duration(seconds: 3), () {
       if (!mounted) return;
       setState(() => _visible = false);
+      _scheduleUnmountControls();
+    });
+  }
+
+  void _scheduleUnmountControls() {
+    _unmountTimer?.cancel();
+    _unmountTimer = Timer(_unmountDelay, () {
+      if (!mounted || _visible) return;
+      setState(() => _controlsMounted = false);
     });
   }
 
   void _showAndHold() {
     _hideTimer?.cancel();
-    if (!_visible && mounted) {
-      setState(() => _visible = true);
+    _unmountTimer?.cancel();
+    if ((!_visible || !_controlsMounted) && mounted) {
+      setState(() {
+        _controlsMounted = true;
+        _visible = true;
+      });
     }
     _scheduleHide();
   }
 
   @override
   Widget build(BuildContext context) {
+    final shouldShowErrors = widget.error != null || widget.runtimeError != null;
+    final shouldMountControls = _controlsMounted || _visible || widget.loading || shouldShowErrors;
+
     return MouseRegion(
       onEnter: (_) => _showAndHold(),
       onHover: (_) => _showAndHold(),
@@ -113,59 +135,62 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
             Positioned.fill(
               child: _PlayerDimOverlay(visible: widget.loading),
             ),
-            IgnorePointer(
-              ignoring: !_visible,
-              child: AnimatedOpacity(
-                opacity: _visible ? 1 : 0,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      left: 12,
-                      right: 12,
-                      top: 12,
-                      child: _WatchTopActionBar(
-                        metadata: widget.metadata,
-                        isFollowing: widget.isFollowing,
-                        followBusy: widget.followBusy,
-                        player: widget.player,
-                        onBack: widget.onBack,
-                        onToggleFollow: widget.onToggleFollow,
-                        onSubscribe: widget.onSubscribe,
-                        onReload: widget.onReload,
-                        onStop: widget.onStop,
-                      ),
-                    ),
-                    Positioned(
-                      left: 12,
-                      right: 12,
-                      bottom: 10,
-                      child: SafeArea(
-                        top: false,
-                        minimum: const EdgeInsets.only(bottom: 2),
-                        child: _WatchBottomControlBar(
-                          player: widget.player,
-                          playerRuntime: widget.playerRuntime,
-                          muted: widget.muted,
-                          volume: widget.volume,
-                          fullscreen: widget.fullscreen,
-                          chatVisible: widget.chatVisible,
-                          showFullscreenButton: widget.showFullscreenButton,
-                          onToggleMute: widget.onToggleMute,
-                          onVolumeChanged: widget.onVolumeChanged,
-                          qualityVariants: widget.qualityVariants,
-                          currentVariant: widget.currentVariant,
-                          onQualityChanged: widget.onQualityChanged,
-                          onToggleChat: widget.onToggleChat,
-                          onToggleFullscreen: widget.onToggleFullscreen,
+            if (shouldMountControls)
+              IgnorePointer(
+                ignoring: !_visible,
+                child: AnimatedOpacity(
+                  opacity: _visible ? 1 : 0,
+                  duration: _fadeDuration,
+                  curve: Curves.easeOutCubic,
+                  child: RepaintBoundary(
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          top: 12,
+                          child: _WatchTopActionBar(
+                            metadata: widget.metadata,
+                            isFollowing: widget.isFollowing,
+                            followBusy: widget.followBusy,
+                            player: widget.player,
+                            onBack: widget.onBack,
+                            onToggleFollow: widget.onToggleFollow,
+                            onSubscribe: widget.onSubscribe,
+                            onReload: widget.onReload,
+                            onStop: widget.onStop,
+                          ),
                         ),
-                      ),
+                        Positioned(
+                          left: 12,
+                          right: 12,
+                          bottom: 10,
+                          child: SafeArea(
+                            top: false,
+                            minimum: const EdgeInsets.only(bottom: 2),
+                            child: _WatchBottomControlBar(
+                              player: widget.player,
+                              playerRuntime: widget.playerRuntime,
+                              muted: widget.muted,
+                              volume: widget.volume,
+                              fullscreen: widget.fullscreen,
+                              chatVisible: widget.chatVisible,
+                              showFullscreenButton: widget.showFullscreenButton,
+                              onToggleMute: widget.onToggleMute,
+                              onVolumeChanged: widget.onVolumeChanged,
+                              qualityVariants: widget.qualityVariants,
+                              currentVariant: widget.currentVariant,
+                              onQualityChanged: widget.onQualityChanged,
+                              onToggleChat: widget.onToggleChat,
+                              onToggleFullscreen: widget.onToggleFullscreen,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
             if (widget.error != null && widget.error!.trim().isNotEmpty)
               Positioned(
                 left: 16,

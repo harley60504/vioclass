@@ -22,10 +22,10 @@ class _WatchCompactAvatarTile extends StatelessWidget {
       message: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
       child: TwitchGlassSurface(
         borderRadius: BorderRadius.circular(tiny ? 14 : 16),
-        backgroundColor: Colors.black.withOpacity(0.36),
+        backgroundColor: Colors.black.withOpacity(0.42),
         borderColor: Colors.white.withOpacity(0.10),
-        blurSigma: 18,
-        boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.20),
+        blurSigma: 0,
+        boxShadow: const <BoxShadow>[],
         child: SizedBox(
           width: tileSize,
           height: tileSize,
@@ -66,10 +66,10 @@ class _WatchStreamHeaderCard extends StatelessWidget {
 
     return TwitchGlassSurface(
       borderRadius: BorderRadius.circular(compact ? 16 : 20),
-      backgroundColor: Colors.black.withOpacity(0.38),
+      backgroundColor: Colors.black.withOpacity(0.46),
       borderColor: Colors.white.withOpacity(0.11),
-      blurSigma: 18,
-      boxShadow: TwitchGlassPanelShadow.soft(opacity: compact ? 0.24 : 0.30),
+      blurSigma: 0,
+      boxShadow: const <BoxShadow>[],
       child: SizedBox(
         height: height,
         child: Padding(

@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_discovery_stream_template_stage189c_gradient_background
+// PATCH VERSION: twitch_discovery_stream_template_stage219m_emote_only_route_fix
 // Shared discovery stream grid for FollowingPage and BrowsePage.
 
 import 'dart:async';
@@ -7,8 +7,14 @@ import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../pages/twitch_emote_only_test_page.dart';
 import '../../pages/twitch_watch_route_guard.dart';
 import 'twitch_stream_card.dart';
+
+const bool _openEmoteOnlyFromDiscovery = bool.fromEnvironment(
+  'TWITCH_EMOTE_ONLY_FROM_DISCOVERY',
+  defaultValue: false,
+);
 
 class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final ScrollController controller;
@@ -96,7 +102,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                           return RepaintBoundary(
                             child: TwitchStreamCard(
                               stream: stream,
-                              onTap: () => _openWatchPage(context, stream),
+                              onTap: () => _openStreamTarget(context, stream),
                             ),
                           );
                         },
@@ -117,7 +123,21 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
     );
   }
 
-  void _openWatchPage(BuildContext context, TwitchLiveStream stream) {
+  void _openStreamTarget(BuildContext context, TwitchLiveStream stream) {
+    if (_openEmoteOnlyFromDiscovery) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => TwitchEmoteOnlyTestPage(
+            initialChannelLogin: stream.channelLogin,
+            initialChannelId: stream.userId,
+            initialDisplayName: stream.userName,
+            autoLoad: true,
+          ),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => TwitchWatchRouteGuard(

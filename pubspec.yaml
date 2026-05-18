@@ -20,15 +20,45 @@ dependencies:
   uuid: ^4.5.3
   url_launcher: ^6.3.2
   cached_network_image: ^3.4.1
+  flutter_cache_manager: ^3.4.1
 
-  media_kit: ^1.2.6
-  media_kit_video: ^2.0.1
-  media_kit_libs_video: ^1.0.7
-  media_kit_libs_android_video: ^1.3.8
+  # Stage 220F: PiliPlus-style media_kit fork test.
+  # Keep normal hosted constraints here because media_kit_video's pubspec
+  # declares hosted media_kit dependencies. Actual fork sources are forced in
+  # dependency_overrides below to avoid Pub source conflicts.
+  media_kit: 1.1.11
+  media_kit_video:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/media-kit.git
+      path: media_kit_video
+      ref: version_1.2.5
+  media_kit_libs_video:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/media-kit.git
+      path: libs/universal/media_kit_libs_video
+      ref: version_1.2.5
 
   flutter_inappwebview: ^6.1.5
   desktop_webview_window: ^0.2.3
   window_manager: ^0.5.1
+
+dependency_overrides:
+  # media_kit_video depends on hosted media_kit ^1.1.11. Override that hosted
+  # source to the same fork/ref so Player.create + PlayerConfiguration.options
+  # can be resolved consistently.
+  media_kit:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/media-kit.git
+      path: media_kit
+      ref: version_1.2.5
+
+  # media_kit_libs_video depends on hosted media_kit_libs_android_video ^1.3.6.
+  # Keep Android native libs on the same fork/ref for this test branch.
+  media_kit_libs_android_video:
+    git:
+      url: https://github.com/bggRGjQaUbCoE/media-kit.git
+      path: libs/android/media_kit_libs_android_video
+      ref: version_1.2.5
   
 dev_dependencies:
   flutter_test:
@@ -41,3 +71,4 @@ flutter:
 
   assets:
     - assets/twitch/default_channel_points.png
+    - assets/app/vio_class_icon.svg

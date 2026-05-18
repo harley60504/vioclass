@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_player_common_buttons_stage214_tinted_round_buttons
+// PATCH VERSION: twitch_player_common_buttons_stage221c_no_control_blur
 
 part of twitch_watch_player_area;
 
@@ -31,7 +31,7 @@ class _RoundIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
     final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
-    final effectiveBackgroundColor = backgroundColor ?? Colors.black.withOpacity(0.34);
+    final effectiveBackgroundColor = backgroundColor ?? Colors.black.withOpacity(0.42);
     final effectiveBorderColor = borderColor ?? Colors.white.withOpacity(0.10);
 
     return Tooltip(
@@ -46,8 +46,8 @@ class _RoundIconButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(radius),
             backgroundColor: effectiveBackgroundColor,
             borderColor: effectiveBorderColor,
-            blurSigma: 16,
-            boxShadow: TwitchGlassPanelShadow.compact(opacity: glowOpacity),
+            blurSigma: 0,
+            boxShadow: const <BoxShadow>[],
             child: SizedBox(
               width: size,
               height: size,

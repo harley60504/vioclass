@@ -34,13 +34,13 @@ class _FollowButton extends StatelessWidget {
           child: TwitchGlassSurface(
             borderRadius: BorderRadius.circular(radius),
             backgroundColor: followed
-                ? Colors.pinkAccent.withOpacity(0.20)
-                : Colors.black.withOpacity(0.34),
+                ? Colors.pinkAccent.withOpacity(0.24)
+                : Colors.black.withOpacity(0.42),
             borderColor: followed
                 ? Colors.pinkAccent.withOpacity(0.34)
                 : Colors.white.withOpacity(0.10),
-            blurSigma: 16,
-            boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.18),
+            blurSigma: 0,
+            boxShadow: const <BoxShadow>[],
             child: SizedBox(
               width: size,
               height: visualHeight,
@@ -91,10 +91,10 @@ class _SubscribeButton extends StatelessWidget {
         onTap: onPressed,
         child: TwitchGlassSurface(
           borderRadius: BorderRadius.circular(radius),
-          backgroundColor: const Color(0xFF9146FF).withOpacity(0.22),
+          backgroundColor: const Color(0xFF9146FF).withOpacity(0.28),
           borderColor: const Color(0xFFBF94FF).withOpacity(0.30),
-          blurSigma: 16,
-          boxShadow: TwitchGlassPanelShadow.compact(opacity: 0.20),
+          blurSigma: 0,
+          boxShadow: const <BoxShadow>[],
           child: SizedBox(
             height: visualHeight,
             width: compact ? visualHeight : null,
