@@ -20,6 +20,8 @@ class TwitchMediaKitPlayerHost {
   TwitchMediaKitPlayerHost._();
 
   static String? get currentMediaUri => _currentMediaUri;
+  static Player? get playerOrNull => _player;
+  static VideoController? get videoControllerOrNull => _videoController;
 
   static TwitchMediaKitPlayerSession acquire({
     String title = 'Twitch Raw Proxy',
@@ -53,16 +55,22 @@ class TwitchMediaKitPlayerHost {
       final player = await Player.create(
         configuration: PlayerConfiguration(
           title: title,
-          bufferSize: 16 * 1024 * 1024,
+          // Match the player_core Stage 220H low-latency profile used in the
+          // isolated Android test page.
+          bufferSize: 8 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
           options: const <String, String>{
             'volume': '100',
             'volume-max': '100',
-            'video-sync': 'audio',
-            'autosync': '30',
             'force-seekable': 'yes',
-            'cache': 'yes',
-            'demuxer-seekable-cache': 'yes',
+            'video-sync': 'audio',
+            'autosync': '0',
+            'cache': 'no',
+            'cache-pause': 'no',
+            'demuxer-seekable-cache': 'no',
+            'demuxer-readahead-secs': '0',
+            'demuxer-max-back-bytes': '0',
+            'demuxer-max-bytes': '1048576',
           },
         ),
       );
@@ -207,8 +215,13 @@ class TwitchMediaKitPlayerSession {
   })  : _title = title,
         _generation = generation;
 
+  Player? get playerOrNull => _player ?? TwitchMediaKitPlayerHost.playerOrNull;
+
+  VideoController? get videoControllerOrNull =>
+      _videoController ?? TwitchMediaKitPlayerHost.videoControllerOrNull;
+
   Player get player {
-    final value = _player ?? TwitchMediaKitPlayerHost._player;
+    final value = playerOrNull;
     if (value == null) {
       throw StateError('TwitchMediaKitPlayerSession is not ready. Call ensureReady() first.');
     }
@@ -216,7 +229,7 @@ class TwitchMediaKitPlayerSession {
   }
 
   VideoController get videoController {
-    final value = _videoController ?? TwitchMediaKitPlayerHost._videoController;
+    final value = videoControllerOrNull;
     if (value == null) {
       throw StateError('TwitchMediaKitPlayerSession is not ready. Call ensureReady() first.');
     }
