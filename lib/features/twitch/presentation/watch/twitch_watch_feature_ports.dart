@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage186h_relationship_port
+// PATCH VERSION: twitch_watch_feature_ports_stage220i_nullable_player_handles
 //
 // Feature-facing ports for Watch composition.
 //
@@ -28,6 +28,9 @@ class TwitchWatchPlayerPort {
   const TwitchWatchPlayerPort({required this.services});
 
   TwitchPlaylistPlayerRuntime get runtime => services.playerRuntime;
+  Player? get playerOrNull => services.playerSession.playerOrNull;
+  VideoController? get videoControllerOrNull =>
+      services.playerSession.videoControllerOrNull;
   Player get player => services.playerSession.player;
   VideoController get videoController => services.playerSession.videoController;
   List<TwitchM3u8Variant> get qualityVariants => services.playerRuntime.variants;
@@ -262,50 +265,31 @@ class TwitchWatchEngagementPort {
     );
   }
 
-  Future<TwitchChannelPointsClaimResult> claimCommunityPoints({
-    required String channelId,
-    required String claimId,
-  }) {
-    return services.channelPointsRuntimeService.claimBonus(
-      channelId: channelId,
-      claimId: claimId,
-    );
-  }
-
-  Future<TwitchWatchRewardRedeemResult> redeemReward({
-    required String channelId,
-    required Map<String, dynamic> reward,
-    required String textInput,
-  }) async {
-    final title = reward['title']?.toString() ?? 'Reward';
-    await services.channelPointsRuntimeService.redeemReward(
-      channelId: channelId,
-      reward: reward,
-      textInput: textInput,
-    );
-    return TwitchWatchRewardRedeemResult(title: title);
-  }
-
-  Future<TwitchPredictionSnapshot?> refreshPrediction({
+  Future<TwitchChannelPointRedeemResult> redeemReward({
     required String channelLogin,
+    required String rewardId,
+    String? prompt,
   }) {
-    return services.publicPredictionApi.fetchPredictionContext(
+    return services.channelPointsApi.redeemReward(
       channelLogin: channelLogin,
+      rewardId: rewardId,
+      prompt: prompt,
     );
   }
 
-  Future<TwitchWatchPredictionBetResult> placePredictionBet({
-    required TwitchPredictionSnapshot prediction,
-    required TwitchPredictionOutcome outcome,
+  Future<TwitchPredictionBetResult> placePredictionBet({
+    required String eventId,
+    required String outcomeId,
     required int points,
+    required String outcomeTitle,
   }) async {
-    await services.dropsPredictionApi.makePrediction(
-      prediction: prediction,
-      outcome: outcome,
+    await services.dropsPredictionApi.placePredictionBet(
+      eventId: eventId,
+      outcomeId: outcomeId,
       points: points,
     );
     return TwitchWatchPredictionBetResult(
-      outcomeTitle: outcome.title,
+      outcomeTitle: outcomeTitle,
       points: points,
     );
   }
@@ -316,10 +300,10 @@ class TwitchWatchRelationshipPort {
 
   const TwitchWatchRelationshipPort({required this.services});
 
-  Future<TwitchPrivateGqlRelationshipSnapshot> fetchRelationship({
+  Future<TwitchRelationshipSnapshot> fetchRelationship({
     required String channelLogin,
-    String? targetUserId,
-    String? viewerUserId,
+    required String? targetUserId,
+    required String? viewerUserId,
   }) {
     return services.relationshipApi.fetchRelationship(
       channelLogin: channelLogin,
@@ -328,10 +312,10 @@ class TwitchWatchRelationshipPort {
     );
   }
 
-  Future<TwitchPrivateGqlRelationshipSnapshot> followChannel({
+  Future<TwitchRelationshipSnapshot> followChannel({
     required String channelLogin,
-    String? targetUserId,
-    String? viewerUserId,
+    required String? targetUserId,
+    required String? viewerUserId,
   }) {
     return services.relationshipApi.followChannel(
       channelLogin: channelLogin,
@@ -340,10 +324,10 @@ class TwitchWatchRelationshipPort {
     );
   }
 
-  Future<TwitchPrivateGqlRelationshipSnapshot> unfollowChannel({
+  Future<TwitchRelationshipSnapshot> unfollowChannel({
     required String channelLogin,
-    String? targetUserId,
-    String? viewerUserId,
+    required String? targetUserId,
+    required String? viewerUserId,
   }) {
     return services.relationshipApi.unfollowChannel(
       channelLogin: channelLogin,
@@ -354,35 +338,5 @@ class TwitchWatchRelationshipPort {
 
   Uri buildSubscribeUri(String channelLogin) {
     return services.subscribeApi.buildSubscribeUri(channelLogin);
-  }
-
-  Uri buildChannelUri(String channelLogin) {
-    return services.subscribeApi.buildChannelUri(channelLogin);
-  }
-}
-
-class TwitchWatchFeaturePorts {
-  final TwitchWatchPlayerPort player;
-  final TwitchWatchChatPort chat;
-  final TwitchWatchEmotePort emotes;
-  final TwitchWatchEngagementPort engagement;
-  final TwitchWatchRelationshipPort relationship;
-
-  const TwitchWatchFeaturePorts({
-    required this.player,
-    required this.chat,
-    required this.emotes,
-    required this.engagement,
-    required this.relationship,
-  });
-
-  factory TwitchWatchFeaturePorts.fromServices(TwitchWatchServices services) {
-    return TwitchWatchFeaturePorts(
-      player: TwitchWatchPlayerPort(services: services.player),
-      chat: TwitchWatchChatPort(services: services.chat),
-      emotes: TwitchWatchEmotePort(services: services.emotes),
-      engagement: TwitchWatchEngagementPort(services: services.engagement),
-      relationship: TwitchWatchRelationshipPort(services: services.relationship),
-    );
   }
 }
