@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage188r_standalone_widgets
+// PATCH VERSION: twitch_watch_page_stage219x_staged_startup_pipeline
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
 
@@ -31,6 +31,11 @@ import '../watch/twitch_watch_port_scope.dart';
 import '../watch/twitch_watch_scope.dart';
 import '../widgets/watch/twitch_watch_blocking_startup_overlay.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
+
+const bool _enableWatchPlayer = bool.fromEnvironment(
+  'TWITCH_ENABLE_WATCH_PLAYER',
+  defaultValue: false,
+);
 
 class TwitchWatchPage extends StatefulWidget {
   final TwitchStreamHeaderMetadata initialMetadata;
@@ -276,20 +281,35 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     return value.isEmpty ? 'roger9527' : value;
   }
 
-  bool get _busy => _loadingAuth || _loadingWatch || _loadingPlayer || _connectingChat;
+  bool get _busy =>
+      _loadingAuth ||
+      _loadingWatch ||
+      _loadingPlayer ||
+      _connectingChat ||
+      _chatBootstrapping ||
+      _engagementBootstrapping ||
+      _emoteBootstrapping ||
+      _relationshipBootstrapping;
 
   bool get _showBlockingStartupMask {
     return _loadingAuth ||
         _loadingWatch ||
-        _loadingPlayer ||
+        _relationshipBootstrapping ||
+        _engagementBootstrapping ||
+        _emoteBootstrapping ||
         _chatBootstrapping ||
-        _connectingChat;
+        _connectingChat ||
+        (_enableWatchPlayer && _loadingPlayer);
   }
 
   String get _startupMaskTitle {
     if (_loadingAuth) return '正在準備 Twitch 工作階段...';
-    if (_loadingPlayer || _loadingWatch) return '正在載入直播...';
+    if (_loadingWatch) return '正在準備觀看頁...';
+    if (_relationshipBootstrapping) return '正在準備頻道資料...';
+    if (_engagementBootstrapping) return '正在預載互動資料...';
+    if (_emoteBootstrapping) return '正在預載聊天室貼圖...';
     if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
+    if (_enableWatchPlayer && _loadingPlayer) return '正在啟動播放器...';
     return '正在載入...';
   }
 
@@ -530,9 +550,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       );
       if (!_isCurrentWatchTask(generation, channel)) return;
 
-      await _loadPlayer(channel);
-      if (!_isCurrentWatchTask(generation, channel)) return;
-
       setState(() => _loadingWatch = false);
       unawaited(_runWatchStartupPipeline(
         channel: channel,
@@ -548,6 +565,16 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   Future<void> _loadPlayer(String channel) async {
+    if (!_enableWatchPlayer) {
+      if (mounted) {
+        setState(() {
+          _loadingPlayer = false;
+          _playerError = null;
+        });
+      }
+      return;
+    }
+
     setState(() {
       _loadingPlayer = true;
       _playerError = null;
@@ -601,8 +628,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
-    setState(() => _chatBootstrapping = true);
-    await _runDeferredChatStartup(channel, generation);
+    setState(() => _relationshipBootstrapping = true);
+    await _prepareWatchBackgroundSnapshot(generation, channel);
+    if (!_isCurrentWatchTask(generation, channel)) return;
+    await _runDeferredRelationshipStartup(generation, channel);
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
@@ -616,12 +645,36 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
-    setState(() => _relationshipBootstrapping = true);
-    await _runDeferredRelationshipStartup(generation, channel);
+    setState(() => _chatBootstrapping = true);
+    await _runDeferredChatStartup(channel, generation);
+    await _yieldToUi();
+    if (!_isCurrentWatchTask(generation, channel)) return;
+
+    if (_enableWatchPlayer) {
+      await _loadPlayer(channel);
+    }
   }
 
   Future<void> _yieldToUi() async {
     await Future<void>.delayed(Duration.zero);
+  }
+
+  Future<void> _prepareWatchBackgroundSnapshot(
+    int generation,
+    String channel,
+  ) async {
+    try {
+      final startup = await _watchPorts.chat.fetchStartupSnapshot(
+        channelLogin: channel,
+      );
+      if (!_isCurrentWatchTask(generation, channel)) return;
+      final nextChannelId = startup.channelId.trim();
+      if (nextChannelId.isNotEmpty && nextChannelId != _channelId) {
+        setState(() => _channelId = nextChannelId);
+      }
+    } catch (error) {
+      debugPrint('prepare watch background snapshot failed: $error');
+    }
   }
 
   Future<void> _runDeferredChatStartup(
@@ -1058,7 +1111,9 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
             Positioned.fill(
               child: TwitchWatchBlockingStartupOverlay(
                 title: _startupMaskTitle,
-                subtitle: '正在啟動播放器與聊天室，互動資料會在背景載入。',
+                subtitle: _enableWatchPlayer
+                    ? '先預載頻道與互動資料，再啟動聊天室，最後載入播放器。'
+                    : '先預載頻道與互動資料，再啟動聊天室；播放器目前已停用。',
               ),
             ),
         ],
