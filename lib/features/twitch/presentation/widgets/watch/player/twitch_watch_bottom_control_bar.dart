@@ -216,12 +216,10 @@ class _WatchBottomControlBar extends StatelessWidget {
 
             return TwitchGlassSurface(
               borderRadius: BorderRadius.circular(24),
-              backgroundColor: Colors.black.withOpacity(mobileLowCost ? 0.56 : 0.42),
+              backgroundColor: Colors.black.withOpacity(0.56),
               borderColor: Colors.white.withOpacity(0.12),
-              blurSigma: mobileLowCost ? 0 : 20,
-              boxShadow: mobileLowCost
-                  ? const <BoxShadow>[]
-                  : TwitchGlassPanelShadow.soft(opacity: 0.36),
+              blurSigma: 0,
+              boxShadow: const <BoxShadow>[],
               child: SizedBox(
                 height: barHeight,
                 child: barContent,
