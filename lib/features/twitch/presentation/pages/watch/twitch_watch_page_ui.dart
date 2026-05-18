@@ -1,0 +1,27 @@
+part of twitch_watch_page;
+
+extension _TwitchWatchPageUiMethods on _TwitchWatchPageState {
+  Future<void> _enterMobileImmersiveByDefault() async {
+    if (!TwitchFullscreenController.isMobilePlatform) return;
+    try {
+      await TwitchFullscreenController.setFullscreen(true);
+      _mobileImmersiveEntered = true;
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFullscreenMode() async {
+    final next = !_fullscreenMode;
+    try {
+      await TwitchFullscreenController.setFullscreen(next);
+      if (!mounted) return;
+      setState(() => _fullscreenMode = next);
+    } catch (error) {
+      _showSnack('切換全螢幕失敗：$error');
+    }
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+}
