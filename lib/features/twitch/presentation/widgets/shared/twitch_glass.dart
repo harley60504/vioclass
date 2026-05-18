@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 class TwitchGlassSurface extends StatelessWidget {
@@ -24,14 +25,41 @@ class TwitchGlassSurface extends StatelessWidget {
     this.clipBehavior = Clip.antiAlias,
   });
 
+  bool get _useLowCostMobileGlass {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // BackdropFilter blur over a video surface is expensive on mobile/tablet.
+    // It forces extra compositing/raster work whenever the video frame changes.
+    // Keep the glass look on desktop, but use a plain translucent surface on
+    // Android/iOS to avoid the FPS drop when player controls are visible.
+    final lowCostMobile = _useLowCostMobileGlass;
+    final effectiveBlurSigma = lowCostMobile ? 0.0 : blurSigma;
+    final effectiveBoxShadow = lowCostMobile ? const <BoxShadow>[] : boxShadow;
+    final effectiveBackgroundColor = lowCostMobile
+        ? Color.alphaBlend(
+            Colors.black.withOpacity(0.10),
+            backgroundColor,
+          )
+        : backgroundColor;
+
     final decorated = DecoratedBox(
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: effectiveBackgroundColor,
         borderRadius: borderRadius,
         border: Border.all(color: borderColor),
-        boxShadow: boxShadow,
+        boxShadow: effectiveBoxShadow,
       ),
       child: Padding(
         padding: padding,
@@ -42,12 +70,12 @@ class TwitchGlassSurface extends StatelessWidget {
     return ClipRRect(
       borderRadius: borderRadius,
       clipBehavior: clipBehavior,
-      child: blurSigma <= 0
+      child: effectiveBlurSigma <= 0
           ? decorated
           : BackdropFilter(
               filter: ImageFilter.blur(
-                sigmaX: blurSigma,
-                sigmaY: blurSigma,
+                sigmaX: effectiveBlurSigma,
+                sigmaY: effectiveBlurSigma,
               ),
               child: decorated,
             ),
