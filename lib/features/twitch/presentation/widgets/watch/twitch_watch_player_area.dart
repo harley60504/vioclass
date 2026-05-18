@@ -1,4 +1,4 @@
-// PATCH VERSION: watch_player_area_stage219af_split_video_surface_overlay_rebuild
+// PATCH VERSION: watch_player_area_stage219ag_restore_video_attach_safe_rebuild
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
@@ -10,9 +10,8 @@
 // Windows.
 // Stage 211: keep the video itself centered at 16:9, but move Watch controls to
 // the full player pane edges instead of the 16:9 video box edges.
-// Stage 219AF: keep the native Video surface outside playerRuntime's
-// AnimatedBuilder. Runtime / quality / loading updates now rebuild only the
-// overlay layer, not the media_kit video widget.
+// Stage 219AG: revert the experimental Video-surface split. On Windows/media_kit
+// it can leave audio playing while the native video surface does not attach.
 
 library twitch_watch_player_area;
 
@@ -120,31 +119,31 @@ class TwitchWatchPlayerArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.transparent,
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: [
-          Positioned.fill(
-            child: _WatchCenteredVideoSurface(
-              controller: videoController,
-            ),
-          ),
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: playerRuntime,
-              builder: (context, _) {
-                final effectiveFullscreen = fullscreen || fullscreenMode;
-                final effectiveChatVisible = chatVisible;
-                final effectiveFollowBusy = followBusy || relationshipBusy;
-                final effectiveQualityVariants =
-                    qualityVariants ?? playerRuntime.variants;
-                final effectiveCurrentVariant =
-                    currentVariant ?? playerRuntime.currentVariant;
-                final effectiveOnQualityChanged =
-                    onQualityChanged ?? onQualitySelected;
+    return AnimatedBuilder(
+      animation: playerRuntime,
+      builder: (context, _) {
+        final effectiveFullscreen = fullscreen || fullscreenMode;
+        final effectiveChatVisible = chatVisible;
+        final effectiveFollowBusy = followBusy || relationshipBusy;
+        final effectiveQualityVariants =
+            qualityVariants ?? playerRuntime.variants;
+        final effectiveCurrentVariant =
+            currentVariant ?? playerRuntime.currentVariant;
+        final effectiveOnQualityChanged =
+            onQualityChanged ?? onQualitySelected;
 
-                return _WatchControlsOverlay(
+        return ColoredBox(
+          color: Colors.transparent,
+          child: Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              Positioned.fill(
+                child: _WatchCenteredVideoSurface(
+                  controller: videoController,
+                ),
+              ),
+              Positioned.fill(
+                child: _WatchControlsOverlay(
                   loading: loading ||
                       playerRuntime.loading ||
                       playerRuntime.switchingQuality,
@@ -172,12 +171,12 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                   onQualityChanged: effectiveOnQualityChanged,
                   onToggleChat: onToggleChat,
                   onToggleFullscreen: onToggleFullscreen,
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
