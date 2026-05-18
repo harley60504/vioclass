@@ -163,42 +163,69 @@ class _TwitchWatchEmbeddedEmotePanelState
     final subscriptions = _uniqueOfficial(
       userOnly.where((emote) => !_isUnlockedOfficialEmote(emote)),
     );
+    final subscriptionGroups = _groupOfficialByOwner(subscriptions);
 
     final pages = <_EmbeddedEmotePage>[
-      if (channel.isNotEmpty)
+      _EmbeddedEmotePage(
+        label: 'Channel',
+        entries: channel.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+      ),
+      _EmbeddedEmotePage(
+        label: 'Global',
+        entries: global.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+      ),
+      for (final group in subscriptionGroups.entries)
         _EmbeddedEmotePage(
-          label: 'Channel',
-          entries: channel.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+          label: group.key,
+          entries: group.value.map(_EmbeddedEmoteEntry.official).toList(growable: false),
         ),
-      if (global.isNotEmpty)
-        _EmbeddedEmotePage(
-          label: 'Global',
-          entries: global.map(_EmbeddedEmoteEntry.official).toList(growable: false),
-        ),
-      if (subscriptions.isNotEmpty)
-        _EmbeddedEmotePage(
-          label: 'Sub',
-          entries: subscriptions
-              .map(_EmbeddedEmoteEntry.official)
-              .toList(growable: false),
-        ),
-      if (unlocked.isNotEmpty)
-        _EmbeddedEmotePage(
-          label: 'Unlocked',
-          entries: unlocked.map(_EmbeddedEmoteEntry.official).toList(growable: false),
-        ),
+      _EmbeddedEmotePage(
+        label: 'Unlocked',
+        entries: unlocked.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+      ),
     ];
-
-    if (pages.isEmpty) {
-      pages.add(const _EmbeddedEmotePage(label: 'All', entries: <_EmbeddedEmoteEntry>[]));
-    }
 
     return _EmbeddedEmoteProviderTab(label: 'Twitch', pages: pages);
   }
 
+  Map<String, List<TwitchOfficialEmote>> _groupOfficialByOwner(
+    List<TwitchOfficialEmote> emotes,
+  ) {
+    final grouped = <String, List<TwitchOfficialEmote>>{};
+    for (final emote in emotes) {
+      final ownerLabel = _ownerLabel(emote);
+      grouped.putIfAbsent(ownerLabel, () => <TwitchOfficialEmote>[]).add(emote);
+    }
+
+    final keys = grouped.keys.toList(growable: false)
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return <String, List<TwitchOfficialEmote>>{
+      for (final key in keys)
+        key: (_uniqueOfficial(grouped[key] ?? const <TwitchOfficialEmote>[])),
+    };
+  }
+
+  String _ownerLabel(TwitchOfficialEmote emote) {
+    final display = emote.ownerDisplayName.trim();
+    if (display.isNotEmpty) return display;
+
+    final ownerId = emote.ownerId.trim();
+    if (ownerId.isNotEmpty) return 'Sub $ownerId';
+
+    final setId = emote.emoteSetId.trim();
+    if (setId.isNotEmpty) return 'Sub $setId';
+
+    return 'Sub';
+  }
+
   bool _isUnlockedOfficialEmote(TwitchOfficialEmote emote) {
     final type = emote.emoteType.toLowerCase();
-    return type.contains('unlock') || type.contains('unlocked');
+    return type.contains('unlock') ||
+        type.contains('unlocked') ||
+        type.contains('hypetrain') ||
+        type.contains('prime') ||
+        type.contains('limitedtime');
   }
 
   _EmbeddedEmoteProviderTab _thirdPartyProviderTab(
@@ -229,18 +256,13 @@ class _TwitchWatchEmbeddedEmotePanelState
       ...other,
     ];
 
-    final pages = <_EmbeddedEmotePage>[
-      if (channelLike.isNotEmpty)
+    return _EmbeddedEmoteProviderTab(
+      label: label,
+      pages: [
         _EmbeddedEmotePage(label: 'Channel', entries: channelLike),
-      if (global.isNotEmpty)
         _EmbeddedEmotePage(label: 'Global', entries: global),
-    ];
-
-    if (pages.isEmpty) {
-      pages.add(const _EmbeddedEmotePage(label: 'All', entries: <_EmbeddedEmoteEntry>[]));
-    }
-
-    return _EmbeddedEmoteProviderTab(label: label, pages: pages);
+      ],
+    );
   }
 
   List<TwitchOfficialEmote> _uniqueOfficial(Iterable<TwitchOfficialEmote> source) {
@@ -346,17 +368,6 @@ class _EmbeddedProviderPageState extends State<_EmbeddedProviderPage>
     super.build(context);
 
     final tab = widget.tab;
-    if (tab.pages.length == 1) {
-      final page = tab.pages.first;
-      return _EmbeddedEmoteGrid(
-        key: PageStorageKey<String>('grid-${tab.label}-${page.label}'),
-        entries: page.entries,
-        emptyText: widget.loading ? 'Loading emotes...' : 'No emotes',
-        onSelect: widget.onSelect,
-        onLongPress: widget.onLongPress,
-      );
-    }
-
     return DefaultTabController(
       length: tab.pages.length,
       child: Column(
