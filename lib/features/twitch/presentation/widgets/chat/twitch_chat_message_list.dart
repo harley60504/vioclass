@@ -1,4 +1,4 @@
-// PATCH VERSION: chat_message_list_stage217f_scroll_direction_import_fix
+// PATCH VERSION: chat_message_list_stage219r_frosty_render_limit
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 190:
@@ -27,6 +27,12 @@
 // Stage 217F:
 // - Adds the missing rendering import for ScrollDirection used by
 //   UserScrollNotification.direction.
+//
+// Stage 219R:
+// - Mirrors Frosty's render limit behavior: when autoscroll is enabled, render
+//   only the newest 100 messages instead of the whole retained runtime history.
+// - When the user scrolls away from latest, restore the full retained history so
+//   browsing upward still works.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -62,6 +68,7 @@ class TwitchChatMessageList extends StatefulWidget {
 
 class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const double _autoScrollThreshold = 36;
+  static const int _autoFollowRenderMessageLimit = 100;
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
 
@@ -117,11 +124,23 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
   void _resetVisibleMessagesFromRuntime({required bool forceAutoScroll}) {
     final sourceMessages = runtime.messages;
-    _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
+    if (forceAutoScroll) _autoScroll = true;
+    _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
     _lastSourceMessageCount = sourceMessages.length;
     _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
     _hiddenNewMessageCount = 0;
-    if (forceAutoScroll) _autoScroll = true;
+  }
+
+  List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
+    List<TwitchChatRuntimeMessage> sourceMessages,
+  ) {
+    if (!_autoScroll || sourceMessages.length <= _autoFollowRenderMessageLimit) {
+      return List<TwitchChatRuntimeMessage>.of(sourceMessages);
+    }
+
+    return sourceMessages
+        .sublist(sourceMessages.length - _autoFollowRenderMessageLimit)
+        .toList(growable: false);
   }
 
   void _syncVisibleMessagesFromRuntime() {
@@ -153,9 +172,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final shouldAutoFollow = !userRecentlyScrolled && (_autoScroll || _isNearLatest);
 
     if (shouldAutoFollow) {
-      _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
-      _hiddenNewMessageCount = 0;
       _autoScroll = true;
+      _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
+      _hiddenNewMessageCount = 0;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _animateToLatest();
@@ -244,7 +263,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       if (userRecentlyScrolled) return;
       setState(() {
         _autoScroll = true;
-        _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
+        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
         _lastSourceMessageCount = runtime.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
@@ -255,6 +274,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (!nearLatest && _autoScroll) {
       setState(() {
         _autoScroll = false;
+        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       });
     }
   }
@@ -287,7 +307,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _programmaticScrollActive = false;
       if (!mounted) return;
       if (_isNearLatest && !_autoScroll && !_hasRecentUserScroll) {
-        setState(() => _autoScroll = true);
+        setState(() {
+          _autoScroll = true;
+          _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
+        });
       }
     });
   }
@@ -297,7 +320,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _autoScroll = true;
       _userScrollActive = false;
       _lastUserScrollAt = null;
-      _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
+      _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       _lastSourceMessageCount = runtime.messages.length;
       _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
       _hiddenNewMessageCount = 0;
