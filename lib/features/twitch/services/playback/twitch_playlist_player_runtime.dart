@@ -25,9 +25,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   };
 
   static const String _qualityKey = 'twitch_watch_v2_preferred_quality';
-  static const String _qualityChannelPrefix = 'twitch_watch_v2_preferred_quality_';
+  static const String _qualityChannelPrefix =
+      'twitch_watch_v2_preferred_quality_';
   static const String _legacyQualityKey = 'twitch_fvp_proxy_preferred_quality';
-  static const String _legacyQualityChannelPrefix = 'twitch_fvp_proxy_preferred_quality_';
+  static const String _legacyQualityChannelPrefix =
+      'twitch_fvp_proxy_preferred_quality_';
   static const int _mobileStartupTargetHeight = 720;
   static const int _mobileStartupMaxFps = 60;
 
@@ -77,10 +79,23 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Object? get error => _error;
   bool get hasPlaylist => _playlistUri != null;
   String get masterPlaylistText => _masterPlaylistText;
-  List<TwitchM3u8Variant> get variants => List<TwitchM3u8Variant>.unmodifiable(_variants);
+  List<TwitchM3u8Variant> get variants =>
+      List<TwitchM3u8Variant>.unmodifiable(_variants);
   TwitchM3u8Variant? get currentVariant => _currentVariant;
   String get adAwareStatus => _adAwareStatus;
   String? get lastPreferredQualityName => _lastPreferredQualityName;
+
+  /// Stable playback URL for media_kit.
+  ///
+  /// The outer HLS router keeps this local URL stable while quality switching
+  /// swaps only the router's inner upstream playlist. The player should open
+  /// this URL once and stay attached; quality changes should not recreate
+  /// Player / VideoController or call Player.open with a different local URL.
+  String? get stableProxyPlaybackUrl {
+    final router = _proxy ?? _sharedProxy;
+    if (router == null || !router.isRunning) return null;
+    return router.streamTsUrl;
+  }
 
   Future<Uri?> loadLivePlaylist({
     required String channelLogin,
@@ -89,7 +104,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin cannot be empty',
+      );
     }
 
     _channelLogin = login;
@@ -111,14 +130,41 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _lastPreferredQualityName = wantedQuality;
 
       final candidates = await Future.wait<_PlaybackCandidate?>([
-        _loadCandidate(login, platform: 'web', playerType: 'site', sourceTag: 'web-site', defaultHasAds: true),
-        _loadCandidate(login, platform: 'android', playerType: 'autoplay', sourceTag: 'android-autoplay', defaultHasAds: false),
-        _loadCandidate(login, platform: 'ios', playerType: 'site', sourceTag: 'ios-site', defaultHasAds: false),
+        _loadCandidate(
+          login,
+          platform: 'web',
+          playerType: 'site',
+          sourceTag: 'web-site',
+          defaultHasAds: true,
+        ),
+        _loadCandidate(
+          login,
+          platform: 'android',
+          playerType: 'autoplay',
+          sourceTag: 'android-autoplay',
+          defaultHasAds: false,
+        ),
+        _loadCandidate(
+          login,
+          platform: 'ios',
+          playerType: 'site',
+          sourceTag: 'ios-site',
+          defaultHasAds: false,
+        ),
       ]);
 
-      final web = candidates.whereType<_PlaybackCandidate>().where((c) => c.sourceTag == 'web-site').firstOrNull;
-      final android = candidates.whereType<_PlaybackCandidate>().where((c) => c.sourceTag == 'android-autoplay').firstOrNull;
-      final ios = candidates.whereType<_PlaybackCandidate>().where((c) => c.sourceTag == 'ios-site').firstOrNull;
+      final web = candidates
+          .whereType<_PlaybackCandidate>()
+          .where((c) => c.sourceTag == 'web-site')
+          .firstOrNull;
+      final android = candidates
+          .whereType<_PlaybackCandidate>()
+          .where((c) => c.sourceTag == 'android-autoplay')
+          .firstOrNull;
+      final ios = candidates
+          .whereType<_PlaybackCandidate>()
+          .where((c) => c.sourceTag == 'ios-site')
+          .firstOrNull;
       final base = web ?? android ?? ios;
       if (base == null) {
         throw StateError('Twitch master playlist 載入失敗：所有 playback source 都失敗。');
@@ -132,12 +178,20 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _masterPlaylistUri = base.masterUri;
       _masterPlaylistText = base.masterPlaylistText;
       _variants = merged;
-      _adAwareStatus = 'web=${web?.variants.length ?? 0}, android=${android?.variants.length ?? 0}, ios=${ios?.variants.length ?? 0}, clean=${merged.where((v) => !v.hasAds).length}';
+      _adAwareStatus =
+          'web=${web?.variants.length ?? 0}, '
+          'android=${android?.variants.length ?? 0}, '
+          'ios=${ios?.variants.length ?? 0}, '
+          'clean=${merged.where((v) => !v.hasAds).length}';
 
       final selected = preferredVariant == null
           ? _findVariantByName(merged, wantedQuality) ??
-              selectDefaultVariant(merged, allowMobileStartupSafeQuality: wantedQuality == null)
-          : _findMatchingMergedVariant(merged, preferredVariant) ?? preferredVariant;
+              selectDefaultVariant(
+                merged,
+                allowMobileStartupSafeQuality: wantedQuality == null,
+              )
+          : _findMatchingMergedVariant(merged, preferredVariant) ??
+              preferredVariant;
 
       if (selected == null) {
         _playlistUri = base.masterUri;
@@ -180,7 +234,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
   Future<Uri?> _startProxyForVariant(TwitchM3u8Variant variant) async {
     final upstreamUri = Uri.tryParse(variant.url);
-    if (upstreamUri == null) throw StateError('Invalid variant URL: ${variant.url}');
+    if (upstreamUri == null) {
+      throw StateError('Invalid variant URL: ${variant.url}');
+    }
 
     var router = _sharedProxy;
     final previousUpstream = router?.upstreamPlaylistUrl;
@@ -211,20 +267,15 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
 
     await router.waitUntilPrewarmed();
-    _proxyUrl = _revisionedStreamUrl(router);
+
+    // Keep the player-facing URL stable. Quality/source switching happens
+    // inside TwitchStableHlsProxyRouter.switchUpstream(). This avoids forcing
+    // media_kit to reopen a new local URL and keeps the VideoController surface
+    // attached.
+    _proxyUrl = router.streamTsUrl;
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
-  }
-
-  String _revisionedStreamUrl(TwitchStableHlsProxyRouter router) {
-    final uri = Uri.parse(router.streamTsUrl);
-    return uri.replace(
-      queryParameters: <String, String>{
-        ...uri.queryParameters,
-        'sourceRev': _sharedProxyRevision.toString(),
-      },
-    ).toString();
   }
 
   Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({bool notify = true}) async {
@@ -275,14 +326,20 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
   }
 
-  Future<void> _savePreferredQualityName(String login, TwitchM3u8Variant variant) async {
+  Future<void> _savePreferredQualityName(
+    String login,
+    TwitchM3u8Variant variant,
+  ) async {
     final name = variant.name.trim();
     if (login.trim().isEmpty || name.isEmpty) return;
     _lastPreferredQualityName = name;
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_qualityKey, name);
-      await prefs.setString('$_qualityChannelPrefix${login.trim().toLowerCase()}', name);
+      await prefs.setString(
+        '$_qualityChannelPrefix${login.trim().toLowerCase()}',
+        name,
+      );
     } catch (_) {}
   }
 
@@ -299,7 +356,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         platform: platform,
         playerType: playerType,
       );
-      final masterUri = playbackApi.buildLivePlaylistUri(channelLogin: login, accessToken: token);
+      final masterUri = playbackApi.buildLivePlaylistUri(
+        channelLogin: login,
+        accessToken: token,
+      );
       final response = await _dio.getUri<String>(
         masterUri,
         options: Options(
@@ -309,7 +369,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         ),
       );
       final text = response.data ?? '';
-      if ((response.statusCode ?? 0) >= 400 || text.trim().isEmpty) return null;
+      if ((response.statusCode ?? 0) >= 400 || text.trim().isEmpty) {
+        return null;
+      }
       final variants = TwitchM3u8Parser.parseMasterPlaylist(
         text,
         masterUri: masterUri,
@@ -344,7 +406,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     for (final c in cleanCandidates) {
       for (final v in c.variants) {
         final old = cleanByKey[v.adAwareQualityKey];
-        if (old == null || _sortScore(v) > _sortScore(old)) cleanByKey[v.adAwareQualityKey] = v;
+        if (old == null || _sortScore(v) > _sortScore(old)) {
+          cleanByKey[v.adAwareQualityKey] = v;
+        }
       }
     }
 
@@ -353,14 +417,23 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     for (final base in baseVariants) {
       final clean = cleanByKey[base.adAwareQualityKey];
       if (clean == null) {
-        merged.add(base.copyWith(hasAds: true, sourceTag: base.sourceTag.isEmpty ? 'web-site' : base.sourceTag));
+        merged.add(
+          base.copyWith(
+            hasAds: true,
+            sourceTag: base.sourceTag.isEmpty ? 'web-site' : base.sourceTag,
+          ),
+        );
       } else {
         used.add(clean.url);
-        merged.add(base.copyWith(url: clean.url, hasAds: false, sourceTag: clean.sourceTag));
+        merged.add(
+          base.copyWith(url: clean.url, hasAds: false, sourceTag: clean.sourceTag),
+        );
       }
     }
     for (final clean in cleanByKey.values) {
-      if (!used.contains(clean.url) && !merged.any((v) => v.url == clean.url)) merged.add(clean.copyWith(hasAds: false));
+      if (!used.contains(clean.url) && !merged.any((v) => v.url == clean.url)) {
+        merged.add(clean.copyWith(hasAds: false));
+      }
     }
     return _sortVariants(merged);
   }
@@ -392,7 +465,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     if (allowMobileStartupSafeQuality && _prefersMobileStartupSafeQuality) {
       final safe = pool.where((v) {
         final fps = v.fpsRounded;
-        return v.height > 0 && v.height <= _mobileStartupTargetHeight && (fps == 0 || fps <= _mobileStartupMaxFps);
+        return v.height > 0 &&
+            v.height <= _mobileStartupTargetHeight &&
+            (fps == 0 || fps <= _mobileStartupMaxFps);
       }).toList();
       if (safe.isNotEmpty) return _sortVariants(safe).first;
     }
@@ -420,15 +495,25 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return text.contains('source') || text.contains('chunked');
   }
 
-  TwitchM3u8Variant? _findVariantByName(List<TwitchM3u8Variant> variants, String? name) {
+  TwitchM3u8Variant? _findVariantByName(
+    List<TwitchM3u8Variant> variants,
+    String? name,
+  ) {
     final target = name?.trim();
     if (target == null || target.isEmpty) return null;
-    final matches = variants.where((v) => v.name == target || v.displayName == target).toList();
+    final matches = variants
+        .where((v) => v.name == target || v.displayName == target)
+        .toList();
     return matches.isEmpty ? null : _sortVariants(matches).first;
   }
 
-  TwitchM3u8Variant? _findMatchingMergedVariant(List<TwitchM3u8Variant> variants, TwitchM3u8Variant preferred) {
-    final matches = variants.where((v) => v.adAwareQualityKey == preferred.adAwareQualityKey).toList();
+  TwitchM3u8Variant? _findMatchingMergedVariant(
+    List<TwitchM3u8Variant> variants,
+    TwitchM3u8Variant preferred,
+  ) {
+    final matches = variants
+        .where((v) => v.adAwareQualityKey == preferred.adAwareQualityKey)
+        .toList();
     return matches.isEmpty ? null : _sortVariants(matches).first;
   }
 
@@ -474,6 +559,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'upstreamPlaylistUri': upstreamPlaylistUri?.toString(),
       'proxyUrl': proxyUrl,
       'proxyMpvUrl': proxyMpvUrl,
+      'stableProxyPlaybackUrl': stableProxyPlaybackUrl,
       'proxyStreamUrl': router?.streamUrl,
       'proxyLiveStatus': proxyLiveStatus?.toJson(),
       'proxyRunning': router?.isRunning ?? false,
