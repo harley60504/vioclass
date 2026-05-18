@@ -1,5 +1,5 @@
-name: new_twitch_app
-description: "A new Flutter project."
+name: vio_class
+description: "VioClass streaming classroom app."
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -71,3 +71,4 @@ flutter:
 
   assets:
     - assets/twitch/default_channel_points.png
+    - assets/app/vio_class_icon.svg
