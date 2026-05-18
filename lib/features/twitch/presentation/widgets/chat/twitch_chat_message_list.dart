@@ -1,10 +1,18 @@
-// PATCH VERSION: chat_message_list_stage219v_hide_live_divider
+// PATCH VERSION: chat_message_list_stage219w_cached_fingerprint_and_smoother_latest
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
 // Stage 219V:
 // - Hides the old/history to live IRC divider. The divider was useful during
 //   recent-message preload debugging, but in normal watching it stays visible
 //   too often and looks like repeated noise.
+//
+// Stage 219W:
+// - Adds a lightweight Expando cache for message fingerprints, avoiding repeated
+//   id/login/text/date string work while estimating capped-list rollovers.
+// - Coalesces auto-follow-to-latest scroll work so hot chat updates do not queue
+//   one animation per runtime notification.
+// - Uses jumpTo(0) for normal auto-follow and only animates manual "back to
+//   latest" when the distance is small enough to be cheap.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -39,14 +47,19 @@ class TwitchChatMessageList extends StatefulWidget {
 
 class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const double _autoScrollThreshold = 36;
+  static const double _cheapResumeAnimationDistance = 420;
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
 
   final ScrollController _scrollController = ScrollController();
+  final Expando<String> _messageFingerprintCache = Expando<String>(
+    'twitch-chat-message-fingerprint',
+  );
 
   bool _autoScroll = true;
   bool _programmaticScrollActive = false;
   bool _userScrollActive = false;
+  bool _followLatestScheduled = false;
   DateTime? _lastUserScrollAt;
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
@@ -64,9 +77,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     _scrollController.addListener(_handleScrollChanged);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _jumpToLatest();
-    });
+    _scheduleFollowLatest(animated: false);
   }
 
   @override
@@ -75,10 +86,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     if (oldWidget.runtime != widget.runtime) {
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _jumpToLatest();
-      });
+      _scheduleFollowLatest(animated: false);
       return;
     }
 
@@ -133,10 +141,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
       _hiddenNewMessageCount = 0;
       _autoScroll = true;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _animateToLatest();
-      });
+      _scheduleFollowLatest(animated: false);
       return;
     }
 
@@ -151,13 +156,18 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   }
 
   String _messageFingerprint(TwitchChatRuntimeMessage message) {
-    final id = message.id.trim();
-    if (id.isNotEmpty) return 'id:$id';
+    final cached = _messageFingerprintCache[message];
+    if (cached != null) return cached;
 
-    final login = message.userLogin.trim().toLowerCase();
-    final text = message.message.trim();
-    final micros = message.receivedAt.microsecondsSinceEpoch;
-    return 'fallback:$micros|$login|$text';
+    final id = message.id.trim();
+    final fingerprint = id.isNotEmpty
+        ? 'id:$id'
+        : 'fallback:${message.receivedAt.microsecondsSinceEpoch}|'
+            '${message.userLogin.trim().toLowerCase()}|'
+            '${message.message.trim()}';
+
+    _messageFingerprintCache[message] = fingerprint;
+    return fingerprint;
   }
 
   int _estimateAddedMessageCount({
@@ -226,6 +236,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
       });
+      _scheduleFollowLatest(animated: false);
       return;
     }
 
@@ -234,6 +245,21 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _autoScroll = false;
       });
     }
+  }
+
+  void _scheduleFollowLatest({required bool animated}) {
+    if (_followLatestScheduled) return;
+    _followLatestScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _followLatestScheduled = false;
+      if (!mounted) return;
+      if (animated) {
+        _animateOrJumpToLatest();
+      } else {
+        _jumpToLatest();
+      }
+    });
   }
 
   void _jumpToLatest() {
@@ -245,11 +271,17 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     });
   }
 
-  void _animateToLatest() {
+  void _animateOrJumpToLatest() {
     if (!_scrollController.hasClients) return;
 
-    if (_scrollController.offset <= 1) {
+    final distance = _scrollController.offset.abs();
+    if (distance <= 1) {
       _programmaticScrollActive = false;
+      return;
+    }
+
+    if (distance > _cheapResumeAnimationDistance) {
+      _jumpToLatest();
       return;
     }
 
@@ -280,9 +312,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _hiddenNewMessageCount = 0;
     });
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _animateToLatest();
-    });
+    _scheduleFollowLatest(animated: true);
   }
 
   void _openContextSheet(TwitchChatRuntimeMessage message) {
