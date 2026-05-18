@@ -346,7 +346,13 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       );
 
       final global = _unique(results[0], unlocked: true);
-      final user = _unique(results[2], unlocked: true);
+      final rawUser = _unique(results[2], unlocked: true);
+      final ownerNames = await _fetchOwnerDisplayNamesSafe(
+        userEmotes: rawUser,
+        accessToken: accessToken,
+        clientId: clientId,
+      );
+      final user = _applyOwnerDisplayNames(rawUser, ownerNames);
       final userKeys = user.map(_key).toSet();
       final globalKeys = global.map(_key).toSet();
 
@@ -411,6 +417,46 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _userEmotesUnavailable = true;
       return const <TwitchOfficialEmote>[];
     }
+  }
+
+  Future<Map<String, String>> _fetchOwnerDisplayNamesSafe({
+    required List<TwitchOfficialEmote> userEmotes,
+    required String accessToken,
+    required String clientId,
+  }) async {
+    final ownerIds = userEmotes
+        .map((emote) => emote.ownerId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+
+    if (ownerIds.isEmpty) return const <String, String>{};
+
+    try {
+      return await api.fetchUserDisplayNamesByIds(
+        userIds: ownerIds,
+        accessToken: accessToken,
+        clientId: clientId,
+      );
+    } catch (e) {
+      debugPrint('Fetch official emote owner display names failed: $e');
+      return const <String, String>{};
+    }
+  }
+
+  List<TwitchOfficialEmote> _applyOwnerDisplayNames(
+    List<TwitchOfficialEmote> source,
+    Map<String, String> ownerNames,
+  ) {
+    if (source.isEmpty || ownerNames.isEmpty) return source;
+
+    return source
+        .map((emote) {
+          final ownerName = ownerNames[emote.ownerId.trim()]?.trim() ?? '';
+          if (ownerName.isEmpty) return emote;
+          return emote.copyWith(ownerDisplayName: ownerName);
+        })
+        .toList(growable: false)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
   List<TwitchOfficialEmote> _unique(
