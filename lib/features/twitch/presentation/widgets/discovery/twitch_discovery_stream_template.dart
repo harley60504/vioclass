@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_discovery_stream_template_stage219l_emote_only_route
+// PATCH VERSION: twitch_discovery_stream_template_stage219m_emote_only_route_fix
 // Shared discovery stream grid for FollowingPage and BrowsePage.
 
 import 'dart:async';
@@ -129,7 +129,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
         MaterialPageRoute<void>(
           builder: (_) => TwitchEmoteOnlyTestPage(
             initialChannelLogin: stream.channelLogin,
-            initialChannelId: stream.channelId,
+            initialChannelId: stream.userId,
             initialDisplayName: stream.userName,
             autoLoad: true,
           ),
