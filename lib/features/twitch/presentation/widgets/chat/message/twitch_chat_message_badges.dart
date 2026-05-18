@@ -1,7 +1,11 @@
-// PATCH VERSION: twitch_chat_message_badges_stage161_fix_badge_type
+// PATCH VERSION: twitch_chat_message_badges_stage219aa_frosty_light_badges
 //
 // Badge renderer for runtime chat messages. Badge sizing is controlled by
 // TwitchChatMessageVisualMetrics, while this file owns badge image rendering.
+//
+// Stage 219AA:
+// - Removes Tooltip from hot chat badge rendering.
+// - Disables badge image fade for lower rebuild/raster overhead in fast chats.
 
 import 'package:flutter/material.dart';
 
@@ -61,18 +65,17 @@ class TwitchChatMessageBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = compact ? metrics.compactBadgeSize : metrics.badgeSize;
 
-    return Tooltip(
-      message: badge.title,
-      child: TwitchCachedImageLayer(
-        imageUrl: badge.image1x,
-        width: size,
-        height: size,
-        cacheWidth: 36,
-        cacheHeight: 36,
-        fit: BoxFit.contain,
-        fallbackColor: Colors.transparent,
-        errorWidget: const SizedBox.shrink(),
-      ),
+    return TwitchCachedImageLayer(
+      imageUrl: badge.image1x,
+      width: size,
+      height: size,
+      cacheWidth: 36,
+      cacheHeight: 36,
+      fit: BoxFit.contain,
+      fallbackColor: Colors.transparent,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      errorWidget: const SizedBox.shrink(),
     );
   }
 }
