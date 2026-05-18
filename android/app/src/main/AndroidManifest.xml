@@ -3,9 +3,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:label="new_twitch_app"
+        android:label="VioClass"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/vio_class_icon"
         android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
