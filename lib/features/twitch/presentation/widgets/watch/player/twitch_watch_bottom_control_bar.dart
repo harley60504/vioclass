@@ -33,6 +33,19 @@ class _WatchBottomControlBar extends StatelessWidget {
     required this.onToggleFullscreen,
   });
 
+  bool get _useLowCostMobileControls {
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+      case TargetPlatform.iOS:
+        return true;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.macOS:
+      case TargetPlatform.windows:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<bool>(
@@ -43,9 +56,10 @@ class _WatchBottomControlBar extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
+            final mobileLowCost = _useLowCostMobileControls;
             final veryNarrow = constraints.maxWidth < 430;
-            final useCompactLayout = constraints.maxWidth < 700;
-            final collapseLivePlayback = veryNarrow;
+            final useCompactLayout = constraints.maxWidth < 700 || mobileLowCost;
+            final collapseLivePlayback = veryNarrow || mobileLowCost;
             final barHeight = useCompactLayout ? 58.0 : 72.0;
             final horizontalPadding = veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0;
 
@@ -202,10 +216,12 @@ class _WatchBottomControlBar extends StatelessWidget {
 
             return TwitchGlassSurface(
               borderRadius: BorderRadius.circular(24),
-              backgroundColor: Colors.black.withOpacity(0.42),
+              backgroundColor: Colors.black.withOpacity(mobileLowCost ? 0.56 : 0.42),
               borderColor: Colors.white.withOpacity(0.12),
-              blurSigma: 20,
-              boxShadow: TwitchGlassPanelShadow.soft(opacity: 0.36),
+              blurSigma: mobileLowCost ? 0 : 20,
+              boxShadow: mobileLowCost
+                  ? const <BoxShadow>[]
+                  : TwitchGlassPanelShadow.soft(opacity: 0.36),
               child: SizedBox(
                 height: barHeight,
                 child: barContent,
@@ -246,10 +262,10 @@ class _LivePlaybackSheetButton extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: TwitchGlassSurface(
               borderRadius: BorderRadius.circular(22),
-              backgroundColor: Colors.black.withOpacity(0.50),
+              backgroundColor: Colors.black.withOpacity(0.56),
               borderColor: Colors.white.withOpacity(0.13),
-              blurSigma: 22,
-              boxShadow: TwitchGlassPanelShadow.soft(opacity: 0.45),
+              blurSigma: 0,
+              boxShadow: const <BoxShadow>[],
               child: SizedBox(
                 width: sheetWidth,
                 child: Padding(
