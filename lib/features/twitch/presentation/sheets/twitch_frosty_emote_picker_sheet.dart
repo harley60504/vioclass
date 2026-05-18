@@ -29,8 +29,6 @@ Future<void> showTwitchFrostyEmotePickerSheet({
   return showTwitchResponsiveSheet<void>(
     context: context,
     size: TwitchUnifiedSheetSize.medium,
-    portraitHeightFactor: 0.44,
-    landscapeHeightFactor: 0.58,
     builder: (_) => TwitchFrostyEmotePickerSheet(
       cache: cache,
       officialCache: officialCache,
