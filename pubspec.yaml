@@ -1,5 +1,5 @@
-name: new_twitch_app
-description: "A new Flutter project."
+name: vio_class
+description: "VioClass streaming classroom app."
 publish_to: 'none'
 
 version: 1.0.0+1
