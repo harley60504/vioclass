@@ -139,35 +139,53 @@ class _TwitchWatchEmbeddedEmotePanelState
   }
 
   _EmbeddedEmoteProviderTab _officialProviderTab() {
-    final channelUsable = _uniqueOfficial(
-      widget.officialCache.channelEmotes.where((emote) => emote.unlocked),
-    );
-    final user = _uniqueOfficial(widget.officialCache.userEmotes);
+    final channel = _uniqueOfficial(widget.officialCache.channelEmotes);
     final global = _uniqueOfficial(widget.officialCache.globalEmotes);
-    final locked = _uniqueOfficial(widget.officialCache.lockedChannelEmotes);
+    final user = _uniqueOfficial(widget.officialCache.userEmotes);
+
+    final channelKeys = channel.map(_officialKey).toSet();
+    final globalKeys = global.map(_officialKey).toSet();
+    final currentChannelId = widget.officialCache.channelId.trim();
+
+    final userOnly = user.where((emote) {
+      final key = _officialKey(emote);
+      if (channelKeys.contains(key)) return false;
+      if (globalKeys.contains(key)) return false;
+      if (currentChannelId.isNotEmpty && emote.ownerId.trim() == currentChannelId) {
+        return false;
+      }
+      return true;
+    }).toList(growable: false);
+
+    final unlocked = _uniqueOfficial(
+      userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
+    );
+    final subscriptions = _uniqueOfficial(
+      userOnly.where((emote) => !_isUnlockedOfficialEmote(emote)),
+    );
 
     final pages = <_EmbeddedEmotePage>[
-      if (channelUsable.isNotEmpty)
+      if (channel.isNotEmpty)
         _EmbeddedEmotePage(
           label: 'Channel',
-          entries: channelUsable
-              .map(_EmbeddedEmoteEntry.official)
-              .toList(growable: false),
-        ),
-      if (user.isNotEmpty)
-        _EmbeddedEmotePage(
-          label: 'Unlocked',
-          entries: user.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+          entries: channel.map(_EmbeddedEmoteEntry.official).toList(growable: false),
         ),
       if (global.isNotEmpty)
         _EmbeddedEmotePage(
           label: 'Global',
           entries: global.map(_EmbeddedEmoteEntry.official).toList(growable: false),
         ),
-      if (locked.isNotEmpty)
+      if (subscriptions.isNotEmpty)
         _EmbeddedEmotePage(
-          label: 'Locked',
-          entries: locked.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+          label: 'Sub',
+          entries: subscriptions
+              .map(_EmbeddedEmoteEntry.official)
+              .toList(growable: false),
+        ),
+      if (unlocked.isNotEmpty)
+        _EmbeddedEmotePage(
+          label: 'Unlocked',
+          entries: unlocked.map(_EmbeddedEmoteEntry.official).toList(growable: false),
         ),
     ];
 
@@ -176,6 +194,11 @@ class _TwitchWatchEmbeddedEmotePanelState
     }
 
     return _EmbeddedEmoteProviderTab(label: 'Twitch', pages: pages);
+  }
+
+  bool _isUnlockedOfficialEmote(TwitchOfficialEmote emote) {
+    final type = emote.emoteType.toLowerCase();
+    return type.contains('unlock') || type.contains('unlocked');
   }
 
   _EmbeddedEmoteProviderTab _thirdPartyProviderTab(
