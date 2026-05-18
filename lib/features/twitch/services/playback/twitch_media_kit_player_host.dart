@@ -6,7 +6,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
-  defaultValue: false,
+  defaultValue: true,
 );
 
 class TwitchMediaKitPlayerHost {
