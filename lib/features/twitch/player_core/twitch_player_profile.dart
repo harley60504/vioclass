@@ -1,8 +1,8 @@
-// Stage 220A: Independent Twitch player core profile.
+// Stage 220E: Independent Twitch player core profile with PiliPlus-style
+// media_kit tuning.
 //
-// This file intentionally has no WatchPage dependency. It describes how the
-// media engine should be configured on each platform so Android / Windows can
-// be tuned independently before the new core is wired into WatchPage.
+// This branch intentionally tests the media_kit dependency set and mpv options
+// used by PiliPlus' player controller style before touching WatchPage.
 
 import 'package:flutter/foundation.dart';
 
@@ -48,74 +48,97 @@ class TwitchPlayerProfile {
 
   static TwitchPlayerProfile androidLive({bool lowLatency = true}) {
     return TwitchPlayerProfile(
-      id: lowLatency ? 'android-live-low-latency' : 'android-live-stable',
-      label: lowLatency ? 'Android Live Low Latency' : 'Android Live Stable',
-      bufferSize: lowLatency ? 16 * 1024 * 1024 : 32 * 1024 * 1024,
+      id: lowLatency ? 'android-live-low-latency-piliplus' : 'android-live-stable-piliplus',
+      label: lowLatency ? 'Android Live Low Latency PiliPlus' : 'Android Live Stable PiliPlus',
+      bufferSize: lowLatency ? 16 * 1024 * 1024 : 64 * 1024 * 1024,
       enableHardwareAcceleration: true,
       hwdec: 'auto-safe',
       androidAttachSurfaceAfterVideoParameters: false,
       mpvOptions: const <String, String>{
-        // PiliPlus-style: keep platform-specific mpv options centralized.
-        // Keep this conservative for Stage 220A; more aggressive values can be
-        // tested without touching WatchPage.
+        // PiliPlus core options.
         'volume-max': '100',
         'video-sync': 'audio',
+        'autosync': '30',
+        // For stable local HLS proxy URLs: keep mpv treating the stream as
+        // seekable enough for smoother live-edge behavior.
+        'force-seekable': 'yes',
+        // Conservative live-cache hints. These can be tuned after Android test.
+        'cache': 'yes',
+        'demuxer-seekable-cache': 'yes',
       },
     );
   }
 
   static TwitchPlayerProfile iosLive({bool lowLatency = true}) {
     return TwitchPlayerProfile(
-      id: lowLatency ? 'ios-live-low-latency' : 'ios-live-stable',
-      label: lowLatency ? 'iOS Live Low Latency' : 'iOS Live Stable',
-      bufferSize: lowLatency ? 16 * 1024 * 1024 : 32 * 1024 * 1024,
+      id: lowLatency ? 'ios-live-low-latency-piliplus' : 'ios-live-stable-piliplus',
+      label: lowLatency ? 'iOS Live Low Latency PiliPlus' : 'iOS Live Stable PiliPlus',
+      bufferSize: lowLatency ? 16 * 1024 * 1024 : 64 * 1024 * 1024,
       enableHardwareAcceleration: true,
       hwdec: 'auto-safe',
       androidAttachSurfaceAfterVideoParameters: false,
       mpvOptions: const <String, String>{
         'video-sync': 'audio',
+        'autosync': '30',
+        'force-seekable': 'yes',
+        'cache': 'yes',
+        'demuxer-seekable-cache': 'yes',
       },
     );
   }
 
   static TwitchPlayerProfile windowsLive({bool lowLatency = true}) {
     return TwitchPlayerProfile(
-      id: lowLatency ? 'windows-live-low-latency' : 'windows-live-stable',
-      label: lowLatency ? 'Windows Live Low Latency' : 'Windows Live Stable',
-      bufferSize: lowLatency ? 16 * 1024 * 1024 : 32 * 1024 * 1024,
+      id: lowLatency ? 'windows-live-low-latency-piliplus' : 'windows-live-stable-piliplus',
+      label: lowLatency ? 'Windows Live Low Latency PiliPlus' : 'Windows Live Stable PiliPlus',
+      bufferSize: lowLatency ? 16 * 1024 * 1024 : 64 * 1024 * 1024,
       enableHardwareAcceleration: true,
       hwdec: 'auto-safe',
       androidAttachSurfaceAfterVideoParameters: false,
       mpvOptions: const <String, String>{
+        'volume': '100',
         'video-sync': 'audio',
+        'autosync': '30',
+        'force-seekable': 'yes',
+        'cache': 'yes',
+        'demuxer-seekable-cache': 'yes',
       },
     );
   }
 
   static TwitchPlayerProfile desktopLive({bool lowLatency = true}) {
     return TwitchPlayerProfile(
-      id: lowLatency ? 'desktop-live-low-latency' : 'desktop-live-stable',
-      label: lowLatency ? 'Desktop Live Low Latency' : 'Desktop Live Stable',
-      bufferSize: lowLatency ? 16 * 1024 * 1024 : 32 * 1024 * 1024,
+      id: lowLatency ? 'desktop-live-low-latency-piliplus' : 'desktop-live-stable-piliplus',
+      label: lowLatency ? 'Desktop Live Low Latency PiliPlus' : 'Desktop Live Stable PiliPlus',
+      bufferSize: lowLatency ? 16 * 1024 * 1024 : 64 * 1024 * 1024,
       enableHardwareAcceleration: true,
       hwdec: 'auto-safe',
       androidAttachSurfaceAfterVideoParameters: false,
       mpvOptions: const <String, String>{
+        'volume': '100',
         'video-sync': 'audio',
+        'autosync': '30',
+        'force-seekable': 'yes',
+        'cache': 'yes',
+        'demuxer-seekable-cache': 'yes',
       },
     );
   }
 
   static TwitchPlayerProfile genericLive({bool lowLatency = true}) {
     return TwitchPlayerProfile(
-      id: lowLatency ? 'generic-live-low-latency' : 'generic-live-stable',
-      label: lowLatency ? 'Generic Live Low Latency' : 'Generic Live Stable',
-      bufferSize: lowLatency ? 16 * 1024 * 1024 : 32 * 1024 * 1024,
+      id: lowLatency ? 'generic-live-low-latency-piliplus' : 'generic-live-stable-piliplus',
+      label: lowLatency ? 'Generic Live Low Latency PiliPlus' : 'Generic Live Stable PiliPlus',
+      bufferSize: lowLatency ? 16 * 1024 * 1024 : 64 * 1024 * 1024,
       enableHardwareAcceleration: true,
       hwdec: 'auto-safe',
       androidAttachSurfaceAfterVideoParameters: false,
       mpvOptions: const <String, String>{
         'video-sync': 'audio',
+        'autosync': '30',
+        'force-seekable': 'yes',
+        'cache': 'yes',
+        'demuxer-seekable-cache': 'yes',
       },
     );
   }
