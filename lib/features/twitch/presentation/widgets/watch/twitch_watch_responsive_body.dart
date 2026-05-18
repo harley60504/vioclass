@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage219s_player_disabled_by_default
+// PATCH VERSION: twitch_watch_responsive_body_stage219ag_player_enabled_layout_restored
 
 import 'package:flutter/material.dart';
 
@@ -7,7 +7,7 @@ import 'twitch_watch_chat_resize_handle.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
-  defaultValue: false,
+  defaultValue: true,
 );
 
 class TwitchWatchResponsiveBody extends StatelessWidget {
