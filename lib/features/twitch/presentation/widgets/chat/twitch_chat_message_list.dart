@@ -1,4 +1,32 @@
-// PATCH VERSION: chat_message_list_stage219s_frosty_render_limit_and_tile_boundaries
+// PATCH VERSION: chat_message_list_stage217f_scroll_direction_import_fix
+// Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
+//
+// Stage 190:
+// - Fixes chat list freezing after the runtime reaches maxMessages.
+// - Previous logic only compared message count. Once TwitchChatRuntime hits the
+//   capped length, every new message removes one old message, so the count stays
+//   unchanged and the UI can stop syncing.
+// - This version also tracks the newest message fingerprint so rollover updates
+//   still refresh the visible list.
+//
+// Stage 197:
+// - Chat list no longer paints its own solid #0E0E10 background, so Watch chat
+//   panel has one unified background instead of stacked dark blocks.
+// - Purple accents are reduced to softer blue-purple tones.
+//
+// Stage 200:
+// - Moves the live divider from the first live message to the last old/history
+//   message. This keeps the divider at the same visual boundary, but prevents
+//   the first live IRC message tile from owning the divider and appearing twice
+//   in some rollover / rebuild cases.
+//
+// Stage 217:
+// - Makes touch / fast scroll less likely to be pulled back to latest messages.
+// - Lowers the auto-follow threshold and adds a short user-scroll guard window.
+//
+// Stage 217F:
+// - Adds the missing rendering import for ScrollDirection used by
+//   UserScrollNotification.direction.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -34,7 +62,6 @@ class TwitchChatMessageList extends StatefulWidget {
 
 class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const double _autoScrollThreshold = 36;
-  static const int _autoFollowRenderMessageLimit = 100;
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
 
@@ -90,23 +117,11 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
   void _resetVisibleMessagesFromRuntime({required bool forceAutoScroll}) {
     final sourceMessages = runtime.messages;
-    if (forceAutoScroll) _autoScroll = true;
-    _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
+    _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
     _lastSourceMessageCount = sourceMessages.length;
     _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
     _hiddenNewMessageCount = 0;
-  }
-
-  List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
-    List<TwitchChatRuntimeMessage> sourceMessages,
-  ) {
-    if (!_autoScroll || sourceMessages.length <= _autoFollowRenderMessageLimit) {
-      return List<TwitchChatRuntimeMessage>.of(sourceMessages);
-    }
-
-    return sourceMessages
-        .sublist(sourceMessages.length - _autoFollowRenderMessageLimit)
-        .toList(growable: false);
+    if (forceAutoScroll) _autoScroll = true;
   }
 
   void _syncVisibleMessagesFromRuntime() {
@@ -114,6 +129,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final sourceCount = sourceMessages.length;
     final sourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
 
+    // Count alone is not enough: runtime.messages is capped. When the cap is
+    // reached, a new incoming message removes the oldest item, so the total
+    // length stays unchanged. Without this fingerprint check, the chat UI can
+    // look frozen while IRC is still receiving messages.
     final sourceChanged = sourceCount != _lastSourceMessageCount ||
         sourceNewestFingerprint != _lastSourceNewestFingerprint;
 
@@ -134,9 +153,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final shouldAutoFollow = !userRecentlyScrolled && (_autoScroll || _isNearLatest);
 
     if (shouldAutoFollow) {
-      _autoScroll = true;
-      _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
+      _visibleMessages = List<TwitchChatRuntimeMessage>.of(sourceMessages);
       _hiddenNewMessageCount = 0;
+      _autoScroll = true;
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _animateToLatest();
@@ -164,12 +183,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     return 'fallback:$micros|$login|$text';
   }
 
-  String _messageStableKey(TwitchChatRuntimeMessage message) {
-    final id = message.id.trim();
-    if (id.isNotEmpty) return 'msg:$id';
-    return _messageFingerprint(message);
-  }
-
   int _estimateAddedMessageCount({
     required List<TwitchChatRuntimeMessage> sourceMessages,
     required int previousCount,
@@ -190,6 +203,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       messagesAfterPreviousNewest += 1;
     }
 
+    // The previous newest message is already outside the capped runtime list.
+    // This usually means a very active chat. Do not show a misleading huge
+    // number; just show that there are new messages and resume correctly when
+    // tapped.
     return 1;
   }
 
@@ -227,7 +244,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       if (userRecentlyScrolled) return;
       setState(() {
         _autoScroll = true;
-        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
+        _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
         _lastSourceMessageCount = runtime.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
@@ -238,7 +255,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (!nearLatest && _autoScroll) {
       setState(() {
         _autoScroll = false;
-        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       });
     }
   }
@@ -271,10 +287,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _programmaticScrollActive = false;
       if (!mounted) return;
       if (_isNearLatest && !_autoScroll && !_hasRecentUserScroll) {
-        setState(() {
-          _autoScroll = true;
-          _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
-        });
+        setState(() => _autoScroll = true);
       }
     });
   }
@@ -284,7 +297,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _autoScroll = true;
       _userScrollActive = false;
       _lastUserScrollAt = null;
-      _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
+      _visibleMessages = List<TwitchChatRuntimeMessage>.of(runtime.messages);
       _lastSourceMessageCount = runtime.messages.length;
       _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
       _hiddenNewMessageCount = 0;
@@ -377,10 +390,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
               reverse: true,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-              cacheExtent: 520,
-              addAutomaticKeepAlives: false,
-              addRepaintBoundaries: true,
-              addSemanticIndexes: false,
               itemCount: visibleMessages.length,
               itemBuilder: (context, index) {
                 final chronologicalIndex = visibleMessages.length - 1 - index;
@@ -390,23 +399,20 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                   chronologicalIndex,
                 );
 
-                return RepaintBoundary(
-                  key: ValueKey<String>(_messageStableKey(message)),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TwitchRuntimeMessageTile(
-                        message: message,
-                        thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                        showTimestamp: widget.showTimestamp,
-                        fontScale: widget.fontScale,
-                        compact: widget.compact,
-                        onOpenContext: () => _openContextSheet(message),
-                      ),
-                      if (showLiveDividerAfter)
-                        _LiveMessageDivider(fontScale: widget.fontScale),
-                    ],
-                  ),
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TwitchRuntimeMessageTile(
+                      message: message,
+                      thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                      showTimestamp: widget.showTimestamp,
+                      fontScale: widget.fontScale,
+                      compact: widget.compact,
+                      onOpenContext: () => _openContextSheet(message),
+                    ),
+                    if (showLiveDividerAfter)
+                      _LiveMessageDivider(fontScale: widget.fontScale),
+                  ],
                 );
               },
             ),
