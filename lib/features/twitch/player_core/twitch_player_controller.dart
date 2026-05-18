@@ -1,10 +1,16 @@
-// Stage 220A: Independent Twitch player controller.
+// Stage 220F: Independent Twitch player controller.
 //
 // Design goals:
 // - Keep media_kit lifecycle out of WatchPage.
 // - Centralize play / pause / volume / mute / open source operations.
 // - Reduce UI rebuild pressure by publishing position / buffered changes only
 //   when their second value changes, similar to PiliPlus' player controller.
+//
+// PiliPlus media_kit stream compatibility:
+// - PlayerStream exposes playing / completed / position / duration / buffer /
+//   buffering / log / error.
+// - It does not expose volume / width / height streams, so volume is maintained
+//   by this controller and video size is left as an optional future probe.
 
 import 'dart:async';
 
@@ -116,6 +122,8 @@ class TwitchPlayerController extends ChangeNotifier {
   Future<void> stop() async {
     if (!initialized) return;
     await engine.stop();
+    _lastPublishedPositionSecond = -1;
+    _lastPublishedBufferedSecond = -1;
     _emit(_state.copyWith(
       playing: false,
       buffering: false,
@@ -157,48 +165,49 @@ class TwitchPlayerController extends ChangeNotifier {
     _listenersAttached = true;
 
     final player = engine.player;
+    final stream = player.stream;
 
-    _subscriptions.add(player.stream.playing.listen((playing) {
+    _subscriptions.add(stream.playing.listen((playing) {
       _emit(_state.copyWith(playing: playing));
     }));
 
-    _subscriptions.add(player.stream.buffering.listen((buffering) {
-      _emit(_state.copyWith(buffering: buffering));
+    _subscriptions.add(stream.completed.listen((completed) {
+      if (!completed) return;
+      _emit(_state.copyWith(playing: false, buffering: false));
     }));
 
-    _subscriptions.add(player.stream.volume.listen((volume) {
-      final safe = volume.clamp(0.0, 100.0).toDouble();
-      if (safe > 0) _lastNonZeroVolume = safe;
-      _emit(_state.copyWith(volume: safe, muted: safe <= 0));
-    }));
-
-    _subscriptions.add(player.stream.position.listen((position) {
+    _subscriptions.add(stream.position.listen((position) {
       final second = position.inSeconds;
       if (second == _lastPublishedPositionSecond) return;
       _lastPublishedPositionSecond = second;
       _emit(_state.copyWith(position: position));
     }));
 
-    _subscriptions.add(player.stream.duration.listen((duration) {
+    _subscriptions.add(stream.duration.listen((duration) {
       _emit(_state.copyWith(duration: duration));
     }));
 
-    _subscriptions.add(player.stream.buffer.listen((buffered) {
+    _subscriptions.add(stream.buffer.listen((buffered) {
       final second = buffered.inSeconds;
       if (second == _lastPublishedBufferedSecond) return;
       _lastPublishedBufferedSecond = second;
       _emit(_state.copyWith(buffered: buffered));
     }));
 
-    _subscriptions.add(player.stream.width.listen((width) {
-      _emit(_state.copyWith(videoWidth: width == 0 ? null : width));
+    _subscriptions.add(stream.buffering.listen((buffering) {
+      _emit(_state.copyWith(buffering: buffering));
     }));
 
-    _subscriptions.add(player.stream.height.listen((height) {
-      _emit(_state.copyWith(videoHeight: height == 0 ? null : height));
-    }));
+    if (kDebugMode) {
+      _subscriptions.add(stream.log.listen((log) {
+        final text = log.toString();
+        if (text.contains('error') || text.contains('fatal')) {
+          debugPrint('[TwitchPlayerCore][mpv] $text');
+        }
+      }));
+    }
 
-    _subscriptions.add(player.stream.error.listen((error) {
+    _subscriptions.add(stream.error.listen((error) {
       _emit(_state.copyWith(error: error));
     }));
   }
