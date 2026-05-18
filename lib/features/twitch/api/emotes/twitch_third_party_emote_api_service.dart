@@ -51,7 +51,10 @@ class TwitchThirdPartyEmoteApiService {
 
     return raw
         .whereType<Map<String, dynamic>>()
-        .map(_bttvFromJson)
+        .map((json) => _bttvFromJson(
+              json,
+              scope: TwitchThirdPartyEmoteScope.global,
+            ))
         .where((emote) => emote.name.isNotEmpty && emote.imageUrl.isNotEmpty)
         .toList(growable: false);
   }
@@ -71,13 +74,23 @@ class TwitchThirdPartyEmoteApiService {
 
     if (channelEmotes is List) {
       output.addAll(
-        channelEmotes.whereType<Map<String, dynamic>>().map(_bttvFromJson),
+        channelEmotes.whereType<Map<String, dynamic>>().map(
+              (json) => _bttvFromJson(
+                json,
+                scope: TwitchThirdPartyEmoteScope.channel,
+              ),
+            ),
       );
     }
 
     if (sharedEmotes is List) {
       output.addAll(
-        sharedEmotes.whereType<Map<String, dynamic>>().map(_bttvFromJson),
+        sharedEmotes.whereType<Map<String, dynamic>>().map(
+              (json) => _bttvFromJson(
+                json,
+                scope: TwitchThirdPartyEmoteScope.shared,
+              ),
+            ),
       );
     }
 
@@ -86,7 +99,10 @@ class TwitchThirdPartyEmoteApiService {
         .toList(growable: false);
   }
 
-  TwitchThirdPartyEmote _bttvFromJson(Map<String, dynamic> json) {
+  TwitchThirdPartyEmote _bttvFromJson(
+    Map<String, dynamic> json, {
+    required TwitchThirdPartyEmoteScope scope,
+  }) {
     final id = json['id']?.toString() ?? '';
     final code = json['code']?.toString() ?? '';
     return TwitchThirdPartyEmote(
@@ -96,6 +112,7 @@ class TwitchThirdPartyEmoteApiService {
           ? ''
           : 'https://cdn.betterttv.net/emote/$id/2x',
       provider: TwitchThirdPartyEmoteProvider.bttv,
+      scope: scope,
       isZeroWidth: json['modifier'] == true,
       width: _readInt(json['width']),
       height: _readInt(json['height']),
@@ -107,7 +124,7 @@ class TwitchThirdPartyEmoteApiService {
       'https://api.frankerfacez.com/v1/set/global',
     );
 
-    return _ffzFromRoot(raw);
+    return _ffzFromRoot(raw, scope: TwitchThirdPartyEmoteScope.global);
   }
 
   Future<List<TwitchThirdPartyEmote>> fetchFfzChannel({
@@ -122,7 +139,10 @@ class TwitchThirdPartyEmoteApiService {
           'https://api.frankerfacez.com/v1/room/$login',
         );
 
-        final parsed = _ffzFromRoot(raw);
+        final parsed = _ffzFromRoot(
+          raw,
+          scope: TwitchThirdPartyEmoteScope.channel,
+        );
         if (parsed.isNotEmpty) return parsed;
       } catch (_) {
         // Fallback to id endpoint below.
@@ -133,10 +153,13 @@ class TwitchThirdPartyEmoteApiService {
       'https://api.frankerfacez.com/v1/room/id/$channelId',
     );
 
-    return _ffzFromRoot(raw);
+    return _ffzFromRoot(raw, scope: TwitchThirdPartyEmoteScope.channel);
   }
 
-  List<TwitchThirdPartyEmote> _ffzFromRoot(dynamic raw) {
+  List<TwitchThirdPartyEmote> _ffzFromRoot(
+    dynamic raw, {
+    required TwitchThirdPartyEmoteScope scope,
+  }) {
     if (raw is! Map<String, dynamic>) return const <TwitchThirdPartyEmote>[];
 
     final sets = raw['sets'];
@@ -171,6 +194,7 @@ class TwitchThirdPartyEmoteApiService {
             name: name,
             imageUrl: imageUrl,
             provider: TwitchThirdPartyEmoteProvider.ffz,
+            scope: scope,
             width: width,
             height: height,
           ),
@@ -188,7 +212,10 @@ class TwitchThirdPartyEmoteApiService {
       'https://7tv.io/v3/emote-sets/global',
     );
 
-    return _sevenTvFromEmoteSet(raw);
+    return _sevenTvFromEmoteSet(
+      raw,
+      scope: TwitchThirdPartyEmoteScope.global,
+    );
   }
 
   Future<List<TwitchThirdPartyEmote>> fetchSevenTvChannel({
@@ -200,10 +227,16 @@ class TwitchThirdPartyEmoteApiService {
 
     if (raw is! Map<String, dynamic>) return const <TwitchThirdPartyEmote>[];
 
-    return _sevenTvFromEmoteSet(raw['emote_set']);
+    return _sevenTvFromEmoteSet(
+      raw['emote_set'],
+      scope: TwitchThirdPartyEmoteScope.channel,
+    );
   }
 
-  List<TwitchThirdPartyEmote> _sevenTvFromEmoteSet(dynamic raw) {
+  List<TwitchThirdPartyEmote> _sevenTvFromEmoteSet(
+    dynamic raw, {
+    required TwitchThirdPartyEmoteScope scope,
+  }) {
     if (raw is! Map<String, dynamic>) return const <TwitchThirdPartyEmote>[];
 
     final emotes = raw['emotes'];
@@ -260,6 +293,7 @@ class TwitchThirdPartyEmoteApiService {
           name: name,
           imageUrl: imageUrl,
           provider: TwitchThirdPartyEmoteProvider.sevenTv,
+          scope: scope,
           isZeroWidth: (flags & 256) != 0,
           width: selectedWidth,
           height: selectedHeight,
