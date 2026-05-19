@@ -1,8 +1,8 @@
-// PATCH VERSION: twitch_player_common_buttons_stage221c_no_control_blur
+import 'package:flutter/material.dart';
 
-part of twitch_watch_player_area;
+import '../shared/twitch_glass.dart';
 
-class _RoundIconButton extends StatelessWidget {
+class RoundIconButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
   final Color iconColor;
@@ -14,7 +14,8 @@ class _RoundIconButton extends StatelessWidget {
   final bool tiny;
   final double? height;
 
-  const _RoundIconButton({
+  const RoundIconButton({
+    super.key,
     required this.tooltip,
     required this.icon,
     this.iconColor = Colors.white,
@@ -64,7 +65,7 @@ class _RoundIconButton extends StatelessWidget {
   }
 }
 
-class _PlainIconButton extends StatelessWidget {
+class PlainIconButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
   final VoidCallback? onPressed;
@@ -72,7 +73,8 @@ class _PlainIconButton extends StatelessWidget {
   final bool active;
   final bool dense;
 
-  const _PlainIconButton({
+  const PlainIconButton({
+    super.key,
     required this.tooltip,
     required this.icon,
     required this.onPressed,
