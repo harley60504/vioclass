@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 
-const int _channelPointEmoteGridCacheSize = 96;
-const int _channelPointModifierCacheSize = 76;
+const int _channelPointEmoteGridCacheSize = 112;
+const int _channelPointModifierCacheSize = 84;
 
 enum ChannelPointEmoteOverlayMode {
   choose,
@@ -76,7 +76,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       isDense: true,
-                      hintText: choosingModifier ? '選擇修改效果' : '搜尋名稱或 emote ID',
+                      hintText: choosingModifier ? '選擇修改效果' : '搜尋貼圖名稱',
                       hintStyle: const TextStyle(
                         color: Colors.white38,
                         fontSize: 13,
@@ -161,7 +161,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                                   ),
                                 Expanded(
                                   child: Text(
-                                    rewardTitle.isEmpty ? '選擇 emote' : rewardTitle,
+                                    rewardTitle.isEmpty ? '選擇貼圖' : rewardTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -205,7 +205,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                   : error != null
                       ? _OverlayMessage(
                           icon: Icons.error_outline_rounded,
-                          message: '載入 emote 清單失敗：$error',
+                          message: '載入貼圖清單失敗：$error',
                         )
                       : choosingModifier
                           ? _ModifierGrid(
@@ -215,7 +215,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                           : emotes.isEmpty
                               ? const _OverlayMessage(
                                   icon: Icons.search_off_rounded,
-                                  message: '沒有可顯示的 Channel Points emote。',
+                                  message: '沒有可顯示的 Channel Points 貼圖。',
                                 )
                               : _EmoteGrid(
                                   emotes: emotes,
@@ -249,7 +249,7 @@ class _EmoteGrid extends StatelessWidget {
                 : constraints.maxWidth >= 420
                     ? 4
                     : 3;
-        final itemExtent = constraints.maxWidth < 420 ? 104.0 : 118.0;
+        final itemExtent = constraints.maxWidth < 420 ? 96.0 : 108.0;
 
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
@@ -276,31 +276,23 @@ class _EmoteGrid extends StatelessWidget {
                   child: Column(
                     children: [
                       Expanded(
-                        child: _OptimizedChannelPointEmoteImage(
-                          imageUrl: emote.imageUrl,
-                          cacheSize: _channelPointEmoteGridCacheSize,
+                        child: Center(
+                          child: _OptimizedChannelPointEmoteImage(
+                            imageUrl: emote.imageUrl,
+                            cacheSize: _channelPointEmoteGridCacheSize,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 6),
                       Text(
                         emote.token,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.white70,
+                          color: Colors.white,
                           fontSize: constraints.maxWidth < 420 ? 10 : 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        emote.id,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white38,
-                          fontSize: constraints.maxWidth < 420 ? 8 : 9,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],
@@ -331,45 +323,71 @@ class _ModifierGrid extends StatelessWidget {
     if (modifications.isEmpty) {
       return const _OverlayMessage(
         icon: Icons.auto_fix_off_rounded,
-        message: '這個 emote 沒有可用的修改效果。',
+        message: '這個貼圖沒有可用的修改效果。',
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
-      itemCount: modifications.length,
-      itemBuilder: (context, index) {
-        final modifier = modifications[index];
-        return RepaintBoundary(
-          child: Card(
-            color: const Color(0xFF242429),
-            margin: const EdgeInsets.only(bottom: 8),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            child: ListTile(
-              onTap: () => onSelected(modifier),
-              leading: _OptimizedChannelPointEmoteImage(
-                imageUrl: modifier.imageUrl.isNotEmpty ? modifier.imageUrl : emote.imageUrl,
-                width: 38,
-                height: 38,
-                cacheSize: _channelPointModifierCacheSize,
-                fallbackIcon: Icons.auto_fix_high_rounded,
-              ),
-              title: Text(
-                modifier.token,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth >= 760
+            ? 5
+            : constraints.maxWidth >= 560
+                ? 4
+                : constraints.maxWidth >= 420
+                    ? 3
+                    : 2;
+
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            mainAxisExtent: constraints.maxWidth < 420 ? 104.0 : 114.0,
+          ),
+          itemCount: modifications.length,
+          itemBuilder: (context, index) {
+            final modifier = modifications[index];
+            return RepaintBoundary(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => onSelected(modifier),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF242429),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  ),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: _OptimizedChannelPointEmoteImage(
+                            imageUrl: modifier.imageUrl.isNotEmpty ? modifier.imageUrl : emote.imageUrl,
+                            cacheSize: _channelPointModifierCacheSize,
+                            fallbackIcon: Icons.auto_fix_high_rounded,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        modifier.token,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              subtitle: Text(
-                modifier.id,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white54),
-              ),
-              trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white54),
-            ),
-          ),
+            );
+          },
         );
       },
     );
