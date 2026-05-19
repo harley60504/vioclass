@@ -1,9 +1,8 @@
-// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage185_common_progressive_grid_import
+// PATCH VERSION: twitch_official_emote_id_picker_sheet_stage223_name_only_grid
 //
 // Twitch official emote ID picker used by Channel Points emote rewards.
-// This picker intentionally keeps its own grouping because Channel Points
-// emote rewards need emote IDs, not the same UX categories as the normal chat
-// emote picker.
+// Channel Points still needs emote IDs internally, but the visible picker UX now
+// matches the normal emote sheet: grid cards show the image and emote name only.
 
 import 'dart:async';
 
@@ -99,7 +98,7 @@ class _TwitchOfficialEmoteIdPickerSheetState
                 cursorColor: const Color(0xFFBF94FF),
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: '搜尋 Twitch 官方貼圖名稱或 ID',
+                  hintText: '搜尋貼圖名稱',
                   hintStyle: const TextStyle(color: Colors.white38),
                   prefixIcon: const Icon(Icons.search, color: Colors.white54),
                   filled: true,
@@ -132,21 +131,18 @@ class _TwitchOfficialEmoteIdPickerSheetState
                           OfficialEmoteIdPickerSection(
                             title: '此頻道可解鎖',
                             emotes: locked,
-                            badge: 'LOCKED',
                             resetKey: 'locked:$query:${locked.length}',
                           ),
                         if (usable.isNotEmpty)
                           OfficialEmoteIdPickerSection(
                             title: '我的可用 / 此頻道',
                             emotes: usable,
-                            badge: 'OWNED',
                             resetKey: 'usable:$query:${usable.length}',
                           ),
                         if (global.isNotEmpty)
                           OfficialEmoteIdPickerSection(
                             title: 'Twitch 共用',
                             emotes: global,
-                            badge: 'GLOBAL',
                             resetKey: 'global:$query:${global.length}',
                           ),
                         if (locked.isEmpty && usable.isEmpty && global.isEmpty)
@@ -176,14 +172,12 @@ class _TwitchOfficialEmoteIdPickerSheetState
 class OfficialEmoteIdPickerSection extends StatelessWidget {
   final String title;
   final List<TwitchOfficialEmote> emotes;
-  final String badge;
   final String resetKey;
 
   const OfficialEmoteIdPickerSection({
     super.key,
     required this.title,
     required this.emotes,
-    required this.badge,
     required this.resetKey,
   });
 
@@ -218,10 +212,10 @@ class OfficialEmoteIdPickerSection extends StatelessWidget {
               maxCrossAxisExtent: 126,
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              childAspectRatio: 0.86,
+              childAspectRatio: 1.02,
             ),
             itemBuilder: (context, emote, index) {
-              return OfficialEmoteIdGridCard(emote: emote, badge: badge);
+              return OfficialEmoteIdGridCard(emote: emote);
             },
           ),
         ],
@@ -232,12 +226,10 @@ class OfficialEmoteIdPickerSection extends StatelessWidget {
 
 class OfficialEmoteIdGridCard extends StatelessWidget {
   final TwitchOfficialEmote emote;
-  final String badge;
 
   const OfficialEmoteIdGridCard({
     super.key,
     required this.emote,
-    required this.badge,
   });
 
   @override
@@ -245,18 +237,11 @@ class OfficialEmoteIdGridCard extends StatelessWidget {
     return RepaintBoundary(
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          final selectedId = await confirmOfficialEmoteId(
-            context: context,
-            emote: emote,
-            badge: badge,
-          );
-          if (selectedId == null || selectedId.trim().isEmpty) return;
-          if (!context.mounted) return;
+        onTap: () {
           debugPrint(
-            '[ChannelPointsEmoteIdPicker] selected name=${emote.name} id=$selectedId badge=$badge',
+            '[ChannelPointsEmoteIdPicker] selected name=${emote.name} id=${emote.id}',
           );
-          Navigator.of(context).pop(selectedId.trim());
+          Navigator.of(context).pop(emote.id.trim());
         },
         child: Container(
           padding: const EdgeInsets.all(8),
@@ -275,37 +260,16 @@ class OfficialEmoteIdGridCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               Text(
                 emote.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
                   fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'ID: ${emote.id}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFFFD166),
-                  fontSize: 9,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                badge,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white38,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
@@ -314,84 +278,4 @@ class OfficialEmoteIdGridCard extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<String?> confirmOfficialEmoteId({
-  required BuildContext context,
-  required TwitchOfficialEmote emote,
-  required String badge,
-}) {
-  return showTwitchUnifiedSheet<String>(
-    context: context,
-    title: '確認使用這個 emote ID',
-    subtitle: emote.name,
-    icon: Icons.tag_rounded,
-    size: TwitchUnifiedSheetSize.compact,
-    showRefresh: false,
-    builder: (dialogContext) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: TwitchOptimizedEmoteImage(
-                        imageUrl: emote.imageUrl,
-                        width: 72,
-                        height: 72,
-                        cacheSize: twitchEmotePreviewCacheSize,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      emote.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    SelectableText(
-                      emote.id,
-                      style: const TextStyle(
-                        color: Color(0xFFBF94FF),
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      badge,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('取消'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(emote.id),
-                  child: const Text('使用'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    },
-  );
 }
