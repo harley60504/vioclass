@@ -153,7 +153,7 @@ class _WatchTopActionButtons {
 
   List<Widget> buildRightActions() {
     return <Widget>[
-      _FollowButton(
+      FollowButton(
         followed: isFollowing,
         busy: followBusy,
         compact: metrics.compact,
@@ -162,7 +162,7 @@ class _WatchTopActionButtons {
         onPressed: onToggleFollow,
       ),
       SizedBox(width: metrics.actionGap),
-      _SubscribeButton(
+      SubscribeButton(
         compact: metrics.compact,
         tiny: metrics.tiny,
         height: metrics.controlHeight,
