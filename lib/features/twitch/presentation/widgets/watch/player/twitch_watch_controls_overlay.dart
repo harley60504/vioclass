@@ -216,7 +216,7 @@ class _WatchChromeStack extends StatelessWidget {
           left: 12,
           right: 12,
           top: 12,
-          child: _WatchTopActionBar(
+          child: WatchTopActionBar(
             metadata: widget.metadata,
             isFollowing: widget.isFollowing,
             followBusy: widget.followBusy,
