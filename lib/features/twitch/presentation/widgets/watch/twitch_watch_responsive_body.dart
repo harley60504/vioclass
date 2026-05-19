@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage226f_player_only_video_surface
-
 import 'package:flutter/material.dart';
 
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
@@ -56,10 +54,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
       animation: pip,
       builder: (context, _) {
         if (pip.shouldRenderPlayerOnly) {
-          return ColoredBox(
-            color: Colors.black,
-            child: player,
-          );
+          return _PlayerOnlySurface(player: player);
         }
 
         return ColoredBox(
@@ -67,92 +62,32 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final layout = TwitchResponsiveLayout.fromConstraints(constraints);
-              final shellPadding = _shellPaddingFor(layout);
-              final shellGap = _shellGapFor(layout);
 
               if (!_enableWatchPlayer) {
-                return Padding(
-                  padding: shellPadding,
-                  child: _WatchSurface(
-                    child: chatVisible ? chat : const _WatchPlayerDisabledPlaceholder(),
-                  ),
+                return _DisabledPlayerLayout(
+                  layout: layout,
+                  chatVisible: chatVisible,
+                  chat: chat,
                 );
               }
 
               if (layout.shouldUseBottomChat) {
-                final availableWidth = layout.width - shellPadding.horizontal;
-                final availableHeight = layout.height - shellPadding.vertical;
-                final preferredPlayerHeight =
-                    (availableWidth / _playerAspectRatio).clamp(150.0, 320.0).toDouble();
-                final maxPlayerHeightWithChat =
-                    (availableHeight - 430.0).clamp(140.0, 320.0).toDouble();
-                final playerHeight = preferredPlayerHeight
-                    .clamp(140.0, maxPlayerHeightWithChat)
-                    .toDouble();
-
-                return Padding(
-                  padding: shellPadding,
-                  child: Column(
-                    children: [
-                      if (chatVisible)
-                        SizedBox(
-                          height: playerHeight,
-                          width: double.infinity,
-                          child: _WatchSurface(child: player),
-                        )
-                      else
-                        Expanded(child: _WatchSurface(child: player)),
-                      if (chatVisible) SizedBox(height: shellGap),
-                      if (chatVisible)
-                        Expanded(
-                          child: _WatchSurface(child: chat),
-                        ),
-                    ],
-                  ),
+                return _BottomChatLayout(
+                  layout: layout,
+                  chatVisible: chatVisible,
+                  player: player,
+                  chat: chat,
                 );
               }
 
-              final effectiveChatWidth = _effectiveChatPanelWidthForViewport(layout);
-              final horizontalPadding = shellPadding.horizontal;
-              final usableWidth = (layout.width - horizontalPadding - shellGap)
-                  .clamp(1.0, layout.width)
-                  .toDouble();
-              var dragStartWidth = effectiveChatWidth;
-              var accumulatedDx = 0.0;
-
-              return Padding(
-                padding: shellPadding,
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: layout.isPhoneLandscape ? 10 : 1,
-                      child: _WatchSurface(child: player),
-                    ),
-                    if (chatVisible)
-                      SizedBox(
-                        width: shellGap,
-                        child: TwitchWatchChatResizeHandle(
-                          onDragStart: (_) {
-                            dragStartWidth = effectiveChatWidth;
-                            accumulatedDx = 0.0;
-                          },
-                          onDragUpdate: (delta) {
-                            accumulatedDx += delta.delta.dx;
-                            onSetChatPanelWidthForViewport(
-                              viewportWidth: usableWidth,
-                              value: dragStartWidth - accumulatedDx,
-                            );
-                          },
-                          onDragEnd: onPersistChatPanelWidth,
-                        ),
-                      ),
-                    if (chatVisible)
-                      SizedBox(
-                        width: effectiveChatWidth,
-                        child: _WatchSurface(child: chat),
-                      ),
-                  ],
-                ),
+              return _SideChatLayout(
+                layout: layout,
+                chatVisible: chatVisible,
+                chatPanelWidth: _effectiveChatPanelWidthForViewport(layout),
+                player: player,
+                chat: chat,
+                onSetChatPanelWidthForViewport: onSetChatPanelWidthForViewport,
+                onPersistChatPanelWidth: onPersistChatPanelWidth,
               );
             },
           ),
@@ -161,24 +96,20 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     );
   }
 
-  EdgeInsets _shellPaddingFor(TwitchResponsiveLayout layout) {
-    if (layout.isPhonePortrait) {
-      return const EdgeInsets.all(8);
-    }
-    if (layout.width < 900 || layout.isPhoneLandscape) {
-      return const EdgeInsets.all(10);
-    }
+  static EdgeInsets shellPaddingFor(TwitchResponsiveLayout layout) {
+    if (layout.isPhonePortrait) return const EdgeInsets.all(8);
+    if (layout.width < 900 || layout.isPhoneLandscape) return const EdgeInsets.all(10);
     return const EdgeInsets.all(14);
   }
 
-  double _shellGapFor(TwitchResponsiveLayout layout) {
+  static double shellGapFor(TwitchResponsiveLayout layout) {
     if (layout.isPhonePortrait || layout.width < 900) return 8;
     return 12;
   }
 
   double _effectiveChatPanelWidthForViewport(TwitchResponsiveLayout layout) {
-    final horizontalPadding = _shellPaddingFor(layout).horizontal;
-    final gapWidth = chatVisible ? _shellGapFor(layout) : 0.0;
+    final horizontalPadding = shellPaddingFor(layout).horizontal;
+    final gapWidth = chatVisible ? shellGapFor(layout) : 0.0;
     final usableWidth = (layout.width - horizontalPadding - gapWidth)
         .clamp(1.0, layout.width)
         .toDouble();
@@ -194,6 +125,162 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
+  }
+}
+
+class _PlayerOnlySurface extends StatelessWidget {
+  final Widget player;
+
+  const _PlayerOnlySurface({required this.player});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: player,
+    );
+  }
+}
+
+class _DisabledPlayerLayout extends StatelessWidget {
+  final TwitchResponsiveLayout layout;
+  final bool chatVisible;
+  final Widget chat;
+
+  const _DisabledPlayerLayout({
+    required this.layout,
+    required this.chatVisible,
+    required this.chat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: TwitchWatchResponsiveBody.shellPaddingFor(layout),
+      child: _WatchSurface(
+        child: chatVisible ? chat : const _WatchPlayerDisabledPlaceholder(),
+      ),
+    );
+  }
+}
+
+class _BottomChatLayout extends StatelessWidget {
+  final TwitchResponsiveLayout layout;
+  final bool chatVisible;
+  final Widget player;
+  final Widget chat;
+
+  const _BottomChatLayout({
+    required this.layout,
+    required this.chatVisible,
+    required this.player,
+    required this.chat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shellPadding = TwitchWatchResponsiveBody.shellPaddingFor(layout);
+    final shellGap = TwitchWatchResponsiveBody.shellGapFor(layout);
+
+    final availableWidth = layout.width - shellPadding.horizontal;
+    final availableHeight = layout.height - shellPadding.vertical;
+    final preferredPlayerHeight =
+        (availableWidth / TwitchWatchResponsiveBody._playerAspectRatio)
+            .clamp(150.0, 320.0)
+            .toDouble();
+    final maxPlayerHeightWithChat =
+        (availableHeight - 430.0).clamp(140.0, 320.0).toDouble();
+    final playerHeight = preferredPlayerHeight
+        .clamp(140.0, maxPlayerHeightWithChat)
+        .toDouble();
+
+    return Padding(
+      padding: shellPadding,
+      child: Column(
+        children: [
+          if (chatVisible)
+            SizedBox(
+              height: playerHeight,
+              width: double.infinity,
+              child: _WatchSurface(child: player),
+            )
+          else
+            Expanded(child: _WatchSurface(child: player)),
+          if (chatVisible) SizedBox(height: shellGap),
+          if (chatVisible)
+            Expanded(
+              child: _WatchSurface(child: chat),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SideChatLayout extends StatelessWidget {
+  final TwitchResponsiveLayout layout;
+  final bool chatVisible;
+  final double chatPanelWidth;
+  final Widget player;
+  final Widget chat;
+  final void Function({required double viewportWidth, required double value})
+      onSetChatPanelWidthForViewport;
+  final VoidCallback onPersistChatPanelWidth;
+
+  const _SideChatLayout({
+    required this.layout,
+    required this.chatVisible,
+    required this.chatPanelWidth,
+    required this.player,
+    required this.chat,
+    required this.onSetChatPanelWidthForViewport,
+    required this.onPersistChatPanelWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final shellPadding = TwitchWatchResponsiveBody.shellPaddingFor(layout);
+    final shellGap = TwitchWatchResponsiveBody.shellGapFor(layout);
+    final usableWidth = (layout.width - shellPadding.horizontal - shellGap)
+        .clamp(1.0, layout.width)
+        .toDouble();
+    var dragStartWidth = chatPanelWidth;
+    var accumulatedDx = 0.0;
+
+    return Padding(
+      padding: shellPadding,
+      child: Row(
+        children: [
+          Expanded(
+            flex: layout.isPhoneLandscape ? 10 : 1,
+            child: _WatchSurface(child: player),
+          ),
+          if (chatVisible)
+            SizedBox(
+              width: shellGap,
+              child: TwitchWatchChatResizeHandle(
+                onDragStart: (_) {
+                  dragStartWidth = chatPanelWidth;
+                  accumulatedDx = 0.0;
+                },
+                onDragUpdate: (delta) {
+                  accumulatedDx += delta.delta.dx;
+                  onSetChatPanelWidthForViewport(
+                    viewportWidth: usableWidth,
+                    value: dragStartWidth - accumulatedDx,
+                  );
+                },
+                onDragEnd: onPersistChatPanelWidth,
+              ),
+            ),
+          if (chatVisible)
+            SizedBox(
+              width: chatPanelWidth,
+              child: _WatchSurface(child: chat),
+            ),
+        ],
+      ),
+    );
   }
 }
 
