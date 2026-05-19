@@ -1,19 +1,25 @@
-part of twitch_watch_player_area;
+import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+
+import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import 'twitch_player_debug_copy_actions.dart';
 
 enum _PlayerMoreAction {
   debug,
 }
 
-class _PlayerMoreActionsButton extends StatefulWidget {
+class PlayerMoreActionsButton extends StatefulWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
 
-  const _PlayerMoreActionsButton({required this.playerRuntime});
+  const PlayerMoreActionsButton({super.key, required this.playerRuntime});
 
   @override
-  State<_PlayerMoreActionsButton> createState() => _PlayerMoreActionsButtonState();
+  State<PlayerMoreActionsButton> createState() => _PlayerMoreActionsButtonState();
 }
 
-class _PlayerMoreActionsButtonState extends State<_PlayerMoreActionsButton> {
+class _PlayerMoreActionsButtonState extends State<PlayerMoreActionsButton> {
   final GlobalKey _buttonKey = GlobalKey();
 
   bool get _showDebugMenu {
@@ -40,7 +46,7 @@ class _PlayerMoreActionsButtonState extends State<_PlayerMoreActionsButton> {
       items: const <PopupMenuEntry<_PlayerMoreAction>>[
         PopupMenuItem<_PlayerMoreAction>(
           value: _PlayerMoreAction.debug,
-          child: _DebugMenuRow(
+          child: DebugMenuRow(
             icon: Icons.bug_report_outlined,
             label: 'Debug  ›',
           ),
@@ -58,20 +64,20 @@ class _PlayerMoreActionsButtonState extends State<_PlayerMoreActionsButton> {
   }
 
   Future<void> _openDebugSubmenu() async {
-    final selected = await _showAnchoredMenu<_PlaybackDebugCopyAction>(
+    final selected = await _showAnchoredMenu<PlaybackDebugCopyAction>(
       width: 270,
       height: 112,
-      items: const <PopupMenuEntry<_PlaybackDebugCopyAction>>[
-        PopupMenuItem<_PlaybackDebugCopyAction>(
-          value: _PlaybackDebugCopyAction.proxyUrl,
-          child: _DebugMenuRow(
+      items: const <PopupMenuEntry<PlaybackDebugCopyAction>>[
+        PopupMenuItem<PlaybackDebugCopyAction>(
+          value: PlaybackDebugCopyAction.proxyUrl,
+          child: DebugMenuRow(
             icon: Icons.link,
             label: '複製 Dart Proxy URL',
           ),
         ),
-        PopupMenuItem<_PlaybackDebugCopyAction>(
-          value: _PlaybackDebugCopyAction.mpvProxyCommand,
-          child: _DebugMenuRow(
+        PopupMenuItem<PlaybackDebugCopyAction>(
+          value: PlaybackDebugCopyAction.mpvProxyCommand,
+          child: DebugMenuRow(
             icon: Icons.terminal,
             label: '複製 mpv Proxy 指令',
           ),
@@ -81,7 +87,7 @@ class _PlayerMoreActionsButtonState extends State<_PlayerMoreActionsButton> {
 
     if (!mounted || selected == null) return;
 
-    await _PlaybackDebugCopyButton.copyAction(
+    await PlaybackDebugCopyButton.copyAction(
       context: context,
       playerRuntime: widget.playerRuntime,
       action: selected,
