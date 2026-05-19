@@ -1,14 +1,3 @@
-// PATCH VERSION: watch_player_area_stage226f_shared_media_kit_video_surface
-// Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
-//
-// StreamNook-style player area entry point.
-// Stage 220I: allow WatchPage to build before the lazy PiliPlus media_kit
-// session has finished creating Player / VideoController.
-// Stage 226: Android PiP integration hides all non-video chrome while PiP is
-// active and exposes a PiP button through the player controls.
-// Stage 226F: normal player and PiP now share the extracted pure media_kit
-// video surface widget.
-
 library twitch_watch_player_area;
 
 import 'dart:async';
@@ -118,74 +107,156 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[playerRuntime, pip]),
       builder: (context, _) {
-        final currentPlayer = player;
-        final currentVideoController = videoController;
-        final playerReady = currentPlayer != null && currentVideoController != null;
-        final inPipMode = pip.isInPictureInPictureMode;
-        final effectiveFullscreen = fullscreen || fullscreenMode;
-        final effectiveChatVisible = inPipMode ? false : chatVisible;
-        final effectiveFollowBusy = followBusy || relationshipBusy;
-        final effectiveQualityVariants = qualityVariants ?? playerRuntime.variants;
-        final effectiveCurrentVariant = currentVariant ?? playerRuntime.currentVariant;
-        final effectiveOnQualityChanged = onQualityChanged ?? onQualitySelected;
+        final state = _WatchPlayerAreaState.fromWidget(
+          widget: this,
+          pip: pip,
+        );
 
-        return ColoredBox(
-          color: inPipMode ? Colors.black : Colors.transparent,
-          child: Stack(
-            clipBehavior: Clip.hardEdge,
-            children: [
-              Positioned.fill(
-                child: playerReady
-                    ? TwitchMediaKitVideoSurface(controller: currentVideoController)
-                    : const TwitchMediaKitVideoWaitingSurface(),
-              ),
-              if (!inPipMode)
-                if (playerReady)
-                  Positioned.fill(
-                    child: _WatchControlsOverlay(
-                      loading: loading ||
-                          playerRuntime.loading ||
-                          playerRuntime.switchingQuality,
-                      error: error,
-                      runtimeError: playerRuntime.error,
-                      metadata: metadata,
-                      isFollowing: isFollowing,
-                      followBusy: effectiveFollowBusy,
-                      onBack: onBack,
-                      onToggleFollow: onToggleFollow,
-                      onSubscribe: onSubscribe,
-                      onReload: onReload,
-                      onStop: onStop,
-                      player: currentPlayer,
-                      playerRuntime: playerRuntime,
-                      muted: muted,
-                      volume: volume,
-                      fullscreen: effectiveFullscreen,
-                      chatVisible: effectiveChatVisible,
-                      showFullscreenButton: showFullscreenButton,
-                      onToggleMute: onToggleMute,
-                      onVolumeChanged: onVolumeChanged,
-                      qualityVariants: effectiveQualityVariants,
-                      currentVariant: effectiveCurrentVariant,
-                      onQualityChanged: effectiveOnQualityChanged,
-                      onToggleChat: onToggleChat,
-                      onToggleFullscreen: onToggleFullscreen,
-                    ),
-                  )
-                else
-                  Positioned.fill(
-                    child: _WatchControlsNotReadyOverlay(
-                      metadata: metadata,
-                      loading: loading || playerRuntime.loading,
-                      onBack: onBack,
-                      onReload: onReload,
-                    ),
-                  ),
-            ],
+        return _WatchPlayerShell(
+          inPipMode: state.inPipMode,
+          video: _WatchPlayerVideoStage(
+            controller: state.videoController,
           ),
+          overlay: state.shouldShowControlsOverlay
+              ? _WatchControlsOverlay(
+                  loading: state.overlayLoading,
+                  error: error,
+                  runtimeError: playerRuntime.error,
+                  metadata: metadata,
+                  isFollowing: isFollowing,
+                  followBusy: state.effectiveFollowBusy,
+                  onBack: onBack,
+                  onToggleFollow: onToggleFollow,
+                  onSubscribe: onSubscribe,
+                  onReload: onReload,
+                  onStop: onStop,
+                  player: state.player!,
+                  playerRuntime: playerRuntime,
+                  muted: muted,
+                  volume: volume,
+                  fullscreen: state.effectiveFullscreen,
+                  chatVisible: state.effectiveChatVisible,
+                  showFullscreenButton: showFullscreenButton,
+                  onToggleMute: onToggleMute,
+                  onVolumeChanged: onVolumeChanged,
+                  qualityVariants: state.effectiveQualityVariants,
+                  currentVariant: state.effectiveCurrentVariant,
+                  onQualityChanged: state.effectiveOnQualityChanged,
+                  onToggleChat: onToggleChat,
+                  onToggleFullscreen: onToggleFullscreen,
+                )
+              : null,
+          waitingOverlay: state.shouldShowWaitingOverlay
+              ? _WatchControlsNotReadyOverlay(
+                  metadata: metadata,
+                  loading: loading || playerRuntime.loading,
+                  onBack: onBack,
+                  onReload: onReload,
+                )
+              : null,
         );
       },
     );
+  }
+}
+
+class _WatchPlayerAreaState {
+  final Player? player;
+  final VideoController? videoController;
+  final bool playerReady;
+  final bool inPipMode;
+  final bool effectiveFullscreen;
+  final bool effectiveChatVisible;
+  final bool effectiveFollowBusy;
+  final bool overlayLoading;
+  final List<TwitchM3u8Variant> effectiveQualityVariants;
+  final TwitchM3u8Variant? effectiveCurrentVariant;
+  final ValueChanged<TwitchM3u8Variant>? effectiveOnQualityChanged;
+
+  const _WatchPlayerAreaState({
+    required this.player,
+    required this.videoController,
+    required this.playerReady,
+    required this.inPipMode,
+    required this.effectiveFullscreen,
+    required this.effectiveChatVisible,
+    required this.effectiveFollowBusy,
+    required this.overlayLoading,
+    required this.effectiveQualityVariants,
+    required this.effectiveCurrentVariant,
+    required this.effectiveOnQualityChanged,
+  });
+
+  factory _WatchPlayerAreaState.fromWidget({
+    required TwitchWatchPlayerArea widget,
+    required TwitchAndroidPipController pip,
+  }) {
+    final playerReady = widget.player != null && widget.videoController != null;
+
+    return _WatchPlayerAreaState(
+      player: widget.player,
+      videoController: widget.videoController,
+      playerReady: playerReady,
+      inPipMode: pip.isInPictureInPictureMode,
+      effectiveFullscreen: widget.fullscreen || widget.fullscreenMode,
+      effectiveChatVisible:
+          pip.isInPictureInPictureMode ? false : widget.chatVisible,
+      effectiveFollowBusy: widget.followBusy || widget.relationshipBusy,
+      overlayLoading: widget.loading ||
+          widget.playerRuntime.loading ||
+          widget.playerRuntime.switchingQuality,
+      effectiveQualityVariants:
+          widget.qualityVariants ?? widget.playerRuntime.variants,
+      effectiveCurrentVariant:
+          widget.currentVariant ?? widget.playerRuntime.currentVariant,
+      effectiveOnQualityChanged:
+          widget.onQualityChanged ?? widget.onQualitySelected,
+    );
+  }
+
+  bool get shouldShowControlsOverlay => playerReady && !inPipMode;
+  bool get shouldShowWaitingOverlay => !playerReady && !inPipMode;
+}
+
+class _WatchPlayerShell extends StatelessWidget {
+  final bool inPipMode;
+  final Widget video;
+  final Widget? overlay;
+  final Widget? waitingOverlay;
+
+  const _WatchPlayerShell({
+    required this.inPipMode,
+    required this.video,
+    required this.overlay,
+    required this.waitingOverlay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: inPipMode ? Colors.black : Colors.transparent,
+      child: Stack(
+        clipBehavior: Clip.hardEdge,
+        children: [
+          Positioned.fill(child: video),
+          if (overlay != null) Positioned.fill(child: overlay!),
+          if (waitingOverlay != null) Positioned.fill(child: waitingOverlay!),
+        ],
+      ),
+    );
+  }
+}
+
+class _WatchPlayerVideoStage extends StatelessWidget {
+  final VideoController? controller;
+
+  const _WatchPlayerVideoStage({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = this.controller;
+    if (controller == null) return const TwitchMediaKitVideoWaitingSurface();
+    return TwitchMediaKitVideoSurface(controller: controller);
   }
 }
 
