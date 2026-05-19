@@ -308,10 +308,10 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       relationshipError: _relationshipError,
       onToggleFollow: _toggleFollowChannel,
       onSubscribe: _openSubscribePage,
-      chatVisible: _chatVisible,
+      chatVisible: _fullscreenMode ? false : _chatVisible,
       fullscreenMode: _fullscreenMode,
       showFullscreenButton: TwitchFullscreenController.isDesktopPlatform,
-      onToggleChat: _toggleChatVisibility,
+      onToggleChat: _fullscreenMode ? null : _toggleChatVisibility,
       onToggleFullscreen: () => unawaited(_toggleFullscreenMode()),
       muted: _isMuted,
       volume: _volume,
@@ -354,7 +354,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         children: [
           Positioned.fill(
             child: TwitchWatchResponsiveBody(
-              chatVisible: _chatVisible,
+              chatVisible: _fullscreenMode ? false : _chatVisible,
+              fullscreenMode: _fullscreenMode,
               chatPanelWidth: _chatPanelWidth,
               chatPanelRatio: _chatPanelRatio,
               minChatPanelWidth: _minChatPanelWidth,
