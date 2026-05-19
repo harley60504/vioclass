@@ -52,7 +52,9 @@ END
 
 // Icon with lowest ID value placed first to ensure application icon
 // remains consistent on all systems.
-IDI_APP_ICON            ICON                    "resources\\app_icon.ico"
+// Keep the Windows launcher icon in assets/app so app artwork has one shared
+// location. The .ico file is generated from assets/app/vio_class_icon.svg.
+IDI_APP_ICON            ICON                    "..\\..\\assets\\app\\vio_class_icon.ico"
 
 
 /////////////////////////////////////////////////////////////////////////////
