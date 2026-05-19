@@ -43,187 +43,427 @@ class _WatchBottomControlBar extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final veryNarrow = constraints.maxWidth < 430;
-            // Layout should be decided by available width, not platform.
-            // Tablets can keep the same desktop-like control layout while the
-            // control surfaces still stay low-cost by using no blur/shadow.
-            final useCompactLayout = constraints.maxWidth < 700;
-            final collapseLivePlayback = veryNarrow;
-            final barHeight = useCompactLayout ? 58.0 : 72.0;
-            final horizontalPadding = veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0;
-
-            final compactDesignWidth = veryNarrow ? 390.0 : 620.0;
-            final compactDesignHeight = 58.0;
-            final contentWidth = useCompactLayout ? compactDesignWidth : constraints.maxWidth;
-            final contentHeight = useCompactLayout ? compactDesignHeight : barHeight;
+            final layout = _WatchBottomControlBarLayout.fromWidth(
+              constraints.maxWidth,
+            );
 
             final controlsContent = SizedBox(
-              width: contentWidth,
-              height: contentHeight,
+              width: layout.contentWidth,
+              height: layout.contentHeight,
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: useCompactLayout
-                    ? Row(
-                        children: [
-                          _PlainIconButton(
-                            tooltip: playing ? '暫停' : '播放',
-                            icon: playing ? Icons.pause : Icons.play_arrow,
-                            size: veryNarrow ? 26 : 28,
-                            dense: true,
-                            onPressed: () {
-                              unawaited(playing ? player.pause() : player.play());
-                            },
-                          ),
-                          SizedBox(width: veryNarrow ? 2 : 6),
-                          if (collapseLivePlayback) ...[
-                            _LivePlaybackSheetButton(
-                              player: player,
-                              playerRuntime: playerRuntime,
-                            ),
-                            const Spacer(),
-                          ] else ...[
-                            Expanded(
-                              child: TwitchLivePlaybackStrip(
-                                player: player,
-                                playerRuntime: playerRuntime,
-                                compact: true,
-                              ),
-                            ),
-                          ],
-                          SizedBox(width: veryNarrow ? 2 : 6),
-                          _CompactInlineVolumeControl(
-                            muted: muted,
-                            volume: volume,
-                            sliderWidth: veryNarrow ? 50 : 76,
-                            onToggleMute: onToggleMute,
-                            onVolumeChanged: onVolumeChanged,
-                          ),
-                          SizedBox(width: veryNarrow ? 1 : 4),
-                          _QualityButton(
-                            variants: qualityVariants,
-                            currentVariant: currentVariant,
-                            onChanged: onQualityChanged,
-                          ),
-                          _PlainIconButton(
-                            tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
-                            icon: chatVisible
-                                ? Icons.chat_bubble
-                                : Icons.chat_bubble_outline,
-                            size: veryNarrow ? 21 : 23,
-                            active: chatVisible,
-                            dense: true,
-                            onPressed: onToggleChat,
-                          ),
-                          if (showFullscreenButton)
-                            _PlainIconButton(
-                              tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
-                              icon: fullscreen
-                                  ? Icons.fullscreen_exit
-                                  : Icons.fullscreen,
-                              size: veryNarrow ? 23 : 25,
-                              active: fullscreen,
-                              dense: true,
-                              onPressed: onToggleFullscreen,
-                            ),
-                          const _AndroidPipButton(
-                            dense: true,
-                            size: 22,
-                          ),
-                          _PlayerMoreActionsButton(playerRuntime: playerRuntime),
-                        ],
+                padding: EdgeInsets.symmetric(
+                  horizontal: layout.horizontalPadding,
+                ),
+                child: layout.useCompactLayout
+                    ? _CompactWatchBottomControls(
+                        player: player,
+                        playerRuntime: playerRuntime,
+                        playing: playing,
+                        muted: muted,
+                        volume: volume,
+                        fullscreen: fullscreen,
+                        chatVisible: chatVisible,
+                        showFullscreenButton: showFullscreenButton,
+                        onToggleMute: onToggleMute,
+                        onVolumeChanged: onVolumeChanged,
+                        qualityVariants: qualityVariants,
+                        currentVariant: currentVariant,
+                        onQualityChanged: onQualityChanged,
+                        onToggleChat: onToggleChat,
+                        onToggleFullscreen: onToggleFullscreen,
+                        veryNarrow: layout.veryNarrow,
                       )
-                    : Row(
-                        children: [
-                          _PlainIconButton(
-                            tooltip: playing ? '暫停' : '播放',
-                            icon: playing ? Icons.pause : Icons.play_arrow,
-                            size: 32,
-                            onPressed: () {
-                              unawaited(playing ? player.pause() : player.play());
-                            },
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: TwitchLivePlaybackStrip(
-                              player: player,
-                              playerRuntime: playerRuntime,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          _PlainIconButton(
-                            tooltip: muted ? '取消靜音' : '靜音',
-                            icon: muted || volume <= 0
-                                ? Icons.volume_off
-                                : Icons.volume_up,
-                            size: 24,
-                            onPressed: onToggleMute,
-                          ),
-                          SizedBox(
-                            width: 92,
-                            child: Slider(
-                              value: volume.clamp(0.0, 100.0).toDouble(),
-                              min: 0,
-                              max: 100,
-                              onChanged: onVolumeChanged,
-                            ),
-                          ),
-                          _QualityButton(
-                            variants: qualityVariants,
-                            currentVariant: currentVariant,
-                            onChanged: onQualityChanged,
-                          ),
-                          _PlainIconButton(
-                            tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
-                            icon: chatVisible
-                                ? Icons.chat_bubble
-                                : Icons.chat_bubble_outline,
-                            size: 23,
-                            active: chatVisible,
-                            onPressed: onToggleChat,
-                          ),
-                          if (showFullscreenButton)
-                            _PlainIconButton(
-                              tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
-                              icon: fullscreen
-                                  ? Icons.fullscreen_exit
-                                  : Icons.fullscreen,
-                              size: 25,
-                              active: fullscreen,
-                              onPressed: onToggleFullscreen,
-                            ),
-                          const _AndroidPipButton(
-                            size: 23,
-                          ),
-                          _PlayerMoreActionsButton(playerRuntime: playerRuntime),
-                        ],
+                    : _WideWatchBottomControls(
+                        player: player,
+                        playerRuntime: playerRuntime,
+                        playing: playing,
+                        muted: muted,
+                        volume: volume,
+                        fullscreen: fullscreen,
+                        chatVisible: chatVisible,
+                        showFullscreenButton: showFullscreenButton,
+                        onToggleMute: onToggleMute,
+                        onVolumeChanged: onVolumeChanged,
+                        qualityVariants: qualityVariants,
+                        currentVariant: currentVariant,
+                        onQualityChanged: onQualityChanged,
+                        onToggleChat: onToggleChat,
+                        onToggleFullscreen: onToggleFullscreen,
                       ),
               ),
             );
 
-            final barContent = useCompactLayout
-                ? ClipRect(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.center,
-                      child: controlsContent,
-                    ),
-                  )
-                : controlsContent;
-
-            return TwitchGlassSurface(
-              borderRadius: BorderRadius.circular(24),
-              backgroundColor: Colors.black.withOpacity(0.56),
-              borderColor: Colors.white.withOpacity(0.12),
-              blurSigma: 0,
-              boxShadow: const <BoxShadow>[],
-              child: SizedBox(
-                height: barHeight,
-                child: barContent,
-              ),
+            return _WatchBottomControlSurface(
+              height: layout.barHeight,
+              child: layout.useCompactLayout
+                  ? ClipRect(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.center,
+                        child: controlsContent,
+                      ),
+                    )
+                  : controlsContent,
             );
           },
         );
       },
+    );
+  }
+}
+
+class _WatchBottomControlBarLayout {
+  final bool veryNarrow;
+  final bool useCompactLayout;
+  final double barHeight;
+  final double horizontalPadding;
+  final double contentWidth;
+  final double contentHeight;
+
+  const _WatchBottomControlBarLayout({
+    required this.veryNarrow,
+    required this.useCompactLayout,
+    required this.barHeight,
+    required this.horizontalPadding,
+    required this.contentWidth,
+    required this.contentHeight,
+  });
+
+  factory _WatchBottomControlBarLayout.fromWidth(double width) {
+    final veryNarrow = width < 430;
+    final useCompactLayout = width < 700;
+    final barHeight = useCompactLayout ? 58.0 : 72.0;
+
+    return _WatchBottomControlBarLayout(
+      veryNarrow: veryNarrow,
+      useCompactLayout: useCompactLayout,
+      barHeight: barHeight,
+      horizontalPadding: veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0,
+      contentWidth: useCompactLayout ? (veryNarrow ? 390.0 : 620.0) : width,
+      contentHeight: useCompactLayout ? 58.0 : barHeight,
+    );
+  }
+}
+
+class _WatchBottomControlSurface extends StatelessWidget {
+  final double height;
+  final Widget child;
+
+  const _WatchBottomControlSurface({
+    required this.height,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TwitchGlassSurface(
+      borderRadius: BorderRadius.circular(24),
+      backgroundColor: Colors.black.withOpacity(0.56),
+      borderColor: Colors.white.withOpacity(0.12),
+      blurSigma: 0,
+      boxShadow: const <BoxShadow>[],
+      child: SizedBox(
+        height: height,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _CompactWatchBottomControls extends StatelessWidget {
+  final Player player;
+  final TwitchPlaylistPlayerRuntime playerRuntime;
+  final bool playing;
+  final bool muted;
+  final double volume;
+  final bool fullscreen;
+  final bool chatVisible;
+  final bool showFullscreenButton;
+  final VoidCallback? onToggleMute;
+  final ValueChanged<double>? onVolumeChanged;
+  final List<TwitchM3u8Variant> qualityVariants;
+  final TwitchM3u8Variant? currentVariant;
+  final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
+  final VoidCallback? onToggleChat;
+  final VoidCallback? onToggleFullscreen;
+  final bool veryNarrow;
+
+  const _CompactWatchBottomControls({
+    required this.player,
+    required this.playerRuntime,
+    required this.playing,
+    required this.muted,
+    required this.volume,
+    required this.fullscreen,
+    required this.chatVisible,
+    required this.showFullscreenButton,
+    required this.onToggleMute,
+    required this.onVolumeChanged,
+    required this.qualityVariants,
+    required this.currentVariant,
+    required this.onQualityChanged,
+    required this.onToggleChat,
+    required this.onToggleFullscreen,
+    required this.veryNarrow,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _PlayPauseButton(
+          player: player,
+          playing: playing,
+          size: veryNarrow ? 26 : 28,
+          dense: true,
+        ),
+        SizedBox(width: veryNarrow ? 2 : 6),
+        if (veryNarrow) ...[
+          _LivePlaybackSheetButton(
+            player: player,
+            playerRuntime: playerRuntime,
+          ),
+          const Spacer(),
+        ] else ...[
+          Expanded(
+            child: TwitchLivePlaybackStrip(
+              player: player,
+              playerRuntime: playerRuntime,
+              compact: true,
+            ),
+          ),
+        ],
+        SizedBox(width: veryNarrow ? 2 : 6),
+        _CompactInlineVolumeControl(
+          muted: muted,
+          volume: volume,
+          sliderWidth: veryNarrow ? 50 : 76,
+          onToggleMute: onToggleMute,
+          onVolumeChanged: onVolumeChanged,
+        ),
+        SizedBox(width: veryNarrow ? 1 : 4),
+        _QualityButton(
+          variants: qualityVariants,
+          currentVariant: currentVariant,
+          onChanged: onQualityChanged,
+        ),
+        _ChatToggleButton(
+          chatVisible: chatVisible,
+          size: veryNarrow ? 21 : 23,
+          dense: true,
+          onPressed: onToggleChat,
+        ),
+        if (showFullscreenButton)
+          _FullscreenToggleButton(
+            fullscreen: fullscreen,
+            size: veryNarrow ? 23 : 25,
+            dense: true,
+            onPressed: onToggleFullscreen,
+          ),
+        const _AndroidPipButton(
+          dense: true,
+          size: 22,
+        ),
+        _PlayerMoreActionsButton(playerRuntime: playerRuntime),
+      ],
+    );
+  }
+}
+
+class _WideWatchBottomControls extends StatelessWidget {
+  final Player player;
+  final TwitchPlaylistPlayerRuntime playerRuntime;
+  final bool playing;
+  final bool muted;
+  final double volume;
+  final bool fullscreen;
+  final bool chatVisible;
+  final bool showFullscreenButton;
+  final VoidCallback? onToggleMute;
+  final ValueChanged<double>? onVolumeChanged;
+  final List<TwitchM3u8Variant> qualityVariants;
+  final TwitchM3u8Variant? currentVariant;
+  final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
+  final VoidCallback? onToggleChat;
+  final VoidCallback? onToggleFullscreen;
+
+  const _WideWatchBottomControls({
+    required this.player,
+    required this.playerRuntime,
+    required this.playing,
+    required this.muted,
+    required this.volume,
+    required this.fullscreen,
+    required this.chatVisible,
+    required this.showFullscreenButton,
+    required this.onToggleMute,
+    required this.onVolumeChanged,
+    required this.qualityVariants,
+    required this.currentVariant,
+    required this.onQualityChanged,
+    required this.onToggleChat,
+    required this.onToggleFullscreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _PlayPauseButton(
+          player: player,
+          playing: playing,
+          size: 32,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: TwitchLivePlaybackStrip(
+            player: player,
+            playerRuntime: playerRuntime,
+          ),
+        ),
+        const SizedBox(width: 16),
+        _WideVolumeControl(
+          muted: muted,
+          volume: volume,
+          onToggleMute: onToggleMute,
+          onVolumeChanged: onVolumeChanged,
+        ),
+        _QualityButton(
+          variants: qualityVariants,
+          currentVariant: currentVariant,
+          onChanged: onQualityChanged,
+        ),
+        _ChatToggleButton(
+          chatVisible: chatVisible,
+          size: 23,
+          onPressed: onToggleChat,
+        ),
+        if (showFullscreenButton)
+          _FullscreenToggleButton(
+            fullscreen: fullscreen,
+            size: 25,
+            onPressed: onToggleFullscreen,
+          ),
+        const _AndroidPipButton(size: 23),
+        _PlayerMoreActionsButton(playerRuntime: playerRuntime),
+      ],
+    );
+  }
+}
+
+class _PlayPauseButton extends StatelessWidget {
+  final Player player;
+  final bool playing;
+  final double size;
+  final bool dense;
+
+  const _PlayPauseButton({
+    required this.player,
+    required this.playing,
+    required this.size,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PlainIconButton(
+      tooltip: playing ? '暫停' : '播放',
+      icon: playing ? Icons.pause : Icons.play_arrow,
+      size: size,
+      dense: dense,
+      onPressed: () {
+        unawaited(playing ? player.pause() : player.play());
+      },
+    );
+  }
+}
+
+class _WideVolumeControl extends StatelessWidget {
+  final bool muted;
+  final double volume;
+  final VoidCallback? onToggleMute;
+  final ValueChanged<double>? onVolumeChanged;
+
+  const _WideVolumeControl({
+    required this.muted,
+    required this.volume,
+    required this.onToggleMute,
+    required this.onVolumeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PlainIconButton(
+          tooltip: muted ? '取消靜音' : '靜音',
+          icon: muted || volume <= 0 ? Icons.volume_off : Icons.volume_up,
+          size: 24,
+          onPressed: onToggleMute,
+        ),
+        SizedBox(
+          width: 92,
+          child: Slider(
+            value: volume.clamp(0.0, 100.0).toDouble(),
+            min: 0,
+            max: 100,
+            onChanged: onVolumeChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChatToggleButton extends StatelessWidget {
+  final bool chatVisible;
+  final double size;
+  final bool dense;
+  final VoidCallback? onPressed;
+
+  const _ChatToggleButton({
+    required this.chatVisible,
+    required this.size,
+    required this.onPressed,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PlainIconButton(
+      tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
+      icon: chatVisible ? Icons.chat_bubble : Icons.chat_bubble_outline,
+      size: size,
+      active: chatVisible,
+      dense: dense,
+      onPressed: onPressed,
+    );
+  }
+}
+
+class _FullscreenToggleButton extends StatelessWidget {
+  final bool fullscreen;
+  final double size;
+  final bool dense;
+  final VoidCallback? onPressed;
+
+  const _FullscreenToggleButton({
+    required this.fullscreen,
+    required this.size,
+    required this.onPressed,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _PlainIconButton(
+      tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
+      icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+      size: size,
+      active: fullscreen,
+      dense: dense,
+      onPressed: onPressed,
     );
   }
 }
