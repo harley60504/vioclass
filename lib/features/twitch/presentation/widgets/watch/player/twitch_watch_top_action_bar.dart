@@ -1,6 +1,14 @@
-part of twitch_watch_player_area;
+import 'dart:async';
 
-class _WatchTopActionBar extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+
+import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import 'twitch_player_common_buttons.dart';
+import 'twitch_watch_stream_header.dart';
+import 'twitch_watch_top_buttons.dart';
+
+class WatchTopActionBar extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool isFollowing;
   final bool followBusy;
@@ -11,7 +19,8 @@ class _WatchTopActionBar extends StatelessWidget {
   final VoidCallback? onReload;
   final VoidCallback onStop;
 
-  const _WatchTopActionBar({
+  const WatchTopActionBar({
+    super.key,
     required this.metadata,
     required this.isFollowing,
     required this.followBusy,
