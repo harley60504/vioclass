@@ -1,9 +1,9 @@
-part of twitch_watch_player_area;
+import 'package:flutter/material.dart';
 
-class _ErrorCard extends StatelessWidget {
+class PlayerErrorCard extends StatelessWidget {
   final String message;
 
-  const _ErrorCard({required this.message});
+  const PlayerErrorCard({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
