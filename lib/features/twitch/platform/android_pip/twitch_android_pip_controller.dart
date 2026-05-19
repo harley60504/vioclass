@@ -1,10 +1,3 @@
-// Stage 226G: Android Picture-in-Picture bridge for the media_kit Watch player.
-//
-// Android PiP captures the current Activity surface. Before entering PiP we ask
-// Flutter to render only the player surface for a short moment, then native
-// enters PiP. The prepare state has a safety timeout so chat/layout cannot stay
-// hidden if Android refuses or misses PiP.
-
 import 'dart:async';
 import 'dart:io';
 
@@ -12,6 +5,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+/// Flutter-side controller for Android Picture-in-Picture.
+///
+/// Responsibilities kept here:
+/// - call the Android MethodChannel bridge;
+/// - expose whether Android is currently in PiP;
+/// - briefly ask the Flutter Watch layout to render only the player surface
+///   before a manual PiP request;
+/// - recover automatically if Android refuses to enter PiP.
 class TwitchAndroidPipController extends ChangeNotifier {
   TwitchAndroidPipController._() {
     _channel.setMethodCallHandler(_handleNativeCall);
@@ -20,19 +21,19 @@ class TwitchAndroidPipController extends ChangeNotifier {
   static final TwitchAndroidPipController instance = TwitchAndroidPipController._();
 
   static const MethodChannel _channel = MethodChannel('vio_class/android_pip');
-  static const Duration _prepareFrameDelay = Duration(milliseconds: 60);
+  static const Duration _manualPrepareFrameDelay = Duration(milliseconds: 60);
   static const Duration _prepareSafetyTimeout = Duration(milliseconds: 1600);
 
   bool _isInPictureInPictureMode = false;
-  bool _isPreparingAutoPictureInPicture = false;
+  bool _isPreparingPictureInPicture = false;
   bool _lastKnownAvailable = Platform.isAndroid;
   Timer? _prepareTimeout;
 
   bool get isAndroid => Platform.isAndroid;
   bool get isInPictureInPictureMode => _isInPictureInPictureMode;
-  bool get isPreparingAutoPictureInPicture => _isPreparingAutoPictureInPicture;
+  bool get isPreparingPictureInPicture => _isPreparingPictureInPicture;
   bool get shouldRenderPlayerOnly =>
-      _isInPictureInPictureMode || _isPreparingAutoPictureInPicture;
+      _isInPictureInPictureMode || _isPreparingPictureInPicture;
   bool get lastKnownAvailable => _lastKnownAvailable;
 
   Future<bool> isPictureInPictureAvailable() async {
@@ -75,7 +76,7 @@ class TwitchAndroidPipController extends ChangeNotifier {
     if (!Platform.isAndroid) return false;
 
     try {
-      await preparePlayerOnlyForPictureInPicture();
+      await _prepareManualPictureInPictureFrame();
       final entered = await _channel.invokeMethod<bool>(
         'enterPip',
         <String, Object>{
@@ -84,31 +85,33 @@ class TwitchAndroidPipController extends ChangeNotifier {
         },
       );
       if (entered != true) {
-        _setPreparingAutoPictureInPicture(false);
+        _setPreparingPictureInPicture(false);
       }
       return entered ?? false;
     } catch (_) {
-      _setPreparingAutoPictureInPicture(false);
+      _setPreparingPictureInPicture(false);
       return false;
     }
   }
 
-  Future<void> preparePlayerOnlyForPictureInPicture() async {
-    _setPreparingAutoPictureInPicture(true);
-    await Future<void>.delayed(_prepareFrameDelay);
+  Future<void> _prepareManualPictureInPictureFrame() async {
+    _setPreparingPictureInPicture(true);
+    await Future<void>.delayed(_manualPrepareFrameDelay);
   }
 
   Future<dynamic> _handleNativeCall(MethodCall call) async {
     switch (call.method) {
       case 'onAutoPipRequested':
-        await preparePlayerOnlyForPictureInPicture();
+        // Auto PiP from onUserLeaveHint must be immediate on Android. We only
+        // flip this flag as a best-effort hint; native should not wait for it.
+        _setPreparingPictureInPicture(true);
         return true;
       case 'onPipModeChanged':
         final args = call.arguments;
         final enabled = args is Map ? args['isInPip'] == true : false;
         _setPictureInPictureMode(enabled);
         if (!enabled) {
-          _setPreparingAutoPictureInPicture(false);
+          _setPreparingPictureInPicture(false);
         }
         return null;
     }
@@ -124,12 +127,13 @@ class TwitchAndroidPipController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _setPreparingAutoPictureInPicture(bool value) {
-    if (_isPreparingAutoPictureInPicture == value) {
+  void _setPreparingPictureInPicture(bool value) {
+    if (_isPreparingPictureInPicture == value) {
       if (value) _schedulePrepareTimeout();
       return;
     }
-    _isPreparingAutoPictureInPicture = value;
+
+    _isPreparingPictureInPicture = value;
     if (value) {
       _schedulePrepareTimeout();
     } else {
@@ -143,7 +147,7 @@ class TwitchAndroidPipController extends ChangeNotifier {
     _prepareTimeout?.cancel();
     _prepareTimeout = Timer(_prepareSafetyTimeout, () {
       if (!_isInPictureInPictureMode) {
-        _setPreparingAutoPictureInPicture(false);
+        _setPreparingPictureInPicture(false);
       }
     });
   }
