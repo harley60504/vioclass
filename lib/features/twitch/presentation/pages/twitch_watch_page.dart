@@ -1,29 +1,3 @@
-// PATCH VERSION: twitch_watch_page_stage226d_revert_pip_shell
-// Place at: lib/features/twitch/presentation/pages/twitch_watch_page.dart
-// Canonical WatchPage implementation. Keep Windows compatibility in
-// twitch_windows_player_page.dart as an export only.
-//
-// Stage 220J:
-// - Split large WatchPage lifecycle/helper methods into part files.
-// - Keep this file focused on fields, initialization, disposal, and build.
-// - Compatible with the PiliPlus media_kit fork: no direct stream.volume /
-//   stream.width usage remains in this shell.
-//
-// Stage 220K:
-// - Move preference/layout constants to library scope so part files can
-//   reference them without unqualified static-member analyzer errors.
-//
-// Stage 220L:
-// - Split methods into preferences/startup/chat/engagement/relationship/ui.
-//
-// Stage 221E:
-// - Player starts first, chat second, engagement/emotes/relationship in the
-//   background. Background tasks must not show the blocking startup overlay.
-//
-// Stage 226D:
-// - Revert the WatchPage-level PiP shell override. PiP targeting belongs in the
-//   player area / Android bridge instead of changing the whole WatchPage layout.
-
 library twitch_watch_page;
 
 import 'dart:async';
@@ -56,6 +30,7 @@ import '../watch/twitch_watch_scope.dart';
 import '../widgets/watch/twitch_watch_blocking_startup_overlay.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
 
+part 'watch/twitch_watch_page_session.dart';
 part 'watch/twitch_watch_page_methods.dart';
 part 'watch/twitch_watch_page_preferences.dart';
 part 'watch/twitch_watch_page_startup.dart';
@@ -160,19 +135,18 @@ class TwitchWatchPage extends StatefulWidget {
 class _TwitchWatchPageState extends State<TwitchWatchPage> {
   late final TextEditingController _channelController;
   late final TextEditingController _messageController;
+  late final _TwitchWatchSessionHandles _session;
 
-  late final TwitchWatchServices _watchServices;
-  late final TwitchWatchFeaturePorts _watchPorts;
-
-  late final TwitchApiClient _apiClient;
-  late final TwitchAuthService _authService;
-  late final TwitchDropsAuthService _dropsAuthService;
-  late final TwitchWebGqlAuthService _webGqlAuthService;
-  late final TwitchAuthApiService _authApi;
-  late final TwitchRecentMessagesApiService _recentMessagesApi;
-  late final TwitchMediaKitPlayerSession _playerSession;
-
-  Player get _player => _playerSession.player;
+  TwitchWatchServices get _watchServices => _session.services;
+  TwitchWatchFeaturePorts get _watchPorts => _session.ports;
+  TwitchApiClient get _apiClient => _session.apiClient;
+  TwitchAuthService get _authService => _session.authService;
+  TwitchDropsAuthService get _dropsAuthService => _session.dropsAuthService;
+  TwitchWebGqlAuthService get _webGqlAuthService => _session.webGqlAuthService;
+  TwitchAuthApiService get _authApi => _session.authApi;
+  TwitchRecentMessagesApiService get _recentMessagesApi => _session.recentMessagesApi;
+  TwitchMediaKitPlayerSession get _playerSession => _session.playerSession;
+  Player get _player => _session.player;
 
   StreamSubscription<double>? _playerVolumeSubscription;
   Timer? _volumePreferenceSaveDebounce;
@@ -272,17 +246,9 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       text: widget.resolvedInitialMetadata.channelLogin,
     );
     _messageController = TextEditingController();
-
-    _watchServices = TwitchWatchServices.create(playerTitle: 'Twitch Raw Proxy');
-    _watchPorts = TwitchWatchFeaturePorts.fromServices(_watchServices);
-
-    _apiClient = _watchServices.apiClient;
-    _authService = _watchServices.authService;
-    _dropsAuthService = _watchServices.dropsAuthService;
-    _webGqlAuthService = _watchServices.webGqlAuthService;
-    _authApi = _watchServices.authApi;
-    _recentMessagesApi = _watchServices.recentMessagesApi;
-    _playerSession = _watchServices.playerSession;
+    _session = _TwitchWatchSessionHandles.create(
+      playerTitle: 'Twitch Raw Proxy',
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _enterMobileImmersiveByDefault();
@@ -324,7 +290,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       unawaited(TwitchFullscreenController.exitFullscreen());
     }
 
-    _apiClient.close(force: true);
+    _session.closeApiClient();
     super.dispose();
   }
 
