@@ -1,6 +1,16 @@
-part of twitch_watch_player_area;
+import 'dart:async';
 
-class _WatchControlsOverlay extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+
+import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import 'twitch_player_error_card.dart';
+import 'twitch_watch_bottom_control_bar.dart';
+import 'twitch_watch_top_action_bar.dart';
+
+class WatchControlsOverlay extends StatefulWidget {
   final bool loading;
   final String? error;
   final Object? runtimeError;
@@ -27,7 +37,8 @@ class _WatchControlsOverlay extends StatefulWidget {
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
 
-  const _WatchControlsOverlay({
+  const WatchControlsOverlay({
+    super.key,
     required this.loading,
     required this.error,
     required this.runtimeError,
@@ -56,10 +67,10 @@ class _WatchControlsOverlay extends StatefulWidget {
   });
 
   @override
-  State<_WatchControlsOverlay> createState() => _WatchControlsOverlayState();
+  State<WatchControlsOverlay> createState() => _WatchControlsOverlayState();
 }
 
-class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
+class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   static const Duration _fadeDuration = Duration(milliseconds: 180);
   static const Duration _autoHideDelay = Duration(seconds: 3);
   static const Duration _unmountDelay = Duration(milliseconds: 220);
@@ -83,7 +94,7 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
   }
 
   @override
-  void didUpdateWidget(covariant _WatchControlsOverlay oldWidget) {
+  void didUpdateWidget(covariant WatchControlsOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.loading || _hasError) {
       _showAndRestartAutoHide();
@@ -204,7 +215,7 @@ class _FadingWatchChrome extends StatelessWidget {
 }
 
 class _WatchChromeStack extends StatelessWidget {
-  final _WatchControlsOverlay widget;
+  final WatchControlsOverlay widget;
 
   const _WatchChromeStack({required this.widget});
 
@@ -235,7 +246,7 @@ class _WatchChromeStack extends StatelessWidget {
           child: SafeArea(
             top: false,
             minimum: const EdgeInsets.only(bottom: 2),
-            child: _WatchBottomControlBar(
+            child: WatchBottomControlBar(
               player: widget.player,
               playerRuntime: widget.playerRuntime,
               muted: widget.muted,
