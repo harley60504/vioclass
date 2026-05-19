@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage219s_public_emote_sheet
+// PATCH VERSION: twitch_watch_chat_panel_stage227b_persist_engagement_visibility
 
 import 'package:flutter/material.dart';
 
@@ -76,6 +76,10 @@ class TwitchWatchChatPanel extends StatefulWidget {
 }
 
 class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
+  static final Map<String, bool> _showPinnedByChannel = <String, bool>{};
+  static final Map<String, bool> _showPredictionByChannel = <String, bool>{};
+  static final Map<String, String> _lastPredictionIdByChannel = <String, String>{};
+
   final TwitchChatAppearanceController _appearanceController =
       TwitchChatAppearanceController();
 
@@ -84,15 +88,29 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   String? lastPredictionId;
 
+  String get _visibilityKey {
+    final login = widget.fallbackLogin.trim().toLowerCase();
+    if (login.isNotEmpty) return login;
+    final userId = widget.fallbackUserId.trim();
+    if (userId.isNotEmpty) return 'id:$userId';
+    return 'unknown';
+  }
+
   @override
   void initState() {
     super.initState();
     _appearanceController.load();
+    _restoreEngagementVisibility();
   }
 
   @override
   void didUpdateWidget(covariant TwitchWatchChatPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (_visibilityKey != _keyForWidget(oldWidget)) {
+      _restoreEngagementVisibility();
+      return;
+    }
 
     final prediction = widget.prediction;
     final oldPrediction = oldWidget.prediction;
@@ -103,21 +121,22 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     if (id.isNotEmpty && id != lastPredictionId) {
       lastPredictionId = id;
-      showPrediction = !shouldAutoHidePrediction;
+      _lastPredictionIdByChannel[_visibilityKey] = id;
+      _setShowPrediction(!shouldAutoHidePrediction, persist: true, rebuild: false);
       return;
     }
 
     if (id.isNotEmpty &&
         oldShouldAutoHidePrediction &&
         !shouldAutoHidePrediction) {
-      showPrediction = true;
+      _setShowPrediction(true, persist: true, rebuild: false);
       return;
     }
 
     if (id.isNotEmpty &&
         !oldShouldAutoHidePrediction &&
         shouldAutoHidePrediction) {
-      showPrediction = false;
+      _setShowPrediction(false, persist: true, rebuild: false);
     }
   }
 
@@ -125,6 +144,61 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   void dispose() {
     _appearanceController.dispose();
     super.dispose();
+  }
+
+  void _restoreEngagementVisibility() {
+    final key = _visibilityKey;
+    final prediction = widget.prediction;
+    final predictionId = prediction?.id ?? '';
+    final storedPredictionId = _lastPredictionIdByChannel[key];
+
+    showPinned = _showPinnedByChannel[key] ?? true;
+
+    if (predictionId.isNotEmpty &&
+        storedPredictionId != null &&
+        storedPredictionId != predictionId) {
+      lastPredictionId = predictionId;
+      _lastPredictionIdByChannel[key] = predictionId;
+      showPrediction = !_shouldAutoHidePredictionBanner(prediction);
+      _showPredictionByChannel[key] = showPrediction;
+      return;
+    }
+
+    lastPredictionId = predictionId.isNotEmpty ? predictionId : storedPredictionId;
+    if (predictionId.isNotEmpty) {
+      _lastPredictionIdByChannel[key] = predictionId;
+    }
+
+    showPrediction = _showPredictionByChannel[key] ??
+        !_shouldAutoHidePredictionBanner(prediction);
+  }
+
+  String _keyForWidget(TwitchWatchChatPanel widget) {
+    final login = widget.fallbackLogin.trim().toLowerCase();
+    if (login.isNotEmpty) return login;
+    final userId = widget.fallbackUserId.trim();
+    if (userId.isNotEmpty) return 'id:$userId';
+    return 'unknown';
+  }
+
+  void _setShowPinned(bool value) {
+    _showPinnedByChannel[_visibilityKey] = value;
+    setState(() => showPinned = value);
+  }
+
+  void _setShowPrediction(
+    bool value, {
+    bool persist = true,
+    bool rebuild = true,
+  }) {
+    if (persist) {
+      _showPredictionByChannel[_visibilityKey] = value;
+    }
+    if (rebuild) {
+      setState(() => showPrediction = value);
+    } else {
+      showPrediction = value;
+    }
   }
 
   bool _shouldAutoHidePredictionBanner(TwitchPredictionSnapshot? prediction) {
@@ -177,10 +251,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 loading: widget.loadingEngagement,
                 compact: metrics.verticalCompact,
                 onTogglePinned: () {
-                  setState(() => showPinned = !showPinned);
+                  _setShowPinned(!showPinned);
                 },
                 onTogglePrediction: () {
-                  setState(() => showPrediction = !showPrediction);
+                  _setShowPrediction(!showPrediction);
                 },
                 onRefresh: widget.onRefreshEngagement,
                 onOpenAppearance: () => showTwitchChatAppearanceSheet(
