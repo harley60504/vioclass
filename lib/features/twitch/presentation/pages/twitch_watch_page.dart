@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_page_stage226c_player_only_pip_shell
+// PATCH VERSION: twitch_watch_page_stage226d_revert_pip_shell
 // Place at: lib/features/twitch/presentation/pages/twitch_watch_page.dart
 // Canonical WatchPage implementation. Keep Windows compatibility in
 // twitch_windows_player_page.dart as an export only.
@@ -20,10 +20,9 @@
 // - Player starts first, chat second, engagement/emotes/relationship in the
 //   background. Background tasks must not show the blocking startup overlay.
 //
-// Stage 226C:
-// - When Android PiP is active, WatchPage renders only the player surface.
-// - This prevents the PiP window from capturing chat or the purple page
-//   background around the player.
+// Stage 226D:
+// - Revert the WatchPage-level PiP shell override. PiP targeting belongs in the
+//   player area / Android bridge instead of changing the whole WatchPage layout.
 
 library twitch_watch_page;
 
@@ -39,7 +38,6 @@ import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/engagement/twitch_prediction.dart';
-import '../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -384,62 +382,49 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       onOpenPrediction: _openPredictionBetSheet,
     );
 
-    final pip = TwitchAndroidPipController.instance;
-
-    return AnimatedBuilder(
-      animation: pip,
-      builder: (context, _) {
-        final inPipMode = pip.isInPictureInPictureMode;
-        final scaffold = Scaffold(
-          backgroundColor: Colors.black,
-          body: Stack(
-            children: [
-              Positioned.fill(
-                child: inPipMode
-                    ? ColoredBox(
-                        color: Colors.black,
-                        child: playerArea,
-                      )
-                    : TwitchWatchResponsiveBody(
-                        chatVisible: _chatVisible,
-                        chatPanelWidth: _chatPanelWidth,
-                        chatPanelRatio: _chatPanelRatio,
-                        minChatPanelWidth: _minChatPanelWidth,
-                        maxEffectiveMinChatPanelWidth: _maxEffectiveMinChatPanelWidth,
-                        maxChatPanelWidth: _maxChatPanelWidth,
-                        minChatPanelRatio: _minChatPanelRatio,
-                        minStoredChatPanelRatio: _minStoredChatPanelRatio,
-                        maxChatPanelRatio: _maxChatPanelRatio,
-                        player: playerArea,
-                        chat: chatPanel,
-                        onSetChatPanelWidthForViewport: _setChatPanelWidthForViewport,
-                        onPersistChatPanelWidth: () {
-                          _chatWidthPreferenceSaveDebounce?.cancel();
-                          unawaited(_saveChatPanelWidthPreference());
-                        },
-                      ),
+    final scaffold = Scaffold(
+      backgroundColor: const Color(0xFF0E0E10),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: TwitchWatchResponsiveBody(
+              chatVisible: _chatVisible,
+              chatPanelWidth: _chatPanelWidth,
+              chatPanelRatio: _chatPanelRatio,
+              minChatPanelWidth: _minChatPanelWidth,
+              maxEffectiveMinChatPanelWidth: _maxEffectiveMinChatPanelWidth,
+              maxChatPanelWidth: _maxChatPanelWidth,
+              minChatPanelRatio: _minChatPanelRatio,
+              minStoredChatPanelRatio: _minStoredChatPanelRatio,
+              maxChatPanelRatio: _maxChatPanelRatio,
+              player: playerArea,
+              chat: chatPanel,
+              onSetChatPanelWidthForViewport: _setChatPanelWidthForViewport,
+              onPersistChatPanelWidth: () {
+                _chatWidthPreferenceSaveDebounce?.cancel();
+                unawaited(_saveChatPanelWidthPreference());
+              },
+            ),
+          ),
+          if (_showBlockingStartupMask)
+            Positioned.fill(
+              child: TwitchWatchBlockingStartupOverlay(
+                title: _startupMaskTitle,
+                subtitle: _enableWatchPlayer
+                    ? '先啟動播放器，再連線聊天室；互動資料與貼圖會在背景補上。'
+                    : '正在連線聊天室；互動資料與貼圖會在背景補上。',
               ),
-              if (!inPipMode && _showBlockingStartupMask)
-                Positioned.fill(
-                  child: TwitchWatchBlockingStartupOverlay(
-                    title: _startupMaskTitle,
-                    subtitle: _enableWatchPlayer
-                        ? '先啟動播放器，再連線聊天室；互動資料與貼圖會在背景補上。'
-                        : '正在連線聊天室；互動資料與貼圖會在背景補上。',
-                  ),
-                ),
-            ],
-          ),
-        );
+            ),
+        ],
+      ),
+    );
 
-        return TwitchWatchScope(
-          services: _watchServices,
-          child: TwitchWatchPortScope(
-            ports: _watchPorts,
-            child: scaffold,
-          ),
-        );
-      },
+    return TwitchWatchScope(
+      services: _watchServices,
+      child: TwitchWatchPortScope(
+        ports: _watchPorts,
+        child: scaffold,
+      ),
     );
   }
 }
