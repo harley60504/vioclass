@@ -1,9 +1,9 @@
-// PATCH VERSION: twitch_emote_picker_widgets_stage222_long_press_favorites
+// PATCH VERSION: twitch_emote_picker_widgets_stage223_name_only_grid
 //
 // Shared visual widgets for Twitch emote picker sheets.
 // Stage 216: make emote grid cards translucent instead of solid dark blocks.
-// Stage 222: favorite toggling now uses long press instead of a visible star
-// button, so normal tap always means insert.
+// Stage 222: favorite toggling uses long press instead of a visible star button.
+// Stage 223: normal emote picker grid cards now show image + emote name only.
 
 import 'package:flutter/material.dart';
 
@@ -258,34 +258,17 @@ class TwitchThirdPartyEmoteGridCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       emote.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '${emote.providerLabel} · ${emote.scopeLabel}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 9, color: Colors.white38),
-                        ),
-                        if (emote.isZeroWidth) ...[
-                          const SizedBox(width: 4),
-                          const Text(
-                            'ZW',
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Color(0xFFEAB308),
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ],
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ],
                 ),
@@ -297,6 +280,19 @@ class TwitchThirdPartyEmoteGridCard extends StatelessWidget {
                       Icons.star_rounded,
                       size: 16,
                       color: Color(0xFFEAB308),
+                    ),
+                  ),
+                if (emote.isZeroWidth)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Text(
+                      'ZW',
+                      style: TextStyle(
+                        fontSize: 9,
+                        color: Color(0xFFEAB308),
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
               ],
@@ -361,21 +357,16 @@ class TwitchOfficialEmoteGridCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         emote.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-                      ),
-                      Text(
-                        locked ? 'LOCKED' : emote.sourceLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 9,
-                          color: locked ? const Color(0xFFFFD166) : Colors.white38,
-                          fontWeight: FontWeight.w800,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
                     ],
