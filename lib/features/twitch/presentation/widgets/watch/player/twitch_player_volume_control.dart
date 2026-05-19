@@ -20,7 +20,7 @@ class _CompactInlineVolumeControl extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _PlainIconButton(
+        PlainIconButton(
           tooltip: muted ? '取消靜音' : '靜音',
           icon: muted || volume <= 0 ? Icons.volume_off : Icons.volume_up,
           size: 21,
