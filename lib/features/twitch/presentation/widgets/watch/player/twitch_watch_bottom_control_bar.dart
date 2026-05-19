@@ -1,6 +1,19 @@
-part of twitch_watch_player_area;
+import 'dart:async';
 
-class _WatchBottomControlBar extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+
+import '../../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../shared/twitch_glass.dart';
+import 'twitch_live_playback_strip.dart';
+import 'twitch_player_common_buttons.dart';
+import 'twitch_player_more_actions_button.dart';
+import 'twitch_player_pip_button.dart';
+import 'twitch_player_quality_button.dart';
+import 'twitch_player_volume_control.dart';
+
+class WatchBottomControlBar extends StatelessWidget {
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final bool muted;
@@ -16,7 +29,8 @@ class _WatchBottomControlBar extends StatelessWidget {
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
 
-  const _WatchBottomControlBar({
+  const WatchBottomControlBar({
+    super.key,
     required this.player,
     required this.playerRuntime,
     required this.muted,
