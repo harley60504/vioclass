@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import '../../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
 import 'twitch_player_common_buttons.dart';
 
 class AndroidPipButton extends StatefulWidget {
