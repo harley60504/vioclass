@@ -1,4 +1,4 @@
-// PATCH VERSION: watch_player_area_stage226_android_pip
+// PATCH VERSION: watch_player_area_stage226d_pip_source_rect
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
@@ -6,6 +6,8 @@
 // session has finished creating Player / VideoController.
 // Stage 226: Android PiP integration hides all non-video chrome while PiP is
 // active and exposes a PiP button through the player controls.
+// Stage 226D: the actual centered video surface reports its global rect to
+// Android as PiP sourceRectHint. WatchPage stays untouched.
 
 library twitch_watch_player_area;
 
@@ -285,10 +287,40 @@ class _WatchControlsNotReadyOverlay extends StatelessWidget {
   }
 }
 
-class _WatchCenteredVideoSurface extends StatelessWidget {
+class _WatchCenteredVideoSurface extends StatefulWidget {
   final VideoController controller;
 
   const _WatchCenteredVideoSurface({required this.controller});
+
+  @override
+  State<_WatchCenteredVideoSurface> createState() => _WatchCenteredVideoSurfaceState();
+}
+
+class _WatchCenteredVideoSurfaceState extends State<_WatchCenteredVideoSurface> {
+  final GlobalKey _videoSurfaceKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
+  }
+
+  @override
+  void didUpdateWidget(covariant _WatchCenteredVideoSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
+  }
+
+  void _reportSourceRectHint() {
+    if (!mounted || !Platform.isAndroid) return;
+    final context = _videoSurfaceKey.currentContext;
+    if (context == null) return;
+    final renderObject = context.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return;
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final rect = topLeft & renderObject.size;
+    unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -310,12 +342,15 @@ class _WatchCenteredVideoSurface extends StatelessWidget {
         width = width.clamp(1.0, maxWidth).toDouble();
         height = height.clamp(1.0, maxHeight).toDouble();
 
+        WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
+
         return Center(
           child: SizedBox(
+            key: _videoSurfaceKey,
             width: width,
             height: height,
             child: Video(
-              controller: controller,
+              controller: widget.controller,
               fit: BoxFit.contain,
               controls: NoVideoControls,
             ),
