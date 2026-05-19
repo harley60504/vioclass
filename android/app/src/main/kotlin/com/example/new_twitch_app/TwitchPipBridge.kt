@@ -41,8 +41,26 @@ class TwitchPipBridge(
         channel = null
     }
 
-    fun enterPipFromUserLeaveHint(): Boolean {
-        return enterPip(16, 9)
+    fun enterPipFromUserLeaveHint() {
+        val currentChannel = channel
+        if (currentChannel == null) {
+            enterPip(16, 9)
+            return
+        }
+
+        currentChannel.invokeMethod("onAutoPipRequested", null, object : MethodChannel.Result {
+            override fun success(result: Any?) {
+                enterPip(16, 9)
+            }
+
+            override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
+                enterPip(16, 9)
+            }
+
+            override fun notImplemented() {
+                enterPip(16, 9)
+            }
+        })
     }
 
     fun notifyPipModeChanged(isInPip: Boolean) {
