@@ -4,6 +4,8 @@ import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Rational
 import io.flutter.plugin.common.MethodChannel
 
@@ -12,6 +14,7 @@ class TwitchPipBridge(
 ) {
     private var channel: MethodChannel? = null
     private var sourceRectHint: Rect? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun attach(methodChannel: MethodChannel) {
         channel = methodChannel
@@ -39,28 +42,18 @@ class TwitchPipBridge(
     fun detach() {
         channel?.setMethodCallHandler(null)
         channel = null
+        mainHandler.removeCallbacksAndMessages(null)
     }
 
     fun enterPipFromUserLeaveHint() {
         val currentChannel = channel
-        if (currentChannel == null) {
-            enterPip(16, 9)
-            return
+        if (currentChannel != null) {
+            currentChannel.invokeMethod("onAutoPipRequested", null)
         }
 
-        currentChannel.invokeMethod("onAutoPipRequested", null, object : MethodChannel.Result {
-            override fun success(result: Any?) {
-                enterPip(16, 9)
-            }
-
-            override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) {
-                enterPip(16, 9)
-            }
-
-            override fun notImplemented() {
-                enterPip(16, 9)
-            }
-        })
+        mainHandler.postDelayed({
+            enterPip(16, 9)
+        }, 90L)
     }
 
     fun notifyPipModeChanged(isInPip: Boolean) {
