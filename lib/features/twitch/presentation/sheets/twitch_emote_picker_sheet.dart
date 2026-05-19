@@ -1,7 +1,9 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage178_slim_entry
+// PATCH VERSION: twitch_emote_picker_sheet_stage222_frosty_category_merge
 //
 // Thin entry/state file for Twitch emote picker sheets. Heavy panels, widgets,
 // models, and official emote ID picker live in sheets/emote_picker/*.
+// Stage 222: merge Frosty-style scope/category filtering into this original
+// sheet and keep favorite toggling on long press.
 
 import 'dart:async';
 
@@ -95,6 +97,8 @@ class _TwitchThirdPartyEmotePickerSheetState
   TwitchEmotePickerTab _selectedTab = TwitchEmotePickerTab.recent;
   TwitchOfficialEmoteSubFilter _officialSubFilter =
       TwitchOfficialEmoteSubFilter.usable;
+  TwitchThirdPartyEmoteScopeFilter _thirdPartyScopeFilter =
+      TwitchThirdPartyEmoteScopeFilter.all;
 
   TwitchOfficialEmoteCacheService? get _official => widget.officialCache;
 
@@ -146,12 +150,17 @@ class _TwitchThirdPartyEmotePickerSheetState
       cache: widget.cache,
     );
     final query = _query.toLowerCase();
-    final filtered = filterThirdPartyEmotes(source: source, query: query);
+    final filtered = filterThirdPartyEmotes(
+      source: source,
+      query: query,
+      scopeFilter: _thirdPartyScopeFilter,
+    );
 
     final official = _official;
     final isRecentTab = _selectedTab == TwitchEmotePickerTab.recent;
     final isTwitchTab = _selectedTab == TwitchEmotePickerTab.twitch;
     final isFavoritesTab = _selectedTab == TwitchEmotePickerTab.favorites;
+    final isThirdPartyProviderTab = !isRecentTab && !isTwitchTab && !isFavoritesTab;
 
     final media = MediaQuery.of(context);
     final compactVertical =
@@ -165,7 +174,7 @@ class _TwitchThirdPartyEmotePickerSheetState
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
         title: '貼圖',
-        subtitle: '最近 / 收藏 / Twitch / BTTV / 7TV / FFZ',
+        subtitle: '最近 / 收藏 / Twitch / BTTV / 7TV / FFZ｜長按收藏',
         icon: Icons.emoji_emotions_rounded,
         loading: widget.loading,
         onRefresh: widget.onRefresh,
@@ -219,8 +228,35 @@ class _TwitchThirdPartyEmotePickerSheetState
                 ],
               ),
             ),
+            if (isThirdPartyProviderTab)
+              SizedBox(
+                height: compactVertical ? 32 : 36,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                  children: [
+                    for (final scopeFilter in TwitchThirdPartyEmoteScopeFilter.values)
+                      TwitchThirdPartyScopeFilterChip(
+                        scopeFilter: scopeFilter,
+                        selected: _thirdPartyScopeFilter == scopeFilter,
+                        count: twitchThirdPartyEmoteScopeCount(
+                          source: source,
+                          scopeFilter: scopeFilter,
+                        ),
+                        onTap: () {
+                          setState(() => _thirdPartyScopeFilter = scopeFilter);
+                        },
+                      ),
+                  ],
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 3, 12, 7),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                isThirdPartyProviderTab ? 0 : 3,
+                12,
+                7,
+              ),
               child: SizedBox(
                 height: compactVertical ? 34 : 36,
                 child: TextField(
@@ -239,7 +275,9 @@ class _TwitchThirdPartyEmotePickerSheetState
                     ),
                     hintText: isTwitchTab
                         ? '搜尋 Twitch 貼圖（${official?.visibleCount ?? 0}）'
-                        : '搜尋目前分類貼圖',
+                        : isThirdPartyProviderTab
+                            ? '搜尋 ${_thirdPartyScopeFilter.label} 貼圖'
+                            : '搜尋目前分類貼圖',
                     hintStyle: const TextStyle(fontSize: 13),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -313,6 +351,13 @@ class _TwitchThirdPartyEmotePickerSheetState
   }
 
   void _selectTab(TwitchEmotePickerTab tab) {
-    setState(() => _selectedTab = tab);
+    setState(() {
+      _selectedTab = tab;
+      if (tab == TwitchEmotePickerTab.bttv ||
+          tab == TwitchEmotePickerTab.sevenTv ||
+          tab == TwitchEmotePickerTab.ffz) {
+        _thirdPartyScopeFilter = TwitchThirdPartyEmoteScopeFilter.all;
+      }
+    });
   }
 }
