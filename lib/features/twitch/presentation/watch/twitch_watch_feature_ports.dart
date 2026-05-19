@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage231_quality_force_reopen
+// PATCH VERSION: twitch_watch_feature_ports_stage232_seamless_proxy_switch
 //
 // Feature-facing ports for Watch composition.
 //
@@ -54,9 +54,7 @@ class TwitchWatchPlayerPort {
     await services.playerSession.openOrResume(
       uri: uri.toString(),
       play: play,
-      // The stable local proxy URL is intentionally reused across sources.
-      // For channel switches, force media_kit to reopen the same URL so mpv
-      // drops old stream state and reads the new proxy upstream immediately.
+      // Initial open still has to attach media_kit to the stable outer proxy.
       forceOpen: true,
     );
   }
@@ -75,14 +73,13 @@ class TwitchWatchPlayerPort {
       throw StateError('切換畫質失敗：runtime 沒有回傳 playlist uri。');
     }
 
-    await services.playerSession.openOrResume(
-      uri: uri.toString(),
-      play: play || wasPlaying,
-      // The outer proxy URL stays identical across quality switches. Without a
-      // forced reopen, media_kit/mpv can keep reading the old stream connection
-      // or stall at EOF after the router swaps its inner upstream.
-      forceOpen: true,
-    );
+    // Seamless mode: TwitchStableHlsProxyRouter keeps the same /stream.ts HTTP
+    // response open and re-attaches it to the new inner upstream. Do not call
+    // Player.open here, otherwise media_kit will blink/rebuffer like a full
+    // reconnect.
+    if (wasPlaying || play) {
+      await player.play();
+    }
   }
 
   Future<void> pause() {
