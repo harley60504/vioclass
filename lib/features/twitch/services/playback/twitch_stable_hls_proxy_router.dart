@@ -1,3 +1,4 @@
+// PATCH VERSION: twitch_stable_hls_proxy_router_stage232_seamless_stream_loop
 import 'dart:async';
 import 'dart:io';
 
@@ -6,14 +7,10 @@ import 'twitch_hls_low_latency_proxy.dart';
 
 /// Stable local URL wrapper for Twitch HLS playback.
 ///
-/// media_kit is sensitive to repeatedly opening different local URLs such as
-/// `http://127.0.0.1:PORT/stream.ts`. This router keeps one outer HTTP server
-/// and port stable while swapping the inner low-latency proxy when the Twitch
-/// upstream playlist changes.
-///
-/// Stage 125 intentionally keeps the existing low-latency proxy implementation
-/// intact for safety. It reduces player-side churn first; a later stage can
-/// move the inner proxy itself to true in-place upstream switching.
+/// The outer URL and port stay stable. Quality/channel switching swaps the
+/// inner low-latency proxy. For `/stream.ts`, this router keeps the client HTTP
+/// response open and re-attaches it to the new inner stream after the inner
+/// upstream changes, so media_kit does not need Player.open() on every switch.
 class TwitchStableHlsProxyRouter {
   final Map<String, String> upstreamHeaders;
   final int edgeSegmentCount;
@@ -51,6 +48,7 @@ class TwitchStableHlsProxyRouter {
   String? _upstreamPlaylistUrl;
   bool _starting = false;
   bool _switching = false;
+  int _switchGeneration = 0;
 
   int? get port => _server?.port;
 
@@ -96,7 +94,11 @@ class TwitchStableHlsProxyRouter {
   Future<void> switchUpstream(String upstreamPlaylistUrl) async {
     final safeUrl = upstreamPlaylistUrl.trim();
     if (safeUrl.isEmpty) {
-      throw ArgumentError.value(upstreamPlaylistUrl, 'upstreamPlaylistUrl', 'cannot be empty');
+      throw ArgumentError.value(
+        upstreamPlaylistUrl,
+        'upstreamPlaylistUrl',
+        'cannot be empty',
+      );
     }
 
     if (_inner != null && _inner!.isRunning && _upstreamPlaylistUrl == safeUrl) {
@@ -106,6 +108,7 @@ class TwitchStableHlsProxyRouter {
     _switching = true;
     final previous = _inner;
     _inner = null;
+    _switchGeneration++;
 
     try {
       final next = TwitchDartHlsLowLatencyProxy(
@@ -128,12 +131,20 @@ class TwitchStableHlsProxyRouter {
 
       _inner = next;
       _upstreamPlaylistUrl = safeUrl;
+      _switchGeneration++;
+
+      // Close the old inner proxy after the new one is ready. Existing outer
+      // `/stream.ts` clients keep their HTTP response open; when the old inner
+      // stream ends, the stream loop below immediately attaches to the new
+      // inner stream instead of requiring media_kit Player.open().
       await previous?.close();
     } catch (_) {
       _inner = previous;
+      _switchGeneration++;
       rethrow;
     } finally {
       _switching = false;
+      _switchGeneration++;
     }
   }
 
@@ -152,6 +163,7 @@ class TwitchStableHlsProxyRouter {
   Future<void> close() async {
     final server = _server;
     _server = null;
+    _switchGeneration++;
 
     final inner = _inner;
     _inner = null;
@@ -189,7 +201,7 @@ class TwitchStableHlsProxyRouter {
       }
 
       if (path == '/' || path == '/stream' || path == '/stream.ts') {
-        await _proxyToInner(request, Uri.parse(inner.streamTsUrl));
+        await _proxyStreamLoop(request);
         return;
       }
 
@@ -223,9 +235,94 @@ class TwitchStableHlsProxyRouter {
       'upstream=$_upstreamPlaylistUrl\n'
       'inner_running=${_inner?.isRunning ?? false}\n'
       'inner_stream=${_inner?.streamTsUrl}\n'
-      'switching=$_switching\n',
+      'switching=$_switching\n'
+      'switch_generation=$_switchGeneration\n',
     );
     await request.response.close();
+  }
+
+  Future<void> _proxyStreamLoop(HttpRequest request) async {
+    if (request.method == 'HEAD') {
+      request.response.statusCode = HttpStatus.ok;
+      _applyStreamHeaders(request.response);
+      await request.response.close();
+      return;
+    }
+
+    final response = request.response;
+    response.statusCode = HttpStatus.ok;
+    _applyStreamHeaders(response);
+    response.bufferOutput = false;
+
+    var lastAttachedInnerStreamUrl = '';
+    var lastGeneration = -1;
+
+    try {
+      while (_server != null) {
+        final inner = await _waitForReadyInner(
+          lastGeneration: lastGeneration,
+        );
+        if (inner == null) break;
+
+        final target = Uri.parse(inner.streamTsUrl);
+        lastAttachedInnerStreamUrl = target.toString();
+        lastGeneration = _switchGeneration;
+
+        try {
+          final upstreamRequest = await _client.openUrl('GET', target);
+          upstreamRequest.followRedirects = true;
+          upstreamRequest.maxRedirects = 4;
+          final upstreamResponse = await upstreamRequest.close();
+
+          await for (final chunk in upstreamResponse) {
+            if (_server == null) break;
+            response.add(chunk);
+            await response.flush();
+          }
+        } catch (_) {
+          if (_server == null) break;
+        }
+
+        // If the same inner stream simply ended without a router switch, do not
+        // spin aggressively. Give the inner proxy a moment to expose fresh data.
+        if (lastGeneration == _switchGeneration &&
+            lastAttachedInnerStreamUrl == (_inner?.streamTsUrl ?? '')) {
+          await Future<void>.delayed(const Duration(milliseconds: 80));
+        }
+      }
+    } finally {
+      try {
+        await response.close();
+      } catch (_) {}
+    }
+  }
+
+  void _applyStreamHeaders(HttpResponse response) {
+    response.headers.set(HttpHeaders.serverHeader, 'Streamlink');
+    response.headers.contentType = ContentType('video', 'mp2t');
+    response.headers.chunkedTransferEncoding = true;
+    response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+    response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
+  }
+
+  Future<TwitchDartHlsLowLatencyProxy?> _waitForReadyInner({
+    required int lastGeneration,
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    final deadline = DateTime.now().add(timeout);
+
+    while (_server != null && DateTime.now().isBefore(deadline)) {
+      final inner = _inner;
+      if (inner != null && inner.isRunning && _switchGeneration != lastGeneration) {
+        return inner;
+      }
+      if (inner != null && inner.isRunning && !_switching) {
+        return inner;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 35));
+    }
+
+    return _inner != null && _inner!.isRunning ? _inner : null;
   }
 
   Future<void> _proxyToInner(HttpRequest request, Uri target) async {
