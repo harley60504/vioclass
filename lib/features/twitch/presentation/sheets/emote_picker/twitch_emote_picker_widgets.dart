@@ -1,7 +1,9 @@
-// PATCH VERSION: twitch_emote_picker_widgets_stage216_transparent_cards
+// PATCH VERSION: twitch_emote_picker_widgets_stage222_long_press_favorites
 //
 // Shared visual widgets for Twitch emote picker sheets.
 // Stage 216: make emote grid cards translucent instead of solid dark blocks.
+// Stage 222: favorite toggling now uses long press instead of a visible star
+// button, so normal tap always means insert.
 
 import 'package:flutter/material.dart';
 
@@ -143,6 +145,70 @@ class TwitchOfficialSubFilterChip extends StatelessWidget {
   }
 }
 
+class TwitchThirdPartyScopeFilterChip extends StatelessWidget {
+  final TwitchThirdPartyEmoteScopeFilter scopeFilter;
+  final bool selected;
+  final int count;
+  final VoidCallback onTap;
+
+  const TwitchThirdPartyScopeFilterChip({
+    super.key,
+    required this.scopeFilter,
+    required this.selected,
+    required this.count,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final background = selected
+        ? const Color(0xFF9146FF).withOpacity(0.26)
+        : const Color(0xFF242429);
+    final foreground = selected ? const Color(0xFFD9C5FF) : Colors.white70;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? const Color(0xFF9146FF).withOpacity(0.7)
+                  : Colors.white.withOpacity(0.08),
+            ),
+          ),
+          child: Row(
+            children: [
+              Text(
+                scopeFilter.label,
+                style: TextStyle(
+                  color: foreground,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '$count',
+                style: TextStyle(
+                  color: foreground.withOpacity(0.62),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class TwitchThirdPartyEmoteGridCard extends StatelessWidget {
   final TwitchThirdPartyEmote emote;
   final bool favorite;
@@ -160,75 +226,81 @@ class TwitchThirdPartyEmoteGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onInsert,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.052),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: emote.isZeroWidth
-                  ? const Color(0xFFEAB308).withOpacity(0.42)
-                  : Colors.white.withOpacity(0.095),
+      child: Tooltip(
+        message: favorite ? '長按取消收藏' : '長按加入收藏',
+        waitDuration: const Duration(milliseconds: 650),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onInsert,
+          onLongPress: onToggleFavorite,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.052),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: favorite
+                    ? const Color(0xFFEAB308).withOpacity(0.70)
+                    : emote.isZeroWidth
+                        ? const Color(0xFFEAB308).withOpacity(0.42)
+                        : Colors.white.withOpacity(0.095),
+              ),
             ),
-          ),
-          child: Stack(
-            children: [
-              Column(
-                children: [
-                  Expanded(
-                    child: Center(
-                      child: TwitchOptimizedEmoteImage(
-                        imageUrl: emote.imageUrl,
-                        cacheSize: twitchEmoteGridCacheSize,
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: TwitchOptimizedEmoteImage(
+                          imageUrl: emote.imageUrl,
+                          cacheSize: twitchEmoteGridCacheSize,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    emote.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        emote.providerLabel,
-                        style: const TextStyle(fontSize: 9, color: Colors.white38),
-                      ),
-                      if (emote.isZeroWidth) ...[
-                        const SizedBox(width: 4),
-                        const Text(
-                          'ZW',
-                          style: TextStyle(
-                            fontSize: 9,
-                            color: Color(0xFFEAB308),
-                            fontWeight: FontWeight.w900,
-                          ),
+                    const SizedBox(height: 4),
+                    Text(
+                      emote.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${emote.providerLabel} · ${emote.scopeLabel}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 9, color: Colors.white38),
                         ),
+                        if (emote.isZeroWidth) ...[
+                          const SizedBox(width: 4),
+                          const Text(
+                            'ZW',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: Color(0xFFEAB308),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                ],
-              ),
-              Positioned(
-                top: -8,
-                right: -8,
-                child: IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onToggleFavorite,
-                  icon: Icon(
-                    favorite ? Icons.star : Icons.star_border,
-                    size: 18,
-                    color: favorite ? const Color(0xFFEAB308) : Colors.white54,
-                  ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                if (favorite)
+                  const Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Icon(
+                      Icons.star_rounded,
+                      size: 16,
+                      color: Color(0xFFEAB308),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -255,77 +327,81 @@ class TwitchOfficialEmoteGridCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: locked ? null : onInsert,
-        child: Opacity(
-          opacity: locked ? 0.48 : 1,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.052),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: locked
-                    ? const Color(0xFFFFD166).withOpacity(0.26)
-                    : Colors.white.withOpacity(0.095),
+      child: Tooltip(
+        message: favorite ? '長按取消收藏' : '長按加入收藏',
+        waitDuration: const Duration(milliseconds: 650),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: locked ? null : onInsert,
+          onLongPress: onToggleFavorite,
+          child: Opacity(
+            opacity: locked ? 0.48 : 1,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.052),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: favorite
+                      ? const Color(0xFFEAB308).withOpacity(0.70)
+                      : locked
+                          ? const Color(0xFFFFD166).withOpacity(0.26)
+                          : Colors.white.withOpacity(0.095),
+                ),
               ),
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: TwitchOptimizedEmoteImage(
-                          imageUrl: emote.imageUrl,
-                          cacheSize: twitchEmoteGridCacheSize,
+              child: Stack(
+                children: [
+                  Column(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: TwitchOptimizedEmoteImage(
+                            imageUrl: emote.imageUrl,
+                            cacheSize: twitchEmoteGridCacheSize,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      emote.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
-                    ),
-                    Text(
-                      locked ? 'LOCKED' : emote.sourceLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: locked ? const Color(0xFFFFD166) : Colors.white38,
-                        fontWeight: FontWeight.w800,
+                      const SizedBox(height: 4),
+                      Text(
+                        emote.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        locked ? 'LOCKED' : emote.sourceLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 9,
+                          color: locked ? const Color(0xFFFFD166) : Colors.white38,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (favorite)
+                    const Positioned(
+                      top: 0,
+                      right: 0,
+                      child: Icon(
+                        Icons.star_rounded,
+                        size: 16,
+                        color: Color(0xFFEAB308),
                       ),
                     ),
-                  ],
-                ),
-                Positioned(
-                  top: -8,
-                  right: -8,
-                  child: IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: onToggleFavorite,
-                    icon: Icon(
-                      favorite ? Icons.star : Icons.star_border,
-                      size: 18,
-                      color: favorite ? const Color(0xFFEAB308) : Colors.white54,
+                  if (locked)
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      child: Icon(
+                        Icons.lock_rounded,
+                        size: 16,
+                        color: Color(0xFFFFD166),
+                      ),
                     ),
-                  ),
-                ),
-                if (locked)
-                  const Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Icon(
-                      Icons.lock_rounded,
-                      size: 16,
-                      color: Color(0xFFFFD166),
-                    ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
