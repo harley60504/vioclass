@@ -23,12 +23,11 @@ import 'player/twitch_player_more_actions_button.dart';
 import 'player/twitch_player_pip_button.dart';
 import 'player/twitch_player_quality_button.dart';
 import 'player/twitch_player_volume_control.dart';
+import 'player/twitch_watch_bottom_control_bar.dart';
+import 'player/twitch_watch_controls_overlay.dart';
 import 'player/twitch_watch_stream_header.dart';
 import 'player/twitch_watch_top_action_bar.dart';
 import 'player/twitch_watch_top_buttons.dart';
-
-part 'player/twitch_watch_controls_overlay.dart';
-part 'player/twitch_watch_bottom_control_bar.dart';
 
 class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -118,7 +117,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
             controller: state.videoController,
           ),
           overlay: state.shouldShowControlsOverlay
-              ? _WatchControlsOverlay(
+              ? WatchControlsOverlay(
                   loading: state.overlayLoading,
                   error: error,
                   runtimeError: playerRuntime.error,
