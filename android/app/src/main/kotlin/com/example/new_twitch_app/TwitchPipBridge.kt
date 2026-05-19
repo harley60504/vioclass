@@ -4,8 +4,6 @@ import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Rational
 import io.flutter.plugin.common.MethodChannel
 
@@ -14,7 +12,6 @@ class TwitchPipBridge(
 ) {
     private var channel: MethodChannel? = null
     private var sourceRectHint: Rect? = null
-    private val mainHandler = Handler(Looper.getMainLooper())
 
     fun attach(methodChannel: MethodChannel) {
         channel = methodChannel
@@ -37,23 +34,18 @@ class TwitchPipBridge(
                 else -> result.notImplemented()
             }
         }
+
+        updatePictureInPictureParams(16, 9)
     }
 
     fun detach() {
         channel?.setMethodCallHandler(null)
         channel = null
-        mainHandler.removeCallbacksAndMessages(null)
     }
 
-    fun enterPipFromUserLeaveHint() {
-        val currentChannel = channel
-        if (currentChannel != null) {
-            currentChannel.invokeMethod("onAutoPipRequested", null)
-        }
-
-        mainHandler.postDelayed({
-            enterPip(16, 9)
-        }, 90L)
+    fun enterPipFromUserLeaveHint(): Boolean {
+        channel?.invokeMethod("onAutoPipRequested", null)
+        return enterPip(16, 9)
     }
 
     fun notifyPipModeChanged(isInPip: Boolean) {
@@ -79,6 +71,7 @@ class TwitchPipBridge(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) return true
 
+        updatePictureInPictureParams(width, height)
         return activity.enterPictureInPictureMode(buildPictureInPictureParams(width, height))
     }
 
@@ -97,6 +90,10 @@ class TwitchPipBridge(
         val hint = sourceRectHint
         if (hint != null) {
             builder.setSourceRectHint(hint)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setAutoEnterEnabled(true)
         }
 
         return builder.build()
