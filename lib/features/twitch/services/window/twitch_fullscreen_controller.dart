@@ -1,21 +1,16 @@
-// PATCH VERSION: twitch_fullscreen_controller_desktop_method_channel_v49
-// Place at: lib/features/twitch/services/window/twitch_fullscreen_controller.dart
+// PATCH VERSION: twitch_fullscreen_controller_stage231_window_manager_api
 // Fullscreen and chat visibility are independent.
-// Desktop uses the same window_manager MethodChannel contract as the plugin,
-// without importing package:window_manager in shared/mobile code.
-// Android/iOS use Flutter immersive SystemChrome mode only.
+// Desktop uses package:window_manager directly so Windows/macOS/Linux enter real
+// OS fullscreen. Android/iOS use Flutter immersive SystemChrome mode only.
 
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:window_manager/window_manager.dart';
 
 class TwitchFullscreenController {
   const TwitchFullscreenController._();
-
-  static const MethodChannel _windowManagerChannel = MethodChannel(
-    'window_manager',
-  );
 
   static bool _desktopInitialized = false;
 
@@ -31,38 +26,36 @@ class TwitchFullscreenController {
 
   static Future<void> setFullscreen(bool enabled) async {
     if (isDesktopPlatform) {
-      final handled = await _tryDesktopWindowFullscreen(enabled);
-      if (handled) return;
+      await _setDesktopFullscreen(enabled);
+      return;
     }
 
-    await SystemChrome.setEnabledSystemUIMode(
-      enabled ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
-    );
+    await _setMobileFullscreen(enabled);
   }
 
   static Future<void> exitFullscreen() => setFullscreen(false);
 
-  static Future<bool> _tryDesktopWindowFullscreen(bool enabled) async {
-    try {
-      if (!_desktopInitialized) {
-        await _windowManagerChannel.invokeMethod<void>('ensureInitialized');
-        _desktopInitialized = true;
-      }
+  static Future<void> _setDesktopFullscreen(bool enabled) async {
+    await _ensureDesktopInitialized();
 
-      // Important: this must match package:window_manager's argument shape:
-      // {'isFullScreen': bool}. Passing a raw bool can crash/fail on Windows.
-      await _windowManagerChannel.invokeMethod<void>(
-        'setFullScreen',
-        <String, Object?>{
-          'isFullScreen': enabled,
-        },
-      );
-      return true;
-    } catch (error) {
-      if (kDebugMode) {
-        debugPrint('Desktop fullscreen fallback: $error');
-      }
-      return false;
+    final alreadyFullscreen = await windowManager.isFullScreen();
+    if (alreadyFullscreen == enabled) return;
+
+    await windowManager.setFullScreen(enabled);
+    if (enabled) {
+      await windowManager.focus();
     }
+  }
+
+  static Future<void> _ensureDesktopInitialized() async {
+    if (_desktopInitialized) return;
+    await windowManager.ensureInitialized();
+    _desktopInitialized = true;
+  }
+
+  static Future<void> _setMobileFullscreen(bool enabled) {
+    return SystemChrome.setEnabledSystemUIMode(
+      enabled ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+    );
   }
 }
