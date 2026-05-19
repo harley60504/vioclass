@@ -1,11 +1,19 @@
-part of twitch_watch_player_area;
+import 'dart:math' as math;
 
-class _WatchCompactAvatarTile extends StatelessWidget {
+import 'package:characters/characters.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../shared/twitch_glass.dart';
+
+class WatchCompactAvatarTile extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool tiny;
   final double height;
 
-  const _WatchCompactAvatarTile({
+  const WatchCompactAvatarTile({
+    super.key,
     required this.metadata,
     required this.tiny,
     required this.height,
@@ -40,12 +48,13 @@ class _WatchCompactAvatarTile extends StatelessWidget {
   }
 }
 
-class _WatchStreamHeaderCard extends StatelessWidget {
+class WatchStreamHeaderCard extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool compact;
   final double height;
 
-  const _WatchStreamHeaderCard({
+  const WatchStreamHeaderCard({
+    super.key,
     required this.metadata,
     required this.compact,
     required this.height,
