@@ -1,13 +1,14 @@
-// Stage 226: Android Picture-in-Picture bridge for the media_kit Watch player.
+// Stage 226D: Android Picture-in-Picture bridge for the media_kit Watch player.
 //
-// This file intentionally stays platform-facing and UI-free. Widgets should call
-// TwitchAndroidPipController.instance.enterPictureInPicture() and listen to this
-// ChangeNotifier to hide non-video chrome while Android is in PiP mode.
+// The Android PiP API is Activity-level, but the Watch player area can still
+// provide a source-rect hint so Android animates PiP from the actual video area
+// instead of from the whole WatchPage.
 
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 class TwitchAndroidPipController extends ChangeNotifier {
   TwitchAndroidPipController._() {
@@ -39,6 +40,23 @@ class TwitchAndroidPipController extends ChangeNotifier {
       _lastKnownAvailable = false;
       return false;
     }
+  }
+
+  Future<void> setSourceRectHint(Rect rect) async {
+    if (!Platform.isAndroid) return;
+    if (rect.isEmpty || !rect.isFinite) return;
+
+    try {
+      await _channel.invokeMethod<void>(
+        'setSourceRectHint',
+        <String, Object>{
+          'left': rect.left.round(),
+          'top': rect.top.round(),
+          'right': rect.right.round(),
+          'bottom': rect.bottom.round(),
+        },
+      );
+    } catch (_) {}
   }
 
   Future<bool> enterPictureInPicture({
