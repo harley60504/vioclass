@@ -31,6 +31,10 @@ class TwitchPipBridge(
         channel = null
     }
 
+    fun enterPipFromUserLeaveHint(): Boolean {
+        return enterPip(16, 9)
+    }
+
     fun notifyPipModeChanged(isInPip: Boolean) {
         channel?.invokeMethod(
             "onPipModeChanged",
@@ -46,6 +50,7 @@ class TwitchPipBridge(
     private fun enterPip(width: Int, height: Int): Boolean {
         if (!isPipAvailable()) return false
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) return true
 
         val safeWidth = width.coerceIn(1, 100)
         val safeHeight = height.coerceIn(1, 100)
