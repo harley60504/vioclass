@@ -276,7 +276,7 @@ class _WatchErrorOverlay extends StatelessWidget {
       left: 16,
       right: 16,
       bottom: 88,
-      child: _ErrorCard(message: message),
+      child: PlayerErrorCard(message: message),
     );
   }
 
