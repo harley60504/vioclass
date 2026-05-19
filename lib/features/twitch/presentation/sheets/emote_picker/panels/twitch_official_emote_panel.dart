@@ -132,12 +132,12 @@ class TwitchOfficialEmotePanel extends StatelessWidget {
                   resetKey: resetKey,
                   initialItemCount: 48,
                   pageSize: 48,
-                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 16),
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 18),
                   gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: 116,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1.02,
+                    maxCrossAxisExtent: 156,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 0.98,
                   ),
                   itemBuilder: (context, emote, index) {
                     return TwitchOfficialEmoteGridCard(
