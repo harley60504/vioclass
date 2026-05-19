@@ -68,8 +68,9 @@ class TwitchPipBridge(
 
     private fun enterPip(width: Int, height: Int): Boolean {
         if (!isPipAvailable()) return false
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) return true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) {
+            return true
+        }
 
         updatePictureInPictureParams(width, height)
         return activity.enterPictureInPictureMode(buildPictureInPictureParams(width, height))
@@ -77,7 +78,6 @@ class TwitchPipBridge(
 
     private fun updatePictureInPictureParams(width: Int, height: Int) {
         if (!isPipAvailable()) return
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         activity.setPictureInPictureParams(buildPictureInPictureParams(width, height))
     }
 
@@ -87,8 +87,7 @@ class TwitchPipBridge(
         val builder = PictureInPictureParams.Builder()
             .setAspectRatio(Rational(safeWidth, safeHeight))
 
-        val hint = sourceRectHint
-        if (hint != null) {
+        sourceRectHint?.let { hint ->
             builder.setSourceRectHint(hint)
         }
 
