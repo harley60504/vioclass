@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_responsive_body_stage226e_player_only_for_pip
+// PATCH VERSION: twitch_watch_responsive_body_stage226f_player_only_video_surface
 
 import 'package:flutter/material.dart';
 
@@ -56,9 +56,9 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
       animation: pip,
       builder: (context, _) {
         if (pip.shouldRenderPlayerOnly) {
-          return const ColoredBox(
+          return ColoredBox(
             color: Colors.black,
-            child: _PlayerOnlyPipHost(),
+            child: player,
           );
         }
 
@@ -194,17 +194,6 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
-  }
-}
-
-class _PlayerOnlyPipHost extends StatelessWidget {
-  const _PlayerOnlyPipHost();
-
-  @override
-  Widget build(BuildContext context) {
-    final body = context.findAncestorWidgetOfExactType<TwitchWatchResponsiveBody>();
-    if (body == null) return const SizedBox.shrink();
-    return body.player;
   }
 }
 
