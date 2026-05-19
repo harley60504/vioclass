@@ -1,25 +1,37 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage224_large_grid_single_picker
+// PATCH VERSION: twitch_emote_picker_sheet_stage225_unified_frosty_logic
 //
-// Thin entry/state file for Twitch emote picker sheets. Heavy panels, widgets,
-// and models live in sheets/emote_picker/*.
-// Stage 222: merge Frosty-style scope/category filtering into this original
-// sheet and keep favorite toggling on long press.
-// Stage 224: remove the legacy Channel Points official emote ID picker entry;
-// Channel Points should use its overlay only. Normal emote picker uses large
-// visual grid cards.
+// Single unified emote picker sheet.
+// - Keep this file as the only public emote picker entry.
+// - Frosty-style category logic is merged here.
+// - Every category/page uses the same _EmoteEntry model.
+// - Every page uses the same large translucent grid UI.
+// - Search applies to the current page.
+// - Tap inserts emote name.
+// - Long press toggles favorite.
+// - Locked official emotes remain visible but cannot be inserted.
 
-import 'dart:async';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
-import 'emote_picker/twitch_emote_picker_models.dart';
-import 'emote_picker/twitch_emote_picker_panels.dart';
-import 'emote_picker/twitch_emote_picker_widgets.dart';
+
+const int _initialGridCount = 96;
+const int _searchGridLimit = 240;
+const double _cardMaxExtent = 154.0;
+const double _cardAspectRatio = 0.98;
+
+final CacheManager _sheetEmoteCacheManager = CacheManager(
+  Config(
+    'twitchUnifiedEmotePickerImageCache',
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 12000,
+  ),
+);
 
 Future<void> showTwitchEmotePickerSheet({
   required BuildContext context,
@@ -32,7 +44,7 @@ Future<void> showTwitchEmotePickerSheet({
   return showTwitchResponsiveSheet<void>(
     context: context,
     size: TwitchUnifiedSheetSize.large,
-    builder: (_) => TwitchThirdPartyEmotePickerSheet(
+    builder: (_) => TwitchUnifiedEmotePickerSheet(
       cache: cache,
       officialCache: officialCache,
       loading: loading,
@@ -42,297 +54,875 @@ Future<void> showTwitchEmotePickerSheet({
   );
 }
 
-class TwitchThirdPartyEmotePickerSheet extends StatefulWidget {
+class TwitchUnifiedEmotePickerSheet extends StatefulWidget {
   final TwitchThirdPartyEmoteCacheService cache;
   final TwitchOfficialEmoteCacheService? officialCache;
   final bool loading;
   final Future<void> Function() onRefresh;
-  final ValueChanged<String>? onEmoteSelected;
+  final ValueChanged<String> onEmoteSelected;
 
-  const TwitchThirdPartyEmotePickerSheet({
+  const TwitchUnifiedEmotePickerSheet({
     super.key,
     required this.cache,
     required this.loading,
     required this.onRefresh,
+    required this.onEmoteSelected,
     this.officialCache,
-    this.onEmoteSelected,
   });
 
   @override
-  State<TwitchThirdPartyEmotePickerSheet> createState() =>
-      _TwitchThirdPartyEmotePickerSheetState();
+  State<TwitchUnifiedEmotePickerSheet> createState() =>
+      _TwitchUnifiedEmotePickerSheetState();
 }
 
-class _TwitchThirdPartyEmotePickerSheetState
-    extends State<TwitchThirdPartyEmotePickerSheet> {
+class _TwitchUnifiedEmotePickerSheetState
+    extends State<TwitchUnifiedEmotePickerSheet> {
   final TextEditingController _searchController = TextEditingController();
 
-  Timer? _searchDebounce;
   String _query = '';
-  TwitchEmotePickerTab _selectedTab = TwitchEmotePickerTab.recent;
-  TwitchOfficialEmoteSubFilter _officialSubFilter =
-      TwitchOfficialEmoteSubFilter.usable;
-  TwitchThirdPartyEmoteScopeFilter _thirdPartyScopeFilter =
-      TwitchThirdPartyEmoteScopeFilter.all;
 
   TwitchOfficialEmoteCacheService? get _official => widget.officialCache;
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  void _setSearchQueryDebounced(String value) {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(twitchEmoteSearchDebounceDuration, () {
-      if (!mounted) return;
-      setState(() => _query = value.trim());
-    });
-  }
-
-  void _finishInsert(String name) {
-    final trimmed = name.trim();
-    if (trimmed.isEmpty) return;
-
-    final callback = widget.onEmoteSelected;
-    if (callback != null) {
-      callback(trimmed);
-      return;
-    }
-
-    Navigator.of(context).pop(trimmed);
-  }
-
-  void _selectThirdPartyEmote(TwitchThirdPartyEmote emote) {
-    widget.cache.markRecentEmote(emote);
-    _finishInsert(emote.name);
-    if (mounted) setState(() {});
-  }
-
-  void _selectOfficialEmote(TwitchOfficialEmote emote) {
-    if (emote.locked) return;
-    _official?.markRecentEmote(emote);
-    _finishInsert(emote.name);
-    if (mounted) setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
-    final source = twitchThirdPartyEmotesForTab(
-      tab: _selectedTab,
-      cache: widget.cache,
-    );
-    final query = _query.toLowerCase();
-    final filtered = filterThirdPartyEmotes(
-      source: source,
-      query: query,
-      scopeFilter: _thirdPartyScopeFilter,
-    );
-
     final official = _official;
-    final isRecentTab = _selectedTab == TwitchEmotePickerTab.recent;
-    final isTwitchTab = _selectedTab == TwitchEmotePickerTab.twitch;
-    final isFavoritesTab = _selectedTab == TwitchEmotePickerTab.favorites;
-    final isThirdPartyProviderTab = !isRecentTab && !isTwitchTab && !isFavoritesTab;
+    final loading = widget.loading ||
+        widget.cache.loading ||
+        (official?.loading ?? false);
 
-    final media = MediaQuery.of(context);
-    final compactVertical =
-        media.size.height < 520 || media.orientation == Orientation.landscape;
-    final emptyText = twitchEmoteEmptyText(
-      tab: _selectedTab,
-      loading: widget.loading,
-      official: official,
-    );
+    final tabs = <_OuterTab>[
+      _recentTab(),
+      _favoriteTab(),
+      _officialTab(),
+      _thirdPartyTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
+      _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
+      _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
+    ];
 
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
         title: '貼圖',
-        subtitle: '最近 / 收藏 / Twitch / BTTV / 7TV / FFZ｜長按收藏',
+        subtitle: '最近 / 最愛 / Twitch / 7TV / BTTV / FFZ｜長按收藏',
         icon: Icons.emoji_emotions_rounded,
-        loading: widget.loading,
+        loading: loading,
         onRefresh: widget.onRefresh,
-        child: Column(
-          children: [
-            SizedBox(
-              height: compactVertical ? 34 : 42,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  TwitchEmotePickerTabChip(
-                    label: '最近',
-                    icon: Icons.history_rounded,
-                    selected: _selectedTab == TwitchEmotePickerTab.recent,
-                    count: _countForTab(TwitchEmotePickerTab.recent),
-                    onTap: () => _selectTab(TwitchEmotePickerTab.recent),
-                  ),
-                  TwitchEmotePickerTabChip(
-                    label: '收藏',
-                    icon: Icons.star_rounded,
-                    selected: _selectedTab == TwitchEmotePickerTab.favorites,
-                    count: _countForTab(TwitchEmotePickerTab.favorites),
-                    onTap: () => _selectTab(TwitchEmotePickerTab.favorites),
-                  ),
-                  TwitchEmotePickerTabChip(
-                    label: 'Twitch',
-                    icon: Icons.lock_rounded,
-                    selected: _selectedTab == TwitchEmotePickerTab.twitch,
-                    count: _countForTab(TwitchEmotePickerTab.twitch),
-                    onTap: () => _selectTab(TwitchEmotePickerTab.twitch),
-                  ),
-                  TwitchEmotePickerTabChip(
-                    label: 'BTTV',
-                    selected: _selectedTab == TwitchEmotePickerTab.bttv,
-                    count: _countForTab(TwitchEmotePickerTab.bttv),
-                    onTap: () => _selectTab(TwitchEmotePickerTab.bttv),
-                  ),
-                  TwitchEmotePickerTabChip(
-                    label: '7TV',
-                    selected: _selectedTab == TwitchEmotePickerTab.sevenTv,
-                    count: _countForTab(TwitchEmotePickerTab.sevenTv),
-                    onTap: () => _selectTab(TwitchEmotePickerTab.sevenTv),
-                  ),
-                  TwitchEmotePickerTabChip(
-                    label: 'FFZ',
-                    selected: _selectedTab == TwitchEmotePickerTab.ffz,
-                    count: _countForTab(TwitchEmotePickerTab.ffz),
-                    onTap: () => _selectTab(TwitchEmotePickerTab.ffz),
-                  ),
-                ],
+        child: DefaultTabController(
+          length: tabs.length,
+          child: Column(
+            children: [
+              _SearchBar(
+                controller: _searchController,
+                onChanged: (value) {
+                  setState(() {
+                    _query = value.trim().toLowerCase();
+                  });
+                },
               ),
-            ),
-            if (isThirdPartyProviderTab)
-              SizedBox(
-                height: compactVertical ? 32 : 36,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              _MainTabBar(tabs: tabs),
+              const Divider(height: 1),
+              Expanded(
+                child: TabBarView(
                   children: [
-                    for (final scopeFilter in TwitchThirdPartyEmoteScopeFilter.values)
-                      TwitchThirdPartyScopeFilterChip(
-                        scopeFilter: scopeFilter,
-                        selected: _thirdPartyScopeFilter == scopeFilter,
-                        count: twitchThirdPartyEmoteScopeCount(
-                          source: source,
-                          scopeFilter: scopeFilter,
-                        ),
-                        onTap: () {
-                          setState(() => _thirdPartyScopeFilter = scopeFilter);
-                        },
+                    for (final tab in tabs)
+                      _ProviderPage(
+                        key: PageStorageKey<String>('provider-${tab.label}'),
+                        tab: tab,
+                        query: _query,
+                        loading: loading,
+                        onSelect: _selectEntry,
+                        onLongPress: _toggleFavorite,
                       ),
                   ],
                 ),
               ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                12,
-                isThirdPartyProviderTab ? 0 : 3,
-                12,
-                7,
-              ),
-              child: SizedBox(
-                height: compactVertical ? 34 : 36,
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.search, size: 18),
-                    prefixIconConstraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 32,
-                    ),
-                    hintText: isTwitchTab
-                        ? '搜尋 Twitch 貼圖（${official?.visibleCount ?? 0}）'
-                        : isThirdPartyProviderTab
-                            ? '搜尋 ${_thirdPartyScopeFilter.label} 貼圖'
-                            : '搜尋目前分類貼圖',
-                    hintStyle: const TextStyle(fontSize: 13),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 8,
-                    ),
-                  ),
-                  onChanged: _setSearchQueryDebounced,
-                ),
-              ),
-            ),
-            Expanded(
-              child: isRecentTab
-                  ? TwitchRecentEmotePanel(
-                      thirdPartyRecent: widget.cache.recentEmotes,
-                      officialRecent:
-                          official?.recentEmotes ?? const <TwitchOfficialEmote>[],
-                      thirdPartyCache: widget.cache,
-                      officialCache: official,
-                      query: query,
-                      emptyText: emptyText,
-                      onInsertThirdParty: _selectThirdPartyEmote,
-                      onInsertOfficial: _selectOfficialEmote,
-                      onChanged: () => setState(() {}),
-                    )
-                  : isTwitchTab
-                      ? TwitchOfficialEmotePanel(
-                          official: official,
-                          query: query,
-                          loading: widget.loading || (official?.loading ?? false),
-                          emptyText: emptyText,
-                          subFilter: _officialSubFilter,
-                          onSubFilterChanged: (value) {
-                            setState(() => _officialSubFilter = value);
-                          },
-                          onInsert: _selectOfficialEmote,
-                          onChanged: () => setState(() {}),
-                        )
-                      : isFavoritesTab
-                          ? TwitchFavoriteEmotePanel(
-                              thirdPartyFavorites: widget.cache.favoriteEmotes,
-                              officialFavorites:
-                                  official?.favoriteEmotes ?? const <TwitchOfficialEmote>[],
-                              thirdPartyCache: widget.cache,
-                              officialCache: official,
-                              query: query,
-                              emptyText: emptyText,
-                              onInsertThirdParty: _selectThirdPartyEmote,
-                              onInsertOfficial: _selectOfficialEmote,
-                              onChanged: () => setState(() {}),
-                            )
-                          : TwitchThirdPartyProviderEmoteGrid(
-                              emotes: filtered,
-                              cache: widget.cache,
-                              emptyText: emptyText,
-                              onInsert: _selectThirdPartyEmote,
-                              onChanged: () => setState(() {}),
-                            ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  int _countForTab(TwitchEmotePickerTab tab) {
-    return twitchEmoteCountForTab(
-      tab: tab,
-      cache: widget.cache,
-      official: _official,
+  _OuterTab _recentTab() {
+    final official = _official;
+
+    return _OuterTab(
+      label: 'Recent',
+      pages: [
+        _InnerPage(
+          label: 'Recent',
+          entries: <_EmoteEntry>[
+            ...widget.cache.recentEmotes.map(_thirdPartyEntry),
+            ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
+                .map(_officialEntry),
+          ],
+        ),
+      ],
     );
   }
 
-  void _selectTab(TwitchEmotePickerTab tab) {
-    setState(() {
-      _selectedTab = tab;
-      if (tab == TwitchEmotePickerTab.bttv ||
-          tab == TwitchEmotePickerTab.sevenTv ||
-          tab == TwitchEmotePickerTab.ffz) {
-        _thirdPartyScopeFilter = TwitchThirdPartyEmoteScopeFilter.all;
+  _OuterTab _favoriteTab() {
+    final official = _official;
+
+    return _OuterTab(
+      label: 'Favorite',
+      pages: [
+        _InnerPage(
+          label: 'Favorite',
+          entries: <_EmoteEntry>[
+            ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
+            ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
+                .map(_officialEntry),
+          ],
+        ),
+      ],
+    );
+  }
+
+  _OuterTab _officialTab() {
+    final official = _official;
+
+    if (official == null) {
+      return const _OuterTab(
+        label: 'Twitch',
+        pages: [
+          _InnerPage(label: 'Channel', entries: <_EmoteEntry>[]),
+          _InnerPage(label: 'Global', entries: <_EmoteEntry>[]),
+          _InnerPage(label: 'Unlocked', entries: <_EmoteEntry>[]),
+        ],
+      );
+    }
+
+    final channel = _uniqueOfficial(official.channelEmotes);
+    final global = _uniqueOfficial(official.globalEmotes);
+    final user = _uniqueOfficial(official.userEmotes);
+
+    final channelKeys = channel.map(_officialKey).toSet();
+    final globalKeys = global.map(_officialKey).toSet();
+    final currentChannelId = official.channelId.trim();
+
+    final userOnly = user.where((emote) {
+      final key = _officialKey(emote);
+
+      if (channelKeys.contains(key)) return false;
+      if (globalKeys.contains(key)) return false;
+
+      if (currentChannelId.isNotEmpty &&
+          emote.ownerId.trim() == currentChannelId) {
+        return false;
       }
-    });
+
+      return true;
+    }).toList(growable: false);
+
+    final unlocked = _uniqueOfficial(
+      userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
+    );
+
+    final subscriptions = _uniqueOfficial(
+      userOnly.where((emote) => !_isUnlockedOfficialEmote(emote)),
+    );
+
+    final subscriptionGroups = _groupOfficialByOwner(subscriptions);
+
+    return _OuterTab(
+      label: 'Twitch',
+      pages: [
+        _InnerPage(
+          label: 'Channel',
+          entries: channel.map(_officialEntry).toList(growable: false),
+        ),
+        _InnerPage(
+          label: 'Global',
+          entries: global.map(_officialEntry).toList(growable: false),
+        ),
+        for (final group in subscriptionGroups.entries)
+          _InnerPage(
+            label: group.key,
+            entries: group.value.map(_officialEntry).toList(growable: false),
+          ),
+        _InnerPage(
+          label: 'Unlocked',
+          entries: unlocked.map(_officialEntry).toList(growable: false),
+        ),
+      ],
+    );
+  }
+
+  _OuterTab _thirdPartyTab(
+    String label,
+    TwitchThirdPartyEmoteProvider provider,
+  ) {
+    final source = widget.cache.emotesForProvider(provider);
+
+    final channel = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.channel)
+        .map(_thirdPartyEntry)
+        .toList(growable: false);
+
+    final shared = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.shared)
+        .map(_thirdPartyEntry)
+        .toList(growable: false);
+
+    final global = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.global)
+        .map(_thirdPartyEntry)
+        .toList(growable: false);
+
+    final other = source
+        .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.other)
+        .map(_thirdPartyEntry)
+        .toList(growable: false);
+
+    final zeroWidth = source
+        .where((emote) => emote.isZeroWidth)
+        .map(_thirdPartyEntry)
+        .toList(growable: false);
+
+    return _OuterTab(
+      label: label,
+      pages: [
+        _InnerPage(
+          label: 'Channel',
+          entries: <_EmoteEntry>[
+            ...channel,
+            ...shared,
+            ...other,
+          ],
+        ),
+        _InnerPage(
+          label: 'Global',
+          entries: global,
+        ),
+        if (zeroWidth.isNotEmpty)
+          _InnerPage(
+            label: 'ZW',
+            entries: zeroWidth,
+          ),
+      ],
+    );
+  }
+
+  _EmoteEntry _thirdPartyEntry(TwitchThirdPartyEmote emote) {
+    return _EmoteEntry.thirdParty(
+      emote,
+      favorite: widget.cache.isFavorite(emote),
+    );
+  }
+
+  _EmoteEntry _officialEntry(TwitchOfficialEmote emote) {
+    return _EmoteEntry.official(
+      emote,
+      favorite: _official?.isFavorite(emote) ?? false,
+    );
+  }
+
+  Map<String, List<TwitchOfficialEmote>> _groupOfficialByOwner(
+    List<TwitchOfficialEmote> emotes,
+  ) {
+    final grouped = <String, List<TwitchOfficialEmote>>{};
+
+    for (final emote in emotes) {
+      final ownerLabel = _ownerLabel(emote);
+      grouped.putIfAbsent(ownerLabel, () => <TwitchOfficialEmote>[]).add(emote);
+    }
+
+    final keys = grouped.keys.toList(growable: false)
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+
+    return <String, List<TwitchOfficialEmote>>{
+      for (final key in keys)
+        key: _uniqueOfficial(grouped[key] ?? const <TwitchOfficialEmote>[]),
+    };
+  }
+
+  String _ownerLabel(TwitchOfficialEmote emote) {
+    final display = emote.ownerDisplayName.trim();
+    if (display.isNotEmpty) return display;
+
+    final ownerId = emote.ownerId.trim();
+    if (ownerId.isNotEmpty) return 'Sub $ownerId';
+
+    final setId = emote.emoteSetId.trim();
+    if (setId.isNotEmpty) return 'Sub $setId';
+
+    return 'Sub';
+  }
+
+  bool _isUnlockedOfficialEmote(TwitchOfficialEmote emote) {
+    final ownerId = emote.ownerId.trim();
+    final ownerDisplayName = emote.ownerDisplayName.trim();
+    final ownerIsMissing = ownerId.isEmpty && ownerDisplayName.isEmpty;
+
+    final type = emote.emoteType.toLowerCase();
+
+    return ownerIsMissing ||
+        type.contains('unlock') ||
+        type.contains('unlocked') ||
+        type.contains('hypetrain') ||
+        type.contains('prime') ||
+        type.contains('limitedtime');
+  }
+
+  List<TwitchOfficialEmote> _uniqueOfficial(
+    Iterable<TwitchOfficialEmote> source,
+  ) {
+    final byKey = <String, TwitchOfficialEmote>{};
+
+    for (final emote in source) {
+      byKey[_officialKey(emote)] = emote;
+    }
+
+    final output = byKey.values.toList(growable: false)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    return output;
+  }
+
+  String _officialKey(TwitchOfficialEmote emote) {
+    final id = emote.id.trim();
+
+    if (id.isNotEmpty) {
+      return 'id:$id';
+    }
+
+    return 'name:${emote.name.trim().toLowerCase()}';
+  }
+
+  void _selectEntry(_EmoteEntry entry) {
+    if (entry.locked) return;
+
+    final thirdParty = entry.thirdParty;
+    if (thirdParty != null) {
+      widget.cache.markRecentEmote(thirdParty);
+    }
+
+    final official = entry.official;
+    if (official != null) {
+      _official?.markRecentEmote(official);
+    }
+
+    final name = entry.name.trim();
+    if (name.isNotEmpty) {
+      widget.onEmoteSelected(name);
+    }
+  }
+
+  void _toggleFavorite(_EmoteEntry entry) {
+    final thirdParty = entry.thirdParty;
+    if (thirdParty != null) {
+      widget.cache.toggleFavorite(thirdParty);
+      setState(() {});
+      return;
+    }
+
+    final official = entry.official;
+    if (official != null) {
+      _official?.toggleFavorite(official);
+      setState(() {});
+    }
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _SearchBar({
+    required this.controller,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: SizedBox(
+        height: 38,
+        child: TextField(
+          controller: controller,
+          onChanged: onChanged,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          cursorColor: const Color(0xFFBF94FF),
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: '搜尋貼圖名稱',
+            hintStyle: const TextStyle(
+              color: Colors.white38,
+              fontSize: 13,
+            ),
+            prefixIcon: const Icon(
+              Icons.search_rounded,
+              color: Colors.white54,
+              size: 18,
+            ),
+            prefixIconConstraints: const BoxConstraints(
+              minWidth: 34,
+              minHeight: 34,
+            ),
+            filled: true,
+            fillColor: const Color(0xFF0E0E10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MainTabBar extends StatelessWidget {
+  final List<_OuterTab> tabs;
+
+  const _MainTabBar({
+    required this.tabs,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TabBar(
+      isScrollable: true,
+      labelColor: const Color(0xFFD9C5FF),
+      unselectedLabelColor: Colors.white60,
+      indicatorColor: const Color(0xFF9146FF),
+      indicatorSize: TabBarIndicatorSize.label,
+      labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+      labelStyle: const TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w900,
+      ),
+      unselectedLabelStyle: const TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+      ),
+      tabs: [
+        for (final tab in tabs)
+          Tab(
+            text: '${tab.label} ${tab.totalCount}',
+          ),
+      ],
+    );
+  }
+}
+
+class _ProviderPage extends StatefulWidget {
+  final _OuterTab tab;
+  final String query;
+  final bool loading;
+  final ValueChanged<_EmoteEntry> onSelect;
+  final ValueChanged<_EmoteEntry> onLongPress;
+
+  const _ProviderPage({
+    super.key,
+    required this.tab,
+    required this.query,
+    required this.loading,
+    required this.onSelect,
+    required this.onLongPress,
+  });
+
+  @override
+  State<_ProviderPage> createState() => _ProviderPageState();
+}
+
+class _ProviderPageState extends State<_ProviderPage>
+    with AutomaticKeepAliveClientMixin<_ProviderPage> {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    final tab = widget.tab;
+
+    return DefaultTabController(
+      length: tab.pages.length,
+      child: Column(
+        children: [
+          if (tab.pages.length > 1)
+            SizedBox(
+              height: 34,
+              child: TabBar(
+                isScrollable: true,
+                labelColor: const Color(0xFFD9C5FF),
+                unselectedLabelColor: Colors.white54,
+                indicatorColor: const Color(0xFF9146FF),
+                indicatorSize: TabBarIndicatorSize.label,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 10),
+                labelStyle: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                tabs: [
+                  for (final page in tab.pages)
+                    Tab(
+                      text: '${page.label} ${page.entries.length}',
+                    ),
+                ],
+              ),
+            ),
+          if (tab.pages.length > 1) const Divider(height: 1),
+          Expanded(
+            child: TabBarView(
+              children: [
+                for (final page in tab.pages)
+                  _EmoteSection(
+                    key: PageStorageKey<String>(
+                      'section-${tab.label}-${page.label}',
+                    ),
+                    entries: page.entries,
+                    query: widget.query,
+                    emptyText: widget.loading ? 'Loading emotes...' : 'No emotes',
+                    onSelect: widget.onSelect,
+                    onLongPress: widget.onLongPress,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+}
+
+class _EmoteSection extends StatefulWidget {
+  final List<_EmoteEntry> entries;
+  final String query;
+  final String emptyText;
+  final ValueChanged<_EmoteEntry> onSelect;
+  final ValueChanged<_EmoteEntry> onLongPress;
+
+  const _EmoteSection({
+    super.key,
+    required this.entries,
+    required this.query,
+    required this.emptyText,
+    required this.onSelect,
+    required this.onLongPress,
+  });
+
+  @override
+  State<_EmoteSection> createState() => _EmoteSectionState();
+}
+
+class _EmoteSectionState extends State<_EmoteSection>
+    with AutomaticKeepAliveClientMixin<_EmoteSection> {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+
+    final entries = _filteredEntries();
+
+    if (entries.isEmpty) {
+      return Center(
+        child: Text(
+          widget.emptyText,
+          style: const TextStyle(
+            color: Colors.white54,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
+    return MediaQuery.removePadding(
+      context: context,
+      removeTop: true,
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 18),
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: true,
+        addSemanticIndexes: false,
+        cacheExtent: 360,
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: _cardMaxExtent,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: _cardAspectRatio,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+
+          return _EmoteTile(
+            key: ValueKey<String>(entry.stableKey),
+            entry: entry,
+            onTap: () => widget.onSelect(entry),
+            onLongPress: () => widget.onLongPress(entry),
+          );
+        },
+      ),
+    );
+  }
+
+  List<_EmoteEntry> _filteredEntries() {
+    final query = widget.query.trim().toLowerCase();
+
+    if (query.isEmpty) {
+      return widget.entries.take(_initialGridCount).toList(growable: false);
+    }
+
+    return widget.entries.where((entry) {
+      return entry.name.toLowerCase().contains(query) ||
+          entry.id.toLowerCase().contains(query) ||
+          entry.providerLabel.toLowerCase().contains(query);
+    }).take(_searchGridLimit).toList(growable: false);
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+}
+
+class _EmoteTile extends StatelessWidget {
+  final _EmoteEntry entry;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+
+  const _EmoteTile({
+    super.key,
+    required this.entry,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = entry.imageUrl.trim();
+    final locked = entry.locked;
+
+    return RepaintBoundary(
+      child: Tooltip(
+        message: entry.favorite ? '長按取消收藏' : '長按加入收藏',
+        waitDuration: const Duration(milliseconds: 650),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: locked ? null : onTap,
+          onLongPress: onLongPress,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 9, 8, 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.055),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: entry.favorite
+                    ? const Color(0xFFEAB308).withOpacity(0.78)
+                    : locked
+                        ? const Color(0xFFFFD166).withOpacity(0.38)
+                        : const Color(0xFF9146FF).withOpacity(0.30),
+              ),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0x26000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: imageUrl.isEmpty
+                            ? Icon(
+                                locked
+                                    ? Icons.lock_rounded
+                                    : Icons.broken_image_rounded,
+                                color: Colors.white38,
+                                size: 24,
+                              )
+                            : Opacity(
+                                opacity: locked ? 0.62 : 1,
+                                child: CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  cacheKey: entry.stableKey,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.low,
+                                  fadeInDuration:
+                                      const Duration(milliseconds: 160),
+                                  fadeOutDuration:
+                                      const Duration(milliseconds: 120),
+                                  useOldImageOnUrlChange: true,
+                                  cacheManager: _sheetEmoteCacheManager,
+                                  memCacheWidth: 144,
+                                  memCacheHeight: 144,
+                                  placeholder: (_, __) =>
+                                      const SizedBox.shrink(),
+                                  errorWidget: (_, __, ___) => const Icon(
+                                    Icons.broken_image_rounded,
+                                    color: Colors.white38,
+                                    size: 22,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      entry.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+                if (entry.favorite)
+                  const Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Icon(
+                      Icons.star_rounded,
+                      color: Color(0xFFEAB308),
+                      size: 17,
+                    ),
+                  ),
+                if (locked)
+                  const Positioned(
+                    right: 0,
+                    bottom: 20,
+                    child: Icon(
+                      Icons.lock_rounded,
+                      color: Color(0xFFFFD166),
+                      size: 17,
+                    ),
+                  ),
+                if (entry.zeroWidth)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Text(
+                      'ZW',
+                      style: TextStyle(
+                        color: Color(0xFFEAB308),
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OuterTab {
+  final String label;
+  final List<_InnerPage> pages;
+
+  const _OuterTab({
+    required this.label,
+    required this.pages,
+  });
+
+  int get totalCount {
+    return pages.fold<int>(
+      0,
+      (sum, page) => sum + page.entries.length,
+    );
+  }
+}
+
+class _InnerPage {
+  final String label;
+  final List<_EmoteEntry> entries;
+
+  const _InnerPage({
+    required this.label,
+    required this.entries,
+  });
+}
+
+class _EmoteEntry {
+  final String id;
+  final String name;
+  final String imageUrl;
+  final String providerLabel;
+  final bool locked;
+  final bool favorite;
+  final bool zeroWidth;
+  final TwitchThirdPartyEmote? thirdParty;
+  final TwitchOfficialEmote? official;
+
+  const _EmoteEntry({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+    required this.providerLabel,
+    required this.locked,
+    required this.favorite,
+    required this.zeroWidth,
+    this.thirdParty,
+    this.official,
+  });
+
+  factory _EmoteEntry.thirdParty(
+    TwitchThirdPartyEmote emote, {
+    required bool favorite,
+  }) {
+    return _EmoteEntry(
+      id: emote.id,
+      name: emote.name,
+      imageUrl: emote.imageUrl,
+      providerLabel: emote.providerLabel,
+      locked: false,
+      favorite: favorite,
+      zeroWidth: emote.isZeroWidth,
+      thirdParty: emote,
+    );
+  }
+
+  factory _EmoteEntry.official(
+    TwitchOfficialEmote emote, {
+    required bool favorite,
+  }) {
+    return _EmoteEntry(
+      id: emote.id,
+      name: emote.name,
+      imageUrl: emote.imageUrl,
+      providerLabel: emote.sourceLabel,
+      locked: emote.locked,
+      favorite: favorite,
+      zeroWidth: false,
+      official: emote,
+    );
+  }
+
+  String get stableKey {
+    final cleanId = id.trim();
+
+    return cleanId.isNotEmpty
+        ? '$providerLabel:$cleanId'
+        : '$providerLabel:${name.trim().toLowerCase()}';
   }
 }
