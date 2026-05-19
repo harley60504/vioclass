@@ -13,13 +13,11 @@ class _WatchCompactAvatarTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final channelLogin = metadata.channelLogin.trim();
-    final profileImageUrl = metadata.profileImageUrl.trim();
-    final tileSize = height;
-    final size = math.min(tileSize - 12.0, tiny ? 36.0 : 40.0);
+    final data = _WatchStreamHeaderData.fromMetadata(metadata);
+    final size = math.min(height - 12.0, tiny ? 36.0 : 40.0);
 
     return Tooltip(
-      message: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
+      message: data.channelLabel,
       child: TwitchGlassSurface(
         borderRadius: BorderRadius.circular(tiny ? 14 : 16),
         backgroundColor: Colors.black.withOpacity(0.42),
@@ -27,12 +25,12 @@ class _WatchCompactAvatarTile extends StatelessWidget {
         blurSigma: 0,
         boxShadow: const <BoxShadow>[],
         child: SizedBox(
-          width: tileSize,
-          height: tileSize,
+          width: height,
+          height: height,
           child: Center(
             child: _WatchChannelAvatar(
-              imageUrl: profileImageUrl,
-              channelLogin: channelLogin,
+              imageUrl: data.profileImageUrl,
+              channelLogin: data.channelLogin,
               size: size,
             ),
           ),
@@ -55,13 +53,7 @@ class _WatchStreamHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final channelLogin = metadata.channelLogin.trim();
-    final streamTitle = metadata.streamTitle.trim();
-    final gameName = metadata.gameName.trim();
-    final viewerCount = metadata.viewerCount;
-    final profileImageUrl = metadata.profileImageUrl.trim();
-    final language = metadata.language.trim().toUpperCase();
-
+    final data = _WatchStreamHeaderData.fromMetadata(metadata);
     final avatarSize = compact ? 34.0 : 44.0;
 
     return TwitchGlassSurface(
@@ -80,81 +72,15 @@ class _WatchStreamHeaderCard extends StatelessWidget {
           child: Row(
             children: [
               _WatchChannelAvatar(
-                imageUrl: profileImageUrl,
-                channelLogin: channelLogin,
+                imageUrl: data.profileImageUrl,
+                channelLogin: data.channelLogin,
                 size: avatarSize,
               ),
               SizedBox(width: compact ? 8 : 10),
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Tooltip(
-                            message: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
-                            child: Text(
-                              channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: compact ? 13.5 : 17,
-                                fontWeight: FontWeight.w900,
-                                height: 1.05,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (viewerCount != null && viewerCount > 0) ...[
-                          SizedBox(width: compact ? 5 : 7),
-                          _WatchInfoPill(
-                            icon: Icons.visibility_rounded,
-                            label: _formatViewerCount(viewerCount),
-                            compact: compact,
-                          ),
-                        ],
-                        if (gameName.isNotEmpty) ...[
-                          SizedBox(width: compact ? 5 : 7),
-                          _WatchInfoPill(
-                            icon: Icons.sports_esports_rounded,
-                            label: gameName,
-                            copyText: gameName,
-                            compact: compact,
-                          ),
-                        ],
-                        if (language.isNotEmpty) ...[
-                          SizedBox(width: compact ? 5 : 7),
-                          _WatchInfoPill(
-                            icon: Icons.translate_rounded,
-                            label: language,
-                            copyText: metadata.language.trim(),
-                            compact: compact,
-                            maxWidth: compact ? 62 : 72,
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (streamTitle.isNotEmpty) ...[
-                      SizedBox(height: compact ? 3 : 4),
-                      Tooltip(
-                        message: streamTitle,
-                        child: Text(
-                          streamTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: compact ? 11.5 : 13,
-                            fontWeight: FontWeight.w800,
-                            height: 1.05,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                child: _WatchStreamHeaderTextBlock(
+                  data: data,
+                  compact: compact,
                 ),
               ),
             ],
@@ -163,7 +89,184 @@ class _WatchStreamHeaderCard extends StatelessWidget {
       ),
     );
   }
+}
 
+class _WatchStreamHeaderData {
+  final String channelLogin;
+  final String channelLabel;
+  final String streamTitle;
+  final String gameName;
+  final int? viewerCount;
+  final String profileImageUrl;
+  final String language;
+  final String languageLabel;
+
+  const _WatchStreamHeaderData({
+    required this.channelLogin,
+    required this.channelLabel,
+    required this.streamTitle,
+    required this.gameName,
+    required this.viewerCount,
+    required this.profileImageUrl,
+    required this.language,
+    required this.languageLabel,
+  });
+
+  factory _WatchStreamHeaderData.fromMetadata(
+    TwitchStreamHeaderMetadata metadata,
+  ) {
+    final channelLogin = metadata.channelLogin.trim();
+    final language = metadata.language.trim();
+
+    return _WatchStreamHeaderData(
+      channelLogin: channelLogin,
+      channelLabel: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
+      streamTitle: metadata.streamTitle.trim(),
+      gameName: metadata.gameName.trim(),
+      viewerCount: metadata.viewerCount,
+      profileImageUrl: metadata.profileImageUrl.trim(),
+      language: language,
+      languageLabel: language.toUpperCase(),
+    );
+  }
+}
+
+class _WatchStreamHeaderTextBlock extends StatelessWidget {
+  final _WatchStreamHeaderData data;
+  final bool compact;
+
+  const _WatchStreamHeaderTextBlock({
+    required this.data,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _WatchStreamHeaderMainRow(
+          data: data,
+          compact: compact,
+        ),
+        if (data.streamTitle.isNotEmpty) ...[
+          SizedBox(height: compact ? 3 : 4),
+          _WatchStreamTitleText(
+            title: data.streamTitle,
+            compact: compact,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _WatchStreamHeaderMainRow extends StatelessWidget {
+  final _WatchStreamHeaderData data;
+  final bool compact;
+
+  const _WatchStreamHeaderMainRow({
+    required this.data,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Flexible(
+          child: _WatchChannelNameText(
+            label: data.channelLabel,
+            compact: compact,
+          ),
+        ),
+        if (data.viewerCount != null && data.viewerCount! > 0) ...[
+          SizedBox(width: compact ? 5 : 7),
+          _WatchInfoPill(
+            icon: Icons.visibility_rounded,
+            label: _formatViewerCount(data.viewerCount!),
+            compact: compact,
+          ),
+        ],
+        if (data.gameName.isNotEmpty) ...[
+          SizedBox(width: compact ? 5 : 7),
+          _WatchInfoPill(
+            icon: Icons.sports_esports_rounded,
+            label: data.gameName,
+            copyText: data.gameName,
+            compact: compact,
+          ),
+        ],
+        if (data.languageLabel.isNotEmpty) ...[
+          SizedBox(width: compact ? 5 : 7),
+          _WatchInfoPill(
+            icon: Icons.translate_rounded,
+            label: data.languageLabel,
+            copyText: data.language,
+            compact: compact,
+            maxWidth: compact ? 62 : 72,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _WatchChannelNameText extends StatelessWidget {
+  final String label;
+  final bool compact;
+
+  const _WatchChannelNameText({
+    required this.label,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: compact ? 13.5 : 17,
+          fontWeight: FontWeight.w900,
+          height: 1.05,
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchStreamTitleText extends StatelessWidget {
+  final String title;
+  final bool compact;
+
+  const _WatchStreamTitleText({
+    required this.title,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: title,
+      child: Text(
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: Colors.white70,
+          fontSize: compact ? 11.5 : 13,
+          fontWeight: FontWeight.w800,
+          height: 1.05,
+        ),
+      ),
+    );
+  }
 }
 
 class _WatchChannelAvatar extends StatelessWidget {
@@ -187,57 +290,101 @@ class _WatchChannelAvatar extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0xFF2A2236),
-            border: Border.all(color: Colors.white.withOpacity(0.14)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: cleanUrl.isEmpty
-              ? Center(
-                  child: Text(
-                    fallbackLetter,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: size * 0.42,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                )
-              : Image.network(
-                  cleanUrl,
-                  fit: BoxFit.cover,
-                  cacheWidth: (size * 2).round(),
-                  cacheHeight: (size * 2).round(),
-                  errorBuilder: (_, __, ___) => Center(
-                    child: Text(
-                      fallbackLetter,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: size * 0.42,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
+        _WatchAvatarImage(
+          imageUrl: cleanUrl,
+          fallbackLetter: fallbackLetter,
+          size: size,
         ),
-        Positioned(
-          right: -1,
-          bottom: -1,
-          child: Container(
-            width: size * 0.30,
-            height: size * 0.30,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0xFF57F287),
-              border: Border.all(color: const Color(0xDD0E0E10), width: 2),
-            ),
-          ),
-        ),
+        _WatchLiveStatusDot(size: size),
       ],
+    );
+  }
+}
+
+class _WatchAvatarImage extends StatelessWidget {
+  final String imageUrl;
+  final String fallbackLetter;
+  final double size;
+
+  const _WatchAvatarImage({
+    required this.imageUrl,
+    required this.fallbackLetter,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF2A2236),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl.isEmpty
+          ? _WatchAvatarFallbackLetter(
+              letter: fallbackLetter,
+              size: size,
+            )
+          : Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              cacheWidth: (size * 2).round(),
+              cacheHeight: (size * 2).round(),
+              errorBuilder: (_, __, ___) => _WatchAvatarFallbackLetter(
+                letter: fallbackLetter,
+                size: size,
+              ),
+            ),
+    );
+  }
+}
+
+class _WatchAvatarFallbackLetter extends StatelessWidget {
+  final String letter;
+  final double size;
+
+  const _WatchAvatarFallbackLetter({
+    required this.letter,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        letter,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchLiveStatusDot extends StatelessWidget {
+  final double size;
+
+  const _WatchLiveStatusDot({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      right: -1,
+      bottom: -1,
+      child: Container(
+        width: size * 0.30,
+        height: size * 0.30,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0xFF57F287),
+          border: Border.all(color: const Color(0xDD0E0E10), width: 2),
+        ),
+      ),
     );
   }
 }
