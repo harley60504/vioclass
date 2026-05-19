@@ -1,6 +1,8 @@
-part of twitch_watch_player_area;
+import 'package:flutter/material.dart';
 
-class _FollowButton extends StatelessWidget {
+import '../../shared/twitch_glass.dart';
+
+class FollowButton extends StatelessWidget {
   final bool followed;
   final bool busy;
   final bool compact;
@@ -8,7 +10,8 @@ class _FollowButton extends StatelessWidget {
   final double? height;
   final VoidCallback? onPressed;
 
-  const _FollowButton({
+  const FollowButton({
+    super.key,
     required this.followed,
     required this.busy,
     this.compact = false,
@@ -65,13 +68,14 @@ class _FollowButton extends StatelessWidget {
   }
 }
 
-class _SubscribeButton extends StatelessWidget {
+class SubscribeButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool compact;
   final bool tiny;
   final double? height;
 
-  const _SubscribeButton({
+  const SubscribeButton({
+    super.key,
     required this.onPressed,
     this.compact = false,
     this.tiny = false,
