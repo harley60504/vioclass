@@ -137,7 +137,7 @@ class _WatchTopActionButtons {
   });
 
   Widget buildBackButton() {
-    return _RoundIconButton(
+    return RoundIconButton(
       tooltip: '返回',
       icon: Icons.arrow_back,
       iconColor: const Color(0xFF93C5FD),
@@ -169,7 +169,7 @@ class _WatchTopActionButtons {
         onPressed: onSubscribe,
       ),
       SizedBox(width: metrics.actionGap),
-      _RoundIconButton(
+      RoundIconButton(
         tooltip: '重新載入',
         icon: Icons.refresh,
         iconColor: const Color(0xFFA78BFA),
@@ -182,7 +182,7 @@ class _WatchTopActionButtons {
         onPressed: onReload,
       ),
       SizedBox(width: metrics.actionGap),
-      _RoundIconButton(
+      RoundIconButton(
         tooltip: '停止播放',
         icon: Icons.close,
         iconColor: const Color(0xFFFF6B81),
