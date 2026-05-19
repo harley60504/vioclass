@@ -50,7 +50,7 @@ class _AndroidPipButtonState extends State<_AndroidPipButton> {
   Widget build(BuildContext context) {
     if (!Platform.isAndroid || !_available) return const SizedBox.shrink();
 
-    return _PlainIconButton(
+    return PlainIconButton(
       tooltip: '子母畫面',
       icon: Icons.picture_in_picture_alt_rounded,
       size: widget.size,
