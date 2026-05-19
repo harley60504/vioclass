@@ -15,6 +15,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
   static const Color _watchBackgroundColor = Color(0xFF171222);
 
   final bool chatVisible;
+  final bool fullscreenMode;
   final double chatPanelWidth;
   final double chatPanelRatio;
   final double minChatPanelWidth;
@@ -32,6 +33,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
   const TwitchWatchResponsiveBody({
     super.key,
     required this.chatVisible,
+    this.fullscreenMode = false,
     required this.chatPanelWidth,
     required this.chatPanelRatio,
     required this.minChatPanelWidth,
@@ -53,7 +55,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     return AnimatedBuilder(
       animation: pip,
       builder: (context, _) {
-        if (pip.shouldRenderPlayerOnly) {
+        if (pip.shouldRenderPlayerOnly || fullscreenMode) {
           return _PlayerOnlySurface(player: player);
         }
 
@@ -137,7 +139,7 @@ class _PlayerOnlySurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: Colors.black,
-      child: player,
+      child: SizedBox.expand(child: player),
     );
   }
 }
