@@ -1,9 +1,12 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage222_frosty_category_merge
+// PATCH VERSION: twitch_emote_picker_sheet_stage224_large_grid_single_picker
 //
 // Thin entry/state file for Twitch emote picker sheets. Heavy panels, widgets,
-// models, and official emote ID picker live in sheets/emote_picker/*.
+// and models live in sheets/emote_picker/*.
 // Stage 222: merge Frosty-style scope/category filtering into this original
 // sheet and keep favorite toggling on long press.
+// Stage 224: remove the legacy Channel Points official emote ID picker entry;
+// Channel Points should use its overlay only. Normal emote picker uses large
+// visual grid cards.
 
 import 'dart:async';
 
@@ -17,34 +20,6 @@ import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'emote_picker/twitch_emote_picker_models.dart';
 import 'emote_picker/twitch_emote_picker_panels.dart';
 import 'emote_picker/twitch_emote_picker_widgets.dart';
-import 'emote_picker/twitch_official_emote_id_picker_sheet.dart';
-
-Future<String?> showTwitchOfficialEmoteIdPickerSheet({
-  required BuildContext context,
-  required TwitchOfficialEmoteCacheService officialCache,
-  required bool loading,
-  required Future<void> Function() onRefresh,
-  String title = '選擇 Twitch 官方貼圖',
-  String subtitle = '會回傳 Twitch emote ID，不是貼圖名稱。',
-  bool includeGlobalEmotes = true,
-  bool includeUnlockedEmotes = true,
-  bool includeLockedChannelEmotes = true,
-}) {
-  return showTwitchResponsiveSheet<String>(
-    context: context,
-    size: TwitchUnifiedSheetSize.large,
-    builder: (_) => TwitchOfficialEmoteIdPickerSheet(
-      officialCache: officialCache,
-      loading: loading,
-      onRefresh: onRefresh,
-      title: title,
-      subtitle: subtitle,
-      includeGlobalEmotes: includeGlobalEmotes,
-      includeUnlockedEmotes: includeUnlockedEmotes,
-      includeLockedChannelEmotes: includeLockedChannelEmotes,
-    ),
-  );
-}
 
 Future<void> showTwitchEmotePickerSheet({
   required BuildContext context,
