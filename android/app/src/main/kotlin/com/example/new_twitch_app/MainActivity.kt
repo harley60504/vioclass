@@ -30,9 +30,12 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
+            super.onUserLeaveHint()
+            return
+        }
         pipBridge?.enterPipFromUserLeaveHint()
+        super.onUserLeaveHint()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
