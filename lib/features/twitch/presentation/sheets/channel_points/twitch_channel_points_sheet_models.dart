@@ -1,7 +1,9 @@
-// PATCH VERSION: twitch_channel_points_sheet_models_stage171_async_import
+// PATCH VERSION: twitch_channel_points_sheet_models_stage223_name_only_emote_search
 //
 // Small non-widget helpers and model types used by TwitchChannelPointsSheet.
 // Keep these outside the sheet file so the sheet can focus on state flow.
+// Stage 223: Channel Points emote overlay searches by emote name/token only;
+// internal IDs remain payload values but are no longer part of the visible UX.
 
 import 'dart:async';
 
@@ -57,8 +59,7 @@ List<TwitchChannelPointEmoteOption> filterChannelPointOverlayEmotes({
 
   if (cleanQuery.isNotEmpty) {
     output = output.where((emote) {
-      return emote.id.toLowerCase().contains(cleanQuery) ||
-          emote.token.toLowerCase().contains(cleanQuery);
+      return emote.token.toLowerCase().contains(cleanQuery);
     });
   }
 
