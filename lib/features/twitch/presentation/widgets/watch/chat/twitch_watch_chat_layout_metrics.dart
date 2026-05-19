@@ -1,10 +1,12 @@
-// PATCH VERSION: twitch_watch_chat_layout_metrics_stage227_hide_engagement_when_collapsed
+// PATCH VERSION: twitch_watch_chat_layout_metrics_stage227c_restore_layout_only_metrics
 //
 // Pure layout calculations for Watch chat. Keeping these numbers here makes
 // TwitchWatchChatPanel read like composition instead of a block of geometry.
-// Stage 227: when chat is squeezed/collapsed, hide optional engagement cards
-// such as prediction/pinned cards so closing or narrowing chat does not leave
-// a floating bet card visible.
+//
+// Important: this file should only decide whether the current available chat
+// geometry has enough room to display optional engagement content. It should
+// not remember user decisions such as manually hiding a prediction card; that
+// state lives in TwitchWatchChatPanel.
 
 import 'package:flutter/material.dart';
 
@@ -36,7 +38,7 @@ class TwitchWatchChatLayoutMetrics {
         (media.orientation == Orientation.landscape && constraints.maxHeight < 620) ||
         keyboardVisible;
     final ultraVerticalCompact = constraints.maxHeight < 410;
-    final compactWidth = constraints.maxWidth < 360;
+    final compactWidth = constraints.maxWidth < 300;
 
     final maxEngagementHeight = ultraVerticalCompact
         ? (constraints.maxHeight * 0.34).clamp(110.0, 180.0).toDouble()
@@ -55,9 +57,8 @@ class TwitchWatchChatLayoutMetrics {
         .clamp(0.0, maxEngagementHeight)
         .toDouble();
     final minScrollableEngagementHeight = verticalCompact ? 72.0 : 88.0;
-    final hideOptionalEngagement = keyboardVisible ||
-        compactWidth ||
-        maxUsableEngagementHeight < minScrollableEngagementHeight;
+    final hideOptionalEngagement =
+        keyboardVisible || maxUsableEngagementHeight < minScrollableEngagementHeight;
 
     return TwitchWatchChatLayoutMetrics(
       keyboardVisible: keyboardVisible,
