@@ -242,7 +242,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
           onVolumeChanged: onVolumeChanged,
         ),
         SizedBox(width: veryNarrow ? 1 : 4),
-        _QualityButton(
+        QualityButton(
           variants: qualityVariants,
           currentVariant: currentVariant,
           onChanged: onQualityChanged,
@@ -328,7 +328,7 @@ class _WideWatchBottomControls extends StatelessWidget {
           onToggleMute: onToggleMute,
           onVolumeChanged: onVolumeChanged,
         ),
-        _QualityButton(
+        QualityButton(
           variants: qualityVariants,
           currentVariant: currentVariant,
           onChanged: onQualityChanged,
