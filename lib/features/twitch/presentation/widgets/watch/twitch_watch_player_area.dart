@@ -1,9 +1,11 @@
-// PATCH VERSION: watch_player_area_stage220i_nullable_media_session
+// PATCH VERSION: watch_player_area_stage226_android_pip
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
 // Stage 220I: allow WatchPage to build before the lazy PiliPlus media_kit
 // session has finished creating Player / VideoController.
+// Stage 226: Android PiP integration hides all non-video chrome while PiP is
+// active and exposes a PiP button through the player controls.
 
 library twitch_watch_player_area;
 
@@ -19,6 +21,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../shared/twitch_glass.dart';
 
@@ -33,6 +36,7 @@ part 'player/twitch_player_more_actions_button.dart';
 part 'player/twitch_player_quality_button.dart';
 part 'player/twitch_player_common_buttons.dart';
 part 'player/twitch_player_error_card.dart';
+part 'player/twitch_player_pip_button.dart';
 
 const double _watchVideoAspectRatio = 16 / 9;
 
@@ -108,21 +112,24 @@ class TwitchWatchPlayerArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final pip = TwitchAndroidPipController.instance;
+
     return AnimatedBuilder(
-      animation: playerRuntime,
+      animation: Listenable.merge(<Listenable>[playerRuntime, pip]),
       builder: (context, _) {
         final currentPlayer = player;
         final currentVideoController = videoController;
         final playerReady = currentPlayer != null && currentVideoController != null;
+        final inPipMode = pip.isInPictureInPictureMode;
         final effectiveFullscreen = fullscreen || fullscreenMode;
-        final effectiveChatVisible = chatVisible;
+        final effectiveChatVisible = inPipMode ? false : chatVisible;
         final effectiveFollowBusy = followBusy || relationshipBusy;
         final effectiveQualityVariants = qualityVariants ?? playerRuntime.variants;
         final effectiveCurrentVariant = currentVariant ?? playerRuntime.currentVariant;
         final effectiveOnQualityChanged = onQualityChanged ?? onQualitySelected;
 
         return ColoredBox(
-          color: Colors.transparent,
+          color: inPipMode ? Colors.black : Colors.transparent,
           child: Stack(
             clipBehavior: Clip.hardEdge,
             children: [
@@ -131,47 +138,48 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     ? _WatchCenteredVideoSurface(controller: currentVideoController)
                     : const _WatchPlayerWaitingSurface(),
               ),
-              if (playerReady)
-                Positioned.fill(
-                  child: _WatchControlsOverlay(
-                    loading: loading ||
-                        playerRuntime.loading ||
-                        playerRuntime.switchingQuality,
-                    error: error,
-                    runtimeError: playerRuntime.error,
-                    metadata: metadata,
-                    isFollowing: isFollowing,
-                    followBusy: effectiveFollowBusy,
-                    onBack: onBack,
-                    onToggleFollow: onToggleFollow,
-                    onSubscribe: onSubscribe,
-                    onReload: onReload,
-                    onStop: onStop,
-                    player: currentPlayer,
-                    playerRuntime: playerRuntime,
-                    muted: muted,
-                    volume: volume,
-                    fullscreen: effectiveFullscreen,
-                    chatVisible: effectiveChatVisible,
-                    showFullscreenButton: showFullscreenButton,
-                    onToggleMute: onToggleMute,
-                    onVolumeChanged: onVolumeChanged,
-                    qualityVariants: effectiveQualityVariants,
-                    currentVariant: effectiveCurrentVariant,
-                    onQualityChanged: effectiveOnQualityChanged,
-                    onToggleChat: onToggleChat,
-                    onToggleFullscreen: onToggleFullscreen,
+              if (!inPipMode)
+                if (playerReady)
+                  Positioned.fill(
+                    child: _WatchControlsOverlay(
+                      loading: loading ||
+                          playerRuntime.loading ||
+                          playerRuntime.switchingQuality,
+                      error: error,
+                      runtimeError: playerRuntime.error,
+                      metadata: metadata,
+                      isFollowing: isFollowing,
+                      followBusy: effectiveFollowBusy,
+                      onBack: onBack,
+                      onToggleFollow: onToggleFollow,
+                      onSubscribe: onSubscribe,
+                      onReload: onReload,
+                      onStop: onStop,
+                      player: currentPlayer,
+                      playerRuntime: playerRuntime,
+                      muted: muted,
+                      volume: volume,
+                      fullscreen: effectiveFullscreen,
+                      chatVisible: effectiveChatVisible,
+                      showFullscreenButton: showFullscreenButton,
+                      onToggleMute: onToggleMute,
+                      onVolumeChanged: onVolumeChanged,
+                      qualityVariants: effectiveQualityVariants,
+                      currentVariant: effectiveCurrentVariant,
+                      onQualityChanged: effectiveOnQualityChanged,
+                      onToggleChat: onToggleChat,
+                      onToggleFullscreen: onToggleFullscreen,
+                    ),
+                  )
+                else
+                  Positioned.fill(
+                    child: _WatchControlsNotReadyOverlay(
+                      metadata: metadata,
+                      loading: loading || playerRuntime.loading,
+                      onBack: onBack,
+                      onReload: onReload,
+                    ),
                   ),
-                )
-              else
-                Positioned.fill(
-                  child: _WatchControlsNotReadyOverlay(
-                    metadata: metadata,
-                    loading: loading || playerRuntime.loading,
-                    onBack: onBack,
-                    onReload: onReload,
-                  ),
-                ),
             ],
           ),
         );
