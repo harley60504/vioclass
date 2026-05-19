@@ -234,7 +234,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
           ),
         ],
         SizedBox(width: veryNarrow ? 2 : 6),
-        _CompactInlineVolumeControl(
+        CompactInlineVolumeControl(
           muted: muted,
           volume: volume,
           sliderWidth: veryNarrow ? 50 : 76,
