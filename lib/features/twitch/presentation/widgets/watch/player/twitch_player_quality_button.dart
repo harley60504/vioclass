@@ -1,11 +1,14 @@
-part of twitch_watch_player_area;
+import 'package:flutter/material.dart';
 
-class _QualityButton extends StatelessWidget {
+import '../../../../models/playback/twitch_m3u8_variant.dart';
+
+class QualityButton extends StatelessWidget {
   final List<TwitchM3u8Variant> variants;
   final TwitchM3u8Variant? currentVariant;
   final ValueChanged<TwitchM3u8Variant>? onChanged;
 
-  const _QualityButton({
+  const QualityButton({
+    super.key,
     required this.variants,
     required this.currentVariant,
     required this.onChanged,
