@@ -1,4 +1,4 @@
-// PATCH VERSION: watch_player_area_stage226d_pip_source_rect
+// PATCH VERSION: watch_player_area_stage226f_shared_media_kit_video_surface
 // Place at: lib/features/twitch/presentation/widgets/watch/twitch_watch_player_area.dart
 //
 // StreamNook-style player area entry point.
@@ -6,8 +6,8 @@
 // session has finished creating Player / VideoController.
 // Stage 226: Android PiP integration hides all non-video chrome while PiP is
 // active and exposes a PiP button through the player controls.
-// Stage 226D: the actual centered video surface reports its global rect to
-// Android as PiP sourceRectHint. WatchPage stays untouched.
+// Stage 226F: normal player and PiP now share the extracted pure media_kit
+// video surface widget.
 
 library twitch_watch_player_area;
 
@@ -26,6 +26,7 @@ import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../shared/twitch_glass.dart';
+import 'player/twitch_media_kit_video_surface.dart';
 
 part 'player/twitch_watch_controls_overlay.dart';
 part 'player/twitch_watch_top_action_bar.dart';
@@ -39,8 +40,6 @@ part 'player/twitch_player_quality_button.dart';
 part 'player/twitch_player_common_buttons.dart';
 part 'player/twitch_player_error_card.dart';
 part 'player/twitch_player_pip_button.dart';
-
-const double _watchVideoAspectRatio = 16 / 9;
 
 class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -137,8 +136,8 @@ class TwitchWatchPlayerArea extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: playerReady
-                    ? _WatchCenteredVideoSurface(controller: currentVideoController)
-                    : const _WatchPlayerWaitingSurface(),
+                    ? TwitchMediaKitVideoSurface(controller: currentVideoController)
+                    : const TwitchMediaKitVideoWaitingSurface(),
               ),
               if (!inPipMode)
                 if (playerReady)
@@ -186,24 +185,6 @@ class TwitchWatchPlayerArea extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _WatchPlayerWaitingSurface extends StatelessWidget {
-  const _WatchPlayerWaitingSurface();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFF0E0E10),
-      child: Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(strokeWidth: 2.4),
-        ),
-      ),
     );
   }
 }
@@ -283,80 +264,6 @@ class _WatchControlsNotReadyOverlay extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _WatchCenteredVideoSurface extends StatefulWidget {
-  final VideoController controller;
-
-  const _WatchCenteredVideoSurface({required this.controller});
-
-  @override
-  State<_WatchCenteredVideoSurface> createState() => _WatchCenteredVideoSurfaceState();
-}
-
-class _WatchCenteredVideoSurfaceState extends State<_WatchCenteredVideoSurface> {
-  final GlobalKey _videoSurfaceKey = GlobalKey();
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
-  }
-
-  @override
-  void didUpdateWidget(covariant _WatchCenteredVideoSurface oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
-  }
-
-  void _reportSourceRectHint() {
-    if (!mounted || !Platform.isAndroid) return;
-    final context = _videoSurfaceKey.currentContext;
-    if (context == null) return;
-    final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox || !renderObject.hasSize) return;
-    final topLeft = renderObject.localToGlobal(Offset.zero);
-    final rect = topLeft & renderObject.size;
-    unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final maxWidth = constraints.maxWidth;
-        final maxHeight = constraints.maxHeight;
-
-        if (maxWidth <= 0 || maxHeight <= 0) return const SizedBox.shrink();
-
-        var width = maxWidth;
-        var height = width / _watchVideoAspectRatio;
-
-        if (height > maxHeight) {
-          height = maxHeight;
-          width = height * _watchVideoAspectRatio;
-        }
-
-        width = width.clamp(1.0, maxWidth).toDouble();
-        height = height.clamp(1.0, maxHeight).toDouble();
-
-        WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
-
-        return Center(
-          child: SizedBox(
-            key: _videoSurfaceKey,
-            width: width,
-            height: height,
-            child: Video(
-              controller: widget.controller,
-              fit: BoxFit.contain,
-              controls: NoVideoControls,
-            ),
-          ),
-        );
-      },
     );
   }
 }
