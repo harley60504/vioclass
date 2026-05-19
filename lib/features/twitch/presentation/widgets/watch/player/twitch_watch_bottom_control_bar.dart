@@ -125,6 +125,10 @@ class _WatchBottomControlBar extends StatelessWidget {
                               dense: true,
                               onPressed: onToggleFullscreen,
                             ),
+                          const _AndroidPipButton(
+                            dense: true,
+                            size: 22,
+                          ),
                           _PlayerMoreActionsButton(playerRuntime: playerRuntime),
                         ],
                       )
@@ -187,6 +191,9 @@ class _WatchBottomControlBar extends StatelessWidget {
                               active: fullscreen,
                               onPressed: onToggleFullscreen,
                             ),
+                          const _AndroidPipButton(
+                            size: 23,
+                          ),
                           _PlayerMoreActionsButton(playerRuntime: playerRuntime),
                         ],
                       ),
