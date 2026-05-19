@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the Windows launcher icon from the shared VioClass SVG asset.
+"""Generate the Windows launcher icon beside the shared VioClass SVG asset.
 
 Usage from repo root:
 
@@ -9,9 +9,13 @@ Optional dependency install:
 
     python -m pip install cairosvg pillow
 
-The script keeps Windows using the same source artwork as Android:
+The script keeps the canonical app artwork under assets/app:
 - source: assets/app/vio_class_icon.svg
-- output: windows/runner/resources/app_icon.ico
+- output: assets/app/vio_class_icon.ico
+
+Windows reads the generated .ico directly from assets/app through Runner.rc.
+Android still needs its own res/drawable XML launcher icon, but both files use
+the same VioClass artwork direction.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ from pathlib import Path
 def main() -> int:
     repo_root = Path(__file__).resolve().parents[1]
     source_svg = repo_root / "assets" / "app" / "vio_class_icon.svg"
-    output_ico = repo_root / "windows" / "runner" / "resources" / "app_icon.ico"
+    output_ico = repo_root / "assets" / "app" / "vio_class_icon.ico"
 
     if not source_svg.exists():
         print(f"ERROR: source SVG not found: {source_svg}", file=sys.stderr)
