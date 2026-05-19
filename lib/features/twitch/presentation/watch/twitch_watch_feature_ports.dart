@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage220n_force_reopen_channel
+// PATCH VERSION: twitch_watch_feature_ports_stage231_quality_force_reopen
 //
 // Feature-facing ports for Watch composition.
 //
@@ -69,6 +69,7 @@ class TwitchWatchPlayerPort {
     TwitchM3u8Variant variant, {
     bool play = true,
   }) async {
+    final wasPlaying = playerOrNull?.state.playing ?? play;
     final uri = await startProxyForVariant(variant);
     if (uri == null) {
       throw StateError('切換畫質失敗：runtime 沒有回傳 playlist uri。');
@@ -76,7 +77,11 @@ class TwitchWatchPlayerPort {
 
     await services.playerSession.openOrResume(
       uri: uri.toString(),
-      play: play,
+      play: play || wasPlaying,
+      // The outer proxy URL stays identical across quality switches. Without a
+      // forced reopen, media_kit/mpv can keep reading the old stream connection
+      // or stall at EOF after the router swaps its inner upstream.
+      forceOpen: true,
     );
   }
 
