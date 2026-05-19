@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../shared/twitch_glass.dart';
+import '../../shared/twitch_glass.dart';
 
 class RoundIconButton extends StatelessWidget {
   final String tooltip;
