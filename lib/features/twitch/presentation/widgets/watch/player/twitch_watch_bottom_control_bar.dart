@@ -264,7 +264,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
           dense: true,
           size: 22,
         ),
-        _PlayerMoreActionsButton(playerRuntime: playerRuntime),
+        PlayerMoreActionsButton(playerRuntime: playerRuntime),
       ],
     );
   }
@@ -345,7 +345,7 @@ class _WideWatchBottomControls extends StatelessWidget {
             onPressed: onToggleFullscreen,
           ),
         const _AndroidPipButton(size: 23),
-        _PlayerMoreActionsButton(playerRuntime: playerRuntime),
+        PlayerMoreActionsButton(playerRuntime: playerRuntime),
       ],
     );
   }
