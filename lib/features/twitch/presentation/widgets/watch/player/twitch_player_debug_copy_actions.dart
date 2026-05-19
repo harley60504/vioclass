@@ -1,14 +1,17 @@
-part of twitch_watch_player_area;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-enum _PlaybackDebugCopyAction {
+import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+
+enum PlaybackDebugCopyAction {
   proxyUrl,
   mpvProxyCommand,
 }
 
-class _PlaybackDebugCopyButton extends StatelessWidget {
+class PlaybackDebugCopyButton extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
 
-  const _PlaybackDebugCopyButton({required this.playerRuntime});
+  const PlaybackDebugCopyButton({super.key, required this.playerRuntime});
 
   static const String _mpvUserAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
@@ -18,25 +21,25 @@ class _PlaybackDebugCopyButton extends StatelessWidget {
     final proxyUrl = playerRuntime.proxyMpvUrl?.trim() ?? playerRuntime.proxyUrl?.trim();
     final hasProxyUrl = proxyUrl != null && proxyUrl.isNotEmpty;
 
-    return PopupMenuButton<_PlaybackDebugCopyAction>(
+    return PopupMenuButton<PlaybackDebugCopyAction>(
       tooltip: 'Debug：複製 Dart Proxy URL',
       color: const Color(0xFF18181B),
       icon: const Icon(Icons.bug_report_outlined, color: Colors.white, size: 23),
       enabled: hasProxyUrl,
       onSelected: (action) => _handleCopy(context, action),
-      itemBuilder: (context) => <PopupMenuEntry<_PlaybackDebugCopyAction>>[
-        PopupMenuItem<_PlaybackDebugCopyAction>(
-          value: _PlaybackDebugCopyAction.proxyUrl,
+      itemBuilder: (context) => <PopupMenuEntry<PlaybackDebugCopyAction>>[
+        PopupMenuItem<PlaybackDebugCopyAction>(
+          value: PlaybackDebugCopyAction.proxyUrl,
           enabled: hasProxyUrl,
-          child: const _DebugMenuRow(
+          child: const DebugMenuRow(
             icon: Icons.link,
             label: '複製 Dart Proxy URL',
           ),
         ),
-        PopupMenuItem<_PlaybackDebugCopyAction>(
-          value: _PlaybackDebugCopyAction.mpvProxyCommand,
+        PopupMenuItem<PlaybackDebugCopyAction>(
+          value: PlaybackDebugCopyAction.mpvProxyCommand,
           enabled: hasProxyUrl,
-          child: const _DebugMenuRow(
+          child: const DebugMenuRow(
             icon: Icons.terminal,
             label: '複製 mpv Proxy 指令',
           ),
@@ -47,7 +50,7 @@ class _PlaybackDebugCopyButton extends StatelessWidget {
 
   Future<void> _handleCopy(
     BuildContext context,
-    _PlaybackDebugCopyAction action,
+    PlaybackDebugCopyAction action,
   ) {
     return copyAction(
       context: context,
@@ -59,7 +62,7 @@ class _PlaybackDebugCopyButton extends StatelessWidget {
   static Future<void> copyAction({
     required BuildContext context,
     required TwitchPlaylistPlayerRuntime playerRuntime,
-    required _PlaybackDebugCopyAction action,
+    required PlaybackDebugCopyAction action,
   }) async {
     final proxyUrl =
         playerRuntime.proxyMpvUrl?.trim() ?? playerRuntime.proxyUrl?.trim();
@@ -74,18 +77,18 @@ class _PlaybackDebugCopyButton extends StatelessWidget {
     _showCopySnack(context, '已複製${copied.label}。');
   }
 
-  static _PlaybackDebugCopyPayload _buildCopyPayload({
-    required _PlaybackDebugCopyAction action,
+  static PlaybackDebugCopyPayload _buildCopyPayload({
+    required PlaybackDebugCopyAction action,
     required String proxyUrl,
   }) {
     switch (action) {
-      case _PlaybackDebugCopyAction.proxyUrl:
-        return _PlaybackDebugCopyPayload(
+      case PlaybackDebugCopyAction.proxyUrl:
+        return PlaybackDebugCopyPayload(
           label: 'Dart Proxy URL',
           text: proxyUrl,
         );
-      case _PlaybackDebugCopyAction.mpvProxyCommand:
-        return _PlaybackDebugCopyPayload(
+      case PlaybackDebugCopyAction.mpvProxyCommand:
+        return PlaybackDebugCopyPayload(
           label: 'mpv Proxy 指令',
           text: _buildMpvCommand(proxyUrl),
         );
@@ -117,21 +120,22 @@ class _PlaybackDebugCopyButton extends StatelessWidget {
   }
 }
 
-class _PlaybackDebugCopyPayload {
+class PlaybackDebugCopyPayload {
   final String label;
   final String text;
 
-  const _PlaybackDebugCopyPayload({
+  const PlaybackDebugCopyPayload({
     required this.label,
     required this.text,
   });
 }
 
-class _DebugMenuRow extends StatelessWidget {
+class DebugMenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _DebugMenuRow({
+  const DebugMenuRow({
+    super.key,
     required this.icon,
     required this.label,
   });
