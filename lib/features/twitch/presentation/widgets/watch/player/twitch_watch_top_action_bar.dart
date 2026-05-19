@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_watch_top_action_bar_stage219f_player_stop_only
-
 part of twitch_watch_player_area;
 
 class _WatchTopActionBar extends StatelessWidget {
@@ -46,157 +44,266 @@ class _WatchTopActionBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final compact = constraints.maxWidth < 680;
-        final actionTiny = constraints.maxWidth < 430;
-        final actionGap = actionTiny ? 6.0 : 9.0;
-
-        // Stage 101: keep every visible item in the top action bar at the
-        // same visual height. This avoids the 1px bottom overflow caused by
-        // the info card having a different internal height from the buttons.
-        final slotHeight = compact ? 62.0 : 78.0;
-        final controlHeight = compact ? 52.0 : 72.0;
-
-        final infoCard = _WatchStreamHeaderCard(
+        final metrics = _WatchTopActionBarMetrics.fromWidth(
+          constraints.maxWidth,
+        );
+        final actions = _WatchTopActionButtons(
           metadata: metadata,
-          compact: compact,
-          height: controlHeight,
+          isFollowing: isFollowing,
+          followBusy: followBusy,
+          metrics: metrics,
+          onBack: () => unawaited(_pauseThenBack()),
+          onToggleFollow: onToggleFollow,
+          onSubscribe: onSubscribe,
+          onReload: onReload,
+          onStopPlaybackOnly: () => unawaited(_stopPlaybackOnly()),
         );
 
-        final actionButtons = <Widget>[
-          _FollowButton(
-            followed: isFollowing,
-            busy: followBusy,
-            compact: compact,
-            tiny: actionTiny,
-            height: controlHeight,
-            onPressed: onToggleFollow,
-          ),
-          SizedBox(width: actionGap),
-          _SubscribeButton(
-            compact: compact,
-            tiny: actionTiny,
-            height: controlHeight,
-            onPressed: onSubscribe,
-          ),
-          SizedBox(width: actionGap),
-          _RoundIconButton(
-            tooltip: '重新載入',
-            icon: Icons.refresh,
-            iconColor: const Color(0xFFA78BFA),
-            backgroundColor: const Color(0xFF4C1D95).withOpacity(0.22),
-            borderColor: const Color(0xFFA78BFA).withOpacity(0.24),
-            glowOpacity: 0.20,
-            compact: compact,
-            tiny: actionTiny,
-            height: controlHeight,
-            onPressed: onReload,
-          ),
-          SizedBox(width: actionGap),
-          _RoundIconButton(
-            tooltip: '停止播放',
-            icon: Icons.close,
-            iconColor: const Color(0xFFFF6B81),
-            backgroundColor: const Color(0xFF7F1D1D).withOpacity(0.24),
-            borderColor: const Color(0xFFFF6B81).withOpacity(0.26),
-            glowOpacity: 0.20,
-            compact: compact,
-            tiny: actionTiny,
-            height: controlHeight,
-            onPressed: () => unawaited(_stopPlaybackOnly()),
-          ),
-        ];
-
-        Widget content;
-        double designWidth;
-
-        if (compact) {
-          designWidth = actionTiny ? 470 : 570;
-          content = Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _RoundIconButton(
-                tooltip: '返回',
-                icon: Icons.arrow_back,
-                iconColor: const Color(0xFF93C5FD),
-                backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.20),
-                borderColor: const Color(0xFF93C5FD).withOpacity(0.22),
-                glowOpacity: 0.18,
-                compact: true,
-                tiny: actionTiny,
-                height: controlHeight,
-                onPressed: () => unawaited(_pauseThenBack()),
-              ),
-              SizedBox(width: actionGap),
-              _WatchCompactAvatarTile(
+        final content = metrics.compact
+            ? _CompactWatchTopActionContent(
+                metrics: metrics,
+                actions: actions,
                 metadata: metadata,
-                tiny: actionTiny,
-                height: controlHeight,
-              ),
-              const Spacer(),
-              SizedBox(width: actionGap),
-              ...actionButtons,
-            ],
-          );
-        } else {
-          designWidth = 1040;
-          content = Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _RoundIconButton(
-                tooltip: '返回',
-                icon: Icons.arrow_back,
-                iconColor: const Color(0xFF93C5FD),
-                backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.20),
-                borderColor: const Color(0xFF93C5FD).withOpacity(0.22),
-                glowOpacity: 0.18,
-                height: controlHeight,
-                onPressed: () => unawaited(_pauseThenBack()),
-              ),
-              const SizedBox(width: 10),
-              Expanded(child: infoCard),
-              const SizedBox(width: 12),
-              ...actionButtons,
-            ],
-          );
-        }
+              )
+            : _WideWatchTopActionContent(
+                metrics: metrics,
+                actions: actions,
+                metadata: metadata,
+              );
 
-        // Stage 102: keep full-width behavior, but restore the top-bar
-        // scaleDown safety net for every breakpoint. If the viewport is
-        // narrower than the designed row, shrink the whole row instead of
-        // letting fixed-height buttons/info cards overflow. When there is
-        // enough space, use the full available width so the info card stretches.
-        final availableWidth = constraints.maxWidth.isFinite
-            ? constraints.maxWidth
-            : designWidth;
-        final shouldScaleDown = availableWidth < designWidth;
-
-        if (!shouldScaleDown) {
-          return SizedBox(
-            width: double.infinity,
-            height: slotHeight,
-            child: content,
-          );
-        }
-
-        return SizedBox(
-          width: double.infinity,
-          height: slotHeight,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: designWidth,
-                  height: slotHeight,
-                  child: Center(child: content),
-                ),
-              ),
-            ),
-          ),
+        return _ScaledWatchTopActionSlot(
+          metrics: metrics,
+          availableWidth: constraints.maxWidth,
+          child: content,
         );
       },
+    );
+  }
+}
+
+class _WatchTopActionBarMetrics {
+  final bool compact;
+  final bool tiny;
+  final double actionGap;
+  final double slotHeight;
+  final double controlHeight;
+  final double designWidth;
+
+  const _WatchTopActionBarMetrics({
+    required this.compact,
+    required this.tiny,
+    required this.actionGap,
+    required this.slotHeight,
+    required this.controlHeight,
+    required this.designWidth,
+  });
+
+  factory _WatchTopActionBarMetrics.fromWidth(double width) {
+    final compact = width < 680;
+    final tiny = width < 430;
+
+    return _WatchTopActionBarMetrics(
+      compact: compact,
+      tiny: tiny,
+      actionGap: tiny ? 6.0 : 9.0,
+      slotHeight: compact ? 62.0 : 78.0,
+      controlHeight: compact ? 52.0 : 72.0,
+      designWidth: compact ? (tiny ? 470.0 : 570.0) : 1040.0,
+    );
+  }
+}
+
+class _WatchTopActionButtons {
+  final TwitchStreamHeaderMetadata metadata;
+  final bool isFollowing;
+  final bool followBusy;
+  final _WatchTopActionBarMetrics metrics;
+  final VoidCallback onBack;
+  final VoidCallback? onToggleFollow;
+  final VoidCallback? onSubscribe;
+  final VoidCallback? onReload;
+  final VoidCallback onStopPlaybackOnly;
+
+  const _WatchTopActionButtons({
+    required this.metadata,
+    required this.isFollowing,
+    required this.followBusy,
+    required this.metrics,
+    required this.onBack,
+    required this.onToggleFollow,
+    required this.onSubscribe,
+    required this.onReload,
+    required this.onStopPlaybackOnly,
+  });
+
+  Widget buildBackButton() {
+    return _RoundIconButton(
+      tooltip: '返回',
+      icon: Icons.arrow_back,
+      iconColor: const Color(0xFF93C5FD),
+      backgroundColor: const Color(0xFF1E3A8A).withOpacity(0.20),
+      borderColor: const Color(0xFF93C5FD).withOpacity(0.22),
+      glowOpacity: 0.18,
+      compact: metrics.compact,
+      tiny: metrics.tiny,
+      height: metrics.controlHeight,
+      onPressed: onBack,
+    );
+  }
+
+  List<Widget> buildRightActions() {
+    return <Widget>[
+      _FollowButton(
+        followed: isFollowing,
+        busy: followBusy,
+        compact: metrics.compact,
+        tiny: metrics.tiny,
+        height: metrics.controlHeight,
+        onPressed: onToggleFollow,
+      ),
+      SizedBox(width: metrics.actionGap),
+      _SubscribeButton(
+        compact: metrics.compact,
+        tiny: metrics.tiny,
+        height: metrics.controlHeight,
+        onPressed: onSubscribe,
+      ),
+      SizedBox(width: metrics.actionGap),
+      _RoundIconButton(
+        tooltip: '重新載入',
+        icon: Icons.refresh,
+        iconColor: const Color(0xFFA78BFA),
+        backgroundColor: const Color(0xFF4C1D95).withOpacity(0.22),
+        borderColor: const Color(0xFFA78BFA).withOpacity(0.24),
+        glowOpacity: 0.20,
+        compact: metrics.compact,
+        tiny: metrics.tiny,
+        height: metrics.controlHeight,
+        onPressed: onReload,
+      ),
+      SizedBox(width: metrics.actionGap),
+      _RoundIconButton(
+        tooltip: '停止播放',
+        icon: Icons.close,
+        iconColor: const Color(0xFFFF6B81),
+        backgroundColor: const Color(0xFF7F1D1D).withOpacity(0.24),
+        borderColor: const Color(0xFFFF6B81).withOpacity(0.26),
+        glowOpacity: 0.20,
+        compact: metrics.compact,
+        tiny: metrics.tiny,
+        height: metrics.controlHeight,
+        onPressed: onStopPlaybackOnly,
+      ),
+    ];
+  }
+}
+
+class _CompactWatchTopActionContent extends StatelessWidget {
+  final _WatchTopActionBarMetrics metrics;
+  final _WatchTopActionButtons actions;
+  final TwitchStreamHeaderMetadata metadata;
+
+  const _CompactWatchTopActionContent({
+    required this.metrics,
+    required this.actions,
+    required this.metadata,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        actions.buildBackButton(),
+        SizedBox(width: metrics.actionGap),
+        _WatchCompactAvatarTile(
+          metadata: metadata,
+          tiny: metrics.tiny,
+          height: metrics.controlHeight,
+        ),
+        const Spacer(),
+        SizedBox(width: metrics.actionGap),
+        ...actions.buildRightActions(),
+      ],
+    );
+  }
+}
+
+class _WideWatchTopActionContent extends StatelessWidget {
+  final _WatchTopActionBarMetrics metrics;
+  final _WatchTopActionButtons actions;
+  final TwitchStreamHeaderMetadata metadata;
+
+  const _WideWatchTopActionContent({
+    required this.metrics,
+    required this.actions,
+    required this.metadata,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        actions.buildBackButton(),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _WatchStreamHeaderCard(
+            metadata: metadata,
+            compact: false,
+            height: metrics.controlHeight,
+          ),
+        ),
+        const SizedBox(width: 12),
+        ...actions.buildRightActions(),
+      ],
+    );
+  }
+}
+
+class _ScaledWatchTopActionSlot extends StatelessWidget {
+  final _WatchTopActionBarMetrics metrics;
+  final double availableWidth;
+  final Widget child;
+
+  const _ScaledWatchTopActionSlot({
+    required this.metrics,
+    required this.availableWidth,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final safeAvailableWidth = availableWidth.isFinite
+        ? availableWidth
+        : metrics.designWidth;
+    final shouldScaleDown = safeAvailableWidth < metrics.designWidth;
+
+    if (!shouldScaleDown) {
+      return SizedBox(
+        width: double.infinity,
+        height: metrics.slotHeight,
+        child: child,
+      );
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      height: metrics.slotHeight,
+      child: ClipRect(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: metrics.designWidth,
+              height: metrics.slotHeight,
+              child: Center(child: child),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
