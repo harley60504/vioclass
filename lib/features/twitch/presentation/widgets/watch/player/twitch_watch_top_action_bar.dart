@@ -216,7 +216,7 @@ class _CompactWatchTopActionContent extends StatelessWidget {
       children: [
         actions.buildBackButton(),
         SizedBox(width: metrics.actionGap),
-        _WatchCompactAvatarTile(
+        WatchCompactAvatarTile(
           metadata: metadata,
           tiny: metrics.tiny,
           height: metrics.controlHeight,
@@ -248,7 +248,7 @@ class _WideWatchTopActionContent extends StatelessWidget {
         actions.buildBackButton(),
         const SizedBox(width: 10),
         Expanded(
-          child: _WatchStreamHeaderCard(
+          child: WatchStreamHeaderCard(
             metadata: metadata,
             compact: false,
             height: metrics.controlHeight,
