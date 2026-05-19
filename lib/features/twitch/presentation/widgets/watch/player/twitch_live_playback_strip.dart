@@ -1,4 +1,10 @@
-part of twitch_watch_player_area;
+import 'dart:async';
+import 'dart:ui' show FontFeature;
+
+import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+
+import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 
 class TwitchLivePlaybackStrip extends StatefulWidget {
   final Player player;
@@ -114,9 +120,6 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
         return null;
       }
 
-      // proxy status is measured on the proxy output timeline. media_kit's
-      // position/duration timeline can be shifted by about one segment, so map:
-      //   media target = proxy safe + (media duration - proxy output)
       final mediaOffset = mediaDuration - proxyOutput;
       final rawTarget = proxySafe + mediaOffset;
       final maxTarget = mediaDuration.inMilliseconds > 800
@@ -158,9 +161,6 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
       if (!duplicate) targets.add(target);
     }
 
-    // Try several real seek targets near the media tail. Some HLS tail targets
-    // are rejected or clamped by media_kit/mpv, so a single magic number is not
-    // reliable enough.
     for (final backoff in _liveSeekBackoffCandidates) {
       addTarget(mediaDuration - backoff);
     }
