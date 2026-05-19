@@ -1,19 +1,26 @@
-part of twitch_watch_player_area;
+import 'dart:async';
+import 'dart:io';
 
-class _AndroidPipButton extends StatefulWidget {
+import 'package:flutter/material.dart';
+
+import '../../../platform/android_pip/twitch_android_pip_controller.dart';
+import 'twitch_player_common_buttons.dart';
+
+class AndroidPipButton extends StatefulWidget {
   final bool dense;
   final double size;
 
-  const _AndroidPipButton({
+  const AndroidPipButton({
+    super.key,
     this.dense = false,
     this.size = 23,
   });
 
   @override
-  State<_AndroidPipButton> createState() => _AndroidPipButtonState();
+  State<AndroidPipButton> createState() => _AndroidPipButtonState();
 }
 
-class _AndroidPipButtonState extends State<_AndroidPipButton> {
+class _AndroidPipButtonState extends State<AndroidPipButton> {
   final TwitchAndroidPipController _pip = TwitchAndroidPipController.instance;
   bool _available = Platform.isAndroid;
   bool _checking = false;
