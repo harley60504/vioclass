@@ -1,9 +1,10 @@
-// PATCH VERSION: twitch_emote_picker_widgets_stage223_name_only_grid
+// PATCH VERSION: twitch_emote_picker_widgets_stage225_unified_large_grid
 //
 // Shared visual widgets for Twitch emote picker sheets.
 // Stage 216: make emote grid cards translucent instead of solid dark blocks.
 // Stage 222: favorite toggling uses long press instead of a visible star button.
-// Stage 223: normal emote picker grid cards now show image + emote name only.
+// Stage 223: normal emote picker grid cards show image + emote name only.
+// Stage 225: unify locked/unlocked cards into the same large visible grid model.
 
 import 'package:flutter/material.dart';
 
@@ -225,81 +226,14 @@ class TwitchThirdPartyEmoteGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Tooltip(
-        message: favorite ? '長按取消收藏' : '長按加入收藏',
-        waitDuration: const Duration(milliseconds: 650),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onInsert,
-          onLongPress: onToggleFavorite,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.052),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: favorite
-                    ? const Color(0xFFEAB308).withOpacity(0.70)
-                    : emote.isZeroWidth
-                        ? const Color(0xFFEAB308).withOpacity(0.42)
-                        : Colors.white.withOpacity(0.095),
-              ),
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: TwitchOptimizedEmoteImage(
-                          imageUrl: emote.imageUrl,
-                          cacheSize: twitchEmoteGridCacheSize,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      emote.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                if (favorite)
-                  const Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Icon(
-                      Icons.star_rounded,
-                      size: 16,
-                      color: Color(0xFFEAB308),
-                    ),
-                  ),
-                if (emote.isZeroWidth)
-                  const Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Text(
-                      'ZW',
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: Color(0xFFEAB308),
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return _TwitchUnifiedEmoteGridCard(
+      imageUrl: emote.imageUrl,
+      label: emote.name,
+      favorite: favorite,
+      locked: false,
+      zeroWidth: emote.isZeroWidth,
+      onTap: onInsert,
+      onLongPress: onToggleFavorite,
     );
   }
 }
@@ -322,77 +256,134 @@ class TwitchOfficialEmoteGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _TwitchUnifiedEmoteGridCard(
+      imageUrl: emote.imageUrl,
+      label: emote.name,
+      favorite: favorite,
+      locked: locked,
+      zeroWidth: false,
+      onTap: locked ? null : onInsert,
+      onLongPress: onToggleFavorite,
+    );
+  }
+}
+
+class _TwitchUnifiedEmoteGridCard extends StatelessWidget {
+  final String imageUrl;
+  final String label;
+  final bool favorite;
+  final bool locked;
+  final bool zeroWidth;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  const _TwitchUnifiedEmoteGridCard({
+    required this.imageUrl,
+    required this.label,
+    required this.favorite,
+    required this.locked,
+    required this.zeroWidth,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tooltip = favorite ? '長按取消收藏' : '長按加入收藏';
+    final borderColor = favorite
+        ? const Color(0xFFEAB308).withOpacity(0.78)
+        : locked
+            ? const Color(0xFFFFD166).withOpacity(0.46)
+            : zeroWidth
+                ? const Color(0xFFEAB308).withOpacity(0.46)
+                : const Color(0xFF9146FF).withOpacity(0.34);
+
     return RepaintBoundary(
       child: Tooltip(
-        message: favorite ? '長按取消收藏' : '長按加入收藏',
+        message: tooltip,
         waitDuration: const Duration(milliseconds: 650),
         child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: locked ? null : onInsert,
-          onLongPress: onToggleFavorite,
-          child: Opacity(
-            opacity: locked ? 0.48 : 1,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.052),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: favorite
-                      ? const Color(0xFFEAB308).withOpacity(0.70)
-                      : locked
-                          ? const Color(0xFFFFD166).withOpacity(0.26)
-                          : Colors.white.withOpacity(0.095),
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 9, 8, 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF242429),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: borderColor),
+              boxShadow: const <BoxShadow>[
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 4),
                 ),
-              ),
-              child: Stack(
-                children: [
-                  Column(
-                    children: [
-                      Expanded(
-                        child: Center(
+              ],
+            ),
+            child: Stack(
+              children: [
+                Column(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: Opacity(
+                          opacity: locked ? 0.70 : 1,
                           child: TwitchOptimizedEmoteImage(
-                            imageUrl: emote.imageUrl,
-                            cacheSize: twitchEmoteGridCacheSize,
+                            imageUrl: imageUrl,
+                            cacheSize: 132,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        emote.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                        ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        height: 1.1,
+                        fontWeight: FontWeight.w900,
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+                if (favorite)
+                  const Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Icon(
+                      Icons.star_rounded,
+                      size: 17,
+                      color: Color(0xFFEAB308),
+                    ),
                   ),
-                  if (favorite)
-                    const Positioned(
-                      top: 0,
-                      right: 0,
-                      child: Icon(
-                        Icons.star_rounded,
-                        size: 16,
+                if (locked)
+                  const Positioned(
+                    right: 0,
+                    bottom: 20,
+                    child: Icon(
+                      Icons.lock_rounded,
+                      size: 17,
+                      color: Color(0xFFFFD166),
+                    ),
+                  ),
+                if (zeroWidth)
+                  const Positioned(
+                    top: 0,
+                    left: 0,
+                    child: Text(
+                      'ZW',
+                      style: TextStyle(
+                        fontSize: 9,
                         color: Color(0xFFEAB308),
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                  if (locked)
-                    const Positioned(
-                      top: 0,
-                      left: 0,
-                      child: Icon(
-                        Icons.lock_rounded,
-                        size: 16,
-                        color: Color(0xFFFFD166),
-                      ),
-                    ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),
