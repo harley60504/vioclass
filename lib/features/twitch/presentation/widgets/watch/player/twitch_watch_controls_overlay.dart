@@ -61,6 +61,7 @@ class _WatchControlsOverlay extends StatefulWidget {
 
 class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
   static const Duration _fadeDuration = Duration(milliseconds: 180);
+  static const Duration _autoHideDelay = Duration(seconds: 3);
   static const Duration _unmountDelay = Duration(milliseconds: 220);
 
   bool _visible = true;
@@ -68,17 +69,24 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
   Timer? _hideTimer;
   Timer? _unmountTimer;
 
+  bool get _hasError =>
+      (widget.error != null && widget.error!.trim().isNotEmpty) ||
+      widget.runtimeError != null;
+
+  bool get _shouldKeepControlsMounted =>
+      _controlsMounted || _visible || widget.loading || _hasError;
+
   @override
   void initState() {
     super.initState();
-    _scheduleHide();
+    _scheduleAutoHide();
   }
 
   @override
   void didUpdateWidget(covariant _WatchControlsOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.loading || widget.error != null || widget.runtimeError != null) {
-      _showAndHold();
+    if (widget.loading || _hasError) {
+      _showAndRestartAutoHide();
     }
   }
 
@@ -89,10 +97,11 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
     super.dispose();
   }
 
-  void _scheduleHide() {
+  void _scheduleAutoHide() {
     _hideTimer?.cancel();
-    if (widget.loading || widget.error != null || widget.runtimeError != null) return;
-    _hideTimer = Timer(const Duration(seconds: 3), () {
+    if (widget.loading || _hasError) return;
+
+    _hideTimer = Timer(_autoHideDelay, () {
       if (!mounted) return;
       setState(() => _visible = false);
       _scheduleUnmountControls();
@@ -107,108 +116,178 @@ class _WatchControlsOverlayState extends State<_WatchControlsOverlay> {
     });
   }
 
-  void _showAndHold() {
+  void _showAndRestartAutoHide() {
     _hideTimer?.cancel();
     _unmountTimer?.cancel();
+
     if ((!_visible || !_controlsMounted) && mounted) {
       setState(() {
         _controlsMounted = true;
         _visible = true;
       });
     }
-    _scheduleHide();
+
+    _scheduleAutoHide();
   }
 
   @override
   Widget build(BuildContext context) {
-    final shouldShowErrors = widget.error != null || widget.runtimeError != null;
-    final shouldMountControls = _controlsMounted || _visible || widget.loading || shouldShowErrors;
-
-    return MouseRegion(
-      onEnter: (_) => _showAndHold(),
-      onHover: (_) => _showAndHold(),
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: _showAndHold,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: _PlayerDimOverlay(visible: widget.loading),
+    return _WatchControlsInteractionLayer(
+      onWakeControls: _showAndRestartAutoHide,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: _PlayerDimOverlay(visible: widget.loading),
+          ),
+          if (_shouldKeepControlsMounted)
+            _FadingWatchChrome(
+              visible: _visible,
+              fadeDuration: _fadeDuration,
+              child: _WatchChromeStack(widget: widget),
             ),
-            if (shouldMountControls)
-              IgnorePointer(
-                ignoring: !_visible,
-                child: AnimatedOpacity(
-                  opacity: _visible ? 1 : 0,
-                  duration: _fadeDuration,
-                  curve: Curves.easeOutCubic,
-                  child: RepaintBoundary(
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          left: 12,
-                          right: 12,
-                          top: 12,
-                          child: _WatchTopActionBar(
-                            metadata: widget.metadata,
-                            isFollowing: widget.isFollowing,
-                            followBusy: widget.followBusy,
-                            player: widget.player,
-                            onBack: widget.onBack,
-                            onToggleFollow: widget.onToggleFollow,
-                            onSubscribe: widget.onSubscribe,
-                            onReload: widget.onReload,
-                            onStop: widget.onStop,
-                          ),
-                        ),
-                        Positioned(
-                          left: 12,
-                          right: 12,
-                          bottom: 10,
-                          child: SafeArea(
-                            top: false,
-                            minimum: const EdgeInsets.only(bottom: 2),
-                            child: _WatchBottomControlBar(
-                              player: widget.player,
-                              playerRuntime: widget.playerRuntime,
-                              muted: widget.muted,
-                              volume: widget.volume,
-                              fullscreen: widget.fullscreen,
-                              chatVisible: widget.chatVisible,
-                              showFullscreenButton: widget.showFullscreenButton,
-                              onToggleMute: widget.onToggleMute,
-                              onVolumeChanged: widget.onVolumeChanged,
-                              qualityVariants: widget.qualityVariants,
-                              currentVariant: widget.currentVariant,
-                              onQualityChanged: widget.onQualityChanged,
-                              onToggleChat: widget.onToggleChat,
-                              onToggleFullscreen: widget.onToggleFullscreen,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            if (widget.error != null && widget.error!.trim().isNotEmpty)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 88,
-                child: _ErrorCard(message: widget.error!),
-              ),
-            if (widget.runtimeError != null)
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 88,
-                child: _ErrorCard(message: widget.runtimeError.toString()),
-              ),
-          ],
-        ),
+          _WatchErrorOverlay(
+            error: widget.error,
+            runtimeError: widget.runtimeError,
+          ),
+        ],
       ),
     );
+  }
+}
+
+class _WatchControlsInteractionLayer extends StatelessWidget {
+  final VoidCallback onWakeControls;
+  final Widget child;
+
+  const _WatchControlsInteractionLayer({
+    required this.onWakeControls,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => onWakeControls(),
+      onHover: (_) => onWakeControls(),
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: onWakeControls,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _FadingWatchChrome extends StatelessWidget {
+  final bool visible;
+  final Duration fadeDuration;
+  final Widget child;
+
+  const _FadingWatchChrome({
+    required this.visible,
+    required this.fadeDuration,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !visible,
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: fadeDuration,
+        curve: Curves.easeOutCubic,
+        child: RepaintBoundary(child: child),
+      ),
+    );
+  }
+}
+
+class _WatchChromeStack extends StatelessWidget {
+  final _WatchControlsOverlay widget;
+
+  const _WatchChromeStack({required this.widget});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          left: 12,
+          right: 12,
+          top: 12,
+          child: _WatchTopActionBar(
+            metadata: widget.metadata,
+            isFollowing: widget.isFollowing,
+            followBusy: widget.followBusy,
+            player: widget.player,
+            onBack: widget.onBack,
+            onToggleFollow: widget.onToggleFollow,
+            onSubscribe: widget.onSubscribe,
+            onReload: widget.onReload,
+            onStop: widget.onStop,
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 10,
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 2),
+            child: _WatchBottomControlBar(
+              player: widget.player,
+              playerRuntime: widget.playerRuntime,
+              muted: widget.muted,
+              volume: widget.volume,
+              fullscreen: widget.fullscreen,
+              chatVisible: widget.chatVisible,
+              showFullscreenButton: widget.showFullscreenButton,
+              onToggleMute: widget.onToggleMute,
+              onVolumeChanged: widget.onVolumeChanged,
+              qualityVariants: widget.qualityVariants,
+              currentVariant: widget.currentVariant,
+              onQualityChanged: widget.onQualityChanged,
+              onToggleChat: widget.onToggleChat,
+              onToggleFullscreen: widget.onToggleFullscreen,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WatchErrorOverlay extends StatelessWidget {
+  final String? error;
+  final Object? runtimeError;
+
+  const _WatchErrorOverlay({
+    required this.error,
+    required this.runtimeError,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final message = _resolveMessage();
+    if (message == null) return const SizedBox.shrink();
+
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 88,
+      child: _ErrorCard(message: message),
+    );
+  }
+
+  String? _resolveMessage() {
+    final explicitError = error?.trim();
+    if (explicitError != null && explicitError.isNotEmpty) {
+      return explicitError;
+    }
+    final runtime = runtimeError;
+    if (runtime == null) return null;
+    return runtime.toString();
   }
 }
 
