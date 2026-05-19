@@ -366,7 +366,7 @@ class _PlayPauseButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PlainIconButton(
+    return PlainIconButton(
       tooltip: playing ? '暫停' : '播放',
       icon: playing ? Icons.pause : Icons.play_arrow,
       size: size,
@@ -396,7 +396,7 @@ class _WideVolumeControl extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _PlainIconButton(
+        PlainIconButton(
           tooltip: muted ? '取消靜音' : '靜音',
           icon: muted || volume <= 0 ? Icons.volume_off : Icons.volume_up,
           size: 24,
@@ -431,7 +431,7 @@ class _ChatToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PlainIconButton(
+    return PlainIconButton(
       tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
       icon: chatVisible ? Icons.chat_bubble : Icons.chat_bubble_outline,
       size: size,
@@ -457,7 +457,7 @@ class _FullscreenToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PlainIconButton(
+    return PlainIconButton(
       tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
       icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
       size: size,
@@ -572,7 +572,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PlainIconButton(
+    return PlainIconButton(
       tooltip: '打開播放進度',
       icon: Icons.timeline_rounded,
       size: 22,
