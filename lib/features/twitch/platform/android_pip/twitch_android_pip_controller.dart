@@ -1,9 +1,9 @@
-// Stage 226E: Android Picture-in-Picture bridge for the media_kit Watch player.
+// Stage 226G: Android Picture-in-Picture bridge for the media_kit Watch player.
 //
-// Android PiP captures the Activity surface. sourceRectHint only controls the
-// transition animation, not the captured content. To avoid capturing chat or
-// WatchPage background, Android asks Flutter to prepare PiP first; the Watch
-// responsive body then temporarily renders only the player area.
+// Android PiP captures the current Activity surface. Before entering PiP we ask
+// Flutter to render only the player surface for a short moment, then native
+// enters PiP. The prepare state has a safety timeout so chat/layout cannot stay
+// hidden if Android refuses or misses PiP.
 
 import 'dart:async';
 import 'dart:io';
@@ -20,10 +20,13 @@ class TwitchAndroidPipController extends ChangeNotifier {
   static final TwitchAndroidPipController instance = TwitchAndroidPipController._();
 
   static const MethodChannel _channel = MethodChannel('vio_class/android_pip');
+  static const Duration _prepareFrameDelay = Duration(milliseconds: 60);
+  static const Duration _prepareSafetyTimeout = Duration(milliseconds: 1600);
 
   bool _isInPictureInPictureMode = false;
   bool _isPreparingAutoPictureInPicture = false;
   bool _lastKnownAvailable = Platform.isAndroid;
+  Timer? _prepareTimeout;
 
   bool get isAndroid => Platform.isAndroid;
   bool get isInPictureInPictureMode => _isInPictureInPictureMode;
@@ -72,8 +75,7 @@ class TwitchAndroidPipController extends ChangeNotifier {
     if (!Platform.isAndroid) return false;
 
     try {
-      _setPreparingAutoPictureInPicture(true);
-      await _allowFlutterToPresentPlayerOnlyFrame();
+      await preparePlayerOnlyForPictureInPicture();
       final entered = await _channel.invokeMethod<bool>(
         'enterPip',
         <String, Object>{
@@ -91,11 +93,15 @@ class TwitchAndroidPipController extends ChangeNotifier {
     }
   }
 
+  Future<void> preparePlayerOnlyForPictureInPicture() async {
+    _setPreparingAutoPictureInPicture(true);
+    await Future<void>.delayed(_prepareFrameDelay);
+  }
+
   Future<dynamic> _handleNativeCall(MethodCall call) async {
     switch (call.method) {
       case 'onAutoPipRequested':
-        _setPreparingAutoPictureInPicture(true);
-        await _allowFlutterToPresentPlayerOnlyFrame();
+        await preparePlayerOnlyForPictureInPicture();
         return true;
       case 'onPipModeChanged':
         final args = call.arguments;
@@ -108,19 +114,37 @@ class TwitchAndroidPipController extends ChangeNotifier {
     }
   }
 
-  Future<void> _allowFlutterToPresentPlayerOnlyFrame() async {
-    await Future<void>.delayed(const Duration(milliseconds: 90));
-  }
-
   void _setPictureInPictureMode(bool value) {
     if (_isInPictureInPictureMode == value) return;
     _isInPictureInPictureMode = value;
+    if (value) {
+      _prepareTimeout?.cancel();
+      _prepareTimeout = null;
+    }
     notifyListeners();
   }
 
   void _setPreparingAutoPictureInPicture(bool value) {
-    if (_isPreparingAutoPictureInPicture == value) return;
+    if (_isPreparingAutoPictureInPicture == value) {
+      if (value) _schedulePrepareTimeout();
+      return;
+    }
     _isPreparingAutoPictureInPicture = value;
+    if (value) {
+      _schedulePrepareTimeout();
+    } else {
+      _prepareTimeout?.cancel();
+      _prepareTimeout = null;
+    }
     notifyListeners();
+  }
+
+  void _schedulePrepareTimeout() {
+    _prepareTimeout?.cancel();
+    _prepareTimeout = Timer(_prepareSafetyTimeout, () {
+      if (!_isInPictureInPictureMode) {
+        _setPreparingAutoPictureInPicture(false);
+      }
+    });
   }
 }
