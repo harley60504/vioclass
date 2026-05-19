@@ -35,12 +35,12 @@ class TwitchMixedEmoteGrid extends StatelessWidget {
       resetKey: resetKey,
       initialItemCount: 48,
       pageSize: 48,
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 18),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 120,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: 1.08,
+        maxCrossAxisExtent: 156,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.98,
       ),
       itemBuilder: (context, entry, index) {
         if (entry.thirdParty != null) {
