@@ -1,6 +1,7 @@
-// PATCH VERSION: twitch_emote_picker_models_stage180_no_official_hard_limit
+// PATCH VERSION: twitch_emote_picker_models_stage222_frosty_category_merge
 //
 // Shared enums, constants and non-widget helpers for Twitch emote picker sheets.
+// Stage 222: merge Frosty-style scope/category filtering into the original sheet.
 
 import '../../../models/emotes/twitch_official_emote.dart';
 import '../../../models/emotes/twitch_third_party_emote.dart';
@@ -26,6 +27,32 @@ enum TwitchOfficialEmoteSubFilter {
   usable,
   channel,
   global,
+}
+
+enum TwitchThirdPartyEmoteScopeFilter {
+  all,
+  channel,
+  shared,
+  global,
+  zeroWidth,
+}
+
+extension TwitchThirdPartyEmoteScopeFilterUi
+    on TwitchThirdPartyEmoteScopeFilter {
+  String get label {
+    switch (this) {
+      case TwitchThirdPartyEmoteScopeFilter.all:
+        return '全部';
+      case TwitchThirdPartyEmoteScopeFilter.channel:
+        return '頻道';
+      case TwitchThirdPartyEmoteScopeFilter.shared:
+        return 'Shared';
+      case TwitchThirdPartyEmoteScopeFilter.global:
+        return '全域';
+      case TwitchThirdPartyEmoteScopeFilter.zeroWidth:
+        return 'ZW';
+    }
+  }
 }
 
 class TwitchMixedEmoteEntry {
@@ -111,13 +138,50 @@ String twitchEmoteEmptyText({
   }
 }
 
+bool twitchThirdPartyEmoteMatchesScopeFilter({
+  required TwitchThirdPartyEmote emote,
+  required TwitchThirdPartyEmoteScopeFilter scopeFilter,
+}) {
+  switch (scopeFilter) {
+    case TwitchThirdPartyEmoteScopeFilter.all:
+      return true;
+    case TwitchThirdPartyEmoteScopeFilter.channel:
+      return emote.scope == TwitchThirdPartyEmoteScope.channel ||
+          emote.scope == TwitchThirdPartyEmoteScope.other;
+    case TwitchThirdPartyEmoteScopeFilter.shared:
+      return emote.scope == TwitchThirdPartyEmoteScope.shared;
+    case TwitchThirdPartyEmoteScopeFilter.global:
+      return emote.scope == TwitchThirdPartyEmoteScope.global;
+    case TwitchThirdPartyEmoteScopeFilter.zeroWidth:
+      return emote.isZeroWidth;
+  }
+}
+
+int twitchThirdPartyEmoteScopeCount({
+  required List<TwitchThirdPartyEmote> source,
+  required TwitchThirdPartyEmoteScopeFilter scopeFilter,
+}) {
+  return source.where((emote) {
+    return twitchThirdPartyEmoteMatchesScopeFilter(
+      emote: emote,
+      scopeFilter: scopeFilter,
+    );
+  }).length;
+}
+
 List<TwitchThirdPartyEmote> filterThirdPartyEmotes({
   required List<TwitchThirdPartyEmote> source,
   required String query,
+  TwitchThirdPartyEmoteScopeFilter scopeFilter =
+      TwitchThirdPartyEmoteScopeFilter.all,
   int limit = twitchThirdPartyGridLimit,
 }) {
   final lowerQuery = query.trim().toLowerCase();
   return source
+      .where((emote) => twitchThirdPartyEmoteMatchesScopeFilter(
+            emote: emote,
+            scopeFilter: scopeFilter,
+          ))
       .where((emote) => lowerQuery.isEmpty ||
           emote.name.toLowerCase().contains(lowerQuery) ||
           emote.id.toLowerCase().contains(lowerQuery))
