@@ -16,6 +16,7 @@ import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../shared/twitch_glass.dart';
 import 'player/twitch_media_kit_video_surface.dart';
+import 'player/twitch_player_more_actions_button.dart';
 
 part 'player/twitch_watch_controls_overlay.dart';
 part 'player/twitch_watch_top_action_bar.dart';
@@ -24,8 +25,6 @@ part 'player/twitch_watch_top_buttons.dart';
 part 'player/twitch_watch_bottom_control_bar.dart';
 part 'player/twitch_live_playback_strip.dart';
 part 'player/twitch_player_volume_control.dart';
-part 'player/twitch_player_more_actions_button.dart';
-part 'player/twitch_player_debug_copy_actions.dart';
 part 'player/twitch_player_quality_button.dart';
 part 'player/twitch_player_common_buttons.dart';
 part 'player/twitch_player_error_card.dart';
