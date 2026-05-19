@@ -1,13 +1,16 @@
-part of twitch_watch_player_area;
+import 'package:flutter/material.dart';
 
-class _CompactInlineVolumeControl extends StatelessWidget {
+import 'twitch_player_common_buttons.dart';
+
+class CompactInlineVolumeControl extends StatelessWidget {
   final bool muted;
   final double volume;
   final double sliderWidth;
   final VoidCallback? onToggleMute;
   final ValueChanged<double>? onVolumeChanged;
 
-  const _CompactInlineVolumeControl({
+  const CompactInlineVolumeControl({
+    super.key,
     required this.muted,
     required this.volume,
     required this.sliderWidth,
