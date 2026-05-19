@@ -4,7 +4,7 @@ import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../sheets/twitch_channel_points_sheet.dart';
-import '../../sheets/twitch_frosty_emote_picker_sheet.dart';
+import '../../sheets/twitch_emote_picker_sheet.dart';
 import '../../sheets/twitch_prediction_bet_sheet.dart';
 import '../twitch_watch_feature_ports.dart';
 
@@ -44,7 +44,7 @@ class TwitchWatchSheetPortLauncher {
   });
 
   Future<void> openEmotePicker(BuildContext context) async {
-    await showTwitchFrostyEmotePickerSheet(
+    await showTwitchEmotePickerSheet(
       context: context,
       cache: emotes.thirdParty,
       officialCache: emotes.official,
