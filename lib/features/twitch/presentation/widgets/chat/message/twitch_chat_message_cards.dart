@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import 'twitch_chat_message_content.dart';
 import 'twitch_chat_message_special_style.dart';
@@ -10,6 +11,7 @@ import 'twitch_chat_message_visual_metrics.dart';
 class TwitchChatNormalMessageCard extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final Color displayColor;
   final String displayNameText;
   final bool showTimestamp;
@@ -20,6 +22,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
     super.key,
     required this.message,
     required this.thirdPartyEmotes,
+    required this.officialEmotes,
     required this.displayColor,
     required this.displayNameText,
     required this.showTimestamp,
@@ -49,6 +52,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
               child: TwitchChatMessageContent(
                 message: message,
                 thirdPartyEmotes: thirdPartyEmotes,
+                officialEmotes: officialEmotes,
                 displayColor: displayColor,
                 displayNameText: displayNameText,
                 showSystemMessage: true,
@@ -66,6 +70,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
 class TwitchChatSpecialMessageCard extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final Color displayColor;
   final String displayNameText;
   final TwitchChatSpecialMessageStyle style;
@@ -77,6 +82,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
     super.key,
     required this.message,
     required this.thirdPartyEmotes,
+    required this.officialEmotes,
     required this.displayColor,
     required this.displayNameText,
     required this.style,
@@ -174,6 +180,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                         TwitchChatMessageContent(
                           message: message,
                           thirdPartyEmotes: thirdPartyEmotes,
+                          officialEmotes: officialEmotes,
                           displayColor: displayColor,
                           displayNameText: displayNameText,
                           showSystemMessage: false,
