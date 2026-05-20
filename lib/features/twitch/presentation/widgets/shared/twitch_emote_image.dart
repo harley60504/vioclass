@@ -7,10 +7,11 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 /// Use this widget for both chat message emotes and emote picker tiles so image
 /// fallback behavior stays identical across the app.
 ///
-/// Twitch official animated emotes can occasionally fail Flutter Windows'
-/// multi-frame decoder with errors such as:
+/// Some Twitch official animated emotes can fail Flutter's multi-frame image
+/// decoder on both Windows and Android with errors such as:
 ///   Could not getPixels for frame N
-/// For those cases this widget can fallback to the official static CDN variant.
+/// For normal chat/menu usage this widget prefers the official static CDN
+/// variant first, then falls back through the original/animated/default URLs.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
   final String name;
@@ -18,6 +19,7 @@ class TwitchEmoteImage extends StatefulWidget {
   final String providerLabel;
   final bool isOfficial;
   final bool locked;
+  final bool preferStaticOfficial;
   final BoxFit fit;
   final double? width;
   final double? height;
@@ -37,6 +39,7 @@ class TwitchEmoteImage extends StatefulWidget {
     this.providerLabel = '',
     this.isOfficial = false,
     this.locked = false,
+    this.preferStaticOfficial = true,
     this.fit = BoxFit.contain,
     this.width,
     this.height,
@@ -73,7 +76,8 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         oldWidget.name != widget.name ||
         oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.providerLabel != widget.providerLabel ||
-        oldWidget.isOfficial != widget.isOfficial) {
+        oldWidget.isOfficial != widget.isOfficial ||
+        oldWidget.preferStaticOfficial != widget.preferStaticOfficial) {
       imageIndex = 0;
       fallbackQueued = false;
     }
@@ -89,7 +93,9 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         Icon(
           widget.locked ? Icons.lock_rounded : Icons.broken_image_rounded,
           color: Colors.white38,
-          size: widget.height == null ? 22 : (widget.height! * 0.72).clamp(14.0, 26.0),
+          size: widget.height == null
+              ? 22
+              : (widget.height! * 0.72).clamp(14.0, 26.0),
         );
 
     if (widget.debug) {
@@ -174,11 +180,20 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
   List<String> get imageCandidates {
     if (!widget.isOfficial) return uniqueUrls(<String>[widget.imageUrl]);
 
+    if (widget.preferStaticOfficial) {
+      return uniqueUrls(<String>[
+        officialStaticEmoteUrl(widget.id),
+        widget.imageUrl,
+        officialAnimatedEmoteUrl(widget.id),
+        officialDefaultEmoteUrl(widget.id),
+      ]);
+    }
+
     return uniqueUrls(<String>[
       widget.imageUrl,
-      officialStaticEmoteUrl(widget.id),
       officialAnimatedEmoteUrl(widget.id),
       officialDefaultEmoteUrl(widget.id),
+      officialStaticEmoteUrl(widget.id),
     ]);
   }
 
