@@ -94,6 +94,26 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     return output;
   }
 
+  List<TwitchOfficialEmote> get renderableEmotes {
+    final byKey = <String, TwitchOfficialEmote>{};
+
+    for (final emote in usableEmotes) {
+      byKey[_key(emote)] = emote;
+    }
+
+    if (_userEmotesUnavailable) {
+      for (final emote in _channelEmotes) {
+        if (emote.name.trim().isEmpty || emote.imageUrl.trim().isEmpty) continue;
+        byKey.putIfAbsent(_key(emote), () => emote);
+      }
+    }
+
+    final output = byKey.values.toList(growable: false)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+
+    return output;
+  }
+
   List<TwitchOfficialEmote> get nonGlobalUsableEmotes {
     final globalKeys = _globalEmotes.map(_key).toSet();
     final byKey = <String, TwitchOfficialEmote>{};
@@ -128,6 +148,25 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     final lower = clean.toLowerCase();
 
     for (final emote in usableEmotes) {
+      final emoteName = emote.name.trim();
+      if (emoteName.isEmpty || emote.imageUrl.trim().isEmpty) continue;
+      if (emoteName == clean) return emote;
+      if (caseInsensitiveMatch == null && emoteName.toLowerCase() == lower) {
+        caseInsensitiveMatch = emote;
+      }
+    }
+
+    return caseInsensitiveMatch;
+  }
+
+  TwitchOfficialEmote? lookupRenderableByName(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return null;
+
+    TwitchOfficialEmote? caseInsensitiveMatch;
+    final lower = clean.toLowerCase();
+
+    for (final emote in renderableEmotes) {
       final emoteName = emote.name.trim();
       if (emoteName.isEmpty || emote.imageUrl.trim().isEmpty) continue;
       if (emoteName == clean) return emote;
@@ -632,6 +671,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       'userCount': userEmotes.length,
       'lockedCount': lockedChannelEmotes.length,
       'usableCount': usableEmotes.length,
+      'renderableCount': renderableEmotes.length,
       'nonGlobalUsableCount': nonGlobalUsableEmotes.length,
       'favoriteCount': favoriteCount,
       'favoritesLoaded': favoritesLoaded,
