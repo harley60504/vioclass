@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../../../models/chat/twitch_chat_render_segment.dart';
+import '../../../../models/emotes/twitch_official_emote.dart';
 import '../../../../models/emotes/twitch_third_party_emote.dart';
+import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import 'twitch_chat_message_visual_metrics.dart';
@@ -19,6 +21,7 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
   required BuildContext context,
   required List<TwitchChatRenderSegment> segments,
   required TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
+  required TwitchOfficialEmoteCacheService? officialEmotes,
   required TwitchChatMessageVisualMetrics metrics,
 }) {
   final spans = <InlineSpan>[];
@@ -27,11 +30,12 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
     switch (segment.type) {
       case TwitchChatRenderSegmentType.text:
       case TwitchChatRenderSegmentType.emoji:
-        _appendTextOrThirdPartyEmoteSpans(
+        _appendTextOrCachedEmoteSpans(
           context: context,
           spans: spans,
           text: segment.content,
           thirdPartyEmotes: thirdPartyEmotes,
+          officialEmotes: officialEmotes,
           metrics: metrics,
         );
         break;
@@ -56,40 +60,132 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
   return spans;
 }
 
-void _appendTextOrThirdPartyEmoteSpans({
+void _appendTextOrCachedEmoteSpans({
   required BuildContext context,
   required List<InlineSpan> spans,
   required String text,
   required TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
+  required TwitchOfficialEmoteCacheService? officialEmotes,
   required TwitchChatMessageVisualMetrics metrics,
 }) {
   if (text.isEmpty) return;
 
-  final cache = thirdPartyEmotes;
-  if (cache == null || cache.count == 0) {
+  final hasThirdParty = thirdPartyEmotes != null && thirdPartyEmotes.count > 0;
+  final hasOfficial = officialEmotes != null && officialEmotes.renderableEmotes.isNotEmpty;
+
+  if (!hasThirdParty && !hasOfficial) {
     spans.add(TextSpan(text: text, style: _normalTextStyle(metrics)));
     return;
   }
 
   final parts = _splitPreservingWhitespace(text);
-  if (parts.length == 1 && cache.lookup(parts.first) == null) {
+  if (parts.length == 1 &&
+      _lookupCachedInlineEmote(
+            token: parts.first,
+            thirdPartyEmotes: thirdPartyEmotes,
+            officialEmotes: officialEmotes,
+          ) ==
+          null) {
     spans.add(TextSpan(text: text, style: _normalTextStyle(metrics)));
     return;
   }
 
   for (final part in parts) {
-    final emote = cache.lookup(part);
-    if (emote == null || part.trim().isEmpty) {
+    final token = part.trim();
+    final emote = token.isEmpty
+        ? null
+        : _lookupCachedInlineEmote(
+            token: token,
+            thirdPartyEmotes: thirdPartyEmotes,
+            officialEmotes: officialEmotes,
+          );
+
+    if (emote == null || token.isEmpty) {
       spans.add(TextSpan(text: part, style: _normalTextStyle(metrics)));
       continue;
     }
 
-    _appendThirdPartyEmoteSpan(
-      spans: spans,
-      emote: emote,
-      metrics: metrics,
-    );
+    if (emote is TwitchOfficialEmote) {
+      _appendOfficialEmoteSpan(
+        spans: spans,
+        emote: emote,
+        fallbackText: part,
+        metrics: metrics,
+      );
+      continue;
+    }
+
+    if (emote is TwitchThirdPartyEmote) {
+      _appendThirdPartyEmoteSpan(
+        spans: spans,
+        emote: emote,
+        metrics: metrics,
+      );
+      continue;
+    }
+
+    spans.add(TextSpan(text: part, style: _normalTextStyle(metrics)));
   }
+}
+
+Object? _lookupCachedInlineEmote({
+  required String token,
+  required TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
+  required TwitchOfficialEmoteCacheService? officialEmotes,
+}) {
+  final clean = token.trim();
+  if (clean.isEmpty) return null;
+
+  final official = officialEmotes?.lookupRenderableByName(clean);
+  if (official != null) return official;
+
+  final thirdParty = thirdPartyEmotes?.lookup(clean);
+  if (thirdParty != null) return thirdParty;
+
+  return null;
+}
+
+void _appendOfficialEmoteSpan({
+  required List<InlineSpan> spans,
+  required TwitchOfficialEmote emote,
+  required String fallbackText,
+  required TwitchChatMessageVisualMetrics metrics,
+}) {
+  final imageUrl = emote.imageUrl.trim().isNotEmpty
+      ? emote.imageUrl.trim()
+      : 'https://static-cdn.jtvnw.net/emoticons/v2/${emote.id}/default/dark/2.0';
+
+  if (imageUrl.trim().isEmpty) {
+    spans.add(TextSpan(text: fallbackText, style: _normalTextStyle(metrics)));
+    return;
+  }
+
+  final size = metrics.emoteSize;
+  spans.add(
+    WidgetSpan(
+      alignment: PlaceholderAlignment.middle,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1),
+        child: RepaintBoundary(
+          child: TwitchCachedImageLayer(
+            imageUrl: imageUrl,
+            width: size,
+            height: size,
+            cacheManager: _chatInlineEmoteCacheManager,
+            fit: BoxFit.contain,
+            fallbackColor: Colors.transparent,
+            fadeInDuration: Duration.zero,
+            fadeOutDuration: Duration.zero,
+            placeholder: const SizedBox.shrink(),
+            errorWidget: Text(
+              fallbackText.isEmpty ? emote.name : fallbackText,
+              style: _normalTextStyle(metrics),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 void _appendThirdPartyEmoteSpan({
@@ -257,12 +353,14 @@ List<String> _splitPreservingWhitespace(String text) {
 class TwitchChatMessageSegmentView extends StatelessWidget {
   final TwitchChatRenderSegment segment;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final TwitchChatMessageVisualMetrics metrics;
 
   const TwitchChatMessageSegmentView({
     super.key,
     required this.segment,
     this.thirdPartyEmotes,
+    this.officialEmotes,
     required this.metrics,
   });
 
@@ -273,6 +371,7 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
         return _TextSegment(
           segment: segment,
           thirdPartyEmotes: thirdPartyEmotes,
+          officialEmotes: officialEmotes,
           metrics: metrics,
         );
       case TwitchChatRenderSegmentType.link:
@@ -280,7 +379,12 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
       case TwitchChatRenderSegmentType.twitchEmote:
         return _EmoteSegment(segment: segment, metrics: metrics);
       case TwitchChatRenderSegmentType.emoji:
-        return _TextSegment(segment: segment, metrics: metrics);
+        return _TextSegment(
+          segment: segment,
+          thirdPartyEmotes: thirdPartyEmotes,
+          officialEmotes: officialEmotes,
+          metrics: metrics,
+        );
       case TwitchChatRenderSegmentType.cheermote:
         return _CheermoteSegment(segment: segment, metrics: metrics);
     }
@@ -290,11 +394,13 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
 class _TextSegment extends StatelessWidget {
   final TwitchChatRenderSegment segment;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final TwitchChatMessageVisualMetrics metrics;
 
   const _TextSegment({
     required this.segment,
     this.thirdPartyEmotes,
+    this.officialEmotes,
     required this.metrics,
   });
 
@@ -303,46 +409,16 @@ class _TextSegment extends StatelessWidget {
     if (segment.content.isEmpty) return const SizedBox.shrink();
 
     final spans = <InlineSpan>[];
-    _appendTextOrThirdPartyEmoteSpans(
+    _appendTextOrCachedEmoteSpans(
       context: context,
       spans: spans,
       text: segment.content,
       thirdPartyEmotes: thirdPartyEmotes,
+      officialEmotes: officialEmotes,
       metrics: metrics,
     );
 
     return Text.rich(TextSpan(children: spans));
-  }
-}
-
-class _TextOrThirdPartyEmote extends StatelessWidget {
-  final String text;
-  final TwitchThirdPartyEmote? emote;
-  final TwitchChatMessageVisualMetrics metrics;
-
-  const _TextOrThirdPartyEmote({
-    required this.text,
-    required this.emote,
-    required this.metrics,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final item = emote;
-    if (item == null || text.trim().isEmpty) {
-      return Text(
-        text,
-        textAlign: TextAlign.left,
-        style: _normalTextStyle(metrics),
-      );
-    }
-
-    return RepaintBoundary(
-      child: _ThirdPartyInlineEmoteImage(
-        emote: item,
-        metrics: metrics,
-      ),
-    );
   }
 }
 
