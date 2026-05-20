@@ -4,10 +4,11 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Shared Twitch / third-party emote image renderer.
 ///
-/// Diagnostic baseline:
+/// Stable behavior:
 /// - Use the normal CachedNetworkImage / Flutter image pipeline only.
-/// - Official Twitch emotes use the normal/original URL flow first so animated
-///   or default variants can be tested directly.
+/// - Official Twitch emotes use the original URL flow first so animated/default
+///   variants can display when Flutter's codec supports them.
+/// - If a candidate fails, the widget quickly falls back to the next candidate.
 /// - No Dart frame decoding is used here.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
@@ -19,7 +20,7 @@ class TwitchEmoteImage extends StatefulWidget {
   final bool preferStaticOfficial;
 
   /// Kept only for compatibility with existing call sites.
-  /// This diagnostic version intentionally ignores decoded rendering.
+  /// This stable version intentionally ignores decoded rendering.
   final bool tryDecodedAnimatedOfficial;
   final bool decodedAnimatedOnlyForKnownProblemEmotes;
   final BoxFit fit;
@@ -102,7 +103,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
               : (widget.height! * 0.72).clamp(14.0, 26.0),
         );
 
-    if (widget.debug || isKnownProblemAnimatedEmote) {
+    if (widget.debug) {
       debugLog(
         'network build name=${widget.name} id=${widget.id} '
         'provider=${widget.providerLabel} official=${widget.isOfficial} '
@@ -143,19 +144,12 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     );
   }
 
-  bool get isKnownProblemAnimatedEmote {
-    final id = widget.id.trim();
-    final name = widget.name.trim();
-    return id == 'emotesv2_8a5801a43a8d4dce893b8c3f28978e3e' ||
-        name == 'corgiHHH';
-  }
-
   void handleImageError({
     required String failedUrl,
     required Object error,
     required List<String> candidates,
   }) {
-    if (widget.debug || isKnownProblemAnimatedEmote) {
+    if (widget.debug) {
       debugLog(
         'network error name=${widget.name} id=${widget.id} index=$imageIndex '
         'url=$failedUrl error=$error candidates=${candidates.join(' | ')}',
@@ -166,7 +160,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
     final nextIndex = imageIndex + 1;
     if (nextIndex >= candidates.length) {
-      if (widget.debug || isKnownProblemAnimatedEmote) {
+      if (widget.debug) {
         debugLog('network fallback exhausted name=${widget.name} id=${widget.id}');
       }
       return;
@@ -174,7 +168,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
     fallbackQueued = true;
 
-    if (widget.debug || isKnownProblemAnimatedEmote) {
+    if (widget.debug) {
       debugLog(
         'network fallback queued name=${widget.name} from=$failedUrl to=${candidates[nextIndex]}',
       );
