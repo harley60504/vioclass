@@ -1,8 +1,9 @@
-// PATCH VERSION: twitch_runtime_message_tile_stage157_card_shells
+// PATCH VERSION: twitch_runtime_message_tile_stage243_official_emote_fallback
 
 import 'package:flutter/material.dart';
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import 'message/twitch_chat_message_cards.dart';
 import 'message/twitch_chat_message_special_style.dart';
@@ -12,6 +13,7 @@ import 'message/twitch_chat_message_visual_metrics.dart';
 class TwitchRuntimeMessageTile extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final bool showTimestamp;
   final double fontScale;
   final bool compact;
@@ -21,6 +23,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     super.key,
     required this.message,
     this.thirdPartyEmotes,
+    this.officialEmotes,
     this.showTimestamp = false,
     this.fontScale = 1.0,
     this.compact = false,
@@ -41,6 +44,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
       return TwitchChatSpecialMessageCard(
         message: message,
         thirdPartyEmotes: thirdPartyEmotes,
+        officialEmotes: officialEmotes,
         displayColor: displayColor,
         displayNameText: displayNameText,
         style: style,
@@ -53,6 +57,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     return TwitchChatNormalMessageCard(
       message: message,
       thirdPartyEmotes: thirdPartyEmotes,
+      officialEmotes: officialEmotes,
       displayColor: displayColor,
       displayNameText: displayNameText,
       showTimestamp: showTimestamp,
