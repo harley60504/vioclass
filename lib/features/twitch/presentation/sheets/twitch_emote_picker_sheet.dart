@@ -13,7 +13,7 @@ const int _initialGridCount = 96;
 const int _searchGridLimit = 240;
 const double _cardMaxExtent = 154.0;
 const double _cardAspectRatio = 0.98;
-const bool _emotePickerDebugEnabled = true;
+const bool _emotePickerDebugEnabled = false;
 
 void _emotePickerDebugLog(String message) {
   if (!_emotePickerDebugEnabled) return;
@@ -653,13 +653,6 @@ class _EmoteTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final locked = entry.locked;
 
-    if (entry.name == 'corgiHHH') {
-      _emotePickerDebugLog(
-        'shared tile build name=${entry.name} id=${entry.id} '
-        'imageUrl=${entry.imageUrl} isOfficial=${entry.isOfficial}',
-      );
-    }
-
     return RepaintBoundary(
       child: Tooltip(
         message: entry.favorite ? '長按取消收藏' : '長按加入收藏',
@@ -718,7 +711,7 @@ class _EmoteTile extends StatelessWidget {
                                   color: Colors.white38,
                                   size: 22,
                                 ),
-                                debug: entry.name == 'corgiHHH',
+                                debug: false,
                                 debugTag: 'TwitchEmotePickerImage',
                               ),
                       ),
