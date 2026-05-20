@@ -119,8 +119,20 @@ class _TwitchChatMessageContentState extends State<TwitchChatMessageContent> {
       widget.metrics.scale,
       thirdPartyCache,
       thirdPartyCache?.count ?? 0,
+      thirdPartyCache?.recentCount ?? 0,
+      thirdPartyCache?.favoriteCount ?? 0,
+      Object.hashAll(
+        thirdPartyCache?.recentEmotes.map((e) => '${e.provider.name}:${e.id}:${e.name}:${e.imageUrl}') ??
+            const <String>[],
+      ),
       officialCache,
       officialCache?.renderableEmotes.length ?? 0,
+      officialCache?.recentCount ?? 0,
+      officialCache?.favoriteCount ?? 0,
+      Object.hashAll(
+        officialCache?.recentEmotes.map((e) => '${e.source.name}:${e.id}:${e.name}:${e.imageUrl}') ??
+            const <String>[],
+      ),
     ]);
   }
 
