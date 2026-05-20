@@ -16,7 +16,10 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
     loadRecentEmotes();
   }
 
-  static const Duration memoryCacheDuration = Duration(minutes: 5);
+  // Stage debug: disable channel memory cache and persistent Recent cache.
+  static const bool disableRuntimeEmoteCache = true;
+  static const bool disablePersistentRecentCache = true;
+
   static const String favoriteStorageKey = 'twitch_third_party_favorite_emotes_v1';
   static const String recentStorageKey = 'twitch_third_party_recent_emotes_v1';
   static const int maxRecentEmotes = 80;
@@ -24,7 +27,6 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   final Map<String, TwitchThirdPartyEmote> _byName = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _favorites = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _recent = <String, TwitchThirdPartyEmote>{};
-  final Map<String, _CachedThirdPartyEmoteSet> _memoryCache = <String, _CachedThirdPartyEmoteSet>{};
 
   bool _favoritesLoaded = false;
   bool _recentLoaded = false;
@@ -95,12 +97,17 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   }
 
   void markRecentEmote(TwitchThirdPartyEmote emote) {
+    if (emote.name.trim().isEmpty || emote.imageUrl.trim().isEmpty) {
+      return;
+    }
+
     final key = _favoriteKey(emote);
     final next = <String, TwitchThirdPartyEmote>{key: emote};
 
     for (final entry in _recent.entries) {
       if (entry.key == key) continue;
       if (next.length >= maxRecentEmotes) break;
+      if (entry.value.imageUrl.trim().isEmpty) continue;
       next[entry.key] = entry.value;
     }
 
@@ -158,48 +165,30 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   }
 
   Future<void> loadRecentEmotes() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(recentStorageKey);
-
-      if (raw == null || raw.trim().isEmpty) {
+    if (disablePersistentRecentCache) {
+      _recent.clear();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(recentStorageKey);
+      } catch (e) {
+        debugPrint('Clear disabled third party recent emote cache failed: $e');
+      } finally {
         _recentLoaded = true;
         notifyListeners();
-        return;
       }
-
-      final decoded = jsonDecode(raw);
-      final next = <String, TwitchThirdPartyEmote>{};
-
-      if (decoded is List) {
-        for (final item in decoded) {
-          if (item is! Map) continue;
-          final emote = _favoriteFromJson(Map<String, dynamic>.from(item));
-          if (emote == null) continue;
-          next[_favoriteKey(emote)] = emote;
-          if (next.length >= maxRecentEmotes) break;
-        }
-      }
-
-      _recent
-        ..clear()
-        ..addAll(next);
-      _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-    } catch (e) {
-      debugPrint('Load third party recent emotes failed: $e');
-    } finally {
-      _recentLoaded = true;
-      notifyListeners();
+      return;
     }
   }
 
   Future<void> _saveRecentEmotes() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonList = recentEmotes.map((emote) => emote.toJson()).toList(growable: false);
-      await prefs.setString(recentStorageKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Save third party recent emotes failed: $e');
+    if (disablePersistentRecentCache) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(recentStorageKey);
+      } catch (e) {
+        debugPrint('Skip third party recent emote cache save failed: $e');
+      }
+      return;
     }
   }
 
@@ -228,7 +217,9 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   }
 
   TwitchThirdPartyEmote? lookup(String name) {
-    return _byName[name];
+    final clean = name.trim();
+    if (clean.isEmpty) return null;
+    return _byName[clean] ?? _byName[clean.toLowerCase()];
   }
 
   String _favoriteKey(TwitchThirdPartyEmote emote) {
@@ -282,7 +273,6 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
     _recent
       ..clear()
       ..addAll(next);
-    _saveRecentEmotes();
   }
 
   TwitchThirdPartyEmote? _favoriteFromJson(Map<String, dynamic> json) {
@@ -332,22 +322,6 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
 
     if (cid.isEmpty) return;
 
-    final cached = _memoryCache[cid];
-    if (cached != null && !cached.isExpired) {
-      _byName
-        ..clear()
-        ..addAll(cached.byName);
-      _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
-      _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-
-      _loading = false;
-      _error = null;
-      _channelId = cid;
-      _channelLogin = login;
-      notifyListeners();
-      return;
-    }
-
     _loading = true;
     _error = null;
     _channelId = cid;
@@ -360,21 +334,25 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
         channelLogin: login,
       );
 
-      final next = <String, TwitchThirdPartyEmote>{
-        for (final emote in emotes)
-          if (emote.name.trim().isNotEmpty) emote.name: emote,
-      };
+      final next = <String, TwitchThirdPartyEmote>{};
+      void put(String key, TwitchThirdPartyEmote emote) {
+        final clean = key.trim();
+        if (clean.isEmpty) return;
+        next[clean] = emote;
+      }
+
+      for (final emote in emotes) {
+        final name = emote.name.trim();
+        if (name.isEmpty || emote.imageUrl.trim().isEmpty) continue;
+        put(name, emote);
+        put(name.toLowerCase(), emote);
+      }
 
       _byName
         ..clear()
         ..addAll(next);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-
-      _memoryCache[cid] = _CachedThirdPartyEmoteSet(
-        byName: Map<String, TwitchThirdPartyEmote>.unmodifiable(next),
-        fetchedAt: DateTime.now(),
-      );
     } catch (e) {
       _error = e;
     } finally {
@@ -403,25 +381,12 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       'favoritesLoaded': favoritesLoaded,
       'recentCount': recentCount,
       'recentLoaded': recentLoaded,
+      'persistentRecentCacheDisabled': disablePersistentRecentCache,
+      'runtimeEmoteCacheDisabled': disableRuntimeEmoteCache,
       'bttvCount': countForProvider(TwitchThirdPartyEmoteProvider.bttv),
       'sevenTvCount': countForProvider(TwitchThirdPartyEmoteProvider.sevenTv),
       'ffzCount': countForProvider(TwitchThirdPartyEmoteProvider.ffz),
       'scopeSample': emotes.take(40).map((emote) => emote.toJson()).toList(),
     };
-  }
-}
-
-class _CachedThirdPartyEmoteSet {
-  final Map<String, TwitchThirdPartyEmote> byName;
-  final DateTime fetchedAt;
-
-  const _CachedThirdPartyEmoteSet({
-    required this.byName,
-    required this.fetchedAt,
-  });
-
-  bool get isExpired {
-    return DateTime.now().difference(fetchedAt) >
-        TwitchThirdPartyEmoteCacheService.memoryCacheDuration;
   }
 }
