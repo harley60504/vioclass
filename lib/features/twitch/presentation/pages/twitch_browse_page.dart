@@ -1,8 +1,8 @@
-// PATCH VERSION: twitch_browse_page_stage213_soft_refresh_cards
+// PATCH VERSION: twitch_browse_page_stage242_reconciler_refresh
 // Uses the same discovery template as FollowingPage and the actual project models/services.
-// Stage 213: refresh / re-enter updates stream cards in-place without clearing
-// the grid, so switching back to this page or pressing refresh does not cause a
-// full loading rebuild.
+// Stage 242: refresh/re-enter keeps the grid visible, fetches the latest live
+// window, removes offline streams, adds newly live streams, and preserves the
+// latest Twitch API order through TwitchStreamRefreshReconciler.
 
 import 'dart:async';
 
@@ -13,6 +13,7 @@ import '../../services/discovery/twitch_discovery_service.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_login_required_view.dart';
+import 'twitch_stream_refresh_reconciler.dart';
 
 class TwitchBrowsePage extends StatefulWidget {
   final TwitchDiscoveryService discoveryService;
@@ -33,6 +34,8 @@ class TwitchBrowsePage extends StatefulWidget {
 }
 
 class TwitchBrowsePageState extends State<TwitchBrowsePage> {
+  static const int _browsePageSize = 100;
+
   final ScrollController scrollController = ScrollController();
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
@@ -139,22 +142,18 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     });
 
     try {
-      final page = await widget.discoveryService.fetchBrowseStreams(
-        first: 100,
-        gameId: selectedGameId,
-        language: currentLanguage,
+      final refreshed = await _fetchRefreshedStreamWindow(
+        targetCount: TwitchStreamRefreshReconciler.targetRefreshCount(
+          loadedCount: hadExistingStreams ? loadedStreams.length : _browsePageSize,
+          pageSize: _browsePageSize,
+        ),
       );
-      final streamsWithProfiles = await _attachProfileImages(page.streams);
       if (!mounted || generation != _refreshGeneration) return;
+
       setState(() {
-        loadedStreams = hadExistingStreams
-            ? _mergeFirstPageStreams(
-                existing: loadedStreams,
-                firstPage: streamsWithProfiles,
-              )
-            : streamsWithProfiles;
-        nextCursor = page.cursor;
-        hasMore = page.hasMore;
+        loadedStreams = refreshed.streams;
+        nextCursor = refreshed.cursor;
+        hasMore = refreshed.hasMore;
         loadingFirstPage = false;
         errorText = null;
         paginationError = null;
@@ -176,6 +175,49 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     }
   }
 
+  Future<_BrowseRefreshWindow> _fetchRefreshedStreamWindow({
+    required int targetCount,
+  }) async {
+    final collected = <TwitchLiveStream>[];
+
+    var page = await widget.discoveryService.fetchBrowseStreams(
+      first: _browsePageSize,
+      gameId: selectedGameId,
+      language: currentLanguage,
+    );
+    collected.addAll(page.streams);
+
+    var cursor = page.cursor;
+    var hasMorePage = page.hasMore;
+
+    while (hasMorePage &&
+        cursor != null &&
+        cursor.trim().isNotEmpty &&
+        collected.length < targetCount) {
+      page = await widget.discoveryService.fetchBrowseStreams(
+        after: cursor,
+        first: _browsePageSize,
+        gameId: selectedGameId,
+        language: currentLanguage,
+      );
+      collected.addAll(page.streams);
+      cursor = page.cursor;
+      hasMorePage = page.hasMore;
+    }
+
+    final reconciled = TwitchStreamRefreshReconciler.reconcileLatestWindow(
+      refreshedWindow: collected,
+      identityOf: _streamIdentity,
+    );
+    final streamsWithProfiles = await _attachProfileImages(reconciled);
+
+    return _BrowseRefreshWindow(
+      streams: streamsWithProfiles,
+      cursor: cursor,
+      hasMore: hasMorePage,
+    );
+  }
+
   Future<void> loadMore() async {
     if (loadingMore || !hasMore) return;
     final cursor = nextCursor;
@@ -192,23 +234,19 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     try {
       final page = await widget.discoveryService.fetchBrowseStreams(
         after: cursor,
-        first: 100,
+        first: _browsePageSize,
         gameId: selectedGameId,
         language: currentLanguage,
       );
       final streamsWithProfiles = await _attachProfileImages(page.streams);
       if (!mounted) return;
 
-      final existingIds = loadedStreams.map(_streamIdentity).toSet();
-      final uniqueNewStreams = streamsWithProfiles
-          .where((stream) => !existingIds.contains(_streamIdentity(stream)))
-          .toList(growable: false);
-
       setState(() {
-        loadedStreams = <TwitchLiveStream>[
-          ...loadedStreams,
-          ...uniqueNewStreams,
-        ];
+        loadedStreams = TwitchStreamRefreshReconciler.appendUniquePage(
+          loaded: loadedStreams,
+          nextPage: streamsWithProfiles,
+          identityOf: _streamIdentity,
+        );
         nextCursor = page.cursor;
         hasMore = page.hasMore;
         loadingMore = false;
@@ -313,24 +351,6 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     } catch (_) {
       return streams;
     }
-  }
-
-  List<TwitchLiveStream> _mergeFirstPageStreams({
-    required List<TwitchLiveStream> existing,
-    required List<TwitchLiveStream> firstPage,
-  }) {
-    if (existing.isEmpty) return firstPage;
-
-    final firstPageIds = firstPage.map(_streamIdentity).toSet();
-    final existingTail = existing
-        .skip(firstPage.length)
-        .where((stream) => !firstPageIds.contains(_streamIdentity(stream)))
-        .toList(growable: false);
-
-    return <TwitchLiveStream>[
-      ...firstPage,
-      ...existingTail,
-    ];
   }
 
   String _streamIdentity(TwitchLiveStream stream) {
@@ -830,6 +850,18 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       ),
     );
   }
+}
+
+class _BrowseRefreshWindow {
+  final List<TwitchLiveStream> streams;
+  final String? cursor;
+  final bool hasMore;
+
+  const _BrowseRefreshWindow({
+    required this.streams,
+    required this.cursor,
+    required this.hasMore,
+  });
 }
 
 class _GameCategoryGridTile extends StatelessWidget {
