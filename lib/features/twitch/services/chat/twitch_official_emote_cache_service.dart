@@ -9,6 +9,13 @@ import '../../models/emotes/twitch_official_emote.dart';
 typedef TwitchAccessTokenProvider = Future<String?> Function();
 typedef TwitchClientIdProvider = Future<String?> Function();
 
+void _officialEmoteDebugLog(String message) {
+  final line = '[TwitchOfficialEmoteDebug] $message';
+  debugPrint(line, wrapWidth: 1024);
+  // ignore: avoid_print
+  print(line);
+}
+
 class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   final TwitchOfficialEmoteApiService api;
   final TwitchAccessTokenProvider accessTokenProvider;
@@ -19,6 +26,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     required this.accessTokenProvider,
     required this.clientIdProvider,
   }) {
+    _officialEmoteDebugLog('service constructed');
     loadFavoriteEmotes();
     loadRecentEmotes();
   }
@@ -106,11 +114,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   List<TwitchOfficialEmote> get renderableEmotes {
-    // Rendering chat messages is not the same thing as permission to send an
-    // emote. If another viewer already sent a channel emote, we can render it as
-    // long as the channel/global/user catalog gives us an image URL. Therefore
-    // this intentionally includes locked channel emotes and known recent/favorite
-    // snapshots instead of depending only on usableEmotes.
     return allKnownEmotes;
   }
 
@@ -141,10 +144,12 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   TwitchOfficialEmote? lookupUsableByName(String name) {
+    _officialEmoteDebugLog('lookupUsableByName name=$name usableCount=${usableEmotes.length}');
     return _lookupByName(name, usableEmotes);
   }
 
   TwitchOfficialEmote? lookupRenderableByName(String name) {
+    _officialEmoteDebugLog('lookupRenderableByName name=$name renderableCount=${renderableEmotes.length}');
     return _lookupByName(name, renderableEmotes);
   }
 
@@ -153,7 +158,10 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     List<TwitchOfficialEmote> source,
   ) {
     final clean = name.trim();
-    if (clean.isEmpty) return null;
+    if (clean.isEmpty) {
+      _officialEmoteDebugLog('lookup skipped empty name sourceCount=${source.length}');
+      return null;
+    }
 
     TwitchOfficialEmote? caseInsensitiveMatch;
     final lower = clean.toLowerCase();
@@ -161,10 +169,29 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     for (final emote in source) {
       final emoteName = emote.name.trim();
       if (emoteName.isEmpty || _imageUrlFor(emote).isEmpty) continue;
-      if (emoteName == clean) return emote.copyWith(imageUrl: _imageUrlFor(emote));
+      if (emoteName == clean) {
+        final resolved = emote.copyWith(imageUrl: _imageUrlFor(emote));
+        _officialEmoteDebugLog(
+          'lookup exact hit query=$clean name=${resolved.name} id=${resolved.id} '
+          'imageUrl=${resolved.imageUrl} source=${resolved.source.name} locked=${resolved.locked} '
+          'emoteType=${resolved.emoteType} emoteSetId=${resolved.emoteSetId} ownerId=${resolved.ownerId}',
+        );
+        return resolved;
+      }
       if (caseInsensitiveMatch == null && emoteName.toLowerCase() == lower) {
         caseInsensitiveMatch = emote.copyWith(imageUrl: _imageUrlFor(emote));
       }
+    }
+
+    if (caseInsensitiveMatch != null) {
+      _officialEmoteDebugLog(
+        'lookup lowercase hit query=$clean name=${caseInsensitiveMatch.name} id=${caseInsensitiveMatch.id} '
+        'imageUrl=${caseInsensitiveMatch.imageUrl} source=${caseInsensitiveMatch.source.name} '
+        'locked=${caseInsensitiveMatch.locked} emoteType=${caseInsensitiveMatch.emoteType} '
+        'emoteSetId=${caseInsensitiveMatch.emoteSetId} ownerId=${caseInsensitiveMatch.ownerId}',
+      );
+    } else {
+      _officialEmoteDebugLog('lookup miss query=$clean sourceCount=${source.length}');
     }
 
     return caseInsensitiveMatch;
@@ -181,6 +208,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
   void toggleFavorite(TwitchOfficialEmote emote) {
     final key = _favoriteKey(emote);
+    _officialEmoteDebugLog('toggleFavorite name=${emote.name} id=${emote.id} key=$key');
 
     if (_favorites.containsKey(key)) {
       _favorites.remove(key);
@@ -198,6 +226,9 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
   void markRecentEmote(TwitchOfficialEmote emote) {
     final key = _favoriteKey(emote);
+    _officialEmoteDebugLog(
+      'markRecent name=${emote.name} id=${emote.id} key=$key imageUrl=${_imageUrlFor(emote)}',
+    );
     final next = <String, TwitchOfficialEmote>{
       key: emote.copyWith(imageUrl: _imageUrlFor(emote)),
     };
@@ -217,11 +248,13 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   Future<void> loadFavoriteEmotes() async {
+    _officialEmoteDebugLog('loadFavoriteEmotes start');
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(favoriteStorageKey);
 
       if (raw == null || raw.trim().isEmpty) {
+        _officialEmoteDebugLog('loadFavoriteEmotes empty storage');
         _favoritesLoaded = true;
         notifyListeners();
         return;
@@ -243,8 +276,10 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         ..clear()
         ..addAll(next);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
+      _officialEmoteDebugLog('loadFavoriteEmotes done count=${_favorites.length}');
     } catch (e) {
       debugPrint('Load official favorite emotes failed: $e');
+      _officialEmoteDebugLog('loadFavoriteEmotes error=$e');
     } finally {
       _favoritesLoaded = true;
       notifyListeners();
@@ -256,17 +291,21 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = favoriteEmotes.map((emote) => emote.toJson()).toList(growable: false);
       await prefs.setString(favoriteStorageKey, jsonEncode(jsonList));
+      _officialEmoteDebugLog('saveFavoriteEmotes count=${jsonList.length}');
     } catch (e) {
       debugPrint('Save official favorite emotes failed: $e');
+      _officialEmoteDebugLog('saveFavoriteEmotes error=$e');
     }
   }
 
   Future<void> loadRecentEmotes() async {
+    _officialEmoteDebugLog('loadRecentEmotes start');
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(recentStorageKey);
 
       if (raw == null || raw.trim().isEmpty) {
+        _officialEmoteDebugLog('loadRecentEmotes empty storage');
         _recentLoaded = true;
         notifyListeners();
         return;
@@ -289,8 +328,10 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         ..clear()
         ..addAll(next);
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
+      _officialEmoteDebugLog('loadRecentEmotes done count=${_recent.length}');
     } catch (e) {
       debugPrint('Load official recent emotes failed: $e');
+      _officialEmoteDebugLog('loadRecentEmotes error=$e');
     } finally {
       _recentLoaded = true;
       notifyListeners();
@@ -302,12 +343,15 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final jsonList = recentEmotes.map((emote) => emote.toJson()).toList(growable: false);
       await prefs.setString(recentStorageKey, jsonEncode(jsonList));
+      _officialEmoteDebugLog('saveRecentEmotes count=${jsonList.length}');
     } catch (e) {
       debugPrint('Save official recent emotes failed: $e');
+      _officialEmoteDebugLog('saveRecentEmotes error=$e');
     }
   }
 
   Future<void> clearRecentEmotes() async {
+    _officialEmoteDebugLog('clearRecentEmotes');
     _recent.clear();
     notifyListeners();
 
@@ -316,10 +360,12 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       await prefs.remove(recentStorageKey);
     } catch (e) {
       debugPrint('Clear official recent emotes failed: $e');
+      _officialEmoteDebugLog('clearRecentEmotes error=$e');
     }
   }
 
   Future<void> clearFavoriteEmotes() async {
+    _officialEmoteDebugLog('clearFavoriteEmotes');
     _favorites.clear();
     notifyListeners();
 
@@ -328,6 +374,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       await prefs.remove(favoriteStorageKey);
     } catch (e) {
       debugPrint('Clear official favorite emotes failed: $e');
+      _officialEmoteDebugLog('clearFavoriteEmotes error=$e');
     }
   }
 
@@ -339,12 +386,24 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     final cleanChannelId = channelId.trim();
     final cleanViewerId = viewerId.trim();
 
-    if (cleanChannelId.isEmpty) return;
+    _officialEmoteDebugLog(
+      'loadForChannel start channelId=$cleanChannelId viewerId=$cleanViewerId forceRefresh=$forceRefresh',
+    );
+
+    if (cleanChannelId.isEmpty) {
+      _officialEmoteDebugLog('loadForChannel skipped empty channelId');
+      return;
+    }
 
     final cacheKey = '$cleanChannelId:$cleanViewerId';
     final cached = _memoryCache[cacheKey];
 
     if (!forceRefresh && cached != null && !cached.isExpired) {
+      _officialEmoteDebugLog(
+        'loadForChannel memory cache hit key=$cacheKey global=${cached.globalEmotes.length} '
+        'channel=${cached.channelEmotes.length} user=${cached.userEmotes.length} '
+        'locked=${cached.lockedChannelEmotes.length}',
+      );
       _applyCached(cached);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
@@ -356,6 +415,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       return;
     }
 
+    _officialEmoteDebugLog('loadForChannel cache miss key=$cacheKey');
     _loading = true;
     _error = null;
     _userEmotesUnavailable = false;
@@ -367,6 +427,11 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       final accessToken = await accessTokenProvider();
       final clientId = await clientIdProvider();
 
+      _officialEmoteDebugLog(
+        'loadForChannel credentials accessTokenEmpty=${accessToken == null || accessToken.trim().isEmpty} '
+        'clientIdEmpty=${clientId == null || clientId.trim().isEmpty}',
+      );
+
       if (accessToken == null ||
           accessToken.trim().isEmpty ||
           clientId == null ||
@@ -375,6 +440,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         _channelEmotes = const <TwitchOfficialEmote>[];
         _userEmotes = const <TwitchOfficialEmote>[];
         _lockedChannelEmotes = const <TwitchOfficialEmote>[];
+        _officialEmoteDebugLog('loadForChannel stop missing credentials');
         return;
       }
 
@@ -383,18 +449,28 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
           api.fetchGlobalEmotes(
             accessToken: accessToken,
             clientId: clientId,
-          ).catchError((_) => <TwitchOfficialEmote>[]),
+          ).catchError((e) {
+            _officialEmoteDebugLog('fetchGlobalEmotes error=$e');
+            return <TwitchOfficialEmote>[];
+          }),
           api.fetchChannelEmotes(
             broadcasterId: cleanChannelId,
             accessToken: accessToken,
             clientId: clientId,
-          ).catchError((_) => <TwitchOfficialEmote>[]),
+          ).catchError((e) {
+            _officialEmoteDebugLog('fetchChannelEmotes error=$e');
+            return <TwitchOfficialEmote>[];
+          }),
           _fetchUserEmotesSafe(
             userId: cleanViewerId,
             accessToken: accessToken,
             clientId: clientId,
           ),
         ],
+      );
+
+      _officialEmoteDebugLog(
+        'fetch raw counts global=${results[0].length} channel=${results[1].length} user=${results[2].length}',
       );
 
       final global = _unique(results[0], unlocked: true);
@@ -437,6 +513,12 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
 
+      _officialEmoteDebugLog(
+        'loadForChannel applied global=${_globalEmotes.length} channel=${_channelEmotes.length} '
+        'user=${_userEmotes.length} locked=${_lockedChannelEmotes.length} '
+        'allKnown=${allKnownEmotes.length} usable=${usableEmotes.length} renderable=${renderableEmotes.length}',
+      );
+
       _memoryCache[cacheKey] = _CachedOfficialEmoteSet(
         globalEmotes: _globalEmotes,
         channelEmotes: _channelEmotes,
@@ -447,9 +529,11 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       );
     } catch (e) {
       _error = e;
+      _officialEmoteDebugLog('loadForChannel error=$e');
     } finally {
       _loading = false;
       notifyListeners();
+      _officialEmoteDebugLog('loadForChannel finally loading=$_loading error=$_error');
     }
   }
 
@@ -458,16 +542,22 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     required String accessToken,
     required String clientId,
   }) async {
-    if (userId.trim().isEmpty) return const <TwitchOfficialEmote>[];
+    if (userId.trim().isEmpty) {
+      _officialEmoteDebugLog('fetchUserEmotes skipped empty userId');
+      return const <TwitchOfficialEmote>[];
+    }
 
     try {
-      return await api.fetchUserEmotes(
+      final result = await api.fetchUserEmotes(
         userId: userId,
         accessToken: accessToken,
         clientId: clientId,
       );
-    } catch (_) {
+      _officialEmoteDebugLog('fetchUserEmotes done count=${result.length}');
+      return result;
+    } catch (e) {
       _userEmotesUnavailable = true;
+      _officialEmoteDebugLog('fetchUserEmotes error=$e');
       return const <TwitchOfficialEmote>[];
     }
   }
@@ -482,16 +572,22 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         .where((id) => id.isNotEmpty)
         .toSet();
 
-    if (ownerIds.isEmpty) return const <String, String>{};
+    if (ownerIds.isEmpty) {
+      _officialEmoteDebugLog('fetchOwnerDisplayNames skipped empty ownerIds');
+      return const <String, String>{};
+    }
 
     try {
-      return await api.fetchUserDisplayNamesByIds(
+      final result = await api.fetchUserDisplayNamesByIds(
         userIds: ownerIds,
         accessToken: accessToken,
         clientId: clientId,
       );
+      _officialEmoteDebugLog('fetchOwnerDisplayNames done count=${result.length}');
+      return result;
     } catch (e) {
       debugPrint('Fetch official emote owner display names failed: $e');
+      _officialEmoteDebugLog('fetchOwnerDisplayNames error=$e');
       return const <String, String>{};
     }
   }
@@ -665,6 +761,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   void clear() {
+    _officialEmoteDebugLog('clear service');
     _globalEmotes = const <TwitchOfficialEmote>[];
     _channelEmotes = const <TwitchOfficialEmote>[];
     _userEmotes = const <TwitchOfficialEmote>[];
