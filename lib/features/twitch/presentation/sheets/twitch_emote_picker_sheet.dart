@@ -1,14 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage245_recent_official_rebuild
-//
-// Single unified emote picker sheet.
-// - Keep this file as the only public emote picker entry.
-// - Frosty-style category logic is merged here.
-// - Every category/page uses the same _EmoteEntry model.
-// - Every page uses the same large translucent grid UI.
-// - Search applies to the current page.
-// - Tap inserts emote name and writes Recent.
-// - Long press toggles favorite.
-// - Official and third-party recent/favorite state rebuilds from their own cache.
+// PATCH VERSION: twitch_emote_picker_sheet_stage246_official_image_fallback
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -24,15 +14,11 @@ const int _initialGridCount = 96;
 const int _searchGridLimit = 240;
 const double _cardMaxExtent = 154.0;
 const double _cardAspectRatio = 0.98;
-
 const bool _emotePickerDebugEnabled = true;
 
 void _emotePickerDebugLog(String message) {
   if (!_emotePickerDebugEnabled) return;
-  final line = '[TwitchEmotePickerDebug] $message';
-  debugPrint(line, wrapWidth: 1024);
-  // ignore: avoid_print
-  print(line);
+  debugPrint('[TwitchEmotePickerDebug] $message', wrapWidth: 1024);
 }
 
 String _officialAnimatedEmoteUrl(String id) {
@@ -45,6 +31,18 @@ String _officialDefaultEmoteUrl(String id) {
   final cleanId = id.trim();
   if (cleanId.isEmpty) return '';
   return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/default/dark/2.0';
+}
+
+List<String> _uniqueUrls(Iterable<String> urls) {
+  final seen = <String>{};
+  final result = <String>[];
+  for (final url in urls) {
+    final clean = url.trim();
+    if (clean.isEmpty || seen.contains(clean)) continue;
+    seen.add(clean);
+    result.add(clean);
+  }
+  return result;
 }
 
 final CacheManager _sheetEmoteCacheManager = CacheManager(
@@ -64,18 +62,10 @@ Future<void> showTwitchEmotePickerSheet({
   required ValueChanged<String> onEmoteSelected,
 }) {
   _emotePickerDebugLog(
-    'showTwitchEmotePickerSheet loading=$loading '
-    'thirdPartyCount=${cache.count} thirdPartyLoading=${cache.loading} '
-    'officialAttached=${officialCache != null} '
-    'officialLoading=${officialCache?.loading} '
-    'officialChannelCount=${officialCache?.channelEmotes.length} '
-    'officialGlobalCount=${officialCache?.globalEmotes.length} '
-    'officialUserCount=${officialCache?.userEmotes.length} '
-    'officialRecentCount=${officialCache?.recentCount} '
-    'officialFavoriteCount=${officialCache?.favoriteCount} '
-    'officialChannelId=${officialCache?.channelId} '
-    'officialViewerId=${officialCache?.viewerId} '
-    'officialError=${officialCache?.error}',
+    'show sheet loading=$loading thirdParty=${cache.count} '
+    'officialChannel=${officialCache?.channelEmotes.length} '
+    'officialGlobal=${officialCache?.globalEmotes.length} '
+    'officialUser=${officialCache?.userEmotes.length}',
   );
 
   return showTwitchResponsiveSheet<void>(
@@ -115,20 +105,12 @@ class TwitchUnifiedEmotePickerSheet extends StatefulWidget {
 class _TwitchUnifiedEmotePickerSheetState
     extends State<TwitchUnifiedEmotePickerSheet> {
   final TextEditingController _searchController = TextEditingController();
-
   String _query = '';
 
   TwitchOfficialEmoteCacheService? get _official => widget.officialCache;
 
   @override
-  void initState() {
-    super.initState();
-    _emotePickerDebugLog('TwitchUnifiedEmotePickerSheet initState');
-  }
-
-  @override
   void dispose() {
-    _emotePickerDebugLog('TwitchUnifiedEmotePickerSheet dispose');
     _searchController.dispose();
     super.dispose();
   }
@@ -136,13 +118,6 @@ class _TwitchUnifiedEmotePickerSheetState
   @override
   Widget build(BuildContext context) {
     final official = _official;
-
-    _emotePickerDebugLog(
-      'sheet build widgetLoading=${widget.loading} '
-      'thirdPartyLoading=${widget.cache.loading} '
-      'officialAttached=${official != null} officialLoading=${official?.loading} '
-      'query=$_query',
-    );
 
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[
@@ -163,10 +138,6 @@ class _TwitchUnifiedEmotePickerSheetState
           _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
         ];
 
-        _emotePickerDebugLog(
-          'animated builder loading=$loading tabs=${tabs.map((tab) => '${tab.label}:${tab.totalCount}').join(',')}',
-        );
-
         return SafeArea(
           child: TwitchUnifiedSheetScaffold(
             title: '貼圖',
@@ -184,7 +155,6 @@ class _TwitchUnifiedEmotePickerSheetState
                       setState(() {
                         _query = value.trim().toLowerCase();
                       });
-                      _emotePickerDebugLog('search changed query=$_query');
                     },
                   ),
                   _MainTabBar(tabs: tabs),
@@ -215,21 +185,16 @@ class _TwitchUnifiedEmotePickerSheetState
 
   _OuterTab _recentTab() {
     final official = _official;
-
-    final entries = <_EmoteEntry>[
-      ...widget.cache.recentEmotes.map(_thirdPartyEntry),
-      ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
-          .map(_officialEntry),
-    ];
-
-    _emotePickerDebugLog('recentTab entries=${entries.length}');
-
     return _OuterTab(
       label: 'Recent',
       pages: [
         _InnerPage(
           label: 'Recent',
-          entries: entries,
+          entries: <_EmoteEntry>[
+            ...widget.cache.recentEmotes.map(_thirdPartyEntry),
+            ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
+                .map(_officialEntry),
+          ],
         ),
       ],
     );
@@ -237,21 +202,16 @@ class _TwitchUnifiedEmotePickerSheetState
 
   _OuterTab _favoriteTab() {
     final official = _official;
-
-    final entries = <_EmoteEntry>[
-      ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
-      ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
-          .map(_officialEntry),
-    ];
-
-    _emotePickerDebugLog('favoriteTab entries=${entries.length}');
-
     return _OuterTab(
       label: 'Favorite',
       pages: [
         _InnerPage(
           label: 'Favorite',
-          entries: entries,
+          entries: <_EmoteEntry>[
+            ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
+            ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
+                .map(_officialEntry),
+          ],
         ),
       ],
     );
@@ -261,7 +221,6 @@ class _TwitchUnifiedEmotePickerSheetState
     final official = _official;
 
     if (official == null) {
-      _emotePickerDebugLog('officialTab skipped officialCache=null');
       return const _OuterTab(
         label: 'Twitch',
         pages: [
@@ -277,13 +236,7 @@ class _TwitchUnifiedEmotePickerSheetState
     final user = _uniqueOfficial(official.userEmotes);
 
     _emotePickerDebugLog(
-      'officialTab rawCounts channel=${official.channelEmotes.length} '
-      'global=${official.globalEmotes.length} user=${official.userEmotes.length} '
-      'uniqueChannel=${channel.length} uniqueGlobal=${global.length} uniqueUser=${user.length} '
-      'recent=${official.recentCount} favorite=${official.favoriteCount} '
-      'loading=${official.loading} error=${official.error} '
-      'channelId=${official.channelId} viewerId=${official.viewerId} '
-      'userEmotesUnavailable=${official.userEmotesUnavailable}',
+      'official tab channel=${channel.length} global=${global.length} user=${user.length}',
     );
 
     final channelKeys = channel.map(_officialKey).toSet();
@@ -292,33 +245,22 @@ class _TwitchUnifiedEmotePickerSheetState
 
     final userOnly = user.where((emote) {
       final key = _officialKey(emote);
-
       if (channelKeys.contains(key)) return false;
       if (globalKeys.contains(key)) return false;
-
       if (currentChannelId.isNotEmpty &&
           emote.ownerId.trim() == currentChannelId) {
         return false;
       }
-
       return true;
     }).toList(growable: false);
 
     final unlocked = _uniqueOfficial(
       userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
     );
-
     final subscriptions = _uniqueOfficial(
       userOnly.where((emote) => !_isUnlockedOfficialEmote(emote)),
     );
-
     final subscriptionGroups = _groupOfficialByOwner(subscriptions);
-
-    _emotePickerDebugLog(
-      'officialTab pages channel=${channel.length} global=${global.length} '
-      'subscriptions=${subscriptions.length} subscriptionGroups=${subscriptionGroups.length} '
-      'unlocked=${unlocked.length}',
-    );
 
     return _OuterTab(
       label: 'Twitch',
@@ -349,103 +291,63 @@ class _TwitchUnifiedEmotePickerSheetState
     TwitchThirdPartyEmoteProvider provider,
   ) {
     final source = widget.cache.emotesForProvider(provider);
-
     final channel = source
         .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.channel)
         .map(_thirdPartyEntry)
         .toList(growable: false);
-
     final shared = source
         .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.shared)
         .map(_thirdPartyEntry)
         .toList(growable: false);
-
     final global = source
         .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.global)
         .map(_thirdPartyEntry)
         .toList(growable: false);
-
     final other = source
         .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.other)
         .map(_thirdPartyEntry)
         .toList(growable: false);
-
     final zeroWidth = source
         .where((emote) => emote.isZeroWidth)
         .map(_thirdPartyEntry)
         .toList(growable: false);
-
-    _emotePickerDebugLog(
-      'thirdPartyTab label=$label source=${source.length} channel=${channel.length} '
-      'shared=${shared.length} global=${global.length} other=${other.length} '
-      'zeroWidth=${zeroWidth.length}',
-    );
 
     return _OuterTab(
       label: label,
       pages: [
         _InnerPage(
           label: 'Channel',
-          entries: <_EmoteEntry>[
-            ...channel,
-            ...shared,
-            ...other,
-          ],
+          entries: <_EmoteEntry>[...channel, ...shared, ...other],
         ),
-        _InnerPage(
-          label: 'Global',
-          entries: global,
-        ),
-        if (zeroWidth.isNotEmpty)
-          _InnerPage(
-            label: 'ZW',
-            entries: zeroWidth,
-          ),
+        _InnerPage(label: 'Global', entries: global),
+        if (zeroWidth.isNotEmpty) _InnerPage(label: 'ZW', entries: zeroWidth),
       ],
     );
   }
 
   _EmoteEntry _thirdPartyEntry(TwitchThirdPartyEmote emote) {
-    final entry = _EmoteEntry.thirdParty(
+    return _EmoteEntry.thirdParty(
       emote,
       favorite: widget.cache.isFavorite(emote),
     );
-    _emotePickerDebugLog(
-      'entry thirdParty name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
-      'imageUrl=${entry.imageUrl} favorite=${entry.favorite} zeroWidth=${entry.zeroWidth}',
-    );
-    return entry;
   }
 
   _EmoteEntry _officialEntry(TwitchOfficialEmote emote) {
-    final locked = _isOfficialEntryLocked(emote);
-    final entry = _EmoteEntry.official(
+    return _EmoteEntry.official(
       emote,
       favorite: _official?.isFavorite(emote) ?? false,
-      locked: locked,
+      locked: _isOfficialEntryLocked(emote),
     );
-    _emotePickerDebugLog(
-      'entry official name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
-      'imageUrl=${entry.imageUrl} locked=${entry.locked} favorite=${entry.favorite} '
-      'source=${emote.source.name} unlocked=${emote.unlocked} emoteType=${emote.emoteType} '
-      'tier=${emote.tier} emoteSetId=${emote.emoteSetId} ownerId=${emote.ownerId} '
-      'owner=${emote.ownerDisplayName} animatedCandidate=${_officialAnimatedEmoteUrl(emote.id)} '
-      'defaultCandidate=${_officialDefaultEmoteUrl(emote.id)}',
-    );
-    return entry;
   }
 
   bool _isOfficialEntryLocked(TwitchOfficialEmote emote) {
     final official = _official;
     if (official == null) return emote.locked;
-
     if (official.isUsable(emote)) return false;
-
     if (official.userEmotesUnavailable &&
         emote.source == TwitchOfficialEmoteSource.channel) {
       return false;
     }
-
     return true;
   }
 
@@ -453,15 +355,12 @@ class _TwitchUnifiedEmotePickerSheetState
     List<TwitchOfficialEmote> emotes,
   ) {
     final grouped = <String, List<TwitchOfficialEmote>>{};
-
     for (final emote in emotes) {
       final ownerLabel = _ownerLabel(emote);
       grouped.putIfAbsent(ownerLabel, () => <TwitchOfficialEmote>[]).add(emote);
     }
-
     final keys = grouped.keys.toList(growable: false)
       ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-
     return <String, List<TwitchOfficialEmote>>{
       for (final key in keys)
         key: _uniqueOfficial(grouped[key] ?? const <TwitchOfficialEmote>[]),
@@ -471,13 +370,10 @@ class _TwitchUnifiedEmotePickerSheetState
   String _ownerLabel(TwitchOfficialEmote emote) {
     final display = emote.ownerDisplayName.trim();
     if (display.isNotEmpty) return display;
-
     final ownerId = emote.ownerId.trim();
     if (ownerId.isNotEmpty) return 'Sub $ownerId';
-
     final setId = emote.emoteSetId.trim();
     if (setId.isNotEmpty) return 'Sub $setId';
-
     return 'Sub';
   }
 
@@ -485,9 +381,7 @@ class _TwitchUnifiedEmotePickerSheetState
     final ownerId = emote.ownerId.trim();
     final ownerDisplayName = emote.ownerDisplayName.trim();
     final ownerIsMissing = ownerId.isEmpty && ownerDisplayName.isEmpty;
-
     final type = emote.emoteType.toLowerCase();
-
     return ownerIsMissing ||
         type.contains('unlock') ||
         type.contains('unlocked') ||
@@ -500,72 +394,44 @@ class _TwitchUnifiedEmotePickerSheetState
     Iterable<TwitchOfficialEmote> source,
   ) {
     final byKey = <String, TwitchOfficialEmote>{};
-
     for (final emote in source) {
       byKey[_officialKey(emote)] = emote;
     }
-
     final output = byKey.values.toList(growable: false)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-
     return output;
   }
 
   String _officialKey(TwitchOfficialEmote emote) {
     final id = emote.id.trim();
-
-    if (id.isNotEmpty) {
-      return 'id:$id';
-    }
-
-    return 'name:${emote.name.trim().toLowerCase()}';
+    return id.isNotEmpty ? 'id:$id' : 'name:${emote.name.trim().toLowerCase()}';
   }
 
   void _selectEntry(_EmoteEntry entry) {
-    _emotePickerDebugLog(
-      'select entry name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
-      'locked=${entry.locked} imageUrl=${entry.imageUrl} stableKey=${entry.stableKey}',
-    );
-
     if (entry.locked) return;
-
     var changedRecent = false;
-
     final thirdParty = entry.thirdParty;
     if (thirdParty != null) {
       widget.cache.markRecentEmote(thirdParty);
       changedRecent = true;
     }
-
     final official = entry.official;
     if (official != null) {
       _official?.markRecentEmote(official);
       changedRecent = true;
     }
-
-    if (changedRecent && mounted) {
-      setState(() {});
-    }
-
+    if (changedRecent && mounted) setState(() {});
     final name = entry.name.trim();
-    if (name.isNotEmpty) {
-      widget.onEmoteSelected(name);
-    }
+    if (name.isNotEmpty) widget.onEmoteSelected(name);
   }
 
   void _toggleFavorite(_EmoteEntry entry) {
-    _emotePickerDebugLog(
-      'toggle favorite name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
-      'favorite=${entry.favorite} locked=${entry.locked}',
-    );
-
     final thirdParty = entry.thirdParty;
     if (thirdParty != null) {
       widget.cache.toggleFavorite(thirdParty);
       setState(() {});
       return;
     }
-
     final official = entry.official;
     if (official != null) {
       _official?.toggleFavorite(official);
@@ -578,10 +444,7 @@ class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
-  const _SearchBar({
-    required this.controller,
-    required this.onChanged,
-  });
+  const _SearchBar({required this.controller, required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -601,10 +464,7 @@ class _SearchBar extends StatelessWidget {
           decoration: InputDecoration(
             isDense: true,
             hintText: '搜尋貼圖名稱',
-            hintStyle: const TextStyle(
-              color: Colors.white38,
-              fontSize: 13,
-            ),
+            hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
             prefixIcon: const Icon(
               Icons.search_rounded,
               color: Colors.white54,
@@ -620,10 +480,7 @@ class _SearchBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 8,
-            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
           ),
         ),
       ),
@@ -634,9 +491,7 @@ class _SearchBar extends StatelessWidget {
 class _MainTabBar extends StatelessWidget {
   final List<_OuterTab> tabs;
 
-  const _MainTabBar({
-    required this.tabs,
-  });
+  const _MainTabBar({required this.tabs});
 
   @override
   Widget build(BuildContext context) {
@@ -647,20 +502,10 @@ class _MainTabBar extends StatelessWidget {
       indicatorColor: const Color(0xFF9146FF),
       indicatorSize: TabBarIndicatorSize.label,
       labelPadding: const EdgeInsets.symmetric(horizontal: 10),
-      labelStyle: const TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w900,
-      ),
-      unselectedLabelStyle: const TextStyle(
-        fontSize: 12.5,
-        fontWeight: FontWeight.w700,
-      ),
-      tabs: [
-        for (final tab in tabs)
-          Tab(
-            text: '${tab.label} ${tab.totalCount}',
-          ),
-      ],
+      labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
+      unselectedLabelStyle:
+          const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+      tabs: [for (final tab in tabs) Tab(text: '${tab.label} ${tab.totalCount}')],
     );
   }
 }
@@ -690,13 +535,7 @@ class _ProviderPageState extends State<_ProviderPage>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
     final tab = widget.tab;
-
-    _emotePickerDebugLog(
-      'providerPage build tab=${tab.label} pages=${tab.pages.length} '
-      'query=${widget.query} loading=${widget.loading}',
-    );
 
     return DefaultTabController(
       length: tab.pages.length,
@@ -712,19 +551,13 @@ class _ProviderPageState extends State<_ProviderPage>
                 indicatorColor: const Color(0xFF9146FF),
                 indicatorSize: TabBarIndicatorSize.label,
                 labelPadding: const EdgeInsets.symmetric(horizontal: 10),
-                labelStyle: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w800,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                ),
+                labelStyle:
+                    const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+                unselectedLabelStyle:
+                    const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
                 tabs: [
                   for (final page in tab.pages)
-                    Tab(
-                      text: '${page.label} ${page.entries.length}',
-                    ),
+                    Tab(text: '${page.label} ${page.entries.length}'),
                 ],
               ),
             ),
@@ -734,9 +567,7 @@ class _ProviderPageState extends State<_ProviderPage>
               children: [
                 for (final page in tab.pages)
                   _EmoteSection(
-                    key: PageStorageKey<String>(
-                      'section-${tab.label}-${page.label}',
-                    ),
+                    key: PageStorageKey<String>('section-${tab.label}-${page.label}'),
                     entries: page.entries,
                     query: widget.query,
                     emptyText: widget.loading ? 'Loading emotes...' : 'No emotes',
@@ -780,13 +611,7 @@ class _EmoteSectionState extends State<_EmoteSection>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-
     final entries = _filteredEntries();
-
-    _emotePickerDebugLog(
-      'emoteSection build original=${widget.entries.length} filtered=${entries.length} '
-      'query=${widget.query} emptyText=${widget.emptyText}',
-    );
 
     if (entries.isEmpty) {
       return Center(
@@ -818,7 +643,6 @@ class _EmoteSectionState extends State<_EmoteSection>
         itemCount: entries.length,
         itemBuilder: (context, index) {
           final entry = entries[index];
-
           return _EmoteTile(
             key: ValueKey<String>(entry.stableKey),
             entry: entry,
@@ -832,11 +656,9 @@ class _EmoteSectionState extends State<_EmoteSection>
 
   List<_EmoteEntry> _filteredEntries() {
     final query = widget.query.trim().toLowerCase();
-
     if (query.isEmpty) {
       return widget.entries.take(_initialGridCount).toList(growable: false);
     }
-
     return widget.entries.where((entry) {
       return entry.name.toLowerCase().contains(query) ||
           entry.id.toLowerCase().contains(query) ||
@@ -848,7 +670,7 @@ class _EmoteSectionState extends State<_EmoteSection>
   bool get wantKeepAlive => true;
 }
 
-class _EmoteTile extends StatelessWidget {
+class _EmoteTile extends StatefulWidget {
   final _EmoteEntry entry;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -861,17 +683,39 @@ class _EmoteTile extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final imageUrl = entry.imageUrl.trim();
-    final locked = entry.locked;
+  State<_EmoteTile> createState() => _EmoteTileState();
+}
 
-    _emotePickerDebugLog(
-      'tile build name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
-      'locked=$locked favorite=${entry.favorite} zeroWidth=${entry.zeroWidth} '
-      'stableKey=${entry.stableKey} imageUrl=$imageUrl '
-      'officialAnimated=${_officialAnimatedEmoteUrl(entry.id)} '
-      'officialDefault=${_officialDefaultEmoteUrl(entry.id)}',
-    );
+class _EmoteTileState extends State<_EmoteTile> {
+  int _imageIndex = 0;
+  bool _fallbackQueued = false;
+
+  _EmoteEntry get entry => widget.entry;
+
+  @override
+  void didUpdateWidget(covariant _EmoteTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.stableKey != widget.entry.stableKey ||
+        oldWidget.entry.imageUrl != widget.entry.imageUrl) {
+      _imageIndex = 0;
+      _fallbackQueued = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final candidates = entry.imageCandidates;
+    if (_imageIndex >= candidates.length) _imageIndex = 0;
+    final imageUrl = candidates.isEmpty ? '' : candidates[_imageIndex];
+    final locked = entry.locked;
+    final imageCacheKey = imageUrl.isEmpty ? entry.stableKey : '${entry.stableKey}:$imageUrl';
+
+    if (entry.name == 'corgiHHH') {
+      _emotePickerDebugLog(
+        'tile build name=${entry.name} id=${entry.id} index=$_imageIndex '
+        'url=$imageUrl candidates=${candidates.join(' | ')}',
+      );
+    }
 
     return RepaintBoundary(
       child: Tooltip(
@@ -879,8 +723,8 @@ class _EmoteTile extends StatelessWidget {
         waitDuration: const Duration(milliseconds: 650),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: locked ? null : onTap,
-          onLongPress: onLongPress,
+          onTap: locked ? null : widget.onTap,
+          onLongPress: widget.onLongPress,
           child: Container(
             padding: const EdgeInsets.fromLTRB(8, 9, 8, 8),
             decoration: BoxDecoration(
@@ -909,37 +753,27 @@ class _EmoteTile extends StatelessWidget {
                       child: Center(
                         child: imageUrl.isEmpty
                             ? Icon(
-                                locked
-                                    ? Icons.lock_rounded
-                                    : Icons.broken_image_rounded,
+                                locked ? Icons.lock_rounded : Icons.broken_image_rounded,
                                 color: Colors.white38,
                                 size: 24,
                               )
                             : Opacity(
                                 opacity: locked ? 0.62 : 1,
                                 child: CachedNetworkImage(
+                                  key: ValueKey<String>(imageCacheKey),
                                   imageUrl: imageUrl,
-                                  cacheKey: entry.stableKey,
+                                  cacheKey: imageCacheKey,
                                   fit: BoxFit.contain,
                                   filterQuality: FilterQuality.low,
-                                  fadeInDuration:
-                                      const Duration(milliseconds: 160),
-                                  fadeOutDuration:
-                                      const Duration(milliseconds: 120),
-                                  useOldImageOnUrlChange: true,
+                                  fadeInDuration: const Duration(milliseconds: 160),
+                                  fadeOutDuration: const Duration(milliseconds: 120),
+                                  useOldImageOnUrlChange: false,
                                   cacheManager: _sheetEmoteCacheManager,
                                   memCacheWidth: 144,
                                   memCacheHeight: 144,
-                                  placeholder: (_, __) =>
-                                      const SizedBox.shrink(),
+                                  placeholder: (_, __) => const SizedBox.shrink(),
                                   errorWidget: (_, url, error) {
-                                    _emotePickerDebugLog(
-                                      'image error name=${entry.name} id=${entry.id} '
-                                      'provider=${entry.providerLabel} stableKey=${entry.stableKey} '
-                                      'url=$url imageUrl=$imageUrl error=$error '
-                                      'officialAnimated=${_officialAnimatedEmoteUrl(entry.id)} '
-                                      'officialDefault=${_officialDefaultEmoteUrl(entry.id)}',
-                                    );
+                                    _handleImageError(url, error, candidates);
                                     return const Icon(
                                       Icons.broken_image_rounded,
                                       color: Colors.white38,
@@ -1005,22 +839,44 @@ class _EmoteTile extends StatelessWidget {
       ),
     );
   }
+
+  void _handleImageError(String url, Object error, List<String> candidates) {
+    if (entry.name == 'corgiHHH') {
+      _emotePickerDebugLog(
+        'image error name=${entry.name} index=$_imageIndex url=$url error=$error '
+        'candidates=${candidates.join(' | ')}',
+      );
+    }
+
+    if (_fallbackQueued) return;
+    final nextIndex = _imageIndex + 1;
+    if (nextIndex >= candidates.length) return;
+
+    _fallbackQueued = true;
+    if (entry.name == 'corgiHHH') {
+      _emotePickerDebugLog(
+        'fallback queued name=${entry.name} from=$url to=${candidates[nextIndex]}',
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _imageIndex = nextIndex;
+        _fallbackQueued = false;
+      });
+    });
+  }
 }
 
 class _OuterTab {
   final String label;
   final List<_InnerPage> pages;
 
-  const _OuterTab({
-    required this.label,
-    required this.pages,
-  });
+  const _OuterTab({required this.label, required this.pages});
 
   int get totalCount {
-    return pages.fold<int>(
-      0,
-      (sum, page) => sum + page.entries.length,
-    );
+    return pages.fold<int>(0, (sum, page) => sum + page.entries.length);
   }
 }
 
@@ -1028,10 +884,7 @@ class _InnerPage {
   final String label;
   final List<_EmoteEntry> entries;
 
-  const _InnerPage({
-    required this.label,
-    required this.entries,
-  });
+  const _InnerPage({required this.label, required this.entries});
 }
 
 class _EmoteEntry {
@@ -1090,9 +943,19 @@ class _EmoteEntry {
     );
   }
 
+  bool get isOfficial => official != null;
+
+  List<String> get imageCandidates {
+    if (!isOfficial) return _uniqueUrls(<String>[imageUrl]);
+    return _uniqueUrls(<String>[
+      imageUrl,
+      _officialAnimatedEmoteUrl(id),
+      _officialDefaultEmoteUrl(id),
+    ]);
+  }
+
   String get stableKey {
     final cleanId = id.trim();
-
     return cleanId.isNotEmpty
         ? '$providerLabel:$cleanId'
         : '$providerLabel:${name.trim().toLowerCase()}';
