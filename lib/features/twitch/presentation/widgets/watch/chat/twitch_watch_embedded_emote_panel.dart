@@ -9,9 +9,10 @@ import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 
 const double _embeddedEmoteSize = 30.0;
 const String _debugTargetEmoteName = 'corgiHHH';
+const String _debugTargetKeyword = 'corgi';
 
 bool _isDebugTargetEmoteName(String name) {
-  return name.trim().toLowerCase() == _debugTargetEmoteName.toLowerCase();
+  return name.trim().toLowerCase().contains(_debugTargetKeyword);
 }
 
 String _officialAnimatedEmoteUrl(String id) {
@@ -27,7 +28,10 @@ String _officialDefaultEmoteUrl(String id) {
 }
 
 void _debugTargetEmoteLog(String message) {
-  debugPrint('[TwitchEmoteDebug][$_debugTargetEmoteName] $message');
+  final line = '[TwitchEmoteDebug][$_debugTargetEmoteName] $message';
+  debugPrint(line, wrapWidth: 1024);
+  // ignore: avoid_print
+  print(line);
 }
 
 final CacheManager _embeddedEmoteCacheManager = CacheManager(
@@ -164,6 +168,17 @@ class _TwitchWatchEmbeddedEmotePanelState
     final global = _uniqueOfficial(widget.officialCache.globalEmotes);
     final user = _uniqueOfficial(widget.officialCache.userEmotes);
 
+    _debugOfficialBucketScan('channel', channel);
+    _debugOfficialBucketScan('global', global);
+    _debugOfficialBucketScan('user', user);
+    _debugTargetEmoteLog(
+      'official tab scan counts '
+      'channel=${channel.length} global=${global.length} user=${user.length} '
+      'recent=${widget.officialCache.recentCount} favorite=${widget.officialCache.favoriteCount} '
+      'loading=${widget.loading} channelId=${widget.officialCache.channelId} '
+      'viewerId=${widget.officialCache.viewerId} error=${widget.officialCache.error}',
+    );
+
     final channelKeys = channel.map(_officialKey).toSet();
     final globalKeys = global.map(_officialKey).toSet();
     final currentChannelId = widget.officialCache.channelId.trim();
@@ -207,6 +222,26 @@ class _TwitchWatchEmbeddedEmotePanelState
     ];
 
     return _EmbeddedEmoteProviderTab(label: 'Twitch', pages: pages);
+  }
+
+  void _debugOfficialBucketScan(
+    String bucket,
+    Iterable<TwitchOfficialEmote> emotes,
+  ) {
+    final matches = emotes.where((emote) => _isDebugTargetEmoteName(emote.name));
+
+    for (final emote in matches) {
+      _debugTargetEmoteLog(
+        'official bucket=$bucket match name=${emote.name} id=${emote.id} '
+        'imageUrl=${emote.imageUrl} locked=${emote.locked} '
+        'source=${emote.source.name} unlocked=${emote.unlocked} '
+        'emoteType=${emote.emoteType} tier=${emote.tier} '
+        'emoteSetId=${emote.emoteSetId} ownerId=${emote.ownerId} '
+        'owner=${emote.ownerDisplayName} '
+        'animatedCandidate=${_officialAnimatedEmoteUrl(emote.id)} '
+        'defaultCandidate=${_officialDefaultEmoteUrl(emote.id)}',
+      );
+    }
   }
 
   Map<String, List<TwitchOfficialEmote>> _groupOfficialByOwner(
@@ -550,7 +585,7 @@ class _EmbeddedEmoteTile extends StatelessWidget {
 
     if (entry.isDebugTarget) {
       _debugTargetEmoteLog(
-        'tile build provider=${entry.providerLabel} id=${entry.id} locked=$locked '
+        'tile build name=${entry.name} provider=${entry.providerLabel} id=${entry.id} locked=$locked '
         'stableKey=${entry.stableKey} imageUrl=$imageUrl '
         'animatedCandidate=${entry.officialAnimatedUrl} '
         'defaultCandidate=${entry.officialDefaultUrl}',
@@ -588,7 +623,7 @@ class _EmbeddedEmoteTile extends StatelessWidget {
                   errorWidget: (_, url, error) {
                     if (entry.isDebugTarget) {
                       _debugTargetEmoteLog(
-                        'image error url=$url error=$error '
+                        'image error name=${entry.name} url=$url error=$error '
                         'provider=${entry.providerLabel} id=${entry.id} '
                         'stableKey=${entry.stableKey} '
                         'animatedCandidate=${entry.officialAnimatedUrl} '
@@ -668,7 +703,7 @@ class _EmbeddedEmoteEntry {
 
     if (entry.isDebugTarget) {
       _debugTargetEmoteLog(
-        'entry third-party provider=${entry.providerLabel} id=${entry.id} '
+        'entry third-party name=${entry.name} provider=${entry.providerLabel} id=${entry.id} '
         'imageUrl=${entry.imageUrl} width=${entry.width} height=${entry.height}',
       );
     }
@@ -688,7 +723,7 @@ class _EmbeddedEmoteEntry {
 
     if (entry.isDebugTarget) {
       _debugTargetEmoteLog(
-        'entry official provider=${entry.providerLabel} id=${entry.id} '
+        'entry official name=${entry.name} provider=${entry.providerLabel} id=${entry.id} '
         'imageUrl=${entry.imageUrl} locked=${entry.locked} '
         'source=${emote.source.name} unlocked=${emote.unlocked} '
         'emoteType=${emote.emoteType} tier=${emote.tier} '
