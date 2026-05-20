@@ -1,8 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_header_bar_stage235_prediction_debug_button
-//
-// Stage 235 adds an optional debug-only prediction injection button. The
-// parent decides whether to pass the callback, so release builds can omit it.
-
 import 'package:flutter/material.dart';
 
 import '../../../theme/twitch_ui_tokens.dart';
@@ -23,7 +18,6 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
   final VoidCallback onTogglePrediction;
   final VoidCallback onRefresh;
   final VoidCallback onOpenAppearance;
-  final VoidCallback? onDebugPrediction;
 
   const TwitchWatchChatHeaderBar({
     super.key,
@@ -39,7 +33,6 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
     required this.onTogglePrediction,
     required this.onRefresh,
     required this.onOpenAppearance,
-    this.onDebugPrediction,
   });
 
   @override
@@ -94,14 +87,6 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
             enabled: hasPrediction,
             onTap: onTogglePrediction,
           ),
-          if (onDebugPrediction != null) ...[
-            const SizedBox(width: 5),
-            _HeaderIconButton(
-              tooltip: 'Debug：送出假賭盤更新',
-              icon: Icons.bug_report_rounded,
-              onTap: onDebugPrediction,
-            ),
-          ],
           const SizedBox(width: 5),
           _HeaderIconButton(
             tooltip: '聊天室字體',
