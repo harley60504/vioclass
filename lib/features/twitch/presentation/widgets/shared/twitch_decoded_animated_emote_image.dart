@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:image/image.dart' as img;
@@ -48,15 +47,15 @@ class TwitchDecodedAnimatedEmoteImage extends StatefulWidget {
 
 class _TwitchDecodedAnimatedEmoteImageState
     extends State<TwitchDecodedAnimatedEmoteImage> {
-  Future<List<_DecodedAnimatedFrame>>? _framesFuture;
-  List<_DecodedAnimatedFrame> _frames = const <_DecodedAnimatedFrame>[];
-  Timer? _timer;
-  int _frameIndex = 0;
+  Future<List<_DecodedAnimatedFrame>>? framesFuture;
+  List<_DecodedAnimatedFrame> frames = const <_DecodedAnimatedFrame>[];
+  Timer? timer;
+  int frameIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _startLoad();
+    startLoad();
   }
 
   @override
@@ -66,21 +65,21 @@ class _TwitchDecodedAnimatedEmoteImageState
     if (oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.cacheKey != widget.cacheKey ||
         oldWidget.maxFrames != widget.maxFrames) {
-      _stopTimer();
-      _frames = const <_DecodedAnimatedFrame>[];
-      _frameIndex = 0;
-      _startLoad();
+      stopTimer();
+      frames = const <_DecodedAnimatedFrame>[];
+      frameIndex = 0;
+      startLoad();
     }
   }
 
   @override
   void dispose() {
-    _stopTimer();
+    stopTimer();
     super.dispose();
   }
 
-  void _startLoad() {
-    _framesFuture = _loadAndDecodeFrames(
+  void startLoad() {
+    framesFuture = loadAndDecodeFrames(
       url: widget.imageUrl,
       maxFrames: widget.maxFrames,
       debug: widget.debug,
@@ -90,24 +89,24 @@ class _TwitchDecodedAnimatedEmoteImageState
 
   @override
   Widget build(BuildContext context) {
-    final framesFuture = _framesFuture;
-    if (framesFuture == null) return widget.fallback;
+    final future = framesFuture;
+    if (future == null) return widget.fallback;
 
     return FutureBuilder<List<_DecodedAnimatedFrame>>(
-      future: framesFuture,
+      future: future,
       builder: (context, snapshot) {
-        final frames = snapshot.data;
+        final loadedFrames = snapshot.data;
 
-        if (frames != null && frames.isNotEmpty) {
-          if (!identical(_frames, frames)) {
-            _frames = frames;
-            _frameIndex = _frameIndex.clamp(0, _frames.length - 1).toInt();
-            _scheduleCurrentFrame();
+        if (loadedFrames != null && loadedFrames.isNotEmpty) {
+          if (!identical(frames, loadedFrames)) {
+            frames = loadedFrames;
+            frameIndex = frameIndex.clamp(0, frames.length - 1).toInt();
+            scheduleCurrentFrame();
           }
 
-          final safeIndex = _frameIndex.clamp(0, _frames.length - 1).toInt();
+          final safeIndex = frameIndex.clamp(0, frames.length - 1).toInt();
           return Image.memory(
-            _frames[safeIndex].pngBytes,
+            frames[safeIndex].pngBytes,
             width: widget.width,
             height: widget.height,
             fit: widget.fit,
@@ -126,30 +125,30 @@ class _TwitchDecodedAnimatedEmoteImageState
     );
   }
 
-  void _scheduleCurrentFrame() {
-    if (_timer != null || _frames.length <= 1) return;
+  void scheduleCurrentFrame() {
+    if (timer != null || frames.length <= 1) return;
 
-    final safeIndex = _frameIndex.clamp(0, _frames.length - 1).toInt();
-    final durationMs = _frames[safeIndex].durationMs;
+    final safeIndex = frameIndex.clamp(0, frames.length - 1).toInt();
+    final durationMs = frames[safeIndex].durationMs;
 
-    _timer = Timer(Duration(milliseconds: durationMs), () {
-      _timer = null;
-      if (!mounted || _frames.isEmpty) return;
+    timer = Timer(Duration(milliseconds: durationMs), () {
+      timer = null;
+      if (!mounted || frames.isEmpty) return;
 
       setState(() {
-        _frameIndex = (_frameIndex + 1) % _frames.length;
+        frameIndex = (frameIndex + 1) % frames.length;
       });
 
-      _scheduleCurrentFrame();
+      scheduleCurrentFrame();
     });
   }
 
-  void _stopTimer() {
-    _timer?.cancel();
-    _timer = null;
+  void stopTimer() {
+    timer?.cancel();
+    timer = null;
   }
 
-  static Future<List<_DecodedAnimatedFrame>> _loadAndDecodeFrames({
+  static Future<List<_DecodedAnimatedFrame>> loadAndDecodeFrames({
     required String url,
     required int maxFrames,
     required bool debug,
@@ -161,21 +160,25 @@ class _TwitchDecodedAnimatedEmoteImageState
     try {
       final file = await DefaultCacheManager().getSingleFile(cleanUrl);
       final bytes = await file.readAsBytes();
+      final decoded = img.decodeImage(bytes);
 
-      final frames = await compute<_DecodeAnimatedEmoteRequest,
-          List<_DecodedAnimatedFrame>>(
-        _decodeAnimatedEmoteFrames,
-        _DecodeAnimatedEmoteRequest(
-          bytes: bytes,
-          maxFrames: maxFrames,
-        ),
+      if (decoded == null || decoded.width <= 0 || decoded.height <= 0) {
+        if (debug) {
+          debugPrint('[$debugLabel] decode returned null/empty url=$cleanUrl');
+        }
+        return const <_DecodedAnimatedFrame>[];
+      }
+
+      final decodedFrames = decodeFrames(
+        decoded: decoded,
+        maxFrames: maxFrames,
       );
 
       if (debug) {
-        debugPrint('[$debugLabel] decoded url=$cleanUrl frames=${frames.length}');
+        debugPrint('[$debugLabel] decoded url=$cleanUrl frames=${decodedFrames.length}');
       }
 
-      return frames;
+      return decodedFrames;
     } catch (e, stackTrace) {
       if (debug) {
         debugPrint('[$debugLabel] decode failed url=$cleanUrl error=$e');
@@ -184,16 +187,6 @@ class _TwitchDecodedAnimatedEmoteImageState
       return const <_DecodedAnimatedFrame>[];
     }
   }
-}
-
-class _DecodeAnimatedEmoteRequest {
-  final Uint8List bytes;
-  final int maxFrames;
-
-  const _DecodeAnimatedEmoteRequest({
-    required this.bytes,
-    required this.maxFrames,
-  });
 }
 
 class _DecodedAnimatedFrame {
@@ -206,26 +199,24 @@ class _DecodedAnimatedFrame {
   });
 }
 
-List<_DecodedAnimatedFrame> _decodeAnimatedEmoteFrames(
-  _DecodeAnimatedEmoteRequest request,
-) {
-  final decoded = img.decodeImage(request.bytes);
-  if (decoded == null || !decoded.isValid) {
-    return const <_DecodedAnimatedFrame>[];
-  }
-
+List<_DecodedAnimatedFrame> decodeFrames({
+  required img.Image decoded,
+  required int maxFrames,
+}) {
   final frameCount = decoded.numFrames <= 0 ? 1 : decoded.numFrames;
-  final safeMaxFrames = request.maxFrames <= 0 ? frameCount : request.maxFrames;
+  final safeMaxFrames = maxFrames <= 0 ? frameCount : maxFrames;
   final limit = frameCount < safeMaxFrames ? frameCount : safeMaxFrames;
 
   final output = <_DecodedAnimatedFrame>[];
 
   for (var i = 0; i < limit; i++) {
     final frame = decoded.getFrame(i);
-    if (!frame.isValid || frame.width <= 0 || frame.height <= 0) continue;
+    if (frame.width <= 0 || frame.height <= 0) continue;
 
     final rawDuration = frame.frameDuration;
-    final durationMs = rawDuration <= 0 ? 80 : rawDuration.clamp(25, 1000).toInt();
+    final durationMs = rawDuration <= 0
+        ? 80
+        : rawDuration.clamp(25, 1000).toInt();
     final png = Uint8List.fromList(img.encodePng(frame));
 
     output.add(_DecodedAnimatedFrame(
