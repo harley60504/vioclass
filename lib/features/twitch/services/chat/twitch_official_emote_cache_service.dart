@@ -120,6 +120,25 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     return usableEmotes.length + _lockedChannelEmotes.length;
   }
 
+  TwitchOfficialEmote? lookupUsableByName(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return null;
+
+    TwitchOfficialEmote? caseInsensitiveMatch;
+    final lower = clean.toLowerCase();
+
+    for (final emote in usableEmotes) {
+      final emoteName = emote.name.trim();
+      if (emoteName.isEmpty || emote.imageUrl.trim().isEmpty) continue;
+      if (emoteName == clean) return emote;
+      if (caseInsensitiveMatch == null && emoteName.toLowerCase() == lower) {
+        caseInsensitiveMatch = emote;
+      }
+    }
+
+    return caseInsensitiveMatch;
+  }
+
   bool isUsable(TwitchOfficialEmote emote) {
     if (emote.unlocked) return true;
 
@@ -127,10 +146,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     return _globalEmotes.any((item) => _key(item) == key) ||
         _userEmotes.any((item) => _key(item) == key) ||
         _channelEmotes.any((item) => item.unlocked && _key(item) == key);
-  }
-
-  bool isFavorite(TwitchOfficialEmote emote) {
-    return _favorites.containsKey(_favoriteKey(emote));
   }
 
   void toggleFavorite(TwitchOfficialEmote emote) {
@@ -144,6 +159,10 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
     notifyListeners();
     _saveFavoriteEmotes();
+  }
+
+  bool isFavorite(TwitchOfficialEmote emote) {
+    return _favorites.containsKey(_favoriteKey(emote));
   }
 
   void markRecentEmote(TwitchOfficialEmote emote) {
