@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage246_official_image_fallback
+// PATCH VERSION: twitch_emote_picker_sheet_stage247_official_static_fallback
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -31,6 +31,12 @@ String _officialDefaultEmoteUrl(String id) {
   final cleanId = id.trim();
   if (cleanId.isEmpty) return '';
   return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/default/dark/2.0';
+}
+
+String _officialStaticEmoteUrl(String id) {
+  final cleanId = id.trim();
+  if (cleanId.isEmpty) return '';
+  return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/static/dark/2.0';
 }
 
 List<String> _uniqueUrls(Iterable<String> urls) {
@@ -949,6 +955,7 @@ class _EmoteEntry {
     if (!isOfficial) return _uniqueUrls(<String>[imageUrl]);
     return _uniqueUrls(<String>[
       imageUrl,
+      _officialStaticEmoteUrl(id),
       _officialAnimatedEmoteUrl(id),
       _officialDefaultEmoteUrl(id),
     ]);
