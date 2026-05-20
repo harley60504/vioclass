@@ -5,10 +5,9 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vio_class/features/twitch/auth/services/twitch_web_cookie_service.dart';
+import 'package:vio_class/features/twitch/data/models/twitch_stream_model.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-
-import '../../../auth/services/twitch_web_cookie_service.dart';
-import '../../../data/models/twitch_stream_model.dart';
 
 class TwitchChatSidePanel extends StatefulWidget {
   final TwitchStreamModel stream;
@@ -30,7 +29,7 @@ class TwitchChatSidePanel extends StatefulWidget {
 
 class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
   static const String _ircUrl = 'wss://irc-ws.chat.twitch.tv:443';
-  static const String _webClientId = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
+  static const String _clientId = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
   static const int _maxMessages = 450;
 
   final Dio _dio = Dio(
@@ -38,8 +37,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: const <String, String>{
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
       },
     ),
   );
@@ -47,25 +45,25 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
   final TextEditingController _inputController = TextEditingController();
   final FocusNode _inputFocusNode = FocusNode();
 
-  WebSocketChannel? _ircChannel;
-  StreamSubscription<dynamic>? _ircSubscription;
+  WebSocketChannel? _irc;
+  StreamSubscription<dynamic>? _ircSub;
 
-  final List<_SimpleChatMessage> _messages = <_SimpleChatMessage>[];
-  final Set<String> _seenMessageIds = <String>{};
-  final Map<String, _SimpleEmote> _emotesByExactName = <String, _SimpleEmote>{};
-  final Map<String, _SimpleEmote> _emotesByLowerName = <String, _SimpleEmote>{};
-  final Map<String, _SimpleEmote> _recentEmotes = <String, _SimpleEmote>{};
+  final List<_ChatMsg> _messages = <_ChatMsg>[];
+  final Set<String> _seenIds = <String>{};
+  final Map<String, _Emote> _emoteExact = <String, _Emote>{};
+  final Map<String, _Emote> _emoteLower = <String, _Emote>{};
+  final Map<String, _Emote> _recent = <String, _Emote>{};
 
-  String _statusText = '初始化聊天室...';
-  String? _errorText;
   String? _authToken;
   String? _viewerLogin;
   String? _channelId;
+  String? _errorText;
+  String _status = '初始化聊天室...';
   bool _connecting = false;
   bool _connected = false;
   bool _loadingEmotes = false;
   bool _sending = false;
-  int _rawLineCount = 0;
+  int _rawCount = 0;
 
   String get _channelLogin {
     final login = widget.stream.userLogin.trim();
@@ -75,11 +73,10 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
 
   String get _displayName {
     final name = widget.stream.userName.trim();
-    if (name.isNotEmpty) return name;
-    return _channelLogin;
+    return name.isNotEmpty ? name : _channelLogin;
   }
 
-  String get _recentStorageKey => 'simple_twitch_recent_emotes_$_channelLogin';
+  String get _recentKey => 'simple_twitch_recent_emotes_$_channelLogin';
 
   @override
   void initState() {
@@ -93,14 +90,12 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     final oldLogin = oldWidget.stream.userLogin.trim().isNotEmpty
         ? oldWidget.stream.userLogin.trim().toLowerCase()
         : oldWidget.stream.userName.trim().toLowerCase();
-    if (oldLogin != _channelLogin) {
-      unawaited(_restart());
-    }
+    if (oldLogin != _channelLogin) unawaited(_restart());
   }
 
   @override
   void dispose() {
-    unawaited(_disconnectIrc());
+    unawaited(_disconnect());
     _dio.close(force: true);
     _inputController.dispose();
     _inputFocusNode.dispose();
@@ -108,38 +103,34 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
   }
 
   Future<void> _restart() async {
-    await _disconnectIrc();
+    await _disconnect();
     if (!mounted) return;
-
     setState(() {
       _messages.clear();
-      _seenMessageIds.clear();
-      _emotesByExactName.clear();
-      _emotesByLowerName.clear();
-      _recentEmotes.clear();
-      _statusText = '初始化聊天室...';
+      _seenIds.clear();
+      _emoteExact.clear();
+      _emoteLower.clear();
+      _recent.clear();
+      _status = '初始化聊天室...';
       _errorText = null;
       _connected = false;
       _connecting = true;
-      _rawLineCount = 0;
+      _rawCount = 0;
     });
-
-    await _loadRecentEmotes();
-    await _loadAuthAndChannelContext();
-
+    await _loadRecent();
+    await _loadContext();
     if (!mounted) return;
-
-    unawaited(_loadEmoteCatalog());
-    await _connectIrc();
+    unawaited(_loadEmotes());
+    await _connect();
   }
 
-  Future<void> _loadAuthAndChannelContext() async {
+  Future<void> _loadContext() async {
     final token = await TwitchWebCookieService.readAuthToken();
     String? viewerLogin;
     String? channelId;
 
     try {
-      channelId = await _fetchChannelIdByLogin(_channelLogin);
+      channelId = await _fetchChannelId(_channelLogin);
     } catch (e) {
       _setError('讀取頻道 ID 失敗：$e');
     }
@@ -153,7 +144,6 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     }
 
     if (!mounted) return;
-
     setState(() {
       _authToken = token?.trim();
       _viewerLogin = viewerLogin?.trim().toLowerCase();
@@ -161,33 +151,25 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     });
   }
 
-  Future<String?> _fetchChannelIdByLogin(String login) async {
-    if (login.trim().isEmpty) return null;
-
-    final response = await _dio.post<dynamic>(
+  Future<String?> _fetchChannelId(String login) async {
+    final clean = login.trim().toLowerCase();
+    if (clean.isEmpty) return null;
+    final res = await _dio.post<dynamic>(
       'https://gql.twitch.tv/gql',
       data: <String, dynamic>{
         'operationName': 'SimpleChatChannelId',
-        'query': r'''
-          query SimpleChatChannelId($login: String!) {
-            user(login: $login) {
-              id
-              displayName
-            }
-          }
-        ''',
-        'variables': <String, dynamic>{'login': login.trim().toLowerCase()},
+        'query': 'query SimpleChatChannelId(\$login: String!) { user(login: \$login) { id displayName } }',
+        'variables': <String, dynamic>{'login': clean},
       },
       options: Options(
         headers: const <String, String>{
-          'Client-ID': _webClientId,
+          'Client-ID': _clientId,
           'Content-Type': 'application/json',
         },
-        validateStatus: (status) => status != null && status < 500,
+        validateStatus: (s) => s != null && s < 500,
       ),
     );
-
-    final data = response.data;
+    final data = res.data;
     if (data is! Map) return null;
     final root = data['data'];
     if (root is! Map) return null;
@@ -198,18 +180,17 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
   }
 
   Future<String?> _fetchViewerLogin(String token) async {
-    final response = await _dio.get<dynamic>(
+    final res = await _dio.get<dynamic>(
       'https://api.twitch.tv/helix/users',
       options: Options(
         headers: <String, String>{
-          'Client-ID': _webClientId,
+          'Client-ID': _clientId,
           'Authorization': 'Bearer $token',
         },
-        validateStatus: (status) => status != null && status < 500,
+        validateStatus: (s) => s != null && s < 500,
       ),
     );
-
-    final data = response.data;
+    final data = res.data;
     if (data is! Map) return null;
     final list = data['data'];
     if (list is! List || list.isEmpty) return null;
@@ -219,45 +200,40 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     return login == null || login.isEmpty ? null : login;
   }
 
-  Future<void> _connectIrc() async {
+  Future<void> _connect() async {
     if (!mounted) return;
-
     setState(() {
       _connecting = true;
-      _statusText = '連線 Twitch IRC...';
+      _status = '連線 Twitch IRC...';
     });
-
     try {
       final ws = WebSocketChannel.connect(Uri.parse(_ircUrl));
-      _ircChannel = ws;
-
-      _ircSubscription = ws.stream.listen(
-        _handleIrcSocketEvent,
-        onError: (Object error, StackTrace stackTrace) {
-          _setError('IRC 連線錯誤：$error');
-        },
+      _irc = ws;
+      _ircSub = ws.stream.listen(
+        _onIrcEvent,
+        onError: (Object e, StackTrace s) => _setError('IRC 連線錯誤：$e'),
         onDone: () {
           if (!mounted) return;
           setState(() {
             _connected = false;
             _connecting = false;
-            _statusText = '聊天室已中斷';
+            _status = '聊天室已中斷';
           });
         },
         cancelOnError: false,
       );
 
       final token = _authToken;
-      final viewerLogin = _viewerLogin;
-      final nick = token != null && token.isNotEmpty &&
-              viewerLogin != null && viewerLogin.isNotEmpty
-          ? viewerLogin
+      final viewer = _viewerLogin;
+      final canAuth = token != null && token.isNotEmpty && viewer != null && viewer.isNotEmpty;
+      final nick = canAuth
+          ? viewer
           : 'justinfan${DateTime.now().millisecondsSinceEpoch.remainder(900000) + 100000}';
 
       _sendRaw('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
-      if (token != null && token.isNotEmpty && viewerLogin != null && viewerLogin.isNotEmpty) {
+      if (canAuth) {
         _sendRaw('PASS oauth:$token');
-        _sendRaw('NICK $viewerLogin');
+        _sendRaw('NICK $nick');
       } else {
         _sendRaw('PASS SCHMOOPIIE');
         _sendRaw('NICK $nick');
@@ -268,9 +244,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
       setState(() {
         _connected = true;
         _connecting = false;
-        _statusText = token == null || token.isEmpty
-            ? '匿名讀取聊天室'
-            : '聊天室已連線';
+        _status = canAuth ? '聊天室已連線' : '匿名讀取聊天室';
       });
     } catch (e) {
       _setError('IRC 連線失敗：$e');
@@ -282,38 +256,29 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     }
   }
 
-  Future<void> _disconnectIrc() async {
-    await _ircSubscription?.cancel();
-    _ircSubscription = null;
-    final ws = _ircChannel;
-    _ircChannel = null;
-    await ws?.sink.close();
+  Future<void> _disconnect() async {
+    await _ircSub?.cancel();
+    _ircSub = null;
+    final socket = _irc;
+    _irc = null;
+    await socket?.sink.close();
   }
 
   void _sendRaw(String line) {
-    _ircChannel?.sink.add('$line\r\n');
+    _irc?.sink.add('$line\r\n');
   }
 
-  void _handleIrcSocketEvent(dynamic event) {
+  void _onIrcEvent(dynamic event) {
     final text = event is List<int> ? utf8.decode(event) : event.toString();
-    final lines = text
-        .split(RegExp(r'\r?\n'))
-        .where((line) => line.trim().isNotEmpty)
-        .toList(growable: false);
-
-    for (final line in lines) {
-      _rawLineCount += 1;
+    for (final rawLine in text.split(RegExp(r'\r?\n'))) {
+      final line = rawLine.trimRight();
+      if (line.trim().isEmpty) continue;
+      _rawCount += 1;
       if (line.startsWith('PING')) {
-        final payload = line.contains(':')
-            ? line.substring(line.indexOf(':'))
-            : ':tmi.twitch.tv';
-        _sendRaw('PONG $payload');
+        _sendRaw('PONG :tmi.twitch.tv');
         continue;
       }
-
-      final parsed = _ParsedIrcLine.parse(line);
-      if (parsed.command.isEmpty) continue;
-
+      final parsed = _IrcLine.parse(line);
       switch (parsed.command) {
         case 'PRIVMSG':
           _handlePrivMsg(parsed);
@@ -330,115 +295,89 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
         case 'CLEARCHAT':
           _handleClearChat(parsed);
           break;
-        case 'ROOMSTATE':
-          break;
-        case 'USERSTATE':
-        case 'GLOBALUSERSTATE':
-          break;
       }
     }
   }
 
-  void _handlePrivMsg(_ParsedIrcLine line) {
+  void _handlePrivMsg(_IrcLine line) {
     final text = line.trailing.trimRight();
     if (text.isEmpty) return;
-
     final id = line.tags['id']?.trim();
     final safeId = id != null && id.isNotEmpty
         ? id
         : 'msg-${DateTime.now().microsecondsSinceEpoch}-${_messages.length}';
-
-    if (_seenMessageIds.contains(safeId)) return;
-    _seenMessageIds.add(safeId);
-
-    final login = line.userLogin.trim().isNotEmpty ? line.userLogin : 'unknown';
+    if (_seenIds.contains(safeId)) return;
+    _seenIds.add(safeId);
+    final login = line.userLogin.isNotEmpty ? line.userLogin : 'unknown';
     final displayName = line.tags['display-name']?.trim().isNotEmpty == true
         ? line.tags['display-name']!.trim()
         : login;
-
-    _appendMessage(_SimpleChatMessage(
+    _appendMessage(_ChatMsg(
       id: safeId,
       login: login,
       displayName: displayName,
-      color: _parseUserColor(line.tags['color']) ?? _colorFromText(login),
+      color: _parseColor(line.tags['color']) ?? _colorFromText(login),
       text: text,
       emotesTag: line.tags['emotes'] ?? '',
-      receivedAt: DateTime.now(),
       system: false,
     ));
   }
 
-  void _handleNotice(_ParsedIrcLine line) {
+  void _handleNotice(_IrcLine line) {
     final text = line.trailing.trim();
-    if (text.isEmpty) return;
-    _appendSystemMessage(text);
+    if (text.isNotEmpty) _appendSystem(text);
   }
 
-  void _handleUserNotice(_ParsedIrcLine line) {
-    final systemMessage = line.tags['system-msg']?.trim();
-    final text = line.trailing.trim();
-    final display = systemMessage != null && systemMessage.isNotEmpty
-        ? systemMessage
-        : text;
-    if (display.isEmpty) return;
-    _appendSystemMessage(display);
+  void _handleUserNotice(_IrcLine line) {
+    final system = line.tags['system-msg']?.trim();
+    final text = system != null && system.isNotEmpty ? system : line.trailing.trim();
+    if (text.isNotEmpty) _appendSystem(text);
   }
 
-  void _handleClearMsg(_ParsedIrcLine line) {
-    final targetId = line.tags['target-msg-id']?.trim();
-    if (targetId == null || targetId.isEmpty) return;
-    if (!mounted) return;
+  void _handleClearMsg(_IrcLine line) {
+    final id = line.tags['target-msg-id']?.trim();
+    if (id == null || id.isEmpty || !mounted) return;
     setState(() {
-      _messages.removeWhere((message) => message.id == targetId);
-      _seenMessageIds.remove(targetId);
+      _messages.removeWhere((m) => m.id == id);
+      _seenIds.remove(id);
     });
   }
 
-  void _handleClearChat(_ParsedIrcLine line) {
-    final targetLogin = line.trailing.trim().toLowerCase();
+  void _handleClearChat(_IrcLine line) {
     if (!mounted) return;
-
-    if (targetLogin.isEmpty) {
+    final login = line.trailing.trim().toLowerCase();
+    if (login.isEmpty) {
       setState(() {
         _messages.clear();
-        _seenMessageIds.clear();
+        _seenIds.clear();
       });
-      _appendSystemMessage('聊天室已被清除。');
+      _appendSystem('聊天室已被清除。');
       return;
     }
-
     setState(() {
-      _messages.removeWhere(
-        (message) => message.login.toLowerCase() == targetLogin,
-      );
+      _messages.removeWhere((m) => m.login.toLowerCase() == login);
     });
   }
 
-  void _appendSystemMessage(String text) {
-    final clean = text.trim();
-    if (clean.isEmpty) return;
-    _appendMessage(_SimpleChatMessage(
+  void _appendSystem(String text) {
+    _appendMessage(_ChatMsg(
       id: 'system-${DateTime.now().microsecondsSinceEpoch}',
       login: 'system',
       displayName: 'Twitch',
       color: const Color(0xFFBF94FF),
-      text: clean,
+      text: text,
       emotesTag: '',
-      receivedAt: DateTime.now(),
       system: true,
     ));
   }
 
-  void _appendMessage(_SimpleChatMessage message) {
+  void _appendMessage(_ChatMsg msg) {
     if (!mounted) return;
     setState(() {
-      _messages.add(message);
-      if (_messages.length > _maxMessages) {
-        final removeCount = _messages.length - _maxMessages;
-        for (var i = 0; i < removeCount; i += 1) {
-          final removed = _messages.removeAt(0);
-          _seenMessageIds.remove(removed.id);
-        }
+      _messages.add(msg);
+      while (_messages.length > _maxMessages) {
+        final old = _messages.removeAt(0);
+        _seenIds.remove(old.id);
       }
     });
   }
@@ -447,375 +386,284 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     if (_sending) return;
     final text = _inputController.text.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
     if (text.isEmpty) return;
-
     final token = _authToken;
-    final viewerLogin = _viewerLogin;
-    if (token == null || token.isEmpty || viewerLogin == null || viewerLogin.isEmpty) {
-      _appendSystemMessage('尚未取得可發言的 Twitch Web token，請重新登入。');
+    final viewer = _viewerLogin;
+    if (token == null || token.isEmpty || viewer == null || viewer.isEmpty) {
+      _appendSystem('尚未取得可發言的 Twitch Web token，請重新登入。');
       return;
     }
-
     setState(() => _sending = true);
-
     try {
       _sendRaw('PRIVMSG #$_channelLogin :$text');
       _inputController.clear();
     } catch (e) {
-      _appendSystemMessage('送出失敗：$e');
+      _appendSystem('送出失敗：$e');
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
-  Future<void> _loadEmoteCatalog() async {
+  Future<void> _loadEmotes() async {
     if (!mounted) return;
     setState(() {
       _loadingEmotes = true;
-      _statusText = '讀取貼圖...';
+      _status = '讀取貼圖...';
     });
-
-    final loaded = <_SimpleEmote>[];
-    final channelId = _channelId;
+    final out = <_Emote>[];
     final token = _authToken;
-
+    final channelId = _channelId;
     try {
       if (token != null && token.isNotEmpty) {
-        loaded.addAll(await _fetchHelixGlobalEmotes(token));
+        out.addAll(await _fetchTwitchGlobal(token));
         if (channelId != null && channelId.isNotEmpty) {
-          loaded.addAll(await _fetchHelixChannelEmotes(token, channelId));
+          out.addAll(await _fetchTwitchChannel(token, channelId));
         }
       }
-
       if (channelId != null && channelId.isNotEmpty) {
-        loaded.addAll(await _fetchSevenTvEmotes(channelId));
-        loaded.addAll(await _fetchBttvEmotes(channelId));
-        loaded.addAll(await _fetchFfzEmotes(channelId));
+        out.addAll(await _fetchSevenTv(channelId));
+        out.addAll(await _fetchBttv(channelId));
+        out.addAll(await _fetchFfz(channelId));
       }
     } catch (e) {
       _setError('貼圖讀取失敗：$e');
     }
-
     if (!mounted) return;
-
     setState(() {
-      _emotesByExactName.clear();
-      _emotesByLowerName.clear();
-      for (final emote in loaded) {
-        _addEmoteToLookup(emote);
+      _emoteExact.clear();
+      _emoteLower.clear();
+      for (final e in out) {
+        _addEmote(e);
       }
-      for (final emote in _recentEmotes.values) {
-        _addEmoteToLookup(emote);
+      for (final e in _recent.values) {
+        _addEmote(e);
       }
       _loadingEmotes = false;
-      _statusText = _connected ? '聊天室已連線' : _statusText;
+      _status = _connected ? '聊天室已連線' : _status;
     });
   }
 
-  void _addEmoteToLookup(_SimpleEmote emote) {
-    final name = emote.name.trim();
-    final url = emote.imageUrl.trim();
-    if (name.isEmpty || url.isEmpty) return;
-
-    final existing = _emotesByExactName[name];
-    if (existing == null || emote.kind.index < existing.kind.index) {
-      _emotesByExactName[name] = emote;
-      _emotesByLowerName[name.toLowerCase()] = emote;
+  void _addEmote(_Emote e) {
+    final name = e.name.trim();
+    if (name.isEmpty || e.imageUrl.trim().isEmpty) return;
+    final old = _emoteExact[name];
+    if (old == null || e.kind.index < old.kind.index) {
+      _emoteExact[name] = e;
+      _emoteLower[name.toLowerCase()] = e;
     }
   }
 
-  Future<List<_SimpleEmote>> _fetchHelixGlobalEmotes(String token) async {
-    final response = await _dio.get<dynamic>(
+  Future<List<_Emote>> _fetchTwitchGlobal(String token) async {
+    final res = await _dio.get<dynamic>(
       'https://api.twitch.tv/helix/chat/emotes/global',
-      options: Options(
-        headers: <String, String>{
-          'Client-ID': _webClientId,
-          'Authorization': 'Bearer $token',
-        },
-        validateStatus: (status) => status != null && status < 500,
-      ),
+      options: _helixOptions(token),
     );
-    return _parseHelixEmotes(response.data, _SimpleEmoteKind.twitchGlobal);
+    return _parseHelixEmotes(res.data, _EmoteKind.twitchGlobal);
   }
 
-  Future<List<_SimpleEmote>> _fetchHelixChannelEmotes(
-    String token,
-    String channelId,
-  ) async {
-    final response = await _dio.get<dynamic>(
+  Future<List<_Emote>> _fetchTwitchChannel(String token, String channelId) async {
+    final res = await _dio.get<dynamic>(
       'https://api.twitch.tv/helix/chat/emotes',
       queryParameters: <String, dynamic>{'broadcaster_id': channelId},
-      options: Options(
-        headers: <String, String>{
-          'Client-ID': _webClientId,
-          'Authorization': 'Bearer $token',
-        },
-        validateStatus: (status) => status != null && status < 500,
-      ),
+      options: _helixOptions(token),
     );
-    return _parseHelixEmotes(response.data, _SimpleEmoteKind.twitchChannel);
+    return _parseHelixEmotes(res.data, _EmoteKind.twitchChannel);
   }
 
-  List<_SimpleEmote> _parseHelixEmotes(dynamic raw, _SimpleEmoteKind kind) {
-    if (raw is! Map) return const <_SimpleEmote>[];
-    final data = raw['data'];
-    if (data is! List) return const <_SimpleEmote>[];
+  Options _helixOptions(String token) {
+    return Options(
+      headers: <String, String>{
+        'Client-ID': _clientId,
+        'Authorization': 'Bearer $token',
+      },
+      validateStatus: (s) => s != null && s < 500,
+    );
+  }
 
-    final output = <_SimpleEmote>[];
-    for (final item in data.whereType<Map>()) {
+  List<_Emote> _parseHelixEmotes(dynamic raw, _EmoteKind kind) {
+    if (raw is! Map || raw['data'] is! List) return const <_Emote>[];
+    final out = <_Emote>[];
+    for (final item in (raw['data'] as List).whereType<Map>()) {
       final id = item['id']?.toString().trim() ?? '';
       final name = item['name']?.toString().trim() ?? '';
       if (id.isEmpty || name.isEmpty) continue;
-      output.add(_SimpleEmote(
-        id: id,
-        name: name,
-        imageUrl: _twitchEmoteUrl(id),
-        kind: kind,
-      ));
+      out.add(_Emote(id: id, name: name, imageUrl: _twitchEmoteUrl(id), kind: kind));
     }
-    return output;
+    return out;
   }
 
-  Future<List<_SimpleEmote>> _fetchSevenTvEmotes(String channelId) async {
+  Future<List<_Emote>> _fetchSevenTv(String channelId) async {
     try {
-      final response = await _dio.get<dynamic>(
-        'https://7tv.io/v3/users/twitch/$channelId',
-        options: Options(validateStatus: (status) => status != null && status < 500),
-      );
-      final raw = response.data;
-      if (raw is! Map) return const <_SimpleEmote>[];
+      final res = await _dio.get<dynamic>('https://7tv.io/v3/users/twitch/$channelId');
+      final raw = res.data;
+      if (raw is! Map) return const <_Emote>[];
       final set = raw['emote_set'];
-      if (set is! Map) return const <_SimpleEmote>[];
-      final emotes = set['emotes'];
-      if (emotes is! List) return const <_SimpleEmote>[];
-
-      final output = <_SimpleEmote>[];
-      for (final item in emotes.whereType<Map>()) {
+      if (set is! Map || set['emotes'] is! List) return const <_Emote>[];
+      final out = <_Emote>[];
+      for (final item in (set['emotes'] as List).whereType<Map>()) {
         final name = item['name']?.toString().trim() ?? '';
         final data = item['data'];
         final id = data is Map ? data['id']?.toString().trim() ?? '' : '';
         final host = data is Map ? data['host'] : null;
         final hostUrl = host is Map ? host['url']?.toString().trim() ?? '' : '';
         if (name.isEmpty || id.isEmpty || hostUrl.isEmpty) continue;
-        output.add(_SimpleEmote(
-          id: id,
-          name: name,
-          imageUrl: 'https:$hostUrl/2x.webp',
-          kind: _SimpleEmoteKind.sevenTv,
-        ));
+        out.add(_Emote(id: id, name: name, imageUrl: 'https:$hostUrl/2x.webp', kind: _EmoteKind.sevenTv));
       }
-      return output;
+      return out;
     } catch (_) {
-      return const <_SimpleEmote>[];
+      return const <_Emote>[];
     }
   }
 
-  Future<List<_SimpleEmote>> _fetchBttvEmotes(String channelId) async {
-    final output = <_SimpleEmote>[];
-
+  Future<List<_Emote>> _fetchBttv(String channelId) async {
+    final out = <_Emote>[];
     try {
-      final global = await _dio.get<dynamic>(
-        'https://api.betterttv.net/3/cached/emotes/global',
-        options: Options(validateStatus: (status) => status != null && status < 500),
-      );
-      output.addAll(_parseBttvList(global.data));
+      final g = await _dio.get<dynamic>('https://api.betterttv.net/3/cached/emotes/global');
+      out.addAll(_parseBttv(g.data));
     } catch (_) {}
-
     try {
-      final channel = await _dio.get<dynamic>(
-        'https://api.betterttv.net/3/cached/users/twitch/$channelId',
-        options: Options(validateStatus: (status) => status != null && status < 500),
-      );
-      final raw = channel.data;
+      final c = await _dio.get<dynamic>('https://api.betterttv.net/3/cached/users/twitch/$channelId');
+      final raw = c.data;
       if (raw is Map) {
-        output.addAll(_parseBttvList(raw['channelEmotes']));
-        output.addAll(_parseBttvList(raw['sharedEmotes']));
+        out.addAll(_parseBttv(raw['channelEmotes']));
+        out.addAll(_parseBttv(raw['sharedEmotes']));
       }
     } catch (_) {}
-
-    return output;
+    return out;
   }
 
-  List<_SimpleEmote> _parseBttvList(dynamic raw) {
-    if (raw is! List) return const <_SimpleEmote>[];
-    final output = <_SimpleEmote>[];
+  List<_Emote> _parseBttv(dynamic raw) {
+    if (raw is! List) return const <_Emote>[];
+    final out = <_Emote>[];
     for (final item in raw.whereType<Map>()) {
       final id = item['id']?.toString().trim() ?? '';
       final code = item['code']?.toString().trim() ?? '';
       if (id.isEmpty || code.isEmpty) continue;
-      output.add(_SimpleEmote(
-        id: id,
-        name: code,
-        imageUrl: 'https://cdn.betterttv.net/emote/$id/2x',
-        kind: _SimpleEmoteKind.bttv,
-      ));
+      out.add(_Emote(id: id, name: code, imageUrl: 'https://cdn.betterttv.net/emote/$id/2x', kind: _EmoteKind.bttv));
     }
-    return output;
+    return out;
   }
 
-  Future<List<_SimpleEmote>> _fetchFfzEmotes(String channelId) async {
-    final output = <_SimpleEmote>[];
-
+  Future<List<_Emote>> _fetchFfz(String channelId) async {
     try {
-      final response = await _dio.get<dynamic>(
-        'https://api.frankerfacez.com/v1/room/id/$channelId',
-        options: Options(validateStatus: (status) => status != null && status < 500),
-      );
-      final raw = response.data;
-      if (raw is! Map) return const <_SimpleEmote>[];
-      final sets = raw['sets'];
-      if (sets is! Map) return const <_SimpleEmote>[];
-      for (final set in sets.values.whereType<Map>()) {
+      final res = await _dio.get<dynamic>('https://api.frankerfacez.com/v1/room/id/$channelId');
+      final raw = res.data;
+      if (raw is! Map || raw['sets'] is! Map) return const <_Emote>[];
+      final out = <_Emote>[];
+      for (final set in (raw['sets'] as Map).values.whereType<Map>()) {
         final emoticons = set['emoticons'];
         if (emoticons is! List) continue;
         for (final item in emoticons.whereType<Map>()) {
           final id = item['id']?.toString().trim() ?? '';
           final name = item['name']?.toString().trim() ?? '';
           final urls = item['urls'];
-          String url = '';
-          if (urls is Map) {
-            url = (urls['2'] ?? urls['1'] ?? urls['4'])?.toString().trim() ?? '';
-          }
+          final url = urls is Map ? (urls['2'] ?? urls['1'] ?? urls['4'])?.toString().trim() ?? '' : '';
           if (id.isEmpty || name.isEmpty || url.isEmpty) continue;
-          output.add(_SimpleEmote(
-            id: id,
-            name: name,
-            imageUrl: url.startsWith('//') ? 'https:$url' : url,
-            kind: _SimpleEmoteKind.ffz,
-          ));
+          out.add(_Emote(id: id, name: name, imageUrl: url.startsWith('//') ? 'https:$url' : url, kind: _EmoteKind.ffz));
         }
       }
-    } catch (_) {}
-
-    return output;
+      return out;
+    } catch (_) {
+      return const <_Emote>[];
+    }
   }
 
-  Future<void> _loadRecentEmotes() async {
+  Future<void> _loadRecent() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getStringList(_recentStorageKey) ?? const <String>[];
-      final next = <String, _SimpleEmote>{};
-      for (final text in raw) {
-        final parts = text.split('\t');
-        if (parts.length < 4) continue;
-        final kindIndex = int.tryParse(parts[3]) ?? _SimpleEmoteKind.twitchChannel.index;
-        final kind = _SimpleEmoteKind.values[math.min(kindIndex, _SimpleEmoteKind.values.length - 1)];
-        final emote = _SimpleEmote(
-          id: parts[0],
-          name: parts[1],
-          imageUrl: parts[2],
-          kind: kind,
-        );
-        if (emote.name.trim().isNotEmpty && emote.imageUrl.trim().isNotEmpty) {
-          next[emote.name] = emote;
-        }
+      final rows = prefs.getStringList(_recentKey) ?? const <String>[];
+      final next = <String, _Emote>{};
+      for (final row in rows) {
+        final p = row.split('\t');
+        if (p.length < 4) continue;
+        final kindIndex = int.tryParse(p[3]) ?? _EmoteKind.twitchChannel.index;
+        final kind = _EmoteKind.values[math.min(kindIndex, _EmoteKind.values.length - 1)];
+        final e = _Emote(id: p[0], name: p[1], imageUrl: p[2], kind: kind);
+        if (e.name.isNotEmpty && e.imageUrl.isNotEmpty) next[e.name] = e;
       }
       if (!mounted) return;
-      setState(() {
-        _recentEmotes
-          ..clear()
-          ..addAll(next);
-      });
+      setState(() => _recent.addAll(next));
     } catch (_) {}
   }
 
-  Future<void> _saveRecentEmotes() async {
+  Future<void> _saveRecent() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final data = _recentEmotes.values
-          .take(80)
-          .map((emote) => '${emote.id}\t${emote.name}\t${emote.imageUrl}\t${emote.kind.index}')
-          .toList(growable: false);
-      await prefs.setStringList(_recentStorageKey, data);
+      final rows = _recent.values.take(80).map((e) => '${e.id}\t${e.name}\t${e.imageUrl}\t${e.kind.index}').toList(growable: false);
+      await prefs.setStringList(_recentKey, rows);
     } catch (_) {}
   }
 
-  void _markRecentEmote(_SimpleEmote emote) {
+  void _markRecent(_Emote e) {
     setState(() {
-      final next = <String, _SimpleEmote>{emote.name: emote};
-      for (final entry in _recentEmotes.entries) {
-        if (entry.key == emote.name) continue;
+      final next = <String, _Emote>{e.name: e};
+      for (final entry in _recent.entries) {
+        if (entry.key == e.name) continue;
         if (next.length >= 80) break;
         next[entry.key] = entry.value;
       }
-      _recentEmotes
+      _recent
         ..clear()
         ..addAll(next);
-      _addEmoteToLookup(emote);
+      _addEmote(e);
     });
-    unawaited(_saveRecentEmotes());
+    unawaited(_saveRecent());
   }
 
-  void _insertEmoteText(_SimpleEmote emote) {
-    final controller = _inputController;
-    final text = controller.text;
-    final selection = controller.selection;
-    final start = selection.isValid ? selection.start : text.length;
-    final end = selection.isValid ? selection.end : text.length;
-    final safeStart = start.clamp(0, text.length).toInt();
-    final safeEnd = end.clamp(0, text.length).toInt();
-
-    final before = text.substring(0, safeStart);
-    final after = text.substring(safeEnd);
-    final needsLeftSpace = before.isNotEmpty && !before.endsWith(RegExp(r'\s'));
-    final needsRightSpace = after.isNotEmpty && !after.startsWith(RegExp(r'\s'));
-    final insert = '${needsLeftSpace ? ' ' : ''}${emote.name}${needsRightSpace ? ' ' : ' '}';
-    final nextText = '$before$insert$after';
-    final nextOffset = (before.length + insert.length).clamp(0, nextText.length).toInt();
-
-    controller.value = TextEditingValue(
-      text: nextText,
-      selection: TextSelection.collapsed(offset: nextOffset),
+  void _insertEmote(_Emote e) {
+    final text = _inputController.text;
+    final sel = _inputController.selection;
+    final start = (sel.isValid ? sel.start : text.length).clamp(0, text.length).toInt();
+    final end = (sel.isValid ? sel.end : text.length).clamp(0, text.length).toInt();
+    final before = text.substring(0, start);
+    final after = text.substring(end);
+    final leftSpace = before.isEmpty || before.endsWith(' ') || before.endsWith('\t');
+    final rightSpace = after.isEmpty || after.startsWith(' ') || after.startsWith('\t');
+    final insert = '${leftSpace ? '' : ' '}${e.name}${rightSpace ? ' ' : ' '}';
+    final next = '$before$insert$after';
+    _inputController.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: (before.length + insert.length).clamp(0, next.length).toInt()),
     );
     _inputFocusNode.requestFocus();
-    _markRecentEmote(emote);
+    _markRecent(e);
   }
 
-  void _setError(String message) {
-    if (!mounted) return;
-    setState(() {
-      _errorText = message;
-      _statusText = message;
-    });
-  }
-
-  _SimpleEmote? _lookupEmoteByName(String text) {
-    final clean = text.trim();
+  _Emote? _lookupEmote(String code) {
+    final clean = code.trim();
     if (clean.isEmpty) return null;
-    return _emotesByExactName[clean] ?? _emotesByLowerName[clean.toLowerCase()];
+    return _emoteExact[clean] ?? _emoteLower[clean.toLowerCase()];
   }
 
-  List<_SimpleEmote> _emotesForKind(_SimpleEmoteFilter filter) {
-    Iterable<_SimpleEmote> source;
+  List<_Emote> _emotesFor(_EmoteFilter filter) {
+    Iterable<_Emote> source;
     switch (filter) {
-      case _SimpleEmoteFilter.recent:
-        source = _recentEmotes.values;
+      case _EmoteFilter.recent:
+        source = _recent.values;
         break;
-      case _SimpleEmoteFilter.twitch:
-        source = _emotesByExactName.values.where((item) => item.kind.isTwitch);
+      case _EmoteFilter.twitch:
+        source = _emoteExact.values.where((e) => e.kind.isTwitch);
         break;
-      case _SimpleEmoteFilter.sevenTv:
-        source = _emotesByExactName.values.where((item) => item.kind == _SimpleEmoteKind.sevenTv);
+      case _EmoteFilter.sevenTv:
+        source = _emoteExact.values.where((e) => e.kind == _EmoteKind.sevenTv);
         break;
-      case _SimpleEmoteFilter.bttv:
-        source = _emotesByExactName.values.where((item) => item.kind == _SimpleEmoteKind.bttv);
+      case _EmoteFilter.bttv:
+        source = _emoteExact.values.where((e) => e.kind == _EmoteKind.bttv);
         break;
-      case _SimpleEmoteFilter.ffz:
-        source = _emotesByExactName.values.where((item) => item.kind == _SimpleEmoteKind.ffz);
+      case _EmoteFilter.ffz:
+        source = _emoteExact.values.where((e) => e.kind == _EmoteKind.ffz);
         break;
-      case _SimpleEmoteFilter.all:
-        source = _emotesByExactName.values;
+      case _EmoteFilter.all:
+        source = _emoteExact.values;
         break;
     }
-
     final list = source.toList(growable: false)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return list;
   }
 
-  Future<void> _showEmotePicker() async {
-    final searchController = TextEditingController();
+  Future<void> _showEmotes() async {
+    final search = TextEditingController();
     String keyword = '';
-
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0E0E10),
@@ -827,46 +675,18 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
             return SizedBox(
               height: MediaQuery.of(context).size.height * 0.62,
               child: DefaultTabController(
-                length: _SimpleEmoteFilter.values.length,
+                length: _EmoteFilter.values.length,
                 child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF18181B),
-                        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.emoji_emotions, color: Color(0xFFBF94FF), size: 20),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: Text(
-                              _loadingEmotes ? '貼圖讀取中...' : '貼圖',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: null,
-                            onPressed: () => unawaited(_loadEmoteCatalog()),
-                            icon: const Icon(Icons.refresh, color: Colors.white70, size: 20),
-                          ),
-                          IconButton(
-                            tooltip: null,
-                            onPressed: () => Navigator.of(sheetContext).pop(),
-                            icon: const Icon(Icons.close, color: Colors.white70, size: 20),
-                          ),
-                        ],
-                      ),
+                    _EmoteSheetHeader(
+                      title: _loadingEmotes ? '貼圖讀取中...' : '貼圖',
+                      onRefresh: () => unawaited(_loadEmotes()),
+                      onClose: () => Navigator.of(sheetContext).pop(),
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                       child: TextField(
-                        controller: searchController,
+                        controller: search,
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
                         cursorColor: const Color(0xFFBF94FF),
                         decoration: InputDecoration(
@@ -876,14 +696,9 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
                           prefixIcon: const Icon(Icons.search, color: Colors.white54, size: 18),
                           filled: true,
                           fillColor: Colors.white.withOpacity(0.065),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                         ),
-                        onChanged: (value) {
-                          setSheetState(() => keyword = value.trim().toLowerCase());
-                        },
+                        onChanged: (v) => setSheetState(() => keyword = v.trim().toLowerCase()),
                       ),
                     ),
                     const TabBar(
@@ -902,21 +717,11 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
                     ),
                     Expanded(
                       child: TabBarView(
-                        children: _SimpleEmoteFilter.values.map((filter) {
-                          final items = _emotesForKind(filter).where((emote) {
-                            if (keyword.isEmpty) return true;
-                            return emote.name.toLowerCase().contains(keyword);
-                          }).toList(growable: false);
-
+                        children: _EmoteFilter.values.map((filter) {
+                          final items = _emotesFor(filter).where((e) => keyword.isEmpty || e.name.toLowerCase().contains(keyword)).toList(growable: false);
                           if (items.isEmpty) {
-                            return Center(
-                              child: Text(
-                                _loadingEmotes ? '讀取中...' : '沒有貼圖',
-                                style: const TextStyle(color: Colors.white54),
-                              ),
-                            );
+                            return Center(child: Text(_loadingEmotes ? '讀取中...' : '沒有貼圖', style: const TextStyle(color: Colors.white54)));
                           }
-
                           return GridView.builder(
                             padding: const EdgeInsets.all(12),
                             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
@@ -926,13 +731,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
                               childAspectRatio: 0.82,
                             ),
                             itemCount: items.length,
-                            itemBuilder: (context, index) {
-                              final emote = items[index];
-                              return _EmotePickerTile(
-                                emote: emote,
-                                onTap: () => _insertEmoteText(emote),
-                              );
-                            },
+                            itemBuilder: (context, i) => _EmoteTile(emote: items[i], onTap: () => _insertEmote(items[i])),
                           );
                         }).toList(growable: false),
                       ),
@@ -945,8 +744,15 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
         );
       },
     );
+    search.dispose();
+  }
 
-    searchController.dispose();
+  void _setError(String msg) {
+    if (!mounted) return;
+    setState(() {
+      _errorText = msg;
+      _status = msg;
+    });
   }
 
   @override
@@ -955,21 +761,14 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
       color: const Color(0xFF0E0E10),
       child: Row(
         children: [
-          _ResizeHandle(
-            onDelta: widget.onWidthDelta,
-            onEnd: widget.onWidthDragEnd,
-          ),
+          _ResizeHandle(onDelta: widget.onWidthDelta, onEnd: widget.onWidthDragEnd),
           Expanded(
             child: Column(
               children: [
-                _buildHeader(),
-                if (_errorText != null)
-                  _ChatStatusBanner(
-                    text: _errorText!,
-                    color: Colors.redAccent,
-                  ),
-                Expanded(child: _buildMessageList()),
-                _buildInputBar(),
+                _header(),
+                if (_errorText != null) _StatusBanner(text: _errorText!, color: Colors.redAccent),
+                Expanded(child: _messageList()),
+                _inputBar(),
               ],
             ),
           ),
@@ -978,119 +777,56 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _header() {
     return Container(
       height: 58,
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF18181B),
-        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF18181B), border: Border(bottom: BorderSide(color: Color(0xFF2D2D35)))),
       child: Row(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFF9146FF).withOpacity(0.18),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.35)),
-            ),
-            child: const Icon(Icons.chat_bubble, color: Color(0xFFBF94FF), size: 18),
-          ),
+          const Icon(Icons.chat_bubble, color: Color(0xFFBF94FF), size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '$_displayName 聊天室',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
+                Text('$_displayName 聊天室', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 2),
-                Text(
-                  '${_connected ? '已連線' : _statusText}｜${_messages.length} 則｜${_emotesByExactName.length} 貼圖｜raw $_rawLineCount',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text('${_connected ? '已連線' : _status}｜${_messages.length} 則｜${_emoteExact.length} 貼圖｜raw $_rawCount', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
-          IconButton(
-            tooltip: null,
-            onPressed: _showEmotePicker,
-            icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.white70, size: 20),
-          ),
-          IconButton(
-            tooltip: null,
-            onPressed: () => unawaited(_restart()),
-            icon: _connecting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFBF94FF)),
-                  )
-                : const Icon(Icons.refresh, color: Colors.white70, size: 20),
-          ),
+          IconButton(tooltip: '貼圖', onPressed: _showEmotes, icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.white70, size: 20)),
+          IconButton(tooltip: '重新整理', onPressed: () => unawaited(_restart()), icon: _connecting ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFBF94FF))) : const Icon(Icons.refresh, color: Colors.white70, size: 20)),
         ],
       ),
     );
   }
 
-  Widget _buildMessageList() {
+  Widget _messageList() {
     if (_messages.isEmpty) {
-      return Center(
-        child: Text(
-          _connecting ? '正在連線聊天室...' : '等待聊天室訊息...',
-          style: const TextStyle(color: Colors.white54),
-        ),
-      );
+      return Center(child: Text(_connecting ? '正在連線聊天室...' : '等待聊天室訊息...', style: const TextStyle(color: Colors.white54)));
     }
-
     return ListView.builder(
       reverse: true,
       padding: const EdgeInsets.fromLTRB(6, 8, 6, 8),
       itemCount: _messages.length,
       itemBuilder: (context, index) {
-        final message = _messages[_messages.length - 1 - index];
-        return _SimpleChatMessageTile(
-          key: ValueKey<String>(message.id),
-          message: message,
-          emoteResolver: _lookupEmoteByName,
-        );
+        final msg = _messages[_messages.length - 1 - index];
+        return _ChatTile(key: ValueKey<String>(msg.id), message: msg, resolveEmote: _lookupEmote);
       },
     );
   }
 
-  Widget _buildInputBar() {
+  Widget _inputBar() {
     final canSend = _connected && !_sending;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFF18181B),
-        border: Border(top: BorderSide(color: Color(0xFF2D2D35))),
-      ),
+      decoration: const BoxDecoration(color: Color(0xFF18181B), border: Border(top: BorderSide(color: Color(0xFF2D2D35)))),
       child: Row(
         children: [
-          IconButton(
-            tooltip: null,
-            onPressed: _showEmotePicker,
-            icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.white70, size: 21),
-          ),
+          IconButton(tooltip: '貼圖', onPressed: _showEmotes, icon: const Icon(Icons.emoji_emotions_outlined, color: Colors.white70, size: 21)),
           Expanded(
             child: TextField(
               controller: _inputController,
@@ -1103,16 +839,11 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
               cursorColor: const Color(0xFFBF94FF),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: _authToken == null || _authToken!.isEmpty
-                    ? '登入後可發言'
-                    : '輸入聊天室訊息...',
+                hintText: _authToken == null || _authToken!.isEmpty ? '登入後可發言' : '輸入聊天室訊息...',
                 hintStyle: const TextStyle(color: Colors.white38),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.065),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(999),
-                  borderSide: BorderSide.none,
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(999), borderSide: BorderSide.none),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               ),
             ),
@@ -1128,13 +859,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
                 width: 42,
                 height: 42,
                 child: Center(
-                  child: _sending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : Icon(Icons.send_rounded, color: canSend ? Colors.white : Colors.white38, size: 19),
+                  child: _sending ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : Icon(Icons.send_rounded, color: canSend ? Colors.white : Colors.white38, size: 19),
                 ),
               ),
             ),
@@ -1145,264 +870,164 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
   }
 }
 
-class _SimpleChatMessageTile extends StatelessWidget {
-  final _SimpleChatMessage message;
-  final _SimpleEmote? Function(String text) emoteResolver;
+class _ChatTile extends StatelessWidget {
+  final _ChatMsg message;
+  final _Emote? Function(String code) resolveEmote;
 
-  const _SimpleChatMessageTile({
-    super.key,
-    required this.message,
-    required this.emoteResolver,
-  });
+  const _ChatTile({super.key, required this.message, required this.resolveEmote});
 
   @override
   Widget build(BuildContext context) {
-    final background = message.system
-        ? const Color(0xFF241A35)
-        : const Color(0xFF18181B);
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: background,
+          color: message.system ? const Color(0xFF241A35) : const Color(0xFF18181B),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.white.withOpacity(message.system ? 0.10 : 0.055)),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: message.displayName,
-                  style: TextStyle(
-                    color: message.color,
-                    fontSize: 13.2,
-                    fontWeight: FontWeight.w900,
-                    height: 1.28,
-                  ),
-                ),
-                TextSpan(
-                  text: message.system ? '：' : ': ',
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 13.2,
-                    fontWeight: FontWeight.w700,
-                    height: 1.28,
-                  ),
-                ),
-                ..._buildMessageContentSpans(message, emoteResolver),
-              ],
-            ),
-            textAlign: TextAlign.left,
-          ),
+          child: Text.rich(TextSpan(children: [
+            TextSpan(text: message.displayName, style: TextStyle(color: message.color, fontSize: 13.2, fontWeight: FontWeight.w900, height: 1.28)),
+            const TextSpan(text: ': ', style: TextStyle(color: Colors.white54, fontSize: 13.2, fontWeight: FontWeight.w700, height: 1.28)),
+            ..._contentSpans(message, resolveEmote),
+          ])),
         ),
       ),
     );
   }
 }
 
-List<InlineSpan> _buildMessageContentSpans(
-  _SimpleChatMessage message,
-  _SimpleEmote? Function(String text) emoteResolver,
-) {
-  final text = message.text;
-  final ranges = _parseTwitchEmoteRanges(text, message.emotesTag);
-  final spans = <InlineSpan>[];
+List<InlineSpan> _contentSpans(_ChatMsg msg, _Emote? Function(String code) resolveEmote) {
+  final text = msg.text;
+  final ranges = _parseTwitchRanges(text, msg.emotesTag);
+  final out = <InlineSpan>[];
   var cursor = 0;
-
-  for (final range in ranges) {
-    if (range.start > cursor) {
-      _appendTextLookupSpans(spans, text.substring(cursor, range.start), emoteResolver);
-    }
-    spans.add(_emoteSpan(
-      imageUrl: _twitchEmoteUrl(range.id),
-      fallback: range.code,
-      height: 28,
-    ));
-    cursor = math.max(cursor, range.endExclusive);
+  for (final r in ranges) {
+    if (r.start > cursor) _appendTextSpans(out, text.substring(cursor, r.start), resolveEmote);
+    out.add(_imageSpan(_twitchEmoteUrl(r.id), r.code));
+    cursor = math.max(cursor, r.endExclusive);
   }
-
-  if (cursor < text.length) {
-    _appendTextLookupSpans(spans, text.substring(cursor), emoteResolver);
-  }
-
-  if (spans.isEmpty) {
-    spans.add(TextSpan(text: text, style: _messageTextStyle));
-  }
-
-  return spans;
+  if (cursor < text.length) _appendTextSpans(out, text.substring(cursor), resolveEmote);
+  if (out.isEmpty) out.add(TextSpan(text: text, style: _msgStyle));
+  return out;
 }
 
-void _appendTextLookupSpans(
-  List<InlineSpan> spans,
-  String text,
-  _SimpleEmote? Function(String text) emoteResolver,
-) {
-  if (text.isEmpty) return;
-  final regex = RegExp(r'(\s+|\S+)');
-
-  for (final match in regex.allMatches(text)) {
-    final raw = match.group(0) ?? '';
+void _appendTextSpans(List<InlineSpan> out, String text, _Emote? Function(String code) resolveEmote) {
+  for (final m in RegExp(r'(\s+|\S+)').allMatches(text)) {
+    final raw = m.group(0) ?? '';
     if (raw.isEmpty) continue;
     if (raw.trim().isEmpty) {
-      spans.add(TextSpan(text: raw, style: _messageTextStyle));
+      out.add(TextSpan(text: raw, style: _msgStyle));
       continue;
     }
-
-    final normalized = _stripLookupPunctuation(raw);
-    final emote = normalized.core.isEmpty ? null : emoteResolver(normalized.core);
+    final token = _stripToken(raw);
+    final emote = token.core.isEmpty ? null : resolveEmote(token.core);
     if (emote == null) {
-      spans.add(TextSpan(text: raw, style: _messageTextStyle));
+      out.add(TextSpan(text: raw, style: _msgStyle));
       continue;
     }
-
-    if (normalized.leading.isNotEmpty) {
-      spans.add(TextSpan(text: normalized.leading, style: _messageTextStyle));
-    }
-    spans.add(_emoteSpan(imageUrl: emote.imageUrl, fallback: emote.name, height: 28));
-    if (normalized.trailing.isNotEmpty) {
-      spans.add(TextSpan(text: normalized.trailing, style: _messageTextStyle));
-    }
+    if (token.leading.isNotEmpty) out.add(TextSpan(text: token.leading, style: _msgStyle));
+    out.add(_imageSpan(emote.imageUrl, emote.name));
+    if (token.trailing.isNotEmpty) out.add(TextSpan(text: token.trailing, style: _msgStyle));
   }
 }
 
-WidgetSpan _emoteSpan({
-  required String imageUrl,
-  required String fallback,
-  required double height,
-}) {
+WidgetSpan _imageSpan(String url, String fallback) {
   return WidgetSpan(
     alignment: PlaceholderAlignment.middle,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1.5),
       child: Image.network(
-        imageUrl,
-        height: height,
+        url,
+        height: 28,
         fit: BoxFit.contain,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
-        errorBuilder: (context, error, stackTrace) {
-          return Text(fallback, style: _messageTextStyle);
-        },
+        errorBuilder: (_, __, ___) => Text(fallback, style: _msgStyle),
       ),
     ),
   );
 }
 
-const TextStyle _messageTextStyle = TextStyle(
-  color: Colors.white,
-  fontSize: 13.2,
-  height: 1.28,
-  fontWeight: FontWeight.w500,
-);
+const TextStyle _msgStyle = TextStyle(color: Colors.white, fontSize: 13.2, height: 1.28, fontWeight: FontWeight.w500);
 
-List<_TwitchEmoteRange> _parseTwitchEmoteRanges(String text, String tag) {
-  final clean = tag.trim();
-  if (clean.isEmpty) return const <_TwitchEmoteRange>[];
-
-  final output = <_TwitchEmoteRange>[];
-  for (final group in clean.split('/')) {
-    final separator = group.indexOf(':');
-    if (separator <= 0 || separator >= group.length - 1) continue;
-    final id = group.substring(0, separator).trim();
-    final ranges = group.substring(separator + 1).split(',');
-    for (final range in ranges) {
+List<_TwitchRange> _parseTwitchRanges(String text, String tag) {
+  if (tag.trim().isEmpty) return const <_TwitchRange>[];
+  final out = <_TwitchRange>[];
+  for (final group in tag.split('/')) {
+    final colon = group.indexOf(':');
+    if (colon <= 0) continue;
+    final id = group.substring(0, colon).trim();
+    for (final range in group.substring(colon + 1).split(',')) {
       final dash = range.indexOf('-');
-      if (dash <= 0 || dash >= range.length - 1) continue;
+      if (dash <= 0) continue;
       final start = int.tryParse(range.substring(0, dash));
       final end = int.tryParse(range.substring(dash + 1));
-      if (start == null || end == null || start < 0 || end < start || start >= text.length) {
-        continue;
-      }
+      if (start == null || end == null || start < 0 || end < start || start >= text.length) continue;
       final endExclusive = math.min(end + 1, text.length);
-      output.add(_TwitchEmoteRange(
-        id: id,
-        start: start,
-        endExclusive: endExclusive,
-        code: text.substring(start, endExclusive),
-      ));
+      out.add(_TwitchRange(id: id, start: start, endExclusive: endExclusive, code: text.substring(start, endExclusive)));
     }
   }
-
-  output.sort((a, b) => a.start.compareTo(b.start));
-  final filtered = <_TwitchEmoteRange>[];
-  var cursor = 0;
-  for (final item in output) {
-    if (item.start < cursor) continue;
-    filtered.add(item);
-    cursor = item.endExclusive;
-  }
-  return filtered;
+  out.sort((a, b) => a.start.compareTo(b.start));
+  return out;
 }
 
-_NormalizedToken _stripLookupPunctuation(String token) {
+_Token _stripToken(String token) {
   var start = 0;
   var end = token.length;
-  while (start < end && _isLeadingPunctuation(token.codeUnitAt(start))) {
-    start += 1;
-  }
-  while (end > start && _isTrailingPunctuation(token.codeUnitAt(end - 1))) {
-    end -= 1;
-  }
-  return _NormalizedToken(
-    leading: token.substring(0, start),
-    core: token.substring(start, end),
-    trailing: token.substring(end),
-  );
+  while (start < end && _isLeading(token.codeUnitAt(start))) start += 1;
+  while (end > start && _isTrailing(token.codeUnitAt(end - 1))) end -= 1;
+  return _Token(leading: token.substring(0, start), core: token.substring(start, end), trailing: token.substring(end));
 }
 
-bool _isLeadingPunctuation(int codeUnit) {
-  return codeUnit == 0x28 || codeUnit == 0x5B || codeUnit == 0x7B ||
-      codeUnit == 0x3C || codeUnit == 0x22 || codeUnit == 0x27;
-}
+bool _isLeading(int c) => c == 0x28 || c == 0x5B || c == 0x7B || c == 0x3C || c == 0x22 || c == 0x27;
+bool _isTrailing(int c) => _isLeading(c) || c == 0x29 || c == 0x5D || c == 0x7D || c == 0x3E || c == 0x2E || c == 0x2C || c == 0x21 || c == 0x3F || c == 0x3A || c == 0x3B;
 
-bool _isTrailingPunctuation(int codeUnit) {
-  return codeUnit == 0x29 || codeUnit == 0x5D || codeUnit == 0x7D ||
-      codeUnit == 0x3E || codeUnit == 0x22 || codeUnit == 0x27 ||
-      codeUnit == 0x2E || codeUnit == 0x2C || codeUnit == 0x21 ||
-      codeUnit == 0x3F || codeUnit == 0x3A || codeUnit == 0x3B;
-}
+String _twitchEmoteUrl(String id) => 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
 
-String _twitchEmoteUrl(String id) {
-  return 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
-}
-
-Color? _parseUserColor(String? raw) {
+Color? _parseColor(String? raw) {
   final text = raw?.trim();
   if (text == null || text.isEmpty) return null;
-  final normalized = text.startsWith('#') ? text.substring(1) : text;
-  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(normalized)) return null;
-  return Color(int.parse('FF$normalized', radix: 16));
+  final hex = text.startsWith('#') ? text.substring(1) : text;
+  if (!RegExp(r'^[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+  return Color(int.parse('FF$hex', radix: 16));
 }
 
 Color _colorFromText(String text) {
-  final source = text.trim().isEmpty ? 'twitch' : text.trim().toLowerCase();
   var hash = 0;
-  for (final unit in source.codeUnits) {
-    hash = (hash * 31 + unit) & 0x7fffffff;
-  }
-  const colors = <Color>[
-    Color(0xFFBF94FF),
-    Color(0xFF00A3FF),
-    Color(0xFF00F5D4),
-    Color(0xFFFF75E6),
-    Color(0xFFFFB000),
-    Color(0xFFFF5C7A),
-    Color(0xFF7DD3FC),
-  ];
+  for (final unit in text.toLowerCase().codeUnits) hash = (hash * 31 + unit) & 0x7fffffff;
+  const colors = <Color>[Color(0xFFBF94FF), Color(0xFF00A3FF), Color(0xFF00F5D4), Color(0xFFFF75E6), Color(0xFFFFB000), Color(0xFFFF5C7A), Color(0xFF7DD3FC)];
   return colors[hash % colors.length];
 }
 
-class _EmotePickerTile extends StatelessWidget {
-  final _SimpleEmote emote;
-  final VoidCallback onTap;
+class _EmoteSheetHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback onRefresh;
+  final VoidCallback onClose;
 
-  const _EmotePickerTile({
-    required this.emote,
-    required this.onTap,
-  });
+  const _EmoteSheetHeader({required this.title, required this.onRefresh, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 8, 8),
+      decoration: const BoxDecoration(color: Color(0xFF18181B), border: Border(bottom: BorderSide(color: Color(0xFF2D2D35)))),
+      child: Row(children: [
+        const Icon(Icons.emoji_emotions, color: Color(0xFFBF94FF), size: 20),
+        const SizedBox(width: 9),
+        Expanded(child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900))),
+        IconButton(tooltip: '重新整理', onPressed: onRefresh, icon: const Icon(Icons.refresh, color: Colors.white70, size: 20)),
+        IconButton(tooltip: '關閉', onPressed: onClose, icon: const Icon(Icons.close, color: Colors.white70, size: 20)),
+      ]),
+    );
+  }
+}
+
+class _EmoteTile extends StatelessWidget {
+  final _Emote emote;
+  final VoidCallback onTap;
+  const _EmoteTile({required this.emote, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -1414,44 +1039,21 @@ class _EmotePickerTile extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(7),
-          child: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  child: Image.network(
-                    emote.imageUrl,
-                    fit: BoxFit.contain,
-                    gaplessPlayback: true,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.broken_image, color: Colors.white38, size: 20);
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                emote.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-          ),
+          child: Column(children: [
+            Expanded(child: Center(child: Image.network(emote.imageUrl, fit: BoxFit.contain, gaplessPlayback: true, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, color: Colors.white38, size: 20)))),
+            const SizedBox(height: 5),
+            Text(emote.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white70, fontSize: 10.5, fontWeight: FontWeight.w800)),
+          ]),
         ),
       ),
     );
   }
 }
 
-class _ChatStatusBanner extends StatelessWidget {
+class _StatusBanner extends StatelessWidget {
   final String text;
   final Color color;
-
-  const _ChatStatusBanner({required this.text, required this.color});
+  const _StatusBanner({required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -1459,17 +1061,7 @@ class _ChatStatusBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       color: color.withOpacity(0.14),
-      child: Text(
-        text,
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: color,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-          height: 1.25,
-        ),
-      ),
+      child: Text(text, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w800, height: 1.25)),
     );
   }
 }
@@ -1477,142 +1069,83 @@ class _ChatStatusBanner extends StatelessWidget {
 class _ResizeHandle extends StatelessWidget {
   final ValueChanged<double> onDelta;
   final VoidCallback onEnd;
-
   const _ResizeHandle({required this.onDelta, required this.onEnd});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onHorizontalDragUpdate: (details) => onDelta(details.delta.dx),
+      onHorizontalDragUpdate: (d) => onDelta(d.delta.dx),
       onHorizontalDragEnd: (_) => onEnd(),
       child: MouseRegion(
         cursor: SystemMouseCursors.resizeLeftRight,
-        child: SizedBox(
-          width: 7,
-          child: Center(
-            child: Container(
-              width: 2,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.16),
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-        ),
+        child: SizedBox(width: 7, child: Center(child: Container(width: 2, height: 46, decoration: BoxDecoration(color: Colors.white.withOpacity(0.16), borderRadius: BorderRadius.circular(999))))),
       ),
     );
   }
 }
 
-class _SimpleChatMessage {
+class _ChatMsg {
   final String id;
   final String login;
   final String displayName;
   final Color color;
   final String text;
   final String emotesTag;
-  final DateTime receivedAt;
   final bool system;
-
-  const _SimpleChatMessage({
-    required this.id,
-    required this.login,
-    required this.displayName,
-    required this.color,
-    required this.text,
-    required this.emotesTag,
-    required this.receivedAt,
-    required this.system,
-  });
+  const _ChatMsg({required this.id, required this.login, required this.displayName, required this.color, required this.text, required this.emotesTag, required this.system});
 }
 
-class _SimpleEmote {
+class _Emote {
   final String id;
   final String name;
   final String imageUrl;
-  final _SimpleEmoteKind kind;
-
-  const _SimpleEmote({
-    required this.id,
-    required this.name,
-    required this.imageUrl,
-    required this.kind,
-  });
+  final _EmoteKind kind;
+  const _Emote({required this.id, required this.name, required this.imageUrl, required this.kind});
 }
 
-enum _SimpleEmoteKind {
+enum _EmoteKind {
   twitchChannel,
   twitchGlobal,
   sevenTv,
   bttv,
   ffz;
 
-  bool get isTwitch {
-    return this == _SimpleEmoteKind.twitchChannel ||
-        this == _SimpleEmoteKind.twitchGlobal;
-  }
+  bool get isTwitch => this == _EmoteKind.twitchChannel || this == _EmoteKind.twitchGlobal;
 }
 
-enum _SimpleEmoteFilter {
-  recent,
-  twitch,
-  sevenTv,
-  bttv,
-  ffz,
-  all,
-}
+enum _EmoteFilter { recent, twitch, sevenTv, bttv, ffz, all }
 
-class _TwitchEmoteRange {
+class _TwitchRange {
   final String id;
   final int start;
   final int endExclusive;
   final String code;
-
-  const _TwitchEmoteRange({
-    required this.id,
-    required this.start,
-    required this.endExclusive,
-    required this.code,
-  });
+  const _TwitchRange({required this.id, required this.start, required this.endExclusive, required this.code});
 }
 
-class _NormalizedToken {
+class _Token {
   final String leading;
   final String core;
   final String trailing;
-
-  const _NormalizedToken({
-    required this.leading,
-    required this.core,
-    required this.trailing,
-  });
+  const _Token({required this.leading, required this.core, required this.trailing});
 }
 
-class _ParsedIrcLine {
+class _IrcLine {
   final Map<String, String> tags;
   final String prefix;
   final String command;
-  final List<String> params;
   final String trailing;
 
-  const _ParsedIrcLine({
-    required this.tags,
-    required this.prefix,
-    required this.command,
-    required this.params,
-    required this.trailing,
-  });
+  const _IrcLine({required this.tags, required this.prefix, required this.command, required this.trailing});
 
   String get userLogin {
-    if (prefix.isEmpty) return '';
     final bang = prefix.indexOf('!');
-    if (bang <= 0) return prefix;
-    return prefix.substring(0, bang);
+    if (bang > 0) return prefix.substring(0, bang);
+    return prefix;
   }
 
-  static _ParsedIrcLine parse(String line) {
+  static _IrcLine parse(String line) {
     var rest = line.trimRight();
     final tags = <String, String>{};
     var prefix = '';
@@ -1625,12 +1158,9 @@ class _ParsedIrcLine {
         rest = rest.substring(space + 1);
         for (final pair in rawTags.split(';')) {
           if (pair.isEmpty) continue;
-          final equals = pair.indexOf('=');
-          if (equals < 0) {
-            tags[pair] = '';
-          } else {
-            tags[pair.substring(0, equals)] = _decodeIrcTag(pair.substring(equals + 1));
-          }
+          final eq = pair.indexOf('=');
+          if (eq < 0) tags[pair] = '';
+          if (eq >= 0) tags[pair.substring(0, eq)] = _decodeTag(pair.substring(eq + 1));
         }
       }
     }
@@ -1643,27 +1173,18 @@ class _ParsedIrcLine {
       }
     }
 
-    final trailingIndex = rest.indexOf(' :');
-    if (trailingIndex >= 0) {
-      trailing = rest.substring(trailingIndex + 2);
-      rest = rest.substring(0, trailingIndex);
+    final trail = rest.indexOf(' :');
+    if (trail >= 0) {
+      trailing = rest.substring(trail + 2);
+      rest = rest.substring(0, trail);
     }
 
-    final parts = rest.split(' ').where((part) => part.isNotEmpty).toList(growable: false);
-    final command = parts.isEmpty ? '' : parts.first;
-    final params = parts.length <= 1 ? const <String>[] : parts.sublist(1);
-
-    return _ParsedIrcLine(
-      tags: tags,
-      prefix: prefix,
-      command: command,
-      params: params,
-      trailing: _decodeIrcTag(trailing),
-    );
+    final parts = rest.split(' ').where((p) => p.isNotEmpty).toList(growable: false);
+    return _IrcLine(tags: tags, prefix: prefix, command: parts.isEmpty ? '' : parts.first, trailing: _decodeTag(trailing));
   }
 }
 
-String _decodeIrcTag(String value) {
+String _decodeTag(String value) {
   return value
       .replaceAll(r'\s', ' ')
       .replaceAll(r'\:', ';')
