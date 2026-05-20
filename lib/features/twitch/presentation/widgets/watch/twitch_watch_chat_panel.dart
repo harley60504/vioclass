@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage235_open_prediction_debug_log
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -14,7 +12,6 @@ import '../../../services/engagement/twitch_prediction_hermes_runtime_service.da
 import '../../settings/twitch_chat_appearance_controller.dart';
 import '../../sheets/twitch_chat_appearance_sheet.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
-import '../../sheets/twitch_prediction_debug_log_sheet.dart';
 import 'chat/twitch_watch_chat_engagement_area.dart';
 import 'chat/twitch_watch_chat_header_bar.dart';
 import 'chat/twitch_watch_chat_input_section.dart';
@@ -342,9 +339,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 onOpenAppearance: () => showTwitchChatAppearanceSheet(
                   context: context,
                   controller: _appearanceController,
-                ),
-                onDebugPrediction: () => showTwitchPredictionDebugLogSheet(
-                  context: context,
                 ),
               ),
               Expanded(
