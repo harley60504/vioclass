@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:vio_class/features/twitch/data/models/twitch_stream_model.dart';
 
-import '../../../../data/models/twitch_stream_model.dart';
 import 'twitch_chat_side_panel.dart';
 
-/// Compatibility wrapper for older call sites.
-///
-/// Stage 252: the visible chat UI should use the rebuilt simple chat panel.
-/// Any older widget importing TwitchOfficialChatPanel will now land on the
-/// same rewritten IRC + emote picker path instead of the old renderer.
 class TwitchOfficialChatPanel extends StatelessWidget {
   final TwitchStreamModel stream;
   final String? clientId;
