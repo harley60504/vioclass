@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_panel_stage234_prediction_bus_updates
+// PATCH VERSION: twitch_watch_chat_panel_stage235_open_prediction_debug_log
 
 import 'dart:async';
 
@@ -14,6 +14,7 @@ import '../../../services/engagement/twitch_prediction_hermes_runtime_service.da
 import '../../settings/twitch_chat_appearance_controller.dart';
 import '../../sheets/twitch_chat_appearance_sheet.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
+import '../../sheets/twitch_prediction_debug_log_sheet.dart';
 import 'chat/twitch_watch_chat_engagement_area.dart';
 import 'chat/twitch_watch_chat_header_bar.dart';
 import 'chat/twitch_watch_chat_input_section.dart';
@@ -174,9 +175,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     if (base == null || !base.hasPrediction) return true;
     if (_samePredictionFamily(base, prediction)) return true;
 
-    // Hermes can deliver a brand-new active prediction before the parent watch
-    // page has refreshed its GQL snapshot. Accept that replacement so the chat
-    // card does not stay stuck on the old prediction id.
     final status = prediction.normalizedStatus;
     return status == 'ACTIVE' || status == 'OPEN';
   }
@@ -344,6 +342,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 onOpenAppearance: () => showTwitchChatAppearanceSheet(
                   context: context,
                   controller: _appearanceController,
+                ),
+                onDebugPrediction: () => showTwitchPredictionDebugLogSheet(
+                  context: context,
                 ),
               ),
               Expanded(
