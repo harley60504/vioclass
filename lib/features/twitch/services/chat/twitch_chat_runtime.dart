@@ -19,9 +19,8 @@ class TwitchChatRuntime extends ChangeNotifier {
 
   /// Optional second IRC connection used only for sending messages.
   ///
-  /// Keeping read and write separate makes the main read connection behave more
-  /// like another viewer. It can receive the server version of our own message
-  /// instead of relying only on same-connection echo/local echo.
+  /// If present, both read/write IRC messages are still listened to, but visible
+  /// chat is always server-authored. No local echo is inserted.
   final TwitchIrcApiService? writeIrcApi;
 
   final TwitchBadgeCacheService badgeCache;
@@ -48,15 +47,7 @@ class TwitchChatRuntime extends ChangeNotifier {
 
   static const Duration initialUserStateWait = Duration(milliseconds: 1500);
   static const Duration sendUserStateWait = Duration(milliseconds: 900);
-
-  /// StreamNook-style server-first outgoing flow.
-  ///
-  /// USERSTATE only means Twitch accepted the command pipeline; it is not the
-  /// final visible chat message. Prefer the official PRIVMSG server echo because
-  /// it contains Twitch tags such as emotes/msg id. Local echo is delayed and is
-  /// only a last-resort fallback for network/server echo loss.
-  static const Duration serverEchoFallbackAfterAck = Duration(seconds: 4);
-  static const Duration serverEchoHardTimeout = Duration(seconds: 8);
+  static const Duration pendingOutgoingTtl = Duration(seconds: 20);
 
   TwitchIrcApiService get _sendIrcApi => writeIrcApi ?? ircApi;
   bool get usingDualIrcMode => writeIrcApi != null;
@@ -83,8 +74,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   int _rawEventCount = 0;
   int _recentMessageCount = 0;
   int _recentParseIssueCount = 0;
-  int _localEchoFallbackCount = 0;
-  int _serverEchoReplaceCount = 0;
+  int _serverEchoMatchCount = 0;
   int _rejectedOutgoingCount = 0;
 
   List<TwitchChatRuntimeMessage> get messages {
@@ -102,8 +92,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   int get recentMessageCount => _recentMessageCount;
   int get recentParseIssueCount => _recentParseIssueCount;
   int get pendingOutgoingCount => _pendingOutgoingMessages.length;
-  int get localEchoFallbackCount => _localEchoFallbackCount;
-  int get serverEchoReplaceCount => _serverEchoReplaceCount;
+  int get serverEchoMatchCount => _serverEchoMatchCount;
   int get rejectedOutgoingCount => _rejectedOutgoingCount;
 
   TwitchChatMessageNormalizer get normalizer {
@@ -148,13 +137,12 @@ class TwitchChatRuntime extends ChangeNotifier {
     _rawEventCount = 0;
     _recentMessageCount = 0;
     _recentParseIssueCount = 0;
-    _localEchoFallbackCount = 0;
-    _serverEchoReplaceCount = 0;
+    _serverEchoMatchCount = 0;
     _rejectedOutgoingCount = 0;
 
     _notifyBatcher.cancel();
     _messages.clear();
-    _pendingOutgoingMessages.clear();
+    _clearPendingOutgoingMessages();
     _seenMessageIds.clear();
     _deletedMessageIds.clear();
     _ownUserStateTags.clear();
@@ -312,7 +300,6 @@ class TwitchChatRuntime extends ChangeNotifier {
         _appendRuntimeMessage(
           runtimeMessage,
           notify: false,
-          allowReplaceLocalEcho: false,
         );
       }
 
@@ -339,10 +326,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       case 'GLOBALUSERSTATE':
       case 'USERSTATE':
         _ownUserStateTags.addAll(message.tags);
-
-        if (!usingDualIrcMode && message.command == 'USERSTATE') {
-          _ackOldestPendingFromIrcUserState();
-        }
+        _markOldestPendingAcknowledged();
         return;
 
       case 'NOTICE':
@@ -358,8 +342,6 @@ class TwitchChatRuntime extends ChangeNotifier {
         return;
 
       case 'ROOMSTATE':
-        // Room state is useful for official modes, but this runtime currently
-        // exposes it only through raw/runtime debug. Keep it out of visible chat.
         return;
 
       case 'PRIVMSG':
@@ -382,23 +364,24 @@ class TwitchChatRuntime extends ChangeNotifier {
       case 'GLOBALUSERSTATE':
       case 'USERSTATE':
         _ownUserStateTags.addAll(message.tags);
-        if (message.command == 'USERSTATE') {
-          _ackOldestPendingFromIrcUserState();
-        }
+        _markOldestPendingAcknowledged();
         return;
 
       case 'NOTICE':
         _handleNotice(message);
+        return;
+
+      case 'PRIVMSG':
+        _handleVisiblePrivMsg(message);
         return;
     }
   }
 
   void _handleVisiblePrivMsg(TwitchChatMessage message) {
     final pending = _findMatchingPending(message);
-
     if (pending != null) {
-      _completePendingWithServerMessage(pending, message);
-      return;
+      _removePending(pending);
+      _serverEchoMatchCount += 1;
     }
 
     _appendRuntimeMessage(
@@ -438,7 +421,6 @@ class TwitchChatRuntime extends ChangeNotifier {
         message.tags['target_user_id'];
 
     if (targetUserId == null || targetUserId.trim().isEmpty) {
-      // Full chat clear. Keep system state simple for now.
       _messages.clear();
       _appendSystemMessage('Chat was cleared.');
       notifyListeners();
@@ -464,20 +446,14 @@ class TwitchChatRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _ackOldestPendingFromIrcUserState() {
-    final pending = _pendingOutgoingMessages
-        .where((item) => !item.writeAcknowledged && !item.completed)
-        .cast<_PendingOutgoingChatMessage?>()
-        .firstWhere((item) => item != null, orElse: () => null);
-
-    if (pending == null) return;
-
-    pending.writeAcknowledged = true;
-
-    // USERSTATE is only an ACK. Do not render local echo immediately; wait for
-    // the official PRIVMSG server echo so Twitch emotes / msg id / badges stay
-    // authoritative. Local echo is a delayed fallback only.
-    _scheduleFallbackLocalEcho(pending);
+  void _markOldestPendingAcknowledged() {
+    for (final pending in _pendingOutgoingMessages) {
+      if (!pending.writeAcknowledged) {
+        pending.writeAcknowledged = true;
+        notifyListeners();
+        return;
+      }
+    }
   }
 
   _PendingOutgoingChatMessage? _findMatchingPending(TwitchChatMessage message) {
@@ -487,11 +463,10 @@ class TwitchChatRuntime extends ChangeNotifier {
     if (text.isEmpty) return null;
 
     for (final pending in _pendingOutgoingMessages) {
-      if (pending.completed) continue;
       if (pending.text.trim() != text) continue;
 
       final delta = DateTime.now().difference(pending.createdAt).abs();
-      if (delta <= const Duration(seconds: 20)) {
+      if (delta <= pendingOutgoingTtl) {
         return pending;
       }
     }
@@ -511,55 +486,13 @@ class TwitchChatRuntime extends ChangeNotifier {
     return incomingLogin == _viewerLogin.trim().toLowerCase();
   }
 
-  void _completePendingWithServerMessage(
-    _PendingOutgoingChatMessage pending,
-    TwitchChatMessage serverMessage,
-  ) {
-    _removePending(pending);
-
-    final runtimeMessage = normalizer.normalize(
-      serverMessage,
-      receivedAt: DateTime.now(),
-    );
-
-    final localIndex = _messages.indexWhere((item) => item.id == pending.localId);
-    if (localIndex >= 0) {
-      _messages[localIndex] = runtimeMessage;
-      _markSeen(runtimeMessage);
-      _serverEchoReplaceCount += 1;
-      notifyListeners();
-    } else {
-      _appendRuntimeMessage(runtimeMessage);
-    }
-
-    if (!pending.completer.isCompleted) {
-      pending.completer.complete();
-    }
-  }
-
-  void _completePendingWithLocalEcho(_PendingOutgoingChatMessage pending) {
-    if (pending.completed) return;
-
-    final localEcho = _createLocalEchoMessage(pending);
-    _appendRuntimeMessage(localEcho);
-
-    _removePending(pending);
-    _localEchoFallbackCount += 1;
-
-    if (!pending.completer.isCompleted) {
-      pending.completer.complete();
-    }
-  }
-
   void _rejectNewestPending(TwitchChatMessage noticeMessage) {
     _PendingOutgoingChatMessage? pending;
 
     for (var index = _pendingOutgoingMessages.length - 1; index >= 0; index -= 1) {
       final item = _pendingOutgoingMessages[index];
-      if (!item.completed) {
-        pending = item;
-        break;
-      }
+      pending = item;
+      break;
     }
 
     final reason = noticeMessage.message.trim().isNotEmpty
@@ -570,14 +503,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     _rejectedOutgoingCount += 1;
 
     if (pending != null) {
-      _messages.removeWhere((item) => item.id == pending!.localId);
       _removePending(pending);
-
-      if (!pending.completer.isCompleted) {
-        pending.completer.completeError(StateError(reason));
-      }
-    } else {
-      _removeNewestRecentLocalEcho();
     }
 
     _appendSystemMessage(reason);
@@ -613,7 +539,6 @@ class TwitchChatRuntime extends ChangeNotifier {
   void _appendRuntimeMessage(
     TwitchChatRuntimeMessage message, {
     bool notify = true,
-    bool allowReplaceLocalEcho = true,
   }) {
     if (_isDeletedMessage(message.id)) return;
 
@@ -625,20 +550,6 @@ class TwitchChatRuntime extends ChangeNotifier {
 
       final existingIndex = _messages.indexWhere((item) => item.id == id);
       if (existingIndex >= 0) {
-        return;
-      }
-    }
-
-    if (allowReplaceLocalEcho &&
-        message.source.source != TwitchChatMessageSource.localEcho) {
-      final localEchoIndex = _findMatchingLocalEchoIndex(message);
-      if (localEchoIndex >= 0) {
-        _messages[localEchoIndex] = message;
-        _markSeen(message);
-        _serverEchoReplaceCount += 1;
-        if (notify) {
-          _requestUiNotify();
-        }
         return;
       }
     }
@@ -673,45 +584,6 @@ class TwitchChatRuntime extends ChangeNotifier {
     return _deletedMessageIds.contains(id);
   }
 
-  int _findMatchingLocalEchoIndex(TwitchChatRuntimeMessage incoming) {
-    final incomingText = incoming.message.trim();
-    if (incomingText.isEmpty) return -1;
-
-    final incomingLogin = incoming.userLogin.trim().toLowerCase();
-    if (incomingLogin.isEmpty) return -1;
-
-    final now = incoming.receivedAt;
-
-    for (var index = _messages.length - 1; index >= 0; index -= 1) {
-      final item = _messages[index];
-      if (item.source.source != TwitchChatMessageSource.localEcho) continue;
-      if (item.message.trim() != incomingText) continue;
-      if (item.userLogin.trim().toLowerCase() != incomingLogin) continue;
-
-      final delta = now.difference(item.receivedAt).inSeconds.abs();
-      if (delta <= 30) {
-        return index;
-      }
-    }
-
-    return -1;
-  }
-
-  void _removeNewestRecentLocalEcho() {
-    final now = DateTime.now();
-
-    for (var index = _messages.length - 1; index >= 0; index -= 1) {
-      final item = _messages[index];
-      if (item.source.source != TwitchChatMessageSource.localEcho) continue;
-
-      final age = now.difference(item.receivedAt).abs();
-      if (age <= const Duration(seconds: 30)) {
-        _messages.removeAt(index);
-        return;
-      }
-    }
-  }
-
   Future<void> sendMessage(String message) async {
     if (!_connected) {
       throw StateError('聊天室尚未連線，不能送出訊息。');
@@ -737,14 +609,13 @@ class TwitchChatRuntime extends ChangeNotifier {
     );
 
     _pendingOutgoingMessages.add(pending);
+    _schedulePendingCleanup(pending);
 
     try {
       await _sendIrcApi.sendChatMessage(
         channelLogin: _channelLogin,
         message: text,
       );
-
-      _scheduleHardTimeout(pending);
       notifyListeners();
     } catch (e) {
       _removePending(pending);
@@ -754,90 +625,24 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
   }
 
-  void _scheduleFallbackLocalEcho(_PendingOutgoingChatMessage pending) {
-    if (pending.completed || pending.fallbackTimer != null) return;
-
-    pending.fallbackTimer = Timer(serverEchoFallbackAfterAck, () {
+  void _schedulePendingCleanup(_PendingOutgoingChatMessage pending) {
+    pending.cleanupTimer = Timer(pendingOutgoingTtl, () {
       if (!_pendingOutgoingMessages.contains(pending)) return;
-      if (pending.completed) return;
-
-      _completePendingWithLocalEcho(pending);
-    });
-  }
-
-  void _scheduleHardTimeout(_PendingOutgoingChatMessage pending) {
-    pending.hardTimeoutTimer = Timer(serverEchoHardTimeout, () {
-      if (!_pendingOutgoingMessages.contains(pending)) return;
-      if (pending.completed) return;
-
-      _completePendingWithLocalEcho(pending);
+      _removePending(pending);
+      notifyListeners();
     });
   }
 
   void _removePending(_PendingOutgoingChatMessage pending) {
-    pending.completed = true;
-    pending.fallbackTimer?.cancel();
-    pending.hardTimeoutTimer?.cancel();
+    pending.cleanupTimer?.cancel();
     _pendingOutgoingMessages.remove(pending);
   }
 
-  TwitchChatRuntimeMessage _createLocalEchoMessage(
-    _PendingOutgoingChatMessage pending,
-  ) {
-    final now = DateTime.now();
-    final userStateTags = <String, String>{
-      ...ircApi.currentUserStateTags,
-      if (writeIrcApi != null) ...writeIrcApi!.currentUserStateTags,
-      ..._ownUserStateTags,
-    };
-
-    final login = pending.userLogin.trim().isNotEmpty
-        ? pending.userLogin.trim().toLowerCase()
-        : (_viewerLogin.trim().isEmpty
-            ? (ircApi.currentNick ?? 'me').trim().toLowerCase()
-            : _viewerLogin.trim().toLowerCase());
-
-    final displayNameFromUserState = userStateTags['display-name']?.trim() ?? '';
-    final displayName = displayNameFromUserState.isNotEmpty
-        ? displayNameFromUserState
-        : (_viewerDisplayName.trim().isEmpty ? login : _viewerDisplayName.trim());
-
-    final userId = pending.userId.trim().isNotEmpty
-        ? pending.userId.trim()
-        : (_viewerUserId.trim().isNotEmpty
-            ? _viewerUserId.trim()
-            : (userStateTags['user-id'] ?? ''));
-
-    final mergedTags = <String, String>{
-      ...userStateTags,
-
-      'id': pending.localId,
-      'login': login,
-      'user-id': userId,
-      'display-name': displayName,
-      'tmi-sent-ts': now.millisecondsSinceEpoch.toString(),
-      'client-nonce': pending.localId,
-
-      'first-msg': '0',
-      'returning-chatter': userStateTags['returning-chatter'] ?? '0',
-      'mod': userStateTags['mod'] ?? '0',
-      'subscriber': userStateTags['subscriber'] ?? '0',
-      'turbo': userStateTags['turbo'] ?? '0',
-    }..removeWhere((key, value) => value.trim().isEmpty);
-
-    final source = TwitchChatMessage.synthetic(
-      channelLogin: _channelLogin,
-      userLogin: login,
-      displayName: displayName,
-      message: pending.text,
-      source: TwitchChatMessageSource.localEcho,
-      tags: mergedTags,
-    );
-
-    return normalizer.normalize(
-      source,
-      receivedAt: now,
-    );
+  void _clearPendingOutgoingMessages() {
+    for (final pending in _pendingOutgoingMessages) {
+      pending.cleanupTimer?.cancel();
+    }
+    _pendingOutgoingMessages.clear();
   }
 
   void _appendSystemMessage(String message) {
@@ -878,16 +683,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     _writeMessageSubscription = null;
     _rawSubscription = null;
 
-    for (final pending in List<_PendingOutgoingChatMessage>.from(
-      _pendingOutgoingMessages,
-    )) {
-      _removePending(pending);
-      if (!pending.completer.isCompleted) {
-        pending.completer.completeError(
-          StateError('聊天室已中斷，訊息未確認。'),
-        );
-      }
-    }
+    _clearPendingOutgoingMessages();
 
     await ircApi.disconnect();
     await writeIrcApi?.disconnect();
@@ -920,13 +716,11 @@ class TwitchChatRuntime extends ChangeNotifier {
       'recentMessageCount': recentMessageCount,
       'recentParseIssueCount': recentParseIssueCount,
       'pendingOutgoingCount': pendingOutgoingCount,
-      'localEchoFallbackCount': localEchoFallbackCount,
-      'serverEchoReplaceCount': serverEchoReplaceCount,
+      'serverEchoMatchCount': serverEchoMatchCount,
       'rejectedOutgoingCount': rejectedOutgoingCount,
       'usingDualIrcMode': usingDualIrcMode,
-      'serverFirstOutgoing': true,
-      'serverEchoFallbackAfterAckMs': serverEchoFallbackAfterAck.inMilliseconds,
-      'serverEchoHardTimeoutMs': serverEchoHardTimeout.inMilliseconds,
+      'serverOnlyOutgoing': true,
+      'pendingOutgoingTtlMs': pendingOutgoingTtl.inMilliseconds,
       'seenMessageIdCount': _seenMessageIds.length,
       'deletedMessageIdCount': _deletedMessageIds.length,
       'ownUserStateTags': _ownUserStateTags,
@@ -946,19 +740,14 @@ class _PendingOutgoingChatMessage {
   final DateTime createdAt;
   final String userLogin;
   final String userId;
-  final String localId;
-  final Completer<void> completer = Completer<void>();
 
   bool writeAcknowledged = false;
-  bool completed = false;
-  Timer? fallbackTimer;
-  Timer? hardTimeoutTimer;
+  Timer? cleanupTimer;
 
   _PendingOutgoingChatMessage({
     required this.text,
     required this.createdAt,
     required this.userLogin,
     required this.userId,
-  }) : localId =
-            'local-${userLogin.isEmpty ? "me" : userLogin}-${createdAt.microsecondsSinceEpoch}';
+  });
 }
