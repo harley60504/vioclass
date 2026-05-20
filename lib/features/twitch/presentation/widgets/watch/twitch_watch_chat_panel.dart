@@ -396,7 +396,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                       child: TwitchWatchChatMessageArea(
                         runtime: currentRuntime,
                         thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
-                        officialEmoteCache: widget.officialEmoteCache,
                         appearanceListenable: _appearanceController,
                         fontScale: chatFontScale,
                         compact: metrics.verticalCompact,
