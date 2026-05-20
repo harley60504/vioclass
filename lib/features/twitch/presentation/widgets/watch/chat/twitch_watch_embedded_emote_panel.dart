@@ -8,11 +8,10 @@ import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 
 const double _embeddedEmoteSize = 30.0;
-const String _debugTargetEmoteName = 'corgiHHH';
-const String _debugTargetKeyword = 'corgi';
+const String _debugTargetEmoteName = 'ALL';
 
 bool _isDebugTargetEmoteName(String name) {
-  return name.trim().toLowerCase().contains(_debugTargetKeyword);
+  return true;
 }
 
 String _officialAnimatedEmoteUrl(String id) {
