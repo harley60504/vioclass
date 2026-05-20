@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:vio_class/features/twitch/data/models/twitch_stream_model.dart';
 
 import 'twitch_chat_side_panel.dart';
 
 class TwitchOfficialChatPanel extends StatelessWidget {
-  final TwitchStreamModel stream;
+  final dynamic stream;
   final String? clientId;
   final Future<String?> Function()? accessTokenProvider;
   final String? viewerId;
@@ -26,6 +25,8 @@ class TwitchOfficialChatPanel extends StatelessWidget {
       width: 380,
       onWidthDelta: (_) {},
       onWidthDragEnd: () {},
+      accessTokenProvider: accessTokenProvider,
+      viewerLogin: viewerLogin,
     );
   }
 }
