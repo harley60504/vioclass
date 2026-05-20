@@ -5,9 +5,10 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:vio_class/features/twitch/auth/services/twitch_web_cookie_service.dart';
-import 'package:vio_class/features/twitch/data/models/twitch_stream_model.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+
+import '../../../auth/services/twitch_web_cookie_service.dart';
+import '../../../data/models/twitch_stream_model.dart';
 
 class TwitchChatSidePanel extends StatefulWidget {
   final TwitchStreamModel stream;
@@ -64,6 +65,8 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
   bool _loadingEmotes = false;
   bool _sending = false;
   int _rawCount = 0;
+  int _emoteTagCount = 0;
+  String _lastEmotesTag = '';
 
   String get _channelLogin {
     final login = widget.stream.userLogin.trim();
@@ -116,6 +119,8 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
       _connected = false;
       _connecting = true;
       _rawCount = 0;
+      _emoteTagCount = 0;
+      _lastEmotesTag = '';
     });
     await _loadRecent();
     await _loadContext();
@@ -230,7 +235,6 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
           ? viewer
           : 'justinfan${DateTime.now().millisecondsSinceEpoch.remainder(900000) + 100000}';
 
-      _sendRaw('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
       if (canAuth) {
         _sendRaw('PASS oauth:$token');
         _sendRaw('NICK $nick');
@@ -238,6 +242,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
         _sendRaw('PASS SCHMOOPIIE');
         _sendRaw('NICK $nick');
       }
+      _sendRaw('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
       _sendRaw('JOIN #$_channelLogin');
 
       if (!mounted) return;
@@ -308,6 +313,13 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
         : 'msg-${DateTime.now().microsecondsSinceEpoch}-${_messages.length}';
     if (_seenIds.contains(safeId)) return;
     _seenIds.add(safeId);
+
+    final emotesTag = line.tags['emotes'] ?? '';
+    if (emotesTag.trim().isNotEmpty) {
+      _emoteTagCount += 1;
+      _lastEmotesTag = emotesTag;
+    }
+
     final login = line.userLogin.isNotEmpty ? line.userLogin : 'unknown';
     final displayName = line.tags['display-name']?.trim().isNotEmpty == true
         ? line.tags['display-name']!.trim()
@@ -318,20 +330,27 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
       displayName: displayName,
       color: _parseColor(line.tags['color']) ?? _colorFromText(login),
       text: text,
-      emotesTag: line.tags['emotes'] ?? '',
+      emotesTag: emotesTag,
       system: false,
     ));
   }
 
   void _handleNotice(_IrcLine line) {
     final text = line.trailing.trim();
-    if (text.isNotEmpty) _appendSystem(text);
+    if (text.isEmpty) return;
+    final msgId = line.tags['msg-id']?.trim() ?? '';
+    _appendSystem(
+      _translateTwitchNotice(msgId: msgId, rawText: text),
+      severity: _severityForNotice(msgId),
+    );
   }
 
   void _handleUserNotice(_IrcLine line) {
     final system = line.tags['system-msg']?.trim();
     final text = system != null && system.isNotEmpty ? system : line.trailing.trim();
-    if (text.isNotEmpty) _appendSystem(text);
+    if (text.isNotEmpty) {
+      _appendSystem(_decodeTwitchSystemMessage(text));
+    }
   }
 
   void _handleClearMsg(_IrcLine line) {
@@ -359,15 +378,19 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     });
   }
 
-  void _appendSystem(String text) {
+  void _appendSystem(
+    String text, {
+    _SystemSeverity severity = _SystemSeverity.info,
+  }) {
     _appendMessage(_ChatMsg(
       id: 'system-${DateTime.now().microsecondsSinceEpoch}',
       login: 'system',
-      displayName: 'Twitch',
-      color: const Color(0xFFBF94FF),
+      displayName: 'Twitch 系統',
+      color: severity.color,
       text: text,
       emotesTag: '',
       system: true,
+      severity: severity,
     ));
   }
 
@@ -389,7 +412,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     final token = _authToken;
     final viewer = _viewerLogin;
     if (token == null || token.isEmpty || viewer == null || viewer.isEmpty) {
-      _appendSystem('尚未取得可發言的 Twitch Web token，請重新登入。');
+      _appendSystem('尚未取得可發言的 Twitch Web token，請重新登入。', severity: _SystemSeverity.warning);
       return;
     }
     setState(() => _sending = true);
@@ -397,7 +420,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
       _sendRaw('PRIVMSG #$_channelLogin :$text');
       _inputController.clear();
     } catch (e) {
-      _appendSystem('送出失敗：$e');
+      _appendSystem('送出失敗：$e', severity: _SystemSeverity.error);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -424,6 +447,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
         out.addAll(await _fetchBttv(channelId));
         out.addAll(await _fetchFfz(channelId));
       }
+      out.addAll(await _fetchIvrChannelEmotes(_channelLogin));
     } catch (e) {
       _setError('貼圖讀取失敗：$e');
     }
@@ -565,6 +589,45 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
     } catch (_) {
       return const <_Emote>[];
     }
+  }
+
+  Future<List<_Emote>> _fetchIvrChannelEmotes(String login) async {
+    try {
+      final res = await _dio.get<dynamic>(
+        'https://api.ivr.fi/v2/twitch/emotes/channel/${Uri.encodeComponent(login)}',
+        options: Options(validateStatus: (s) => s != null && s < 500),
+      );
+      return _parseLooseEmotes(res.data, _EmoteKind.twitchChannel);
+    } catch (_) {
+      return const <_Emote>[];
+    }
+  }
+
+  List<_Emote> _parseLooseEmotes(dynamic raw, _EmoteKind kind) {
+    final out = <_Emote>[];
+
+    void walk(dynamic value) {
+      if (value is List) {
+        for (final item in value) walk(item);
+        return;
+      }
+      if (value is! Map) return;
+
+      final id = (value['id'] ?? value['emoteID'] ?? value['emote_id'])?.toString().trim() ?? '';
+      final name = (value['code'] ?? value['name'] ?? value['text'])?.toString().trim() ?? '';
+      var imageUrl = (value['imageUrl'] ?? value['image_url'] ?? value['url'])?.toString().trim() ?? '';
+      if (imageUrl.isEmpty && id.isNotEmpty && kind.isTwitch) {
+        imageUrl = _twitchEmoteUrl(id);
+      }
+      if (id.isNotEmpty && name.isNotEmpty && imageUrl.isNotEmpty) {
+        out.add(_Emote(id: id, name: name, imageUrl: imageUrl, kind: kind));
+      }
+
+      for (final child in value.values) walk(child);
+    }
+
+    walk(raw);
+    return out;
   }
 
   Future<void> _loadRecent() async {
@@ -793,7 +856,7 @@ class _TwitchChatSidePanelState extends State<TwitchChatSidePanel> {
               children: [
                 Text('$_displayName 聊天室', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 14.5, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 2),
-                Text('${_connected ? '已連線' : _status}｜${_messages.length} 則｜${_emoteExact.length} 貼圖｜raw $_rawCount', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700)),
+                Text('${_connected ? '已連線' : _status}｜${_messages.length} 則｜${_emoteExact.length} 貼圖｜raw $_rawCount｜tag $_emoteTagCount', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 11, fontWeight: FontWeight.w700)),
               ],
             ),
           ),
@@ -878,13 +941,17 @@ class _ChatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (message.system) {
+      return _SystemChatTile(message: message);
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: message.system ? const Color(0xFF241A35) : const Color(0xFF18181B),
+          color: const Color(0xFF18181B),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withOpacity(message.system ? 0.10 : 0.055)),
+          border: Border.all(color: Colors.white.withOpacity(0.055)),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),
@@ -893,6 +960,51 @@ class _ChatTile extends StatelessWidget {
             const TextSpan(text: ': ', style: TextStyle(color: Colors.white54, fontSize: 13.2, fontWeight: FontWeight.w700, height: 1.28)),
             ..._contentSpans(message, resolveEmote),
           ])),
+        ),
+      ),
+    );
+  }
+}
+
+class _SystemChatTile extends StatelessWidget {
+  final _ChatMsg message;
+
+  const _SystemChatTile({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final severity = message.severity;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3.5),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: severity.backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: severity.color.withOpacity(0.35)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(severity.icon, size: 16, color: severity.color),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Text.rich(TextSpan(children: [
+                  TextSpan(
+                    text: '${message.displayName}：',
+                    style: TextStyle(
+                      color: severity.color,
+                      fontSize: 12.7,
+                      fontWeight: FontWeight.w900,
+                      height: 1.3,
+                    ),
+                  ),
+                  TextSpan(text: message.text, style: _msgStyle.copyWith(fontWeight: FontWeight.w700)),
+                ])),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -985,6 +1097,49 @@ bool _isLeading(int c) => c == 0x28 || c == 0x5B || c == 0x7B || c == 0x3C || c 
 bool _isTrailing(int c) => _isLeading(c) || c == 0x29 || c == 0x5D || c == 0x7D || c == 0x3E || c == 0x2E || c == 0x2C || c == 0x21 || c == 0x3F || c == 0x3A || c == 0x3B;
 
 String _twitchEmoteUrl(String id) => 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
+
+String _translateTwitchNotice({required String msgId, required String rawText}) {
+  switch (msgId) {
+    case 'msg_duplicate':
+      return '訊息未送出：你在 30 秒內傳送了與上一則完全相同的訊息。';
+    case 'msg_slowmode':
+      return '訊息未送出：目前聊天室啟用了慢速模式，請稍後再發送。';
+    case 'msg_ratelimit':
+      return '訊息未送出：發送速度過快，請稍後再試。';
+    case 'msg_emoteonly':
+      return '訊息未送出：目前聊天室只允許發送貼圖。';
+    case 'msg_subsonly':
+      return '訊息未送出：目前聊天室只有訂閱者可以發言。';
+    case 'msg_followersonly':
+    case 'msg_followersonly_followed':
+    case 'msg_followersonly_zero':
+      return '訊息未送出：目前聊天室只有追隨者可以發言。';
+    case 'msg_verified_email':
+      return '訊息未送出：你的 Twitch 帳號需要完成 Email 驗證。';
+    case 'msg_requires_verified_phone_number':
+      return '訊息未送出：你的 Twitch 帳號需要完成手機號碼驗證。';
+    case 'msg_banned':
+      return '訊息未送出：你已被此頻道禁止發言。';
+    case 'msg_timedout':
+      return '訊息未送出：你目前被此頻道暫時禁言。';
+  }
+
+  const duplicateEnglish = 'Your message was not sent because it is identical to the previous one you sent, less than 30 seconds ago.';
+  if (rawText.trim() == duplicateEnglish) {
+    return '訊息未送出：你在 30 秒內傳送了與上一則完全相同的訊息。';
+  }
+
+  return rawText;
+}
+
+String _decodeTwitchSystemMessage(String rawText) {
+  return rawText.replaceAll(r'\s', ' ');
+}
+
+_SystemSeverity _severityForNotice(String msgId) {
+  if (msgId.startsWith('msg_')) return _SystemSeverity.warning;
+  return _SystemSeverity.info;
+}
 
 Color? _parseColor(String? raw) {
   final text = raw?.trim();
@@ -1093,7 +1248,18 @@ class _ChatMsg {
   final String text;
   final String emotesTag;
   final bool system;
-  const _ChatMsg({required this.id, required this.login, required this.displayName, required this.color, required this.text, required this.emotesTag, required this.system});
+  final _SystemSeverity severity;
+
+  const _ChatMsg({
+    required this.id,
+    required this.login,
+    required this.displayName,
+    required this.color,
+    required this.text,
+    required this.emotesTag,
+    required this.system,
+    this.severity = _SystemSeverity.info,
+  });
 }
 
 class _Emote {
@@ -1115,6 +1281,45 @@ enum _EmoteKind {
 }
 
 enum _EmoteFilter { recent, twitch, sevenTv, bttv, ffz, all }
+
+enum _SystemSeverity {
+  info,
+  warning,
+  error;
+
+  Color get color {
+    switch (this) {
+      case _SystemSeverity.info:
+        return const Color(0xFFBF94FF);
+      case _SystemSeverity.warning:
+        return const Color(0xFFFFC857);
+      case _SystemSeverity.error:
+        return const Color(0xFFFF5C7A);
+    }
+  }
+
+  Color get backgroundColor {
+    switch (this) {
+      case _SystemSeverity.info:
+        return const Color(0xFF241A35);
+      case _SystemSeverity.warning:
+        return const Color(0xFF2B2412);
+      case _SystemSeverity.error:
+        return const Color(0xFF301A20);
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case _SystemSeverity.info:
+        return Icons.info_outline_rounded;
+      case _SystemSeverity.warning:
+        return Icons.warning_amber_rounded;
+      case _SystemSeverity.error:
+        return Icons.error_outline_rounded;
+    }
+  }
+}
 
 class _TwitchRange {
   final String id;
@@ -1180,7 +1385,7 @@ class _IrcLine {
     }
 
     final parts = rest.split(' ').where((p) => p.isNotEmpty).toList(growable: false);
-    return _IrcLine(tags: tags, prefix: prefix, command: parts.isEmpty ? '' : parts.first, trailing: _decodeTag(trailing));
+    return _IrcLine(tags: tags, prefix: prefix, command: parts.isEmpty ? '' : parts.first, trailing: trailing);
   }
 }
 
