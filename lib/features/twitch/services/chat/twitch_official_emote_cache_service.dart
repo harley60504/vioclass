@@ -23,13 +23,15 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     loadRecentEmotes();
   }
 
-  static const Duration memoryCacheDuration = Duration(minutes: 10);
+  // Stage debug: disable channel memory cache and persistent Recent cache.
+  // This is intentionally left as a constant switch so the cache path can be
+  // restored later without changing call sites.
+  static const bool disableRuntimeEmoteCache = true;
+  static const bool disablePersistentRecentCache = true;
+
   static const String favoriteStorageKey = 'twitch_official_favorite_emotes_v1';
   static const String recentStorageKey = 'twitch_official_recent_emotes_v1';
   static const int maxRecentEmotes = 80;
-
-  final Map<String, _CachedOfficialEmoteSet> _memoryCache =
-      <String, _CachedOfficialEmoteSet>{};
 
   List<TwitchOfficialEmote> _globalEmotes = const <TwitchOfficialEmote>[];
   List<TwitchOfficialEmote> _channelEmotes = const <TwitchOfficialEmote>[];
@@ -106,11 +108,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   List<TwitchOfficialEmote> get renderableEmotes {
-    // Rendering chat messages is not the same thing as permission to send an
-    // emote. If another viewer already sent a channel emote, we can render it as
-    // long as the channel/global/user catalog gives us an image URL. Therefore
-    // this intentionally includes locked channel emotes and known recent/favorite
-    // snapshots instead of depending only on usableEmotes.
     return allKnownEmotes;
   }
 
@@ -197,15 +194,20 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   void markRecentEmote(TwitchOfficialEmote emote) {
-    final key = _favoriteKey(emote);
-    final next = <String, TwitchOfficialEmote>{
-      key: emote.copyWith(imageUrl: _imageUrlFor(emote)),
-    };
+    final safeImageUrl = _imageUrlFor(emote);
+    if (emote.name.trim().isEmpty || safeImageUrl.isEmpty) {
+      return;
+    }
+
+    final safeEmote = emote.copyWith(imageUrl: safeImageUrl);
+    final key = _favoriteKey(safeEmote);
+    final next = <String, TwitchOfficialEmote>{key: safeEmote};
 
     for (final entry in _recent.entries) {
       if (entry.key == key) continue;
       if (next.length >= maxRecentEmotes) break;
-      next[entry.key] = entry.value;
+      if (_imageUrlFor(entry.value).isEmpty) continue;
+      next[entry.key] = entry.value.copyWith(imageUrl: _imageUrlFor(entry.value));
     }
 
     _recent
@@ -262,48 +264,30 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   Future<void> loadRecentEmotes() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(recentStorageKey);
-
-      if (raw == null || raw.trim().isEmpty) {
+    if (disablePersistentRecentCache) {
+      _recent.clear();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(recentStorageKey);
+      } catch (e) {
+        debugPrint('Clear disabled official recent emote cache failed: $e');
+      } finally {
         _recentLoaded = true;
         notifyListeners();
-        return;
       }
-
-      final decoded = jsonDecode(raw);
-      final next = <String, TwitchOfficialEmote>{};
-
-      if (decoded is List) {
-        for (final item in decoded) {
-          if (item is! Map) continue;
-          final emote = _favoriteFromJson(Map<String, dynamic>.from(item));
-          if (emote == null) continue;
-          next[_favoriteKey(emote)] = emote.copyWith(imageUrl: _imageUrlFor(emote));
-          if (next.length >= maxRecentEmotes) break;
-        }
-      }
-
-      _recent
-        ..clear()
-        ..addAll(next);
-      _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-    } catch (e) {
-      debugPrint('Load official recent emotes failed: $e');
-    } finally {
-      _recentLoaded = true;
-      notifyListeners();
+      return;
     }
   }
 
   Future<void> _saveRecentEmotes() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonList = recentEmotes.map((emote) => emote.toJson()).toList(growable: false);
-      await prefs.setString(recentStorageKey, jsonEncode(jsonList));
-    } catch (e) {
-      debugPrint('Save official recent emotes failed: $e');
+    if (disablePersistentRecentCache) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(recentStorageKey);
+      } catch (e) {
+        debugPrint('Skip official recent emote cache save failed: $e');
+      }
+      return;
     }
   }
 
@@ -340,21 +324,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     final cleanViewerId = viewerId.trim();
 
     if (cleanChannelId.isEmpty) return;
-
-    final cacheKey = '$cleanChannelId:$cleanViewerId';
-    final cached = _memoryCache[cacheKey];
-
-    if (!forceRefresh && cached != null && !cached.isExpired) {
-      _applyCached(cached);
-      _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
-      _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-      _channelId = cleanChannelId;
-      _viewerId = cleanViewerId;
-      _loading = false;
-      _error = null;
-      notifyListeners();
-      return;
-    }
 
     _loading = true;
     _error = null;
@@ -436,15 +405,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _lockedChannelEmotes = locked;
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-
-      _memoryCache[cacheKey] = _CachedOfficialEmoteSet(
-        globalEmotes: _globalEmotes,
-        channelEmotes: _channelEmotes,
-        userEmotes: _userEmotes,
-        lockedChannelEmotes: _lockedChannelEmotes,
-        userEmotesUnavailable: _userEmotesUnavailable,
-        fetchedAt: DateTime.now(),
-      );
     } catch (e) {
       _error = e;
     } finally {
@@ -561,14 +521,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     return 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
   }
 
-  void _applyCached(_CachedOfficialEmoteSet cached) {
-    _globalEmotes = cached.globalEmotes;
-    _channelEmotes = cached.channelEmotes;
-    _userEmotes = cached.userEmotes;
-    _lockedChannelEmotes = cached.lockedChannelEmotes;
-    _userEmotesUnavailable = cached.userEmotesUnavailable;
-  }
-
   String _favoriteKey(TwitchOfficialEmote emote) {
     final id = emote.id.trim();
     if (id.isNotEmpty) return 'id:$id';
@@ -626,7 +578,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     _recent
       ..clear()
       ..addAll(next);
-    _saveRecentEmotes();
   }
 
   TwitchOfficialEmote? _favoriteFromJson(Map<String, dynamic> json) {
@@ -695,6 +646,8 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       'favoritesLoaded': favoritesLoaded,
       'recentCount': recentCount,
       'recentLoaded': recentLoaded,
+      'persistentRecentCacheDisabled': disablePersistentRecentCache,
+      'runtimeEmoteCacheDisabled': disableRuntimeEmoteCache,
       'userEmotesUnavailable': userEmotesUnavailable,
       'channelSample': channelEmotes
           .take(20)
@@ -716,28 +669,5 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
               })
           .toList(growable: false),
     };
-  }
-}
-
-class _CachedOfficialEmoteSet {
-  final List<TwitchOfficialEmote> globalEmotes;
-  final List<TwitchOfficialEmote> channelEmotes;
-  final List<TwitchOfficialEmote> userEmotes;
-  final List<TwitchOfficialEmote> lockedChannelEmotes;
-  final bool userEmotesUnavailable;
-  final DateTime fetchedAt;
-
-  const _CachedOfficialEmoteSet({
-    required this.globalEmotes,
-    required this.channelEmotes,
-    required this.userEmotes,
-    required this.lockedChannelEmotes,
-    required this.userEmotesUnavailable,
-    required this.fetchedAt,
-  });
-
-  bool get isExpired {
-    return DateTime.now().difference(fetchedAt) >
-        TwitchOfficialEmoteCacheService.memoryCacheDuration;
   }
 }
