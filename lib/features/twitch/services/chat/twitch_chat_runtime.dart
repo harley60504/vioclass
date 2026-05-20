@@ -45,10 +45,18 @@ class TwitchChatRuntime extends ChangeNotifier {
 
   /// 熱門聊天室一秒可能多則訊息；用 runtime 層 batch 合併 notify，避免每則訊息都重建 UI。
   final Duration notifyDebounce;
+
   static const Duration initialUserStateWait = Duration(milliseconds: 1500);
   static const Duration sendUserStateWait = Duration(milliseconds: 900);
-  static const Duration serverEchoFallbackAfterAck = Duration(milliseconds: 650);
-  static const Duration serverEchoHardTimeout = Duration(milliseconds: 2600);
+
+  /// StreamNook-style server-first outgoing flow.
+  ///
+  /// USERSTATE only means Twitch accepted the command pipeline; it is not the
+  /// final visible chat message. Prefer the official PRIVMSG server echo because
+  /// it contains Twitch tags such as emotes/msg id. Local echo is delayed and is
+  /// only a last-resort fallback for network/server echo loss.
+  static const Duration serverEchoFallbackAfterAck = Duration(seconds: 4);
+  static const Duration serverEchoHardTimeout = Duration(seconds: 8);
 
   TwitchIrcApiService get _sendIrcApi => writeIrcApi ?? ircApi;
   bool get usingDualIrcMode => writeIrcApi != null;
@@ -333,7 +341,7 @@ class TwitchChatRuntime extends ChangeNotifier {
         _ownUserStateTags.addAll(message.tags);
 
         if (!usingDualIrcMode && message.command == 'USERSTATE') {
-          _confirmOldestPendingWithLocalEcho();
+          _ackOldestPendingFromIrcUserState();
         }
         return;
 
@@ -375,7 +383,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       case 'USERSTATE':
         _ownUserStateTags.addAll(message.tags);
         if (message.command == 'USERSTATE') {
-          _ackOldestPendingFromWriteConnection();
+          _ackOldestPendingFromIrcUserState();
         }
         return;
 
@@ -456,7 +464,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _ackOldestPendingFromWriteConnection() {
+  void _ackOldestPendingFromIrcUserState() {
     final pending = _pendingOutgoingMessages
         .where((item) => !item.writeAcknowledged && !item.completed)
         .cast<_PendingOutgoingChatMessage?>()
@@ -466,20 +474,10 @@ class TwitchChatRuntime extends ChangeNotifier {
 
     pending.writeAcknowledged = true;
 
-    // Dual IRC mode should prefer server echo from the read connection. The
-    // fallback is intentionally delayed and only used if no read echo arrives.
+    // USERSTATE is only an ACK. Do not render local echo immediately; wait for
+    // the official PRIVMSG server echo so Twitch emotes / msg id / badges stay
+    // authoritative. Local echo is a delayed fallback only.
     _scheduleFallbackLocalEcho(pending);
-  }
-
-  void _confirmOldestPendingWithLocalEcho() {
-    final pending = _pendingOutgoingMessages
-        .where((item) => !item.completed)
-        .cast<_PendingOutgoingChatMessage?>()
-        .firstWhere((item) => item != null, orElse: () => null);
-
-    if (pending == null) return;
-
-    _completePendingWithLocalEcho(pending);
   }
 
   _PendingOutgoingChatMessage? _findMatchingPending(TwitchChatMessage message) {
@@ -493,7 +491,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       if (pending.text.trim() != text) continue;
 
       final delta = DateTime.now().difference(pending.createdAt).abs();
-      if (delta <= const Duration(seconds: 15)) {
+      if (delta <= const Duration(seconds: 20)) {
         return pending;
       }
     }
@@ -578,6 +576,8 @@ class TwitchChatRuntime extends ChangeNotifier {
       if (!pending.completer.isCompleted) {
         pending.completer.completeError(StateError(reason));
       }
+    } else {
+      _removeNewestRecentLocalEcho();
     }
 
     _appendSystemMessage(reason);
@@ -689,12 +689,27 @@ class TwitchChatRuntime extends ChangeNotifier {
       if (item.userLogin.trim().toLowerCase() != incomingLogin) continue;
 
       final delta = now.difference(item.receivedAt).inSeconds.abs();
-      if (delta <= 20) {
+      if (delta <= 30) {
         return index;
       }
     }
 
     return -1;
+  }
+
+  void _removeNewestRecentLocalEcho() {
+    final now = DateTime.now();
+
+    for (var index = _messages.length - 1; index >= 0; index -= 1) {
+      final item = _messages[index];
+      if (item.source.source != TwitchChatMessageSource.localEcho) continue;
+
+      final age = now.difference(item.receivedAt).abs();
+      if (age <= const Duration(seconds: 30)) {
+        _messages.removeAt(index);
+        return;
+      }
+    }
   }
 
   Future<void> sendMessage(String message) async {
@@ -909,6 +924,9 @@ class TwitchChatRuntime extends ChangeNotifier {
       'serverEchoReplaceCount': serverEchoReplaceCount,
       'rejectedOutgoingCount': rejectedOutgoingCount,
       'usingDualIrcMode': usingDualIrcMode,
+      'serverFirstOutgoing': true,
+      'serverEchoFallbackAfterAckMs': serverEchoFallbackAfterAck.inMilliseconds,
+      'serverEchoHardTimeoutMs': serverEchoHardTimeout.inMilliseconds,
       'seenMessageIdCount': _seenMessageIds.length,
       'deletedMessageIdCount': _deletedMessageIds.length,
       'ownUserStateTags': _ownUserStateTags,
