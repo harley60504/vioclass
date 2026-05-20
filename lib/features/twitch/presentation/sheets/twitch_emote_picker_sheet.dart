@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage225_unified_frosty_logic
+// PATCH VERSION: twitch_emote_picker_sheet_stage245_recent_official_rebuild
 //
 // Single unified emote picker sheet.
 // - Keep this file as the only public emote picker entry.
@@ -6,9 +6,9 @@
 // - Every category/page uses the same _EmoteEntry model.
 // - Every page uses the same large translucent grid UI.
 // - Search applies to the current page.
-// - Tap inserts emote name.
+// - Tap inserts emote name and writes Recent.
 // - Long press toggles favorite.
-// - Locked official emotes remain visible but cannot be inserted.
+// - Official and third-party recent/favorite state rebuilds from their own cache.
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -92,59 +92,68 @@ class _TwitchUnifiedEmotePickerSheetState
   @override
   Widget build(BuildContext context) {
     final official = _official;
-    final loading = widget.loading ||
-        widget.cache.loading ||
-        (official?.loading ?? false);
 
-    final tabs = <_OuterTab>[
-      _recentTab(),
-      _favoriteTab(),
-      _officialTab(),
-      _thirdPartyTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
-      _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
-      _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
-    ];
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[
+        widget.cache,
+        if (official != null) official,
+      ]),
+      builder: (context, _) {
+        final loading = widget.loading ||
+            widget.cache.loading ||
+            (official?.loading ?? false);
 
-    return SafeArea(
-      child: TwitchUnifiedSheetScaffold(
-        title: '貼圖',
-        subtitle: '最近 / 最愛 / Twitch / 7TV / BTTV / FFZ｜長按收藏',
-        icon: Icons.emoji_emotions_rounded,
-        loading: loading,
-        onRefresh: widget.onRefresh,
-        child: DefaultTabController(
-          length: tabs.length,
-          child: Column(
-            children: [
-              _SearchBar(
-                controller: _searchController,
-                onChanged: (value) {
-                  setState(() {
-                    _query = value.trim().toLowerCase();
-                  });
-                },
+        final tabs = <_OuterTab>[
+          _recentTab(),
+          _favoriteTab(),
+          _officialTab(),
+          _thirdPartyTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
+          _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
+          _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
+        ];
+
+        return SafeArea(
+          child: TwitchUnifiedSheetScaffold(
+            title: '貼圖',
+            subtitle: '最近 / 最愛 / Twitch / 7TV / BTTV / FFZ｜長按收藏',
+            icon: Icons.emoji_emotions_rounded,
+            loading: loading,
+            onRefresh: widget.onRefresh,
+            child: DefaultTabController(
+              length: tabs.length,
+              child: Column(
+                children: [
+                  _SearchBar(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        _query = value.trim().toLowerCase();
+                      });
+                    },
+                  ),
+                  _MainTabBar(tabs: tabs),
+                  const Divider(height: 1),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        for (final tab in tabs)
+                          _ProviderPage(
+                            key: PageStorageKey<String>('provider-${tab.label}'),
+                            tab: tab,
+                            query: _query,
+                            loading: loading,
+                            onSelect: _selectEntry,
+                            onLongPress: _toggleFavorite,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              _MainTabBar(tabs: tabs),
-              const Divider(height: 1),
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    for (final tab in tabs)
-                      _ProviderPage(
-                        key: PageStorageKey<String>('provider-${tab.label}'),
-                        tab: tab,
-                        query: _query,
-                        loading: loading,
-                        onSelect: _selectEntry,
-                        onLongPress: _toggleFavorite,
-                      ),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -320,7 +329,26 @@ class _TwitchUnifiedEmotePickerSheetState
     return _EmoteEntry.official(
       emote,
       favorite: _official?.isFavorite(emote) ?? false,
+      locked: _isOfficialEntryLocked(emote),
     );
+  }
+
+  bool _isOfficialEntryLocked(TwitchOfficialEmote emote) {
+    final official = _official;
+    if (official == null) return emote.locked;
+
+    if (official.isUsable(emote)) return false;
+
+    // If user-emote fetching failed, do not block channel emotes in the picker.
+    // Twitch will still reject unusable emotes server-side, but this prevents a
+    // false local lock from making valid channel emotes impossible to insert or
+    // write into Recent.
+    if (official.userEmotesUnavailable &&
+        emote.source == TwitchOfficialEmoteSource.channel) {
+      return false;
+    }
+
+    return true;
   }
 
   Map<String, List<TwitchOfficialEmote>> _groupOfficialByOwner(
@@ -398,14 +426,22 @@ class _TwitchUnifiedEmotePickerSheetState
   void _selectEntry(_EmoteEntry entry) {
     if (entry.locked) return;
 
+    var changedRecent = false;
+
     final thirdParty = entry.thirdParty;
     if (thirdParty != null) {
       widget.cache.markRecentEmote(thirdParty);
+      changedRecent = true;
     }
 
     final official = entry.official;
     if (official != null) {
       _official?.markRecentEmote(official);
+      changedRecent = true;
+    }
+
+    if (changedRecent && mounted) {
+      setState(() {});
     }
 
     final name = entry.name.trim();
@@ -905,13 +941,14 @@ class _EmoteEntry {
   factory _EmoteEntry.official(
     TwitchOfficialEmote emote, {
     required bool favorite,
+    bool? locked,
   }) {
     return _EmoteEntry(
       id: emote.id,
       name: emote.name,
       imageUrl: emote.imageUrl,
       providerLabel: emote.sourceLabel,
-      locked: emote.locked,
+      locked: locked ?? emote.locked,
       favorite: favorite,
       zeroWidth: false,
       official: emote,
