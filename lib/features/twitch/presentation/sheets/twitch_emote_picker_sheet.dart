@@ -25,6 +25,28 @@ const int _searchGridLimit = 240;
 const double _cardMaxExtent = 154.0;
 const double _cardAspectRatio = 0.98;
 
+const bool _emotePickerDebugEnabled = true;
+
+void _emotePickerDebugLog(String message) {
+  if (!_emotePickerDebugEnabled) return;
+  final line = '[TwitchEmotePickerDebug] $message';
+  debugPrint(line, wrapWidth: 1024);
+  // ignore: avoid_print
+  print(line);
+}
+
+String _officialAnimatedEmoteUrl(String id) {
+  final cleanId = id.trim();
+  if (cleanId.isEmpty) return '';
+  return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/animated/dark/2.0';
+}
+
+String _officialDefaultEmoteUrl(String id) {
+  final cleanId = id.trim();
+  if (cleanId.isEmpty) return '';
+  return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/default/dark/2.0';
+}
+
 final CacheManager _sheetEmoteCacheManager = CacheManager(
   Config(
     'twitchUnifiedEmotePickerImageCache',
@@ -41,6 +63,21 @@ Future<void> showTwitchEmotePickerSheet({
   required Future<void> Function() onRefresh,
   required ValueChanged<String> onEmoteSelected,
 }) {
+  _emotePickerDebugLog(
+    'showTwitchEmotePickerSheet loading=$loading '
+    'thirdPartyCount=${cache.count} thirdPartyLoading=${cache.loading} '
+    'officialAttached=${officialCache != null} '
+    'officialLoading=${officialCache?.loading} '
+    'officialChannelCount=${officialCache?.channelEmotes.length} '
+    'officialGlobalCount=${officialCache?.globalEmotes.length} '
+    'officialUserCount=${officialCache?.userEmotes.length} '
+    'officialRecentCount=${officialCache?.recentCount} '
+    'officialFavoriteCount=${officialCache?.favoriteCount} '
+    'officialChannelId=${officialCache?.channelId} '
+    'officialViewerId=${officialCache?.viewerId} '
+    'officialError=${officialCache?.error}',
+  );
+
   return showTwitchResponsiveSheet<void>(
     context: context,
     size: TwitchUnifiedSheetSize.large,
@@ -84,7 +121,14 @@ class _TwitchUnifiedEmotePickerSheetState
   TwitchOfficialEmoteCacheService? get _official => widget.officialCache;
 
   @override
+  void initState() {
+    super.initState();
+    _emotePickerDebugLog('TwitchUnifiedEmotePickerSheet initState');
+  }
+
+  @override
   void dispose() {
+    _emotePickerDebugLog('TwitchUnifiedEmotePickerSheet dispose');
     _searchController.dispose();
     super.dispose();
   }
@@ -92,6 +136,13 @@ class _TwitchUnifiedEmotePickerSheetState
   @override
   Widget build(BuildContext context) {
     final official = _official;
+
+    _emotePickerDebugLog(
+      'sheet build widgetLoading=${widget.loading} '
+      'thirdPartyLoading=${widget.cache.loading} '
+      'officialAttached=${official != null} officialLoading=${official?.loading} '
+      'query=$_query',
+    );
 
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[
@@ -112,6 +163,10 @@ class _TwitchUnifiedEmotePickerSheetState
           _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
         ];
 
+        _emotePickerDebugLog(
+          'animated builder loading=$loading tabs=${tabs.map((tab) => '${tab.label}:${tab.totalCount}').join(',')}',
+        );
+
         return SafeArea(
           child: TwitchUnifiedSheetScaffold(
             title: '貼圖',
@@ -129,6 +184,7 @@ class _TwitchUnifiedEmotePickerSheetState
                       setState(() {
                         _query = value.trim().toLowerCase();
                       });
+                      _emotePickerDebugLog('search changed query=$_query');
                     },
                   ),
                   _MainTabBar(tabs: tabs),
@@ -160,16 +216,20 @@ class _TwitchUnifiedEmotePickerSheetState
   _OuterTab _recentTab() {
     final official = _official;
 
+    final entries = <_EmoteEntry>[
+      ...widget.cache.recentEmotes.map(_thirdPartyEntry),
+      ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
+          .map(_officialEntry),
+    ];
+
+    _emotePickerDebugLog('recentTab entries=${entries.length}');
+
     return _OuterTab(
       label: 'Recent',
       pages: [
         _InnerPage(
           label: 'Recent',
-          entries: <_EmoteEntry>[
-            ...widget.cache.recentEmotes.map(_thirdPartyEntry),
-            ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
-                .map(_officialEntry),
-          ],
+          entries: entries,
         ),
       ],
     );
@@ -178,16 +238,20 @@ class _TwitchUnifiedEmotePickerSheetState
   _OuterTab _favoriteTab() {
     final official = _official;
 
+    final entries = <_EmoteEntry>[
+      ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
+      ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
+          .map(_officialEntry),
+    ];
+
+    _emotePickerDebugLog('favoriteTab entries=${entries.length}');
+
     return _OuterTab(
       label: 'Favorite',
       pages: [
         _InnerPage(
           label: 'Favorite',
-          entries: <_EmoteEntry>[
-            ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
-            ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
-                .map(_officialEntry),
-          ],
+          entries: entries,
         ),
       ],
     );
@@ -197,6 +261,7 @@ class _TwitchUnifiedEmotePickerSheetState
     final official = _official;
 
     if (official == null) {
+      _emotePickerDebugLog('officialTab skipped officialCache=null');
       return const _OuterTab(
         label: 'Twitch',
         pages: [
@@ -210,6 +275,16 @@ class _TwitchUnifiedEmotePickerSheetState
     final channel = _uniqueOfficial(official.channelEmotes);
     final global = _uniqueOfficial(official.globalEmotes);
     final user = _uniqueOfficial(official.userEmotes);
+
+    _emotePickerDebugLog(
+      'officialTab rawCounts channel=${official.channelEmotes.length} '
+      'global=${official.globalEmotes.length} user=${official.userEmotes.length} '
+      'uniqueChannel=${channel.length} uniqueGlobal=${global.length} uniqueUser=${user.length} '
+      'recent=${official.recentCount} favorite=${official.favoriteCount} '
+      'loading=${official.loading} error=${official.error} '
+      'channelId=${official.channelId} viewerId=${official.viewerId} '
+      'userEmotesUnavailable=${official.userEmotesUnavailable}',
+    );
 
     final channelKeys = channel.map(_officialKey).toSet();
     final globalKeys = global.map(_officialKey).toSet();
@@ -238,6 +313,12 @@ class _TwitchUnifiedEmotePickerSheetState
     );
 
     final subscriptionGroups = _groupOfficialByOwner(subscriptions);
+
+    _emotePickerDebugLog(
+      'officialTab pages channel=${channel.length} global=${global.length} '
+      'subscriptions=${subscriptions.length} subscriptionGroups=${subscriptionGroups.length} '
+      'unlocked=${unlocked.length}',
+    );
 
     return _OuterTab(
       label: 'Twitch',
@@ -294,6 +375,12 @@ class _TwitchUnifiedEmotePickerSheetState
         .map(_thirdPartyEntry)
         .toList(growable: false);
 
+    _emotePickerDebugLog(
+      'thirdPartyTab label=$label source=${source.length} channel=${channel.length} '
+      'shared=${shared.length} global=${global.length} other=${other.length} '
+      'zeroWidth=${zeroWidth.length}',
+    );
+
     return _OuterTab(
       label: label,
       pages: [
@@ -319,18 +406,33 @@ class _TwitchUnifiedEmotePickerSheetState
   }
 
   _EmoteEntry _thirdPartyEntry(TwitchThirdPartyEmote emote) {
-    return _EmoteEntry.thirdParty(
+    final entry = _EmoteEntry.thirdParty(
       emote,
       favorite: widget.cache.isFavorite(emote),
     );
+    _emotePickerDebugLog(
+      'entry thirdParty name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
+      'imageUrl=${entry.imageUrl} favorite=${entry.favorite} zeroWidth=${entry.zeroWidth}',
+    );
+    return entry;
   }
 
   _EmoteEntry _officialEntry(TwitchOfficialEmote emote) {
-    return _EmoteEntry.official(
+    final locked = _isOfficialEntryLocked(emote);
+    final entry = _EmoteEntry.official(
       emote,
       favorite: _official?.isFavorite(emote) ?? false,
-      locked: _isOfficialEntryLocked(emote),
+      locked: locked,
     );
+    _emotePickerDebugLog(
+      'entry official name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
+      'imageUrl=${entry.imageUrl} locked=${entry.locked} favorite=${entry.favorite} '
+      'source=${emote.source.name} unlocked=${emote.unlocked} emoteType=${emote.emoteType} '
+      'tier=${emote.tier} emoteSetId=${emote.emoteSetId} ownerId=${emote.ownerId} '
+      'owner=${emote.ownerDisplayName} animatedCandidate=${_officialAnimatedEmoteUrl(emote.id)} '
+      'defaultCandidate=${_officialDefaultEmoteUrl(emote.id)}',
+    );
+    return entry;
   }
 
   bool _isOfficialEntryLocked(TwitchOfficialEmote emote) {
@@ -339,10 +441,6 @@ class _TwitchUnifiedEmotePickerSheetState
 
     if (official.isUsable(emote)) return false;
 
-    // If user-emote fetching failed, do not block channel emotes in the picker.
-    // Twitch will still reject unusable emotes server-side, but this prevents a
-    // false local lock from making valid channel emotes impossible to insert or
-    // write into Recent.
     if (official.userEmotesUnavailable &&
         emote.source == TwitchOfficialEmoteSource.channel) {
       return false;
@@ -424,6 +522,11 @@ class _TwitchUnifiedEmotePickerSheetState
   }
 
   void _selectEntry(_EmoteEntry entry) {
+    _emotePickerDebugLog(
+      'select entry name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
+      'locked=${entry.locked} imageUrl=${entry.imageUrl} stableKey=${entry.stableKey}',
+    );
+
     if (entry.locked) return;
 
     var changedRecent = false;
@@ -451,6 +554,11 @@ class _TwitchUnifiedEmotePickerSheetState
   }
 
   void _toggleFavorite(_EmoteEntry entry) {
+    _emotePickerDebugLog(
+      'toggle favorite name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
+      'favorite=${entry.favorite} locked=${entry.locked}',
+    );
+
     final thirdParty = entry.thirdParty;
     if (thirdParty != null) {
       widget.cache.toggleFavorite(thirdParty);
@@ -585,6 +693,11 @@ class _ProviderPageState extends State<_ProviderPage>
 
     final tab = widget.tab;
 
+    _emotePickerDebugLog(
+      'providerPage build tab=${tab.label} pages=${tab.pages.length} '
+      'query=${widget.query} loading=${widget.loading}',
+    );
+
     return DefaultTabController(
       length: tab.pages.length,
       child: Column(
@@ -670,6 +783,11 @@ class _EmoteSectionState extends State<_EmoteSection>
 
     final entries = _filteredEntries();
 
+    _emotePickerDebugLog(
+      'emoteSection build original=${widget.entries.length} filtered=${entries.length} '
+      'query=${widget.query} emptyText=${widget.emptyText}',
+    );
+
     if (entries.isEmpty) {
       return Center(
         child: Text(
@@ -747,6 +865,14 @@ class _EmoteTile extends StatelessWidget {
     final imageUrl = entry.imageUrl.trim();
     final locked = entry.locked;
 
+    _emotePickerDebugLog(
+      'tile build name=${entry.name} id=${entry.id} provider=${entry.providerLabel} '
+      'locked=$locked favorite=${entry.favorite} zeroWidth=${entry.zeroWidth} '
+      'stableKey=${entry.stableKey} imageUrl=$imageUrl '
+      'officialAnimated=${_officialAnimatedEmoteUrl(entry.id)} '
+      'officialDefault=${_officialDefaultEmoteUrl(entry.id)}',
+    );
+
     return RepaintBoundary(
       child: Tooltip(
         message: entry.favorite ? '長按取消收藏' : '長按加入收藏',
@@ -806,11 +932,20 @@ class _EmoteTile extends StatelessWidget {
                                   memCacheHeight: 144,
                                   placeholder: (_, __) =>
                                       const SizedBox.shrink(),
-                                  errorWidget: (_, __, ___) => const Icon(
-                                    Icons.broken_image_rounded,
-                                    color: Colors.white38,
-                                    size: 22,
-                                  ),
+                                  errorWidget: (_, url, error) {
+                                    _emotePickerDebugLog(
+                                      'image error name=${entry.name} id=${entry.id} '
+                                      'provider=${entry.providerLabel} stableKey=${entry.stableKey} '
+                                      'url=$url imageUrl=$imageUrl error=$error '
+                                      'officialAnimated=${_officialAnimatedEmoteUrl(entry.id)} '
+                                      'officialDefault=${_officialDefaultEmoteUrl(entry.id)}',
+                                    );
+                                    return const Icon(
+                                      Icons.broken_image_rounded,
+                                      color: Colors.white38,
+                                      size: 22,
+                                    );
+                                  },
                                 ),
                               ),
                       ),
