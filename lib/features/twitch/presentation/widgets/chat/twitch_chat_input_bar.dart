@@ -1,4 +1,6 @@
-// PATCH VERSION: twitch_chat_input_bar_stage191_unified_glass
+// PATCH VERSION: twitch_chat_input_bar_stage249_safe_async_send
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
@@ -7,7 +9,7 @@ class TwitchChatInputBar extends StatelessWidget {
   final bool enabled;
   final bool sending;
   final bool compact;
-  final VoidCallback onSend;
+  final FutureOr<void> Function() onSend;
   final VoidCallback onOpenEmotes;
 
   const TwitchChatInputBar({
@@ -35,10 +37,38 @@ class TwitchChatInputBar extends StatelessWidget {
   double get _inputVerticalPadding =>
       (_inputRowHeight - _inputFontSize * _inputLineHeight) / 2;
 
-  void _submitIfPossible() {
-    if (enabled && !sending && controller.text.trim().isNotEmpty) {
-      onSend();
+  Future<void> _submitIfPossible(BuildContext context) async {
+    if (!enabled || sending || controller.text.trim().isEmpty) return;
+
+    try {
+      await Future<void>.sync(onSend);
+    } catch (error, stackTrace) {
+      debugPrint('Twitch chat send failed: $error');
+      debugPrint('$stackTrace');
+
+      if (!context.mounted) return;
+
+      final message = _formatSendError(error);
+      if (message.isEmpty) return;
+
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
+  }
+
+  String _formatSendError(Object error) {
+    final raw = error.toString().trim();
+    if (raw.isEmpty) return '聊天室訊息送出失敗';
+
+    return raw
+        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+        .replaceFirst(RegExp(r'^StateError:\s*'), '')
+        .replaceFirst(RegExp(r'^Exception:\s*'), '')
+        .trim();
   }
 
   @override
@@ -61,7 +91,7 @@ class TwitchChatInputBar extends StatelessWidget {
                 fontSize: fontSize,
                 lineHeight: _inputLineHeight,
                 verticalPadding: _inputVerticalPadding,
-                onSubmit: _submitIfPossible,
+                onSubmit: () => unawaited(_submitIfPossible(context)),
               ),
             ),
             const SizedBox(width: 10),
@@ -71,7 +101,7 @@ class TwitchChatInputBar extends StatelessWidget {
               compact: compact,
               enabled: enabled && !sending,
               sending: sending,
-              onTap: _submitIfPossible,
+              onTap: () => unawaited(_submitIfPossible(context)),
             ),
           ],
         ),
