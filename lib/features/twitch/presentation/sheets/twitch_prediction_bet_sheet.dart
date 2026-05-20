@@ -53,6 +53,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   late TwitchPredictionSnapshot _visiblePrediction;
   bool _submitting = false;
   bool _refreshingGqlFallback = false;
+  bool _showRefreshingGqlFallbackChip = false;
 
   String? _localViewerOutcomeId;
   int _localViewerPoints = 0;
@@ -77,7 +78,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
           _visiblePrediction.endedAt != null;
       if (hasLiveTime) setState(() {});
     });
-    _gqlFallbackTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _gqlFallbackTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!mounted || _submitting || _refreshingGqlFallback) return;
       final status = _visiblePrediction.normalizedStatus;
       final shouldRefresh = status == 'ACTIVE' ||
@@ -86,10 +87,13 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
           status.contains('RESOLVE_PENDING') ||
           status.isEmpty;
       if (shouldRefresh) {
-        unawaited(_refreshPredictionFromGqlFallback());
+        // Background safety refresh should not show the blue 「同步中」 chip.
+        // Hermes outcome / odds updates are expected to be silent while the
+        // user is reading or typing in the sheet.
+        unawaited(_refreshPredictionFromGqlFallback(showSyncIndicator: false));
       }
     });
-    unawaited(_refreshPredictionFromGqlFallback());
+    unawaited(_refreshPredictionFromGqlFallback(showSyncIndicator: false));
   }
 
   @override
@@ -212,7 +216,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                 totalUsers: totalUsers,
                 viewerChoice: viewerChoice,
                 timeLabel: timeLabel,
-                refreshingGqlFallback: _refreshingGqlFallback,
+                refreshingGqlFallback: _showRefreshingGqlFallbackChip,
               ),
               const SizedBox(height: 10),
               TextField(
@@ -302,7 +306,8 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         });
       }
 
-      unawaited(_refreshPredictionFromGqlFallback());
+      // Only user-triggered post-bet refresh should expose a visible sync chip.
+      unawaited(_refreshPredictionFromGqlFallback(showSyncIndicator: true));
     } catch (_) {
       final nextPoints = _localViewerPoints - points;
       _localViewerPoints = nextPoints < 0 ? 0 : nextPoints;
@@ -317,13 +322,18 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     }
   }
 
-  Future<void> _refreshPredictionFromGqlFallback() async {
+  Future<void> _refreshPredictionFromGqlFallback({
+    bool showSyncIndicator = false,
+  }) async {
     final loader = widget.onRefreshPrediction ??
         TwitchPredictionApiService.refreshLastPredictionContext;
     if (_refreshingGqlFallback) return;
 
     if (mounted) {
-      setState(() => _refreshingGqlFallback = true);
+      setState(() {
+        _refreshingGqlFallback = true;
+        _showRefreshingGqlFallbackChip = showSyncIndicator;
+      });
     }
 
     try {
@@ -344,7 +354,10 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
       // GQL fallback is best-effort. Keep optimistic/local state if it fails.
     } finally {
       if (mounted) {
-        setState(() => _refreshingGqlFallback = false);
+        setState(() {
+          _refreshingGqlFallback = false;
+          _showRefreshingGqlFallbackChip = false;
+        });
       }
     }
   }
