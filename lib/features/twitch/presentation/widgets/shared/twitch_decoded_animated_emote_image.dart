@@ -1,19 +1,15 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:image/image.dart' as img;
 
-/// Experimental animated emote renderer that bypasses Flutter's animated image
-/// codec by decoding Animated WebP frames in Dart.
+/// Experimental animated emote renderer that decodes animated emote frames in Dart.
 ///
-/// This is intended for problematic Twitch official animated emotes where the
-/// Flutter image pipeline reports errors such as:
-///   Could not getPixels for frame N
-///
-/// The widget decodes the animated file into PNG frame bytes, then displays the
-/// current frame with Image.memory. If decoding fails, [fallback] is shown.
+/// Decoded frame lists are cached by URL, so repeated emotes reuse the same
+/// prepared frames instead of re-decoding every chat row or picker tile.
 class TwitchDecodedAnimatedEmoteImage extends StatefulWidget {
   final String imageUrl;
   final String cacheKey;
@@ -47,6 +43,11 @@ class TwitchDecodedAnimatedEmoteImage extends StatefulWidget {
 
 class _TwitchDecodedAnimatedEmoteImageState
     extends State<TwitchDecodedAnimatedEmoteImage> {
+  static const int maxFrameCacheEntries = 220;
+
+  static final LinkedHashMap<String, Future<List<_DecodedAnimatedFrame>>>
+      frameCache = LinkedHashMap<String, Future<List<_DecodedAnimatedFrame>>>();
+
   Future<List<_DecodedAnimatedFrame>>? framesFuture;
   List<_DecodedAnimatedFrame> frames = const <_DecodedAnimatedFrame>[];
   Timer? timer;
@@ -79,8 +80,9 @@ class _TwitchDecodedAnimatedEmoteImageState
   }
 
   void startLoad() {
-    framesFuture = loadAndDecodeFrames(
+    framesFuture = loadFramesCached(
       url: widget.imageUrl,
+      cacheKey: widget.cacheKey,
       maxFrames: widget.maxFrames,
       debug: widget.debug,
       debugLabel: widget.debugLabel,
@@ -148,6 +150,55 @@ class _TwitchDecodedAnimatedEmoteImageState
     timer = null;
   }
 
+  static Future<List<_DecodedAnimatedFrame>> loadFramesCached({
+    required String url,
+    required String cacheKey,
+    required int maxFrames,
+    required bool debug,
+    required String debugLabel,
+  }) {
+    final cleanUrl = url.trim();
+    if (cleanUrl.isEmpty) {
+      return Future<List<_DecodedAnimatedFrame>>.value(
+        const <_DecodedAnimatedFrame>[],
+      );
+    }
+
+    final key = '${cacheKey.trim().isEmpty ? cleanUrl : cacheKey.trim()}|$cleanUrl|$maxFrames';
+    final cached = frameCache.remove(key);
+    if (cached != null) {
+      frameCache[key] = cached;
+      if (debug) {
+        debugPrint('[$debugLabel] frame cache hit entries=${frameCache.length}');
+      }
+      return cached;
+    }
+
+    if (debug) {
+      debugPrint('[$debugLabel] frame cache miss entries=${frameCache.length}');
+    }
+
+    final future = loadAndDecodeFrames(
+      url: cleanUrl,
+      maxFrames: maxFrames,
+      debug: debug,
+      debugLabel: debugLabel,
+    ).then((value) {
+      if (value.isEmpty) frameCache.remove(key);
+      return value;
+    });
+
+    frameCache[key] = future;
+    trimFrameCache();
+    return future;
+  }
+
+  static void trimFrameCache() {
+    while (frameCache.length > maxFrameCacheEntries) {
+      frameCache.remove(frameCache.keys.first);
+    }
+  }
+
   static Future<List<_DecodedAnimatedFrame>> loadAndDecodeFrames({
     required String url,
     required int maxFrames,
@@ -175,14 +226,15 @@ class _TwitchDecodedAnimatedEmoteImageState
       );
 
       if (debug) {
-        debugPrint('[$debugLabel] decoded url=$cleanUrl frames=${decodedFrames.length}');
+        debugPrint(
+          '[$debugLabel] decoded url=$cleanUrl frames=${decodedFrames.length}',
+        );
       }
 
       return decodedFrames;
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (debug) {
         debugPrint('[$debugLabel] decode failed url=$cleanUrl error=$e');
-        debugPrint('$stackTrace');
       }
       return const <_DecodedAnimatedFrame>[];
     }
