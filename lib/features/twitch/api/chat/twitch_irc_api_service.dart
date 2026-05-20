@@ -32,7 +32,8 @@ class TwitchIrcApiService {
   bool get isConnected => _channel != null;
   String? get currentChannelLogin => _currentChannelLogin;
   String? get currentNick => _currentNick;
-  Map<String, String> get currentUserStateTags => Map<String, String>.unmodifiable(_currentUserStateTags);
+  Map<String, String> get currentUserStateTags =>
+      Map<String, String>.unmodifiable(_currentUserStateTags);
   String get currentUserBadges => _currentUserStateTags['badges'] ?? '';
   String get currentUserColor => _currentUserStateTags['color'] ?? '';
   String get currentUserId => _currentUserStateTags['user-id'] ?? '';
@@ -77,16 +78,20 @@ class TwitchIrcApiService {
 
     final safeToken = accessToken?.trim();
 
-    _send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
-
     if (safeToken != null && safeToken.isNotEmpty) {
       _send('PASS oauth:$safeToken');
       _send('NICK $_currentNick');
     } else {
+      final guestNick = 'justinfan${DateTime.now().millisecondsSinceEpoch.remainder(999999)}';
+      _currentNick = guestNick;
       _send('PASS SCHMOOPIIE');
-      _send('NICK justinfan${DateTime.now().millisecondsSinceEpoch.remainder(999999)}');
+      _send('NICK $guestNick');
     }
 
+    // Twitch IRC tags must be requested before JOIN, after PASS/NICK is safer
+    // across anonymous and authenticated sessions. Without tags, official
+    // emotes arrive as plain text because the PRIVMSG `emotes` tag is missing.
+    _send('CAP REQ :twitch.tv/tags twitch.tv/commands twitch.tv/membership');
     _send('JOIN #$login');
   }
 
