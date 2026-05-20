@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
+import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
 import 'twitch_runtime_message_tile.dart';
@@ -12,6 +13,7 @@ import 'twitch_runtime_message_tile.dart';
 class TwitchChatMessageList extends StatefulWidget {
   final TwitchChatRuntime runtime;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService? officialEmoteCache;
   final bool showTimestamp;
   final double fontScale;
   final bool compact;
@@ -21,6 +23,7 @@ class TwitchChatMessageList extends StatefulWidget {
     super.key,
     required this.runtime,
     required this.thirdPartyEmoteCache,
+    this.officialEmoteCache,
     this.showTimestamp = false,
     this.fontScale = 1.0,
     this.compact = false,
@@ -415,6 +418,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                   key: ValueKey<String>(_messageStableKey(message)),
                   message: message,
                   thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                  officialEmotes: widget.officialEmoteCache,
                   showTimestamp: widget.showTimestamp,
                   fontScale: widget.fontScale,
                   compact: widget.compact,
