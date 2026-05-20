@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_render_segment.dart';
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import 'twitch_chat_message_badges.dart';
 import 'twitch_chat_message_chips.dart';
@@ -13,6 +14,7 @@ import 'twitch_chat_message_visual_metrics.dart';
 class TwitchChatMessageContent extends StatefulWidget {
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final Color displayColor;
   final String displayNameText;
   final bool showSystemMessage;
@@ -24,6 +26,7 @@ class TwitchChatMessageContent extends StatefulWidget {
     super.key,
     required this.message,
     required this.thirdPartyEmotes,
+    this.officialEmotes,
     required this.displayColor,
     required this.displayNameText,
     required this.showSystemMessage,
@@ -100,6 +103,7 @@ class _TwitchChatMessageContentState extends State<TwitchChatMessageContent> {
 
   int _signatureFor(TwitchChatMessageContent widget) {
     final thirdPartyCache = widget.thirdPartyEmotes;
+    final officialCache = widget.officialEmotes;
     return Object.hashAll(<Object?>[
       widget.message,
       widget.message.id,
@@ -115,6 +119,8 @@ class _TwitchChatMessageContentState extends State<TwitchChatMessageContent> {
       widget.metrics.scale,
       thirdPartyCache,
       thirdPartyCache?.count ?? 0,
+      officialCache,
+      officialCache?.renderableEmotes.length ?? 0,
     ]);
   }
 
@@ -200,6 +206,7 @@ class _TwitchChatMessageContentState extends State<TwitchChatMessageContent> {
           context: context,
           segments: segments,
           thirdPartyEmotes: widget.thirdPartyEmotes,
+          officialEmotes: widget.officialEmotes,
           metrics: metrics,
         ),
       );
