@@ -1,8 +1,8 @@
-// PATCH VERSION: twitch_following_page_stage213_soft_refresh_cards
+// PATCH VERSION: twitch_following_page_stage241_reconciler_refresh
 // Uses the same discovery template as BrowsePage and the actual project models/services.
-// Stage 213: refresh / re-enter updates stream cards in-place without clearing
-// the grid, so switching back to this page or pressing refresh does not cause a
-// full loading rebuild.
+// Stage 241: refresh/re-enter keeps the grid visible, fetches the latest live
+// window, removes offline streams, adds newly live streams, and preserves the
+// latest Twitch API order through TwitchStreamRefreshReconciler.
 
 import 'dart:async';
 
@@ -13,6 +13,7 @@ import '../../services/discovery/twitch_discovery_service.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_login_required_view.dart';
+import 'twitch_stream_refresh_reconciler.dart';
 
 class TwitchFollowingPage extends StatefulWidget {
   final TwitchDiscoveryService discoveryService;
@@ -33,6 +34,8 @@ class TwitchFollowingPage extends StatefulWidget {
 }
 
 class TwitchFollowingPageState extends State<TwitchFollowingPage> {
+  static const int _followedPageSize = 100;
+
   final ScrollController scrollController = ScrollController();
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
@@ -125,19 +128,18 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     });
 
     try {
-      final page = await widget.discoveryService.fetchFollowedStreams(first: 100);
-      final streamsWithProfiles = await _attachProfileImages(page.streams);
+      final refreshed = await _fetchRefreshedStreamWindow(
+        targetCount: TwitchStreamRefreshReconciler.targetRefreshCount(
+          loadedCount: hadExistingStreams ? loadedStreams.length : _followedPageSize,
+          pageSize: _followedPageSize,
+        ),
+      );
       if (!mounted || generation != _refreshGeneration) return;
 
       setState(() {
-        loadedStreams = hadExistingStreams
-            ? _mergeFirstPageStreams(
-                existing: loadedStreams,
-                firstPage: streamsWithProfiles,
-              )
-            : streamsWithProfiles;
-        nextCursor = page.cursor;
-        hasMore = page.hasMore;
+        loadedStreams = refreshed.streams;
+        nextCursor = refreshed.cursor;
+        hasMore = refreshed.hasMore;
         loadingFirstPage = false;
         errorText = null;
         paginationError = null;
@@ -159,6 +161,45 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     }
   }
 
+  Future<_FollowingRefreshWindow> _fetchRefreshedStreamWindow({
+    required int targetCount,
+  }) async {
+    final collected = <TwitchLiveStream>[];
+
+    var page = await widget.discoveryService.fetchFollowedStreams(
+      first: _followedPageSize,
+    );
+    collected.addAll(page.streams);
+
+    var cursor = page.cursor;
+    var hasMorePage = page.hasMore;
+
+    while (hasMorePage &&
+        cursor != null &&
+        cursor.trim().isNotEmpty &&
+        collected.length < targetCount) {
+      page = await widget.discoveryService.fetchFollowedStreams(
+        after: cursor,
+        first: _followedPageSize,
+      );
+      collected.addAll(page.streams);
+      cursor = page.cursor;
+      hasMorePage = page.hasMore;
+    }
+
+    final reconciled = TwitchStreamRefreshReconciler.reconcileLatestWindow(
+      refreshedWindow: collected,
+      identityOf: _streamIdentity,
+    );
+    final streamsWithProfiles = await _attachProfileImages(reconciled);
+
+    return _FollowingRefreshWindow(
+      streams: streamsWithProfiles,
+      cursor: cursor,
+      hasMore: hasMorePage,
+    );
+  }
+
   Future<void> loadMore() async {
     if (loadingMore || !hasMore) return;
     final cursor = nextCursor;
@@ -175,21 +216,17 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     try {
       final page = await widget.discoveryService.fetchFollowedStreams(
         after: cursor,
-        first: 100,
+        first: _followedPageSize,
       );
       final streamsWithProfiles = await _attachProfileImages(page.streams);
       if (!mounted) return;
 
-      final existingIds = loadedStreams.map(_streamIdentity).toSet();
-      final uniqueNewStreams = streamsWithProfiles
-          .where((stream) => !existingIds.contains(_streamIdentity(stream)))
-          .toList(growable: false);
-
       setState(() {
-        loadedStreams = <TwitchLiveStream>[
-          ...loadedStreams,
-          ...uniqueNewStreams,
-        ];
+        loadedStreams = TwitchStreamRefreshReconciler.appendUniquePage(
+          loaded: loadedStreams,
+          nextPage: streamsWithProfiles,
+          identityOf: _streamIdentity,
+        );
         nextCursor = page.cursor;
         hasMore = page.hasMore;
         loadingMore = false;
@@ -229,24 +266,6 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     } catch (_) {
       return streams;
     }
-  }
-
-  List<TwitchLiveStream> _mergeFirstPageStreams({
-    required List<TwitchLiveStream> existing,
-    required List<TwitchLiveStream> firstPage,
-  }) {
-    if (existing.isEmpty) return firstPage;
-
-    final firstPageIds = firstPage.map(_streamIdentity).toSet();
-    final existingTail = existing
-        .skip(firstPage.length)
-        .where((stream) => !firstPageIds.contains(_streamIdentity(stream)))
-        .toList(growable: false);
-
-    return <TwitchLiveStream>[
-      ...firstPage,
-      ...existingTail,
-    ];
   }
 
   String _streamIdentity(TwitchLiveStream stream) {
@@ -471,4 +490,16 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       ),
     );
   }
+}
+
+class _FollowingRefreshWindow {
+  final List<TwitchLiveStream> streams;
+  final String? cursor;
+  final bool hasMore;
+
+  const _FollowingRefreshWindow({
+    required this.streams,
+    required this.cursor,
+    required this.hasMore,
+  });
 }
