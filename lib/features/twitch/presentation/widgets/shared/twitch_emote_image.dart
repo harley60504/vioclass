@@ -6,7 +6,8 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 ///
 /// Diagnostic baseline:
 /// - Use the normal CachedNetworkImage / Flutter image pipeline only.
-/// - Official Twitch emotes keep URL fallback candidates.
+/// - Official Twitch emotes use the normal/original URL flow first so animated
+///   or default variants can be tested directly.
 /// - No Dart frame decoding is used here.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
@@ -40,7 +41,7 @@ class TwitchEmoteImage extends StatefulWidget {
     this.providerLabel = '',
     this.isOfficial = false,
     this.locked = false,
-    this.preferStaticOfficial = true,
+    this.preferStaticOfficial = false,
     this.tryDecodedAnimatedOfficial = false,
     this.decodedAnimatedOnlyForKnownProblemEmotes = true,
     this.fit = BoxFit.contain,
