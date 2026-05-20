@@ -2,15 +2,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-import 'twitch_decoded_animated_emote_image.dart';
-
 /// Shared Twitch / third-party emote image renderer.
 ///
-/// Performance-safe behavior:
-/// - Most emotes use the normal CachedNetworkImage path.
-/// - Known problematic emotes can use the Dart decoded animated renderer directly.
-/// - If the normal Flutter image pipeline fails, the same emote switches to the
-///   Dart decoded renderer as a fallback.
+/// Diagnostic baseline:
+/// - Use the normal CachedNetworkImage / Flutter image pipeline only.
+/// - Official Twitch emotes keep URL fallback candidates.
+/// - No Dart frame decoding is used here.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
   final String name;
@@ -20,9 +17,8 @@ class TwitchEmoteImage extends StatefulWidget {
   final bool locked;
   final bool preferStaticOfficial;
 
-  /// Kept for compatibility with existing call sites.
-  /// Despite the old name, this controls decoded rendering for both official
-  /// and third-party emotes.
+  /// Kept only for compatibility with existing call sites.
+  /// This diagnostic version intentionally ignores decoded rendering.
   final bool tryDecodedAnimatedOfficial;
   final bool decodedAnimatedOnlyForKnownProblemEmotes;
   final BoxFit fit;
@@ -45,7 +41,7 @@ class TwitchEmoteImage extends StatefulWidget {
     this.isOfficial = false,
     this.locked = false,
     this.preferStaticOfficial = true,
-    this.tryDecodedAnimatedOfficial = true,
+    this.tryDecodedAnimatedOfficial = false,
     this.decodedAnimatedOnlyForKnownProblemEmotes = true,
     this.fit = BoxFit.contain,
     this.width,
@@ -74,7 +70,6 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
   int imageIndex = 0;
   bool fallbackQueued = false;
-  bool forceDecodedAnimated = false;
 
   @override
   void didUpdateWidget(covariant TwitchEmoteImage oldWidget) {
@@ -85,13 +80,9 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.providerLabel != widget.providerLabel ||
         oldWidget.isOfficial != widget.isOfficial ||
-        oldWidget.preferStaticOfficial != widget.preferStaticOfficial ||
-        oldWidget.tryDecodedAnimatedOfficial != widget.tryDecodedAnimatedOfficial ||
-        oldWidget.decodedAnimatedOnlyForKnownProblemEmotes !=
-            widget.decodedAnimatedOnlyForKnownProblemEmotes) {
+        oldWidget.preferStaticOfficial != widget.preferStaticOfficial) {
       imageIndex = 0;
       fallbackQueued = false;
-      forceDecodedAnimated = false;
     }
   }
 
@@ -112,48 +103,12 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
     if (widget.debug || isKnownProblemAnimatedEmote) {
       debugLog(
-        'build name=${widget.name} id=${widget.id} provider=${widget.providerLabel} '
-        'official=${widget.isOfficial} useDecoded=$shouldUseDecodedAnimated '
-        'forced=$forceDecodedAnimated decodedUrl=$decodedAnimatedUrl currentUrl=$currentUrl',
+        'network build name=${widget.name} id=${widget.id} '
+        'provider=${widget.providerLabel} official=${widget.isOfficial} '
+        'index=$imageIndex currentUrl=$currentUrl candidates=${candidates.join(' | ')}',
       );
     }
 
-    if (shouldUseDecodedAnimated) {
-      return Opacity(
-        opacity: widget.locked ? 0.62 : 1.0,
-        child: TwitchDecodedAnimatedEmoteImage(
-          imageUrl: decodedAnimatedUrl,
-          cacheKey: '$stableKey:decoded:$decodedAnimatedUrl',
-          width: widget.width,
-          height: widget.height,
-          fit: widget.fit,
-          fallback: buildNetworkFallback(
-            currentUrl: currentUrl,
-            fallback: fallback,
-            candidates: candidates,
-            allowDecodedFallback: false,
-          ),
-          loading: widget.placeholder,
-          debug: widget.debug || isKnownProblemAnimatedEmote,
-          debugLabel: 'TwitchDecodedAnimatedEmoteImage:${widget.name}',
-        ),
-      );
-    }
-
-    return buildNetworkFallback(
-      currentUrl: currentUrl,
-      fallback: fallback,
-      candidates: candidates,
-      allowDecodedFallback: true,
-    );
-  }
-
-  Widget buildNetworkFallback({
-    required String currentUrl,
-    required Widget fallback,
-    required List<String> candidates,
-    required bool allowDecodedFallback,
-  }) {
     if (currentUrl.isEmpty) return fallback;
 
     final cacheKey = '$stableKey:$currentUrl';
@@ -180,33 +135,11 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
             failedUrl: url,
             error: error,
             candidates: candidates,
-            allowDecodedFallback: allowDecodedFallback,
           );
           return fallback;
         },
       ),
     );
-  }
-
-  bool get shouldUseDecodedAnimated {
-    if (!widget.tryDecodedAnimatedOfficial) return false;
-    if (decodedAnimatedUrl.isEmpty) return false;
-
-    if (isKnownProblemAnimatedEmote) return true;
-    if (forceDecodedAnimated) return true;
-
-    if (widget.decodedAnimatedOnlyForKnownProblemEmotes) return false;
-
-    return true;
-  }
-
-  String get decodedAnimatedUrl {
-    if (widget.isOfficial) return officialAnimatedEmoteUrl(widget.id);
-    return widget.imageUrl.trim();
-  }
-
-  bool get canSwitchToDecodedFallback {
-    return widget.tryDecodedAnimatedOfficial && decodedAnimatedUrl.isNotEmpty;
   }
 
   bool get isKnownProblemAnimatedEmote {
@@ -220,30 +153,12 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     required String failedUrl,
     required Object error,
     required List<String> candidates,
-    required bool allowDecodedFallback,
   }) {
     if (widget.debug || isKnownProblemAnimatedEmote) {
       debugLog(
         'network error name=${widget.name} id=${widget.id} index=$imageIndex '
-        'url=$failedUrl error=$error allowDecodedFallback=$allowDecodedFallback '
-        'candidates=${candidates.join(' | ')}',
+        'url=$failedUrl error=$error candidates=${candidates.join(' | ')}',
       );
-    }
-
-    if (allowDecodedFallback && !forceDecodedAnimated && canSwitchToDecodedFallback) {
-      if (widget.debug || isKnownProblemAnimatedEmote) {
-        debugLog(
-          'switch to decoded fallback name=${widget.name} decodedUrl=$decodedAnimatedUrl',
-        );
-      }
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          forceDecodedAnimated = true;
-        });
-      });
-      return;
     }
 
     if (fallbackQueued) return;
