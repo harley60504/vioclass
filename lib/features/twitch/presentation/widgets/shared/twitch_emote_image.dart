@@ -2,6 +2,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
+import 'twitch_decoded_animated_emote_image.dart';
+
 /// Shared Twitch emote image renderer.
 ///
 /// Use this widget for both chat message emotes and emote picker tiles so image
@@ -10,8 +12,9 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 /// Some Twitch official animated emotes can fail Flutter's multi-frame image
 /// decoder on both Windows and Android with errors such as:
 ///   Could not getPixels for frame N
-/// For normal chat/menu usage this widget prefers the official static CDN
-/// variant first, then falls back through the original/animated/default URLs.
+///
+/// The stable default is official static-first. For experiments, enable
+/// [tryDecodedAnimatedOfficial] to decode animated WebP frames in Dart first.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
   final String name;
@@ -20,6 +23,8 @@ class TwitchEmoteImage extends StatefulWidget {
   final bool isOfficial;
   final bool locked;
   final bool preferStaticOfficial;
+  final bool tryDecodedAnimatedOfficial;
+  final bool decodedAnimatedOnlyForKnownProblemEmotes;
   final BoxFit fit;
   final double? width;
   final double? height;
@@ -40,6 +45,8 @@ class TwitchEmoteImage extends StatefulWidget {
     this.isOfficial = false,
     this.locked = false,
     this.preferStaticOfficial = true,
+    this.tryDecodedAnimatedOfficial = true,
+    this.decodedAnimatedOnlyForKnownProblemEmotes = true,
     this.fit = BoxFit.contain,
     this.width,
     this.height,
@@ -77,7 +84,10 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         oldWidget.imageUrl != widget.imageUrl ||
         oldWidget.providerLabel != widget.providerLabel ||
         oldWidget.isOfficial != widget.isOfficial ||
-        oldWidget.preferStaticOfficial != widget.preferStaticOfficial) {
+        oldWidget.preferStaticOfficial != widget.preferStaticOfficial ||
+        oldWidget.tryDecodedAnimatedOfficial != widget.tryDecodedAnimatedOfficial ||
+        oldWidget.decodedAnimatedOnlyForKnownProblemEmotes !=
+            widget.decodedAnimatedOnlyForKnownProblemEmotes) {
       imageIndex = 0;
       fallbackQueued = false;
     }
@@ -98,13 +108,48 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
               : (widget.height! * 0.72).clamp(14.0, 26.0),
         );
 
-    if (widget.debug) {
+    if (widget.debug || _isKnownProblemAnimatedEmote) {
       debugLog(
         'build name=${widget.name} id=${widget.id} index=$imageIndex '
-        'url=$currentUrl candidates=${candidates.join(' | ')}',
+        'useDecoded=$_shouldUseDecodedAnimated url=$currentUrl '
+        'candidates=${candidates.join(' | ')}',
       );
     }
 
+    final decodedAnimatedUrl = officialAnimatedEmoteUrl(widget.id);
+    if (_shouldUseDecodedAnimated && decodedAnimatedUrl.isNotEmpty) {
+      return Opacity(
+        opacity: widget.locked ? 0.62 : 1.0,
+        child: TwitchDecodedAnimatedEmoteImage(
+          imageUrl: decodedAnimatedUrl,
+          cacheKey: '$stableKey:decoded:$decodedAnimatedUrl',
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+          fallback: _buildNetworkFallback(
+            currentUrl: currentUrl,
+            fallback: fallback,
+            candidates: candidates,
+          ),
+          loading: widget.placeholder,
+          debug: widget.debug || _isKnownProblemAnimatedEmote,
+          debugLabel: 'TwitchDecodedAnimatedEmoteImage:${widget.name}',
+        ),
+      );
+    }
+
+    return _buildNetworkFallback(
+      currentUrl: currentUrl,
+      fallback: fallback,
+      candidates: candidates,
+    );
+  }
+
+  Widget _buildNetworkFallback({
+    required String currentUrl,
+    required Widget fallback,
+    required List<String> candidates,
+  }) {
     if (currentUrl.isEmpty) return fallback;
 
     final cacheKey = '${stableKey}:$currentUrl';
@@ -138,12 +183,27 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     );
   }
 
+  bool get _shouldUseDecodedAnimated {
+    if (!widget.isOfficial || !widget.tryDecodedAnimatedOfficial) return false;
+    final id = widget.id.trim();
+    if (id.isEmpty) return false;
+    if (!widget.decodedAnimatedOnlyForKnownProblemEmotes) return true;
+    return _isKnownProblemAnimatedEmote;
+  }
+
+  bool get _isKnownProblemAnimatedEmote {
+    final id = widget.id.trim();
+    final name = widget.name.trim();
+    return id == 'emotesv2_8a5801a43a8d4dce893b8c3f28978e3e' ||
+        name == 'corgiHHH';
+  }
+
   void handleImageError({
     required String failedUrl,
     required Object error,
     required List<String> candidates,
   }) {
-    if (widget.debug) {
+    if (widget.debug || _isKnownProblemAnimatedEmote) {
       debugLog(
         'error name=${widget.name} id=${widget.id} index=$imageIndex '
         'url=$failedUrl error=$error candidates=${candidates.join(' | ')}',
@@ -154,7 +214,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
     final nextIndex = imageIndex + 1;
     if (nextIndex >= candidates.length) {
-      if (widget.debug) {
+      if (widget.debug || _isKnownProblemAnimatedEmote) {
         debugLog('fallback exhausted name=${widget.name} id=${widget.id}');
       }
       return;
@@ -162,7 +222,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
     fallbackQueued = true;
 
-    if (widget.debug) {
+    if (widget.debug || _isKnownProblemAnimatedEmote) {
       debugLog(
         'fallback queued name=${widget.name} from=$failedUrl to=${candidates[nextIndex]}',
       );
