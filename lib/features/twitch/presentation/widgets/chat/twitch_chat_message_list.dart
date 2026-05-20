@@ -1,24 +1,10 @@
-// PATCH VERSION: chat_message_list_stage221a_restore_latest_autofollow
+// PATCH VERSION: chat_message_list_stage243_official_emote_fallback
 // Place at: lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart
 //
-// Stage 219Z:
-// - Ports Frosty's non-visual chat list model while keeping StreamNook's tile UI.
-// - Hot runtime updates are buffered into a 200ms view flush cadence instead of
-//   immediately changing the visible ListView on every IRC notification.
-// - When autoscroll is enabled, only the latest 100 messages are rendered.
-// - When the user scrolls away from latest, the full retained history is restored.
-// - Normal auto-follow uses jumpTo(0); only manual resume uses a short cheap
-//   animation when close enough.
-//
-// Stage 219AB:
-// - Adds stable ValueKey for each message tile. This lets Flutter preserve the
-//   mounted tile/content state and its cached InlineSpan list across buffered
-//   list updates when the same message remains visible.
-//
-// Stage 221A:
-// - Restore auto-follow as soon as the scroll position is near latest. The
-//   previous user-scroll guard also blocked the "manually scroll to bottom and
-//   keep following new messages" behavior.
+// Stage 243:
+// - Pass official emote cache through message tiles so official Twitch emotes
+//   can be rendered from text-token fallback when IRC/recent/local paths do not
+//   provide a complete emotes tag.
 
 import 'dart:async';
 
@@ -27,6 +13,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
+import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
 import 'twitch_runtime_message_tile.dart';
@@ -34,6 +21,7 @@ import 'twitch_runtime_message_tile.dart';
 class TwitchChatMessageList extends StatefulWidget {
   final TwitchChatRuntime runtime;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService? officialEmoteCache;
   final bool showTimestamp;
   final double fontScale;
   final bool compact;
@@ -43,6 +31,7 @@ class TwitchChatMessageList extends StatefulWidget {
     super.key,
     required this.runtime,
     required this.thirdPartyEmoteCache,
+    this.officialEmoteCache,
     this.showTimestamp = false,
     this.fontScale = 1.0,
     this.compact = false,
@@ -382,6 +371,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       selectedMessage: message,
       messages: contextMessages,
       thirdPartyEmotes: widget.thirdPartyEmoteCache,
+      officialEmotes: widget.officialEmoteCache,
     );
   }
 
@@ -437,6 +427,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                   key: ValueKey<String>(_messageStableKey(message)),
                   message: message,
                   thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                  officialEmotes: widget.officialEmoteCache,
                   showTimestamp: widget.showTimestamp,
                   fontScale: widget.fontScale,
                   compact: widget.compact,
