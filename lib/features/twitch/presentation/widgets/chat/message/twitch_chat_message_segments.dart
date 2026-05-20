@@ -490,7 +490,7 @@ WidgetSpan _twitchEmoteSpan({
       child: RepaintBoundary(
         child: _ChatMenuStyleEmoteImage(
           imageUrl: imageUrl,
-          cacheKey: 'Twitch:${segment.id ?? segment.url ?? segment.content}',
+          cacheKey: 'Twitch:$imageUrl',
           width: size,
           height: size,
           fallbackText: segment.content.isEmpty ? '[emote]' : segment.content,
