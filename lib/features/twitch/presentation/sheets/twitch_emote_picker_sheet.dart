@@ -1,14 +1,13 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage247_official_static_fallback
+// PATCH VERSION: twitch_emote_picker_sheet_stage249_shared_emote_image
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import '../widgets/shared/twitch_emote_image.dart';
 
 const int _initialGridCount = 96;
 const int _searchGridLimit = 240;
@@ -20,44 +19,6 @@ void _emotePickerDebugLog(String message) {
   if (!_emotePickerDebugEnabled) return;
   debugPrint('[TwitchEmotePickerDebug] $message', wrapWidth: 1024);
 }
-
-String _officialAnimatedEmoteUrl(String id) {
-  final cleanId = id.trim();
-  if (cleanId.isEmpty) return '';
-  return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/animated/dark/2.0';
-}
-
-String _officialDefaultEmoteUrl(String id) {
-  final cleanId = id.trim();
-  if (cleanId.isEmpty) return '';
-  return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/default/dark/2.0';
-}
-
-String _officialStaticEmoteUrl(String id) {
-  final cleanId = id.trim();
-  if (cleanId.isEmpty) return '';
-  return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/static/dark/2.0';
-}
-
-List<String> _uniqueUrls(Iterable<String> urls) {
-  final seen = <String>{};
-  final result = <String>[];
-  for (final url in urls) {
-    final clean = url.trim();
-    if (clean.isEmpty || seen.contains(clean)) continue;
-    seen.add(clean);
-    result.add(clean);
-  }
-  return result;
-}
-
-final CacheManager _sheetEmoteCacheManager = CacheManager(
-  Config(
-    'twitchUnifiedEmotePickerImageCache',
-    stalePeriod: const Duration(days: 30),
-    maxNrOfCacheObjects: 12000,
-  ),
-);
 
 Future<void> showTwitchEmotePickerSheet({
   required BuildContext context,
@@ -676,7 +637,7 @@ class _EmoteSectionState extends State<_EmoteSection>
   bool get wantKeepAlive => true;
 }
 
-class _EmoteTile extends StatefulWidget {
+class _EmoteTile extends StatelessWidget {
   final _EmoteEntry entry;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -689,37 +650,13 @@ class _EmoteTile extends StatefulWidget {
   });
 
   @override
-  State<_EmoteTile> createState() => _EmoteTileState();
-}
-
-class _EmoteTileState extends State<_EmoteTile> {
-  int _imageIndex = 0;
-  bool _fallbackQueued = false;
-
-  _EmoteEntry get entry => widget.entry;
-
-  @override
-  void didUpdateWidget(covariant _EmoteTile oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.entry.stableKey != widget.entry.stableKey ||
-        oldWidget.entry.imageUrl != widget.entry.imageUrl) {
-      _imageIndex = 0;
-      _fallbackQueued = false;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final candidates = entry.imageCandidates;
-    if (_imageIndex >= candidates.length) _imageIndex = 0;
-    final imageUrl = candidates.isEmpty ? '' : candidates[_imageIndex];
     final locked = entry.locked;
-    final imageCacheKey = imageUrl.isEmpty ? entry.stableKey : '${entry.stableKey}:$imageUrl';
 
     if (entry.name == 'corgiHHH') {
       _emotePickerDebugLog(
-        'tile build name=${entry.name} id=${entry.id} index=$_imageIndex '
-        'url=$imageUrl candidates=${candidates.join(' | ')}',
+        'shared tile build name=${entry.name} id=${entry.id} '
+        'imageUrl=${entry.imageUrl} isOfficial=${entry.isOfficial}',
       );
     }
 
@@ -729,8 +666,8 @@ class _EmoteTileState extends State<_EmoteTile> {
         waitDuration: const Duration(milliseconds: 650),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: locked ? null : widget.onTap,
-          onLongPress: widget.onLongPress,
+          onTap: locked ? null : onTap,
+          onLongPress: onLongPress,
           child: Container(
             padding: const EdgeInsets.fromLTRB(8, 9, 8, 8),
             decoration: BoxDecoration(
@@ -757,36 +694,32 @@ class _EmoteTileState extends State<_EmoteTile> {
                   children: [
                     Expanded(
                       child: Center(
-                        child: imageUrl.isEmpty
+                        child: entry.imageUrl.trim().isEmpty
                             ? Icon(
-                                locked ? Icons.lock_rounded : Icons.broken_image_rounded,
+                                locked
+                                    ? Icons.lock_rounded
+                                    : Icons.broken_image_rounded,
                                 color: Colors.white38,
                                 size: 24,
                               )
-                            : Opacity(
-                                opacity: locked ? 0.62 : 1,
-                                child: CachedNetworkImage(
-                                  key: ValueKey<String>(imageCacheKey),
-                                  imageUrl: imageUrl,
-                                  cacheKey: imageCacheKey,
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.low,
-                                  fadeInDuration: const Duration(milliseconds: 160),
-                                  fadeOutDuration: const Duration(milliseconds: 120),
-                                  useOldImageOnUrlChange: false,
-                                  cacheManager: _sheetEmoteCacheManager,
-                                  memCacheWidth: 144,
-                                  memCacheHeight: 144,
-                                  placeholder: (_, __) => const SizedBox.shrink(),
-                                  errorWidget: (_, url, error) {
-                                    _handleImageError(url, error, candidates);
-                                    return const Icon(
-                                      Icons.broken_image_rounded,
-                                      color: Colors.white38,
-                                      size: 22,
-                                    );
-                                  },
+                            : TwitchEmoteImage(
+                                id: entry.id,
+                                name: entry.name,
+                                imageUrl: entry.imageUrl,
+                                providerLabel: entry.providerLabel,
+                                isOfficial: entry.isOfficial,
+                                locked: locked,
+                                fit: BoxFit.contain,
+                                memCacheWidth: 144,
+                                memCacheHeight: 144,
+                                placeholder: const SizedBox.shrink(),
+                                errorPlaceholder: const Icon(
+                                  Icons.broken_image_rounded,
+                                  color: Colors.white38,
+                                  size: 22,
                                 ),
+                                debug: entry.name == 'corgiHHH',
+                                debugTag: 'TwitchEmotePickerImage',
                               ),
                       ),
                     ),
@@ -844,34 +777,6 @@ class _EmoteTileState extends State<_EmoteTile> {
         ),
       ),
     );
-  }
-
-  void _handleImageError(String url, Object error, List<String> candidates) {
-    if (entry.name == 'corgiHHH') {
-      _emotePickerDebugLog(
-        'image error name=${entry.name} index=$_imageIndex url=$url error=$error '
-        'candidates=${candidates.join(' | ')}',
-      );
-    }
-
-    if (_fallbackQueued) return;
-    final nextIndex = _imageIndex + 1;
-    if (nextIndex >= candidates.length) return;
-
-    _fallbackQueued = true;
-    if (entry.name == 'corgiHHH') {
-      _emotePickerDebugLog(
-        'fallback queued name=${entry.name} from=$url to=${candidates[nextIndex]}',
-      );
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _imageIndex = nextIndex;
-        _fallbackQueued = false;
-      });
-    });
   }
 }
 
@@ -950,16 +855,6 @@ class _EmoteEntry {
   }
 
   bool get isOfficial => official != null;
-
-  List<String> get imageCandidates {
-    if (!isOfficial) return _uniqueUrls(<String>[imageUrl]);
-    return _uniqueUrls(<String>[
-      imageUrl,
-      _officialStaticEmoteUrl(id),
-      _officialAnimatedEmoteUrl(id),
-      _officialDefaultEmoteUrl(id),
-    ]);
-  }
 
   String get stableKey {
     final cleanId = id.trim();
