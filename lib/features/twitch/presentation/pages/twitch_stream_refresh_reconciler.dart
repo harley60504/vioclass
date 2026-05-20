@@ -39,7 +39,7 @@ class TwitchStreamRefreshReconciler {
     required List<T> refreshedWindow,
     required TwitchStreamIdentityResolver<T> identityOf,
   }) {
-    if (refreshedWindow.isEmpty) return const <T>[];
+    if (refreshedWindow.isEmpty) return <T>[];
 
     final seen = <String>{};
     final result = <T>[];
