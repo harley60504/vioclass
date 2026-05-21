@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_third_party_emote_cache_service_stage233_static_animated_urls
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -308,9 +310,11 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       id: id,
       name: name,
       imageUrl: imageUrl,
+      staticImageUrl: json['staticImageUrl']?.toString() ?? '',
       provider: provider,
       scope: scope,
       isZeroWidth: json['isZeroWidth'] == true,
+      isAnimated: json['isAnimated'] == true,
       width: _readInt(json['width']),
       height: _readInt(json['height']),
     );
@@ -406,6 +410,10 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       'bttvCount': countForProvider(TwitchThirdPartyEmoteProvider.bttv),
       'sevenTvCount': countForProvider(TwitchThirdPartyEmoteProvider.sevenTv),
       'ffzCount': countForProvider(TwitchThirdPartyEmoteProvider.ffz),
+      'animatedCount': emotes.where((emote) => emote.isAnimated).length,
+      'staticFallbackCount': emotes
+          .where((emote) => emote.staticImageUrl.trim().isNotEmpty)
+          .length,
       'scopeSample': emotes.take(40).map((emote) => emote.toJson()).toList(),
     };
   }
