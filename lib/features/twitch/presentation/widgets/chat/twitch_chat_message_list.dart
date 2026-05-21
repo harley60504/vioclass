@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_list_stage233_static_while_scroll
+// PATCH VERSION: twitch_chat_message_list_stage233e_animation_policy_setting
 
 import 'dart:async';
 
@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart' show ScrollDirection;
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
+import '../../../services/chat/twitch_emote_animation_policy_service.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
@@ -19,6 +20,7 @@ class TwitchChatMessageList extends StatefulWidget {
   final bool showTimestamp;
   final double fontScale;
   final bool compact;
+  final TwitchEmoteAnimationPolicy? emoteAnimationPolicy;
   final ValueChanged<TwitchChatRuntimeMessage>? onOpenMessageContext;
 
   const TwitchChatMessageList({
@@ -29,6 +31,7 @@ class TwitchChatMessageList extends StatefulWidget {
     this.showTimestamp = false,
     this.fontScale = 1.0,
     this.compact = false,
+    this.emoteAnimationPolicy,
     this.onOpenMessageContext,
   });
 
@@ -55,6 +58,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   bool _userScrollActive = false;
   bool _followLatestScheduled = false;
   bool _animateVisibleEmotes = true;
+  TwitchEmoteAnimationPolicy _loadedPolicy =
+      TwitchEmoteAnimationPolicyService.defaultPolicy;
   DateTime? _lastUserScrollAt;
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
@@ -68,6 +73,26 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
   TwitchChatRuntime get runtime => widget.runtime;
 
+  TwitchEmoteAnimationPolicy get _effectivePolicy {
+    return widget.emoteAnimationPolicy ?? _loadedPolicy;
+  }
+
+  bool get _shouldThrottleAnimatedEmotesOnScroll {
+    return _effectivePolicy == TwitchEmoteAnimationPolicy.staticWhileScroll;
+  }
+
+  bool get _shouldAnimateEmotesForTile {
+    switch (_effectivePolicy) {
+      case TwitchEmoteAnimationPolicy.visibleAnimated:
+      case TwitchEmoteAnimationPolicy.alwaysAnimated:
+        return true;
+      case TwitchEmoteAnimationPolicy.staticWhileScroll:
+        return _animateVisibleEmotes;
+      case TwitchEmoteAnimationPolicy.staticOnly:
+        return false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -77,11 +102,16 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     _scrollController.addListener(_handleScrollChanged);
 
     _scheduleFollowLatest(animated: false);
+    unawaited(_loadSavedEmoteAnimationPolicy());
   }
 
   @override
   void didUpdateWidget(covariant TwitchChatMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.emoteAnimationPolicy != widget.emoteAnimationPolicy) {
+      _syncAnimationStateWithPolicy();
+    }
 
     if (oldWidget.runtime != widget.runtime) {
       _bufferFlushTimer?.cancel();
@@ -102,6 +132,31 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSavedEmoteAnimationPolicy() async {
+    if (widget.emoteAnimationPolicy != null) return;
+    final policy = await TwitchEmoteAnimationPolicyService.load();
+    if (!mounted || widget.emoteAnimationPolicy != null) return;
+    setState(() => _loadedPolicy = policy);
+    _syncAnimationStateWithPolicy();
+  }
+
+  void _syncAnimationStateWithPolicy() {
+    switch (_effectivePolicy) {
+      case TwitchEmoteAnimationPolicy.visibleAnimated:
+      case TwitchEmoteAnimationPolicy.alwaysAnimated:
+        _setEmoteAnimationAllowed(true);
+        break;
+      case TwitchEmoteAnimationPolicy.staticWhileScroll:
+        if (!_userScrollActive && !_hasRecentUserScroll) {
+          _setEmoteAnimationAllowed(true);
+        }
+        break;
+      case TwitchEmoteAnimationPolicy.staticOnly:
+        _setEmoteAnimationAllowed(false);
+        break;
+    }
   }
 
   void _resetVisibleMessagesFromRuntime({required bool forceAutoScroll}) {
@@ -246,14 +301,18 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (_programmaticScrollActive) return;
     _userScrollActive = true;
     _lastUserScrollAt = DateTime.now();
-    _setEmoteAnimationAllowed(false);
+    if (_shouldThrottleAnimatedEmotesOnScroll) {
+      _setEmoteAnimationAllowed(false);
+    }
   }
 
   void _markUserScrollEnded() {
     if (_programmaticScrollActive) return;
     _userScrollActive = false;
     _lastUserScrollAt = DateTime.now();
-    _scheduleEmoteAnimationResume();
+    if (_shouldThrottleAnimatedEmotesOnScroll) {
+      _scheduleEmoteAnimationResume();
+    }
   }
 
   void _setEmoteAnimationAllowed(bool value) {
@@ -268,6 +327,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
   void _scheduleEmoteAnimationResume() {
     _emoteAnimationResumeTimer?.cancel();
+    if (!_shouldThrottleAnimatedEmotesOnScroll) return;
     _emoteAnimationResumeTimer = Timer(_emoteAnimationResumeDelay, () {
       if (!mounted) return;
       if (_userScrollActive || _hasRecentUserScroll) {
@@ -456,7 +516,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                   showTimestamp: widget.showTimestamp,
                   fontScale: widget.fontScale,
                   compact: widget.compact,
-                  animateEmotes: _animateVisibleEmotes,
+                  animateEmotes: _shouldAnimateEmotesForTile,
                   onOpenContext: () => _openContextSheet(message),
                 );
               },
