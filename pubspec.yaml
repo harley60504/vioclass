@@ -21,6 +21,7 @@ dependencies:
   url_launcher: ^6.3.2
   cached_network_image: ^3.4.1
   flutter_cache_manager: ^3.4.1
+  visibility_detector: ^0.4.0+2
 
   # Stage 220F: PiliPlus-style media_kit fork test.
   # Keep normal hosted constraints here because media_kit_video's pubspec
