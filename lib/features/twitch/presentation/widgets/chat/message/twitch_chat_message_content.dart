@@ -19,6 +19,7 @@ class TwitchChatMessageContent extends StatelessWidget {
   final bool showSystemMessage;
   final bool showTimestamp;
   final bool compact;
+  final bool animateEmotes;
   final TwitchChatMessageVisualMetrics metrics;
 
   const TwitchChatMessageContent({
@@ -32,6 +33,7 @@ class TwitchChatMessageContent extends StatelessWidget {
     required this.showTimestamp,
     required this.metrics,
     this.compact = false,
+    this.animateEmotes = true,
   });
 
   @override
@@ -150,6 +152,7 @@ class TwitchChatMessageContent extends StatelessWidget {
           thirdPartyEmotes: thirdPartyEmotes,
           officialEmotes: officialEmotes,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         ),
       );
     }
