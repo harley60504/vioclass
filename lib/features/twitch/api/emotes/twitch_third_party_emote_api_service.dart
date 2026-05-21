@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_third_party_emote_api_stage233_static_animated_urls
+
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../core/twitch_api_client.dart';
 
@@ -107,15 +109,17 @@ class TwitchThirdPartyEmoteApiService {
   }) {
     final id = json['id']?.toString() ?? '';
     final code = json['code']?.toString() ?? '';
+    final animated = _readBool(json['animated']) ||
+        (json['imageType']?.toString().toLowerCase() == 'gif');
     return TwitchThirdPartyEmote(
       id: id,
       name: code,
-      imageUrl: id.isEmpty
-          ? ''
-          : 'https://cdn.betterttv.net/emote/$id/2x',
+      imageUrl: id.isEmpty ? '' : 'https://cdn.betterttv.net/emote/$id/2x',
+      staticImageUrl: id.isEmpty ? '' : 'https://cdn.betterttv.net/emote/$id/1x',
       provider: TwitchThirdPartyEmoteProvider.bttv,
       scope: scope,
       isZeroWidth: json['modifier'] == true,
+      isAnimated: animated,
       width: _readInt(json['width']),
       height: _readInt(json['height']),
     );
@@ -183,11 +187,12 @@ class TwitchThirdPartyEmoteApiService {
         final urls = item['urls'];
 
         String imageUrl = '';
+        String staticImageUrl = '';
         if (urls is Map) {
           imageUrl = (urls['2'] ?? urls['1'] ?? urls['4'])?.toString() ?? '';
-          if (imageUrl.startsWith('//')) {
-            imageUrl = 'https:$imageUrl';
-          }
+          staticImageUrl = (urls['1'] ?? urls['2'] ?? urls['4'])?.toString() ?? '';
+          if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
+          if (staticImageUrl.startsWith('//')) staticImageUrl = 'https:$staticImageUrl';
         }
 
         output.add(
@@ -195,6 +200,7 @@ class TwitchThirdPartyEmoteApiService {
             id: id,
             name: name,
             imageUrl: imageUrl,
+            staticImageUrl: staticImageUrl,
             provider: TwitchThirdPartyEmoteProvider.ffz,
             scope: scope,
             width: width,
@@ -252,32 +258,43 @@ class TwitchThirdPartyEmoteApiService {
       final flags = _readInt(item['flags']) ?? 0;
       final data = item['data'];
       final dataMap = data is Map<String, dynamic> ? data : <String, dynamic>{};
+      final dataFlags = _readInt(dataMap['flags']) ?? 0;
+      final animated = (dataFlags & 1) != 0;
 
       final host = dataMap['host'];
       final hostMap = host is Map<String, dynamic> ? host : <String, dynamic>{};
 
       var imageUrl = '';
+      var staticImageUrl = '';
       int? selectedWidth;
       int? selectedHeight;
 
       final files = hostMap['files'];
       if (files is List && files.isNotEmpty) {
         final candidates = files.whereType<Map<String, dynamic>>().toList();
-        final selected = _selectSevenTvChatFile(candidates);
+        final selected = _selectSevenTvChatFile(candidates, animated: animated);
+        final staticSelected = _selectSevenTvStaticChatFile(candidates);
 
         selectedWidth = _readInt(selected['width']);
         selectedHeight = _readInt(selected['height']);
 
         final fileName = selected['name']?.toString() ?? '';
+        final staticFileName = staticSelected['name']?.toString() ?? '';
         final url = hostMap['url']?.toString() ?? '';
 
         if (url.isNotEmpty && fileName.isNotEmpty) {
           imageUrl = 'https:$url/$fileName';
         }
+        if (url.isNotEmpty && staticFileName.isNotEmpty) {
+          staticImageUrl = 'https:$url/$staticFileName';
+        }
       }
 
       if (imageUrl.isEmpty && id.isNotEmpty) {
         imageUrl = 'https://cdn.7tv.app/emote/$id/2x.webp';
+      }
+      if (staticImageUrl.isEmpty && id.isNotEmpty) {
+        staticImageUrl = 'https://cdn.7tv.app/emote/$id/1x.webp';
       }
 
       output.add(
@@ -285,9 +302,11 @@ class TwitchThirdPartyEmoteApiService {
           id: id,
           name: name,
           imageUrl: imageUrl,
+          staticImageUrl: staticImageUrl,
           provider: TwitchThirdPartyEmoteProvider.sevenTv,
           scope: scope,
           isZeroWidth: (flags & 256) != 0,
+          isAnimated: animated,
           width: selectedWidth,
           height: selectedHeight,
         ),
@@ -300,16 +319,50 @@ class TwitchThirdPartyEmoteApiService {
   }
 
   Map<String, dynamic> _selectSevenTvChatFile(
+    List<Map<String, dynamic>> candidates, {
+    required bool animated,
+  }) {
+    if (candidates.isEmpty) return const <String, dynamic>{};
+
+    final formatPool = candidates.where((file) {
+      final format = file['format']?.toString().toLowerCase() ?? '';
+      final name = file['name']?.toString().toLowerCase() ?? '';
+      if (animated) return format == 'webp' || name.endsWith('.webp');
+      return format == 'webp' || format == 'png' || name.endsWith('.webp') || name.endsWith('.png');
+    }).toList(growable: false);
+
+    final preferredPool = formatPool.isNotEmpty ? formatPool : candidates;
+    return _selectByPreferredWidth(preferredPool);
+  }
+
+  Map<String, dynamic> _selectSevenTvStaticChatFile(
     List<Map<String, dynamic>> candidates,
   ) {
     if (candidates.isEmpty) return const <String, dynamic>{};
 
-    final webp = candidates.where((file) {
-      return (file['format']?.toString().toLowerCase() ?? '') == 'webp';
+    final staticPool = candidates.where((file) {
+      final name = file['name']?.toString().toLowerCase() ?? '';
+      final format = file['format']?.toString().toLowerCase() ?? '';
+      return name.endsWith('.png') || format == 'png';
     }).toList(growable: false);
 
-    final preferredPool = webp.isNotEmpty ? webp : candidates;
-    final sorted = preferredPool.toList(growable: false)
+    if (staticPool.isNotEmpty) return _selectByPreferredWidth(staticPool);
+
+    final fallbackPool = candidates.where((file) {
+      final name = file['name']?.toString().toLowerCase() ?? '';
+      final format = file['format']?.toString().toLowerCase() ?? '';
+      return name.endsWith('.webp') || format == 'webp';
+    }).toList(growable: false);
+
+    return _selectByPreferredWidth(fallbackPool.isNotEmpty ? fallbackPool : candidates);
+  }
+
+  Map<String, dynamic> _selectByPreferredWidth(
+    List<Map<String, dynamic>> candidates,
+  ) {
+    if (candidates.isEmpty) return const <String, dynamic>{};
+
+    final sorted = candidates.toList(growable: false)
       ..sort((a, b) {
         final aWidth = _readInt(a['width']) ?? 1 << 20;
         final bWidth = _readInt(b['width']) ?? 1 << 20;
@@ -322,6 +375,13 @@ class TwitchThirdPartyEmoteApiService {
     }
 
     return sorted.last;
+  }
+
+  bool _readBool(Object? value) {
+    if (value is bool) return value;
+    if (value == null) return false;
+    final text = value.toString().toLowerCase();
+    return text == 'true' || text == '1' || text == 'yes';
   }
 
   int? _readInt(Object? value) {
