@@ -1,5 +1,5 @@
-// PATCH VERSION: twitch_stream_page_stage189d_outer_glass_shell
-// Strengthens the outer app chrome so the discovery glass UI is visible.
+// PATCH VERSION: twitch_stream_page_stage233e_emote_policy_setting
+// Adds a home-page setting for chat emote animation behavior.
 
 import 'dart:async';
 
@@ -10,6 +10,7 @@ import '../../api/core/twitch_api_client.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/chat/twitch_emote_animation_policy_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import 'twitch_browse_page.dart';
 import 'twitch_following_page.dart';
@@ -71,6 +72,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   late final TwitchDiscoveryService discoveryService;
 
   TwitchHomeSection selectedSection = TwitchHomeSection.following;
+  TwitchEmoteAnimationPolicy emoteAnimationPolicy =
+      TwitchEmoteAnimationPolicyService.defaultPolicy;
 
   String searchText = '';
   String loginStatus = '檢查登入狀態...';
@@ -94,11 +97,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       authApi: authApi,
     );
 
-    // Do not attach auth listeners here. loadStoredSession() may notify listeners;
-    // feeding that back into _loadLoginState() can create a reload loop on startup.
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadLoginState());
+      unawaited(_loadEmoteAnimationPolicy());
     });
   }
 
@@ -107,6 +108,34 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     searchController.dispose();
     apiClient.close(force: true);
     super.dispose();
+  }
+
+  Future<void> _loadEmoteAnimationPolicy() async {
+    final policy = await TwitchEmoteAnimationPolicyService.load();
+    if (!mounted) return;
+    setState(() => emoteAnimationPolicy = policy);
+  }
+
+  Future<void> _setEmoteAnimationPolicy(
+    TwitchEmoteAnimationPolicy policy, {
+    bool showSnack = true,
+  }) async {
+    await TwitchEmoteAnimationPolicyService.save(policy);
+    if (!mounted) return;
+    setState(() => emoteAnimationPolicy = policy);
+    if (showSnack) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('聊天室貼圖動畫：${policy.label}'),
+          duration: const Duration(milliseconds: 1300),
+        ),
+      );
+    }
+  }
+
+  Future<void> _cycleEmoteAnimationPolicy() async {
+    final next = TwitchEmoteAnimationPolicyService.next(emoteAnimationPolicy);
+    await _setEmoteAnimationPolicy(next);
   }
 
   Future<void> _loadLoginState({bool refreshPages = false}) async {
@@ -643,6 +672,16 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     addSpacingIfNeeded();
     children.add(
       _ToolbarIconButton(
+        tooltip: '貼圖動畫：${emoteAnimationPolicy.label}',
+        icon: Icons.gif_box_rounded,
+        size: buttonSize,
+        onPressed: () => unawaited(_cycleEmoteAnimationPolicy()),
+      ),
+    );
+
+    addSpacingIfNeeded();
+    children.add(
+      _ToolbarIconButton(
         tooltip: '重新整理',
         icon: Icons.refresh_rounded,
         size: buttonSize,
@@ -692,19 +731,75 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
             case 'refresh':
               await refreshCurrentPage();
               break;
+            case 'emote_visible':
+              await _setEmoteAnimationPolicy(
+                TwitchEmoteAnimationPolicy.visibleAnimated,
+              );
+              break;
+            case 'emote_scroll':
+              await _setEmoteAnimationPolicy(
+                TwitchEmoteAnimationPolicy.staticWhileScroll,
+              );
+              break;
+            case 'emote_always':
+              await _setEmoteAnimationPolicy(
+                TwitchEmoteAnimationPolicy.alwaysAnimated,
+              );
+              break;
+            case 'emote_static':
+              await _setEmoteAnimationPolicy(
+                TwitchEmoteAnimationPolicy.staticOnly,
+              );
+              break;
           }
         },
-        itemBuilder: (context) => const <PopupMenuEntry<String>>[
-          PopupMenuItem<String>(
+        itemBuilder: (context) => <PopupMenuEntry<String>>[
+          const PopupMenuItem<String>(
             value: 'login',
             child: Text('完整登入 / 修復登入'),
           ),
-          PopupMenuItem<String>(
+          const PopupMenuItem<String>(
             value: 'refresh',
             child: Text('重新檢查登入狀態'),
           ),
-          PopupMenuDivider(),
+          const PopupMenuDivider(),
           PopupMenuItem<String>(
+            value: 'emote_visible',
+            child: _AccountMenuPolicyItem(
+              title: TwitchEmoteAnimationPolicy.visibleAnimated.label,
+              subtitle: TwitchEmoteAnimationPolicy.visibleAnimated.description,
+              selected: emoteAnimationPolicy ==
+                  TwitchEmoteAnimationPolicy.visibleAnimated,
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'emote_scroll',
+            child: _AccountMenuPolicyItem(
+              title: TwitchEmoteAnimationPolicy.staticWhileScroll.label,
+              subtitle: TwitchEmoteAnimationPolicy.staticWhileScroll.description,
+              selected: emoteAnimationPolicy ==
+                  TwitchEmoteAnimationPolicy.staticWhileScroll,
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'emote_always',
+            child: _AccountMenuPolicyItem(
+              title: TwitchEmoteAnimationPolicy.alwaysAnimated.label,
+              subtitle: TwitchEmoteAnimationPolicy.alwaysAnimated.description,
+              selected: emoteAnimationPolicy ==
+                  TwitchEmoteAnimationPolicy.alwaysAnimated,
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'emote_static',
+            child: _AccountMenuPolicyItem(
+              title: TwitchEmoteAnimationPolicy.staticOnly.label,
+              subtitle: TwitchEmoteAnimationPolicy.staticOnly.description,
+              selected: emoteAnimationPolicy == TwitchEmoteAnimationPolicy.staticOnly,
+            ),
+          ),
+          const PopupMenuDivider(),
+          const PopupMenuItem<String>(
             value: 'logout',
             child: Text('登出'),
           ),
@@ -793,6 +888,65 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               selected: selectedSection == TwitchHomeSection.browse,
               compact: compact,
               onTap: () => selectSection(TwitchHomeSection.browse),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountMenuPolicyItem extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool selected;
+
+  const _AccountMenuPolicyItem({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 260,
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+            color: selected ? _kTwitchPurpleLight : Colors.white38,
+            size: 18,
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 10.5,
+                    height: 1.15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
