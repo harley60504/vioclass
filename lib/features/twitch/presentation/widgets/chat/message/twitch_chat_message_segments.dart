@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_segments_stage233_emote_animation_policy
+// PATCH VERSION: twitch_chat_message_segments_stage233d_service_lookup_resolver
 
 import 'package:flutter/material.dart';
 
@@ -157,88 +157,29 @@ class _ChatInlineEmoteResolver {
   final TwitchOfficialEmoteCacheService? officialEmotes;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
 
-  late final Map<String, TwitchOfficialEmote> _officialByExact = _buildOfficialExact();
-  late final Map<String, TwitchOfficialEmote> _officialByLower = _buildOfficialLower();
-  late final Map<String, TwitchThirdPartyEmote> _thirdPartyByExact = _buildThirdPartyExact();
-  late final Map<String, TwitchThirdPartyEmote> _thirdPartyByLower = _buildThirdPartyLower();
-
   _ChatInlineEmoteResolver({
     required this.officialEmotes,
     required this.thirdPartyEmotes,
   });
 
   bool get hasAnyEmotes {
-    return _officialByExact.isNotEmpty || _thirdPartyByExact.isNotEmpty;
+    return (officialEmotes?.visibleCount ?? 0) > 0 ||
+        (thirdPartyEmotes?.hasAnyEmotes ?? false);
   }
 
   _ResolvedInlineEmote? lookup(String code) {
     final clean = code.trim();
     if (clean.isEmpty) return null;
 
-    final official = _officialByExact[clean] ?? _officialByLower[clean.toLowerCase()];
+    // Use the cache services' indexed lookups instead of rebuilding large
+    // exact/lowercase maps for every message tile build.
+    final official = officialEmotes?.lookupRenderableByName(clean);
     if (official != null) return _ResolvedInlineEmote.official(official);
 
-    final thirdParty = _thirdPartyByExact[clean] ?? _thirdPartyByLower[clean.toLowerCase()];
+    final thirdParty = thirdPartyEmotes?.lookupLoose(clean);
     if (thirdParty != null) return _ResolvedInlineEmote.thirdParty(thirdParty);
 
     return null;
-  }
-
-  Map<String, TwitchOfficialEmote> _buildOfficialExact() {
-    final source = officialEmotes;
-    if (source == null) return const <String, TwitchOfficialEmote>{};
-
-    final byName = <String, TwitchOfficialEmote>{};
-
-    void add(TwitchOfficialEmote emote) {
-      final name = emote.name.trim();
-      final url = _officialImageUrl(emote, animateEmotes: true);
-      if (name.isEmpty || url.isEmpty) return;
-      byName.putIfAbsent(name, () => emote.copyWith(imageUrl: url));
-    }
-
-    for (final emote in source.recentEmotes) add(emote);
-    for (final emote in source.favoriteEmotes) add(emote);
-    for (final emote in source.channelEmotes) add(emote);
-    for (final emote in source.globalEmotes) add(emote);
-    for (final emote in source.userEmotes) add(emote);
-    for (final emote in source.lockedChannelEmotes) add(emote);
-    for (final emote in source.renderableEmotes) add(emote);
-
-    return Map<String, TwitchOfficialEmote>.unmodifiable(byName);
-  }
-
-  Map<String, TwitchOfficialEmote> _buildOfficialLower() {
-    return Map<String, TwitchOfficialEmote>.unmodifiable(<String, TwitchOfficialEmote>{
-      for (final entry in _officialByExact.entries)
-        entry.key.toLowerCase(): entry.value,
-    });
-  }
-
-  Map<String, TwitchThirdPartyEmote> _buildThirdPartyExact() {
-    final source = thirdPartyEmotes;
-    if (source == null) return const <String, TwitchThirdPartyEmote>{};
-
-    final byName = <String, TwitchThirdPartyEmote>{};
-
-    void add(TwitchThirdPartyEmote emote) {
-      final name = emote.name.trim();
-      if (name.isEmpty || emote.imageUrl.trim().isEmpty) return;
-      byName.putIfAbsent(name, () => emote);
-    }
-
-    for (final emote in source.recentEmotes) add(emote);
-    for (final emote in source.favoriteEmotes) add(emote);
-    for (final emote in source.emotes) add(emote);
-
-    return Map<String, TwitchThirdPartyEmote>.unmodifiable(byName);
-  }
-
-  Map<String, TwitchThirdPartyEmote> _buildThirdPartyLower() {
-    return Map<String, TwitchThirdPartyEmote>.unmodifiable(<String, TwitchThirdPartyEmote>{
-      for (final entry in _thirdPartyByExact.entries)
-        entry.key.toLowerCase(): entry.value,
-    });
   }
 }
 
