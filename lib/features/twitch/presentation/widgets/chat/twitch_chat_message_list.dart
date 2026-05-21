@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_chat_message_list_stage233_static_while_scroll
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -41,6 +43,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const Duration _bufferFlushInterval = Duration(milliseconds: 200);
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
+  static const Duration _emoteAnimationResumeDelay = Duration(milliseconds: 260);
 
   final ScrollController _scrollController = ScrollController();
   final Expando<String> _messageFingerprintCache = Expando<String>(
@@ -51,12 +54,14 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   bool _programmaticScrollActive = false;
   bool _userScrollActive = false;
   bool _followLatestScheduled = false;
+  bool _animateVisibleEmotes = true;
   DateTime? _lastUserScrollAt;
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
   String _lastSourceNewestFingerprint = '';
 
   Timer? _bufferFlushTimer;
+  Timer? _emoteAnimationResumeTimer;
   List<TwitchChatRuntimeMessage>? _pendingBufferedSourceMessages;
 
   List<TwitchChatRuntimeMessage> _visibleMessages = <TwitchChatRuntimeMessage>[];
@@ -81,6 +86,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (oldWidget.runtime != widget.runtime) {
       _bufferFlushTimer?.cancel();
       _pendingBufferedSourceMessages = null;
+      _setEmoteAnimationAllowed(true);
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
       _scheduleFollowLatest(animated: false);
       return;
@@ -92,6 +98,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   @override
   void dispose() {
     _bufferFlushTimer?.cancel();
+    _emoteAnimationResumeTimer?.cancel();
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
     super.dispose();
@@ -239,12 +246,36 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (_programmaticScrollActive) return;
     _userScrollActive = true;
     _lastUserScrollAt = DateTime.now();
+    _setEmoteAnimationAllowed(false);
   }
 
   void _markUserScrollEnded() {
     if (_programmaticScrollActive) return;
     _userScrollActive = false;
     _lastUserScrollAt = DateTime.now();
+    _scheduleEmoteAnimationResume();
+  }
+
+  void _setEmoteAnimationAllowed(bool value) {
+    _emoteAnimationResumeTimer?.cancel();
+    if (_animateVisibleEmotes == value) return;
+    if (!mounted) {
+      _animateVisibleEmotes = value;
+      return;
+    }
+    setState(() => _animateVisibleEmotes = value);
+  }
+
+  void _scheduleEmoteAnimationResume() {
+    _emoteAnimationResumeTimer?.cancel();
+    _emoteAnimationResumeTimer = Timer(_emoteAnimationResumeDelay, () {
+      if (!mounted) return;
+      if (_userScrollActive || _hasRecentUserScroll) {
+        _scheduleEmoteAnimationResume();
+        return;
+      }
+      _setEmoteAnimationAllowed(true);
+    });
   }
 
   void _handleScrollChanged() {
@@ -262,6 +293,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
       });
+      _scheduleEmoteAnimationResume();
       _scheduleFollowLatest(animated: false);
       return;
     }
@@ -327,6 +359,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       if (_isNearLatest && !_autoScroll && !_hasRecentUserScroll) {
         setState(() => _autoScroll = true);
       }
+      _scheduleEmoteAnimationResume();
     });
   }
 
@@ -344,6 +377,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _hiddenNewMessageCount = 0;
     });
 
+    _scheduleEmoteAnimationResume();
     _scheduleFollowLatest(animated: true);
   }
 
@@ -422,6 +456,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                   showTimestamp: widget.showTimestamp,
                   fontScale: widget.fontScale,
                   compact: widget.compact,
+                  animateEmotes: _animateVisibleEmotes,
                   onOpenContext: () => _openContextSheet(message),
                 );
               },
