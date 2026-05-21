@@ -1,14 +1,11 @@
-// PATCH VERSION: twitch_chat_message_list_stage233g_scroll_pause_for_wheel_touchpad
+// PATCH VERSION: twitch_chat_message_list_stage242_simple_frosty_like
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
-import 'package:visibility_detector/visibility_detector.dart';
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
-import '../../../services/chat/twitch_emote_animation_policy_service.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
@@ -21,7 +18,6 @@ class TwitchChatMessageList extends StatefulWidget {
   final bool showTimestamp;
   final double fontScale;
   final bool compact;
-  final TwitchEmoteAnimationPolicy? emoteAnimationPolicy;
   final ValueChanged<TwitchChatRuntimeMessage>? onOpenMessageContext;
 
   const TwitchChatMessageList({
@@ -32,7 +28,6 @@ class TwitchChatMessageList extends StatefulWidget {
     this.showTimestamp = false,
     this.fontScale = 1.0,
     this.compact = false,
-    this.emoteAnimationPolicy,
     this.onOpenMessageContext,
   });
 
@@ -46,83 +41,41 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const int _autoFollowRenderMessageLimit = 100;
   static const Duration _bufferFlushInterval = Duration(milliseconds: 200);
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
-  static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
-  static const Duration _emoteAnimationResumeDelay = Duration(milliseconds: 260);
-  static const double _visibleAnimationFractionThreshold = 0.06;
-  static const double _scrollDeltaNoiseThreshold = 0.15;
 
   final ScrollController _scrollController = ScrollController();
   final Expando<String> _messageFingerprintCache = Expando<String>(
     'twitch-chat-message-fingerprint',
   );
-  final Set<String> _visibleMessageKeys = <String>{};
 
   bool _autoScroll = true;
   bool _programmaticScrollActive = false;
-  bool _userScrollActive = false;
   bool _followLatestScheduled = false;
-  bool _animateVisibleEmotes = true;
-  TwitchEmoteAnimationPolicy _loadedPolicy =
-      TwitchEmoteAnimationPolicyService.defaultPolicy;
-  DateTime? _lastUserScrollAt;
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
   String _lastSourceNewestFingerprint = '';
 
   Timer? _bufferFlushTimer;
-  Timer? _emoteAnimationResumeTimer;
   List<TwitchChatRuntimeMessage>? _pendingBufferedSourceMessages;
 
   List<TwitchChatRuntimeMessage> _visibleMessages = <TwitchChatRuntimeMessage>[];
 
   TwitchChatRuntime get runtime => widget.runtime;
 
-  TwitchEmoteAnimationPolicy get _effectivePolicy {
-    return widget.emoteAnimationPolicy ?? _loadedPolicy;
-  }
-
-  bool get _shouldThrottleAnimatedEmotesOnScroll {
-    return _effectivePolicy == TwitchEmoteAnimationPolicy.staticWhileScroll;
-  }
-
-  bool _shouldAnimateEmotesForMessage(String messageKey) {
-    switch (_effectivePolicy) {
-      case TwitchEmoteAnimationPolicy.visibleAnimated:
-        return _visibleMessageKeys.contains(messageKey);
-      case TwitchEmoteAnimationPolicy.alwaysAnimated:
-        return true;
-      case TwitchEmoteAnimationPolicy.staticWhileScroll:
-        return _animateVisibleEmotes;
-      case TwitchEmoteAnimationPolicy.staticOnly:
-        return false;
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-
     _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
-
     _scrollController.addListener(_handleScrollChanged);
-
     _scheduleFollowLatest(animated: false);
-    unawaited(_loadSavedEmoteAnimationPolicy());
   }
 
   @override
   void didUpdateWidget(covariant TwitchChatMessageList oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.emoteAnimationPolicy != widget.emoteAnimationPolicy) {
-      _syncAnimationStateWithPolicy();
-    }
-
     if (oldWidget.runtime != widget.runtime) {
       _bufferFlushTimer?.cancel();
       _pendingBufferedSourceMessages = null;
-      _visibleMessageKeys.clear();
-      _setEmoteAnimationAllowed(true);
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
       _scheduleFollowLatest(animated: false);
       return;
@@ -134,35 +87,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   @override
   void dispose() {
     _bufferFlushTimer?.cancel();
-    _emoteAnimationResumeTimer?.cancel();
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadSavedEmoteAnimationPolicy() async {
-    if (widget.emoteAnimationPolicy != null) return;
-    final policy = await TwitchEmoteAnimationPolicyService.load();
-    if (!mounted || widget.emoteAnimationPolicy != null) return;
-    setState(() => _loadedPolicy = policy);
-    _syncAnimationStateWithPolicy();
-  }
-
-  void _syncAnimationStateWithPolicy() {
-    switch (_effectivePolicy) {
-      case TwitchEmoteAnimationPolicy.visibleAnimated:
-      case TwitchEmoteAnimationPolicy.alwaysAnimated:
-        _setEmoteAnimationAllowed(true);
-        break;
-      case TwitchEmoteAnimationPolicy.staticWhileScroll:
-        if (!_userScrollActive && !_hasRecentUserScroll) {
-          _setEmoteAnimationAllowed(true);
-        }
-        break;
-      case TwitchEmoteAnimationPolicy.staticOnly:
-        _setEmoteAnimationAllowed(false);
-        break;
-    }
   }
 
   void _resetVisibleMessagesFromRuntime({required bool forceAutoScroll}) {
@@ -172,7 +99,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     _lastSourceMessageCount = sourceMessages.length;
     _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
     _hiddenNewMessageCount = 0;
-    _removeStaleVisibleMessageKeys();
   }
 
   List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
@@ -213,8 +139,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     if (shouldAutoFollow) {
       _autoScroll = true;
-      _userScrollActive = false;
-      _lastUserScrollAt = null;
       _hiddenNewMessageCount = 0;
       _pendingBufferedSourceMessages = sourceMessages;
       _scheduleBufferedViewFlush();
@@ -239,7 +163,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _autoScroll = true;
         _hiddenNewMessageCount = 0;
         _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
-        _removeStaleVisibleMessageKeys();
       });
 
       _scheduleFollowLatest(animated: false);
@@ -298,59 +221,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     return _scrollController.offset <= _autoScrollThreshold;
   }
 
-  bool get _hasRecentUserScroll {
-    if (_userScrollActive) return true;
-    final lastUserScrollAt = _lastUserScrollAt;
-    if (lastUserScrollAt == null) return false;
-    return DateTime.now().difference(lastUserScrollAt) < _userScrollGuardDuration;
-  }
-
-  void _markUserScrollActive() {
-    if (_programmaticScrollActive) return;
-    _userScrollActive = true;
-    _lastUserScrollAt = DateTime.now();
-    if (_shouldThrottleAnimatedEmotesOnScroll) {
-      _setEmoteAnimationAllowed(false);
-    }
-  }
-
-  void _markUserScrollEnded() {
-    if (_programmaticScrollActive) return;
-    _userScrollActive = false;
-    _lastUserScrollAt = DateTime.now();
-    if (_shouldThrottleAnimatedEmotesOnScroll) {
-      _scheduleEmoteAnimationResume();
-    }
-  }
-
-  bool _hasMeaningfulScrollDelta(double? delta) {
-    if (delta == null) return true;
-    return delta.abs() > _scrollDeltaNoiseThreshold;
-  }
-
-  void _setEmoteAnimationAllowed(bool value) {
-    _emoteAnimationResumeTimer?.cancel();
-    if (_animateVisibleEmotes == value) return;
-    if (!mounted) {
-      _animateVisibleEmotes = value;
-      return;
-    }
-    setState(() => _animateVisibleEmotes = value);
-  }
-
-  void _scheduleEmoteAnimationResume() {
-    _emoteAnimationResumeTimer?.cancel();
-    if (!_shouldThrottleAnimatedEmotesOnScroll) return;
-    _emoteAnimationResumeTimer = Timer(_emoteAnimationResumeDelay, () {
-      if (!mounted) return;
-      if (_userScrollActive || _hasRecentUserScroll) {
-        _scheduleEmoteAnimationResume();
-        return;
-      }
-      _setEmoteAnimationAllowed(true);
-    });
-  }
-
   void _handleScrollChanged() {
     if (!_scrollController.hasClients || _programmaticScrollActive) return;
 
@@ -359,15 +229,11 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (nearLatest && !_autoScroll) {
       setState(() {
         _autoScroll = true;
-        _userScrollActive = false;
-        _lastUserScrollAt = null;
         _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
         _lastSourceMessageCount = runtime.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
-        _removeStaleVisibleMessageKeys();
       });
-      _scheduleEmoteAnimationResume();
       _scheduleFollowLatest(animated: false);
       return;
     }
@@ -378,7 +244,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       setState(() {
         _autoScroll = false;
         _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
-        _removeStaleVisibleMessageKeys();
       });
     }
   }
@@ -431,10 +296,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         .whenComplete(() {
       _programmaticScrollActive = false;
       if (!mounted) return;
-      if (_isNearLatest && !_autoScroll && !_hasRecentUserScroll) {
+      if (_isNearLatest && !_autoScroll) {
         setState(() => _autoScroll = true);
       }
-      _scheduleEmoteAnimationResume();
     });
   }
 
@@ -444,16 +308,12 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     setState(() {
       _autoScroll = true;
-      _userScrollActive = false;
-      _lastUserScrollAt = null;
       _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       _lastSourceMessageCount = runtime.messages.length;
       _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
       _hiddenNewMessageCount = 0;
-      _removeStaleVisibleMessageKeys();
     });
 
-    _scheduleEmoteAnimationResume();
     _scheduleFollowLatest(animated: true);
   }
 
@@ -476,39 +336,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     );
   }
 
-  void _handleMessageVisibility({
-    required String messageKey,
-    required bool visible,
-  }) {
-    final contains = _visibleMessageKeys.contains(messageKey);
-    if (visible == contains) return;
-
-    if (!mounted) {
-      if (visible) {
-        _visibleMessageKeys.add(messageKey);
-      } else {
-        _visibleMessageKeys.remove(messageKey);
-      }
-      return;
-    }
-
-    setState(() {
-      if (visible) {
-        _visibleMessageKeys.add(messageKey);
-      } else {
-        _visibleMessageKeys.remove(messageKey);
-      }
-    });
-  }
-
-  void _removeStaleVisibleMessageKeys() {
-    if (_visibleMessageKeys.isEmpty) return;
-    final activeKeys = <String>{
-      for (final message in _visibleMessages) _messageStableKey(message),
-    };
-    _visibleMessageKeys.removeWhere((key) => !activeKeys.contains(key));
-  }
-
   @override
   Widget build(BuildContext context) {
     final visibleMessages = _visibleMessages;
@@ -526,68 +353,29 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       color: Colors.transparent,
       child: Stack(
         children: [
-          NotificationListener<ScrollNotification>(
-            onNotification: (notification) {
-              if (notification is ScrollStartNotification) {
-                _markUserScrollActive();
-                _handleScrollChanged();
-              } else if (notification is ScrollUpdateNotification) {
-                if (_hasMeaningfulScrollDelta(notification.scrollDelta)) {
-                  _markUserScrollActive();
-                }
-                _handleScrollChanged();
-              } else if (notification is OverscrollNotification) {
-                if (_hasMeaningfulScrollDelta(notification.overscroll)) {
-                  _markUserScrollActive();
-                }
-                _handleScrollChanged();
-              } else if (notification is UserScrollNotification) {
-                if (notification.direction == ScrollDirection.idle) {
-                  _markUserScrollEnded();
-                } else {
-                  _markUserScrollActive();
-                }
-                _handleScrollChanged();
-              } else if (notification is ScrollEndNotification) {
-                _markUserScrollEnded();
-                _handleScrollChanged();
-              }
-              return false;
-            },
-            child: ListView.builder(
-              controller: _scrollController,
-              reverse: true,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-              itemCount: visibleMessages.length,
-              itemBuilder: (context, index) {
-                final chronologicalIndex = visibleMessages.length - 1 - index;
-                final message = visibleMessages[chronologicalIndex];
-                final messageKey = _messageStableKey(message);
+          ListView.builder(
+            controller: _scrollController,
+            reverse: true,
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+            itemCount: visibleMessages.length,
+            itemBuilder: (context, index) {
+              final chronologicalIndex = visibleMessages.length - 1 - index;
+              final message = visibleMessages[chronologicalIndex];
+              final messageKey = _messageStableKey(message);
 
-                return VisibilityDetector(
-                  key: ValueKey<String>('visible-chat-message:$messageKey'),
-                  onVisibilityChanged: (info) {
-                    _handleMessageVisibility(
-                      messageKey: messageKey,
-                      visible: info.visibleFraction >=
-                          _visibleAnimationFractionThreshold,
-                    );
-                  },
-                  child: TwitchRuntimeMessageTile(
-                    key: ValueKey<String>(messageKey),
-                    message: message,
-                    thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                    officialEmotes: widget.officialEmoteCache,
-                    showTimestamp: widget.showTimestamp,
-                    fontScale: widget.fontScale,
-                    compact: widget.compact,
-                    animateEmotes: _shouldAnimateEmotesForMessage(messageKey),
-                    onOpenContext: () => _openContextSheet(message),
-                  ),
-                );
-              },
-            ),
+              return TwitchRuntimeMessageTile(
+                key: ValueKey<String>(messageKey),
+                message: message,
+                thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                officialEmotes: widget.officialEmoteCache,
+                showTimestamp: widget.showTimestamp,
+                fontScale: widget.fontScale,
+                compact: widget.compact,
+                animateEmotes: true,
+                onOpenContext: () => _openContextSheet(message),
+              );
+            },
           ),
           Positioned(
             left: 12,
