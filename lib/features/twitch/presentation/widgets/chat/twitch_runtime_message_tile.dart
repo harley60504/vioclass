@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_runtime_message_tile_stage233_emote_animation_policy
+
 import 'package:flutter/material.dart';
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
@@ -15,6 +17,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
   final bool showTimestamp;
   final double fontScale;
   final bool compact;
+  final bool animateEmotes;
   final VoidCallback? onOpenContext;
 
   const TwitchRuntimeMessageTile({
@@ -25,6 +28,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     this.showTimestamp = false,
     this.fontScale = 1.0,
     this.compact = false,
+    this.animateEmotes = true,
     this.onOpenContext,
   });
 
@@ -48,6 +52,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
         style: style,
         showTimestamp: showTimestamp,
         metrics: metrics,
+        animateEmotes: animateEmotes,
         onOpenContext: onOpenContext,
       );
     }
@@ -60,6 +65,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
       displayNameText: displayNameText,
       showTimestamp: showTimestamp,
       metrics: metrics,
+      animateEmotes: animateEmotes,
       onOpenContext: onOpenContext,
     );
   }
