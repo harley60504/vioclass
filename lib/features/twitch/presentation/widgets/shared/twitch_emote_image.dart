@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_image_stage233c_shared_cache_manager
+// PATCH VERSION: twitch_emote_image_stage233h_frosty_like_no_fade
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -7,12 +7,11 @@ import '../../../services/chat/twitch_emote_image_cache_manager.dart';
 
 /// Shared Twitch / third-party emote image renderer.
 ///
-/// Stage 233 behavior:
-/// - Normal visible chat can render animated URLs.
-/// - Scrolling / static policy can force a static URL without losing cache.
-/// - Static and animated variants use separate cache keys so Flutter does not
-///   accidentally reuse an animated codec while we are trying to stay static.
-/// - No custom Dart frame decoding is used here.
+/// The default path intentionally stays close to Frosty's behavior:
+/// - one stable animated URL for normal chat rendering,
+/// - shared CachedNetworkImage cache manager,
+/// - no image fade in chat-sized emotes,
+/// - static URL only when a policy explicitly asks for it.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
   final String name;
@@ -153,9 +152,9 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         height: widget.height,
         fit: widget.fit,
         filterQuality: widget.filterQuality,
-        fadeInDuration: const Duration(milliseconds: 80),
-        fadeOutDuration: const Duration(milliseconds: 60),
-        useOldImageOnUrlChange: true,
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        useOldImageOnUrlChange: !widget.forceStatic,
         cacheManager: TwitchEmoteImageCacheManager.instance,
         memCacheWidth: widget.memCacheWidth,
         memCacheHeight: widget.memCacheHeight,
