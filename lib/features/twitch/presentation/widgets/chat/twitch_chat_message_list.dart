@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_list_stage233f_visible_row_animation
+// PATCH VERSION: twitch_chat_message_list_stage233g_scroll_pause_for_wheel_touchpad
 
 import 'dart:async';
 
@@ -49,6 +49,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
   static const Duration _emoteAnimationResumeDelay = Duration(milliseconds: 260);
   static const double _visibleAnimationFractionThreshold = 0.06;
+  static const double _scrollDeltaNoiseThreshold = 0.15;
 
   final ScrollController _scrollController = ScrollController();
   final Expando<String> _messageFingerprintCache = Expando<String>(
@@ -322,6 +323,11 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     }
   }
 
+  bool _hasMeaningfulScrollDelta(double? delta) {
+    if (delta == null) return true;
+    return delta.abs() > _scrollDeltaNoiseThreshold;
+  }
+
   void _setEmoteAnimationAllowed(bool value) {
     _emoteAnimationResumeTimer?.cancel();
     if (_animateVisibleEmotes == value) return;
@@ -522,12 +528,19 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         children: [
           NotificationListener<ScrollNotification>(
             onNotification: (notification) {
-              if (notification is ScrollStartNotification &&
-                  notification.dragDetails != null) {
+              if (notification is ScrollStartNotification) {
                 _markUserScrollActive();
-              } else if (notification is ScrollUpdateNotification &&
-                  notification.dragDetails != null) {
-                _markUserScrollActive();
+                _handleScrollChanged();
+              } else if (notification is ScrollUpdateNotification) {
+                if (_hasMeaningfulScrollDelta(notification.scrollDelta)) {
+                  _markUserScrollActive();
+                }
+                _handleScrollChanged();
+              } else if (notification is OverscrollNotification) {
+                if (_hasMeaningfulScrollDelta(notification.overscroll)) {
+                  _markUserScrollActive();
+                }
+                _handleScrollChanged();
               } else if (notification is UserScrollNotification) {
                 if (notification.direction == ScrollDirection.idle) {
                   _markUserScrollEnded();
