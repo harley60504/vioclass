@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_third_party_emote_cache_service_stage233_static_animated_urls
+// PATCH VERSION: twitch_third_party_emote_cache_service_stage233b_lookup_index
 
 import 'dart:convert';
 
@@ -24,6 +24,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   static const int maxRecentEmotes = 80;
 
   final Map<String, TwitchThirdPartyEmote> _byName = <String, TwitchThirdPartyEmote>{};
+  final Map<String, TwitchThirdPartyEmote> _byLowerName = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _favorites = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _recent = <String, TwitchThirdPartyEmote>{};
   final Map<String, _CachedThirdPartyEmoteSet> _memoryCache = <String, _CachedThirdPartyEmoteSet>{};
@@ -41,6 +42,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   String get channelLogin => _channelLogin;
   bool get favoritesLoaded => _favoritesLoaded;
   bool get recentLoaded => _recentLoaded;
+  bool get hasAnyEmotes => _byName.isNotEmpty || _favorites.isNotEmpty || _recent.isNotEmpty;
 
   List<TwitchThirdPartyEmote> get emotes {
     final output = _byName.values.toList(growable: false)
@@ -233,8 +235,26 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
     return _byName[name];
   }
 
+  TwitchThirdPartyEmote? lookupLoose(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return null;
+    return _byName[clean] ?? _byLowerName[clean.toLowerCase()];
+  }
+
   String _favoriteKey(TwitchThirdPartyEmote emote) {
     return '${emote.provider.name}:${emote.id.isEmpty ? emote.name : emote.id}';
+  }
+
+  void _replaceLoadedEmotes(Map<String, TwitchThirdPartyEmote> next) {
+    _byName
+      ..clear()
+      ..addAll(next);
+    _byLowerName
+      ..clear()
+      ..addAll(<String, TwitchThirdPartyEmote>{
+        for (final entry in _byName.entries)
+          entry.key.toLowerCase(): entry.value,
+      });
   }
 
   void _refreshFavoriteEmoteSnapshotsFromLoadedEmotes() {
@@ -338,9 +358,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
 
     final cached = _memoryCache[cid];
     if (cached != null && !cached.isExpired) {
-      _byName
-        ..clear()
-        ..addAll(cached.byName);
+      _replaceLoadedEmotes(cached.byName);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
 
@@ -369,9 +387,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
           if (emote.name.trim().isNotEmpty) emote.name: emote,
       };
 
-      _byName
-        ..clear()
-        ..addAll(next);
+      _replaceLoadedEmotes(next);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
 
@@ -389,6 +405,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
 
   void clear() {
     _byName.clear();
+    _byLowerName.clear();
     _loading = false;
     _error = null;
     _channelId = '';
