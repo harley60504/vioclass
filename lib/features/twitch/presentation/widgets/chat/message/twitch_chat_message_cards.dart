@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_chat_message_cards_stage233_emote_animation_policy
+
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
@@ -16,6 +18,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
   final String displayNameText;
   final bool showTimestamp;
   final TwitchChatMessageVisualMetrics metrics;
+  final bool animateEmotes;
   final VoidCallback? onOpenContext;
 
   const TwitchChatNormalMessageCard({
@@ -27,6 +30,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
     required this.displayNameText,
     required this.showTimestamp,
     required this.metrics,
+    this.animateEmotes = true,
     required this.onOpenContext,
   });
 
@@ -58,6 +62,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
                 showSystemMessage: true,
                 showTimestamp: showTimestamp,
                 metrics: metrics,
+                animateEmotes: animateEmotes,
               ),
             ),
           ),
@@ -76,6 +81,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
   final TwitchChatSpecialMessageStyle style;
   final bool showTimestamp;
   final TwitchChatMessageVisualMetrics metrics;
+  final bool animateEmotes;
   final VoidCallback? onOpenContext;
 
   const TwitchChatSpecialMessageCard({
@@ -88,6 +94,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
     required this.style,
     required this.showTimestamp,
     required this.metrics,
+    this.animateEmotes = true,
     required this.onOpenContext,
   });
 
@@ -187,6 +194,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                           showTimestamp: false,
                           compact: true,
                           metrics: metrics,
+                          animateEmotes: animateEmotes,
                         ),
                       ],
                     ],
