@@ -1,8 +1,9 @@
-// PATCH VERSION: twitch_emote_image_stage233_static_policy_cache
+// PATCH VERSION: twitch_emote_image_stage233c_shared_cache_manager
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+
+import '../../../services/chat/twitch_emote_image_cache_manager.dart';
 
 /// Shared Twitch / third-party emote image renderer.
 ///
@@ -86,14 +87,6 @@ class TwitchEmoteImage extends StatefulWidget {
 }
 
 class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
-  static final CacheManager cacheManager = CacheManager(
-    Config(
-      'twitchSharedEmoteImageCache',
-      stalePeriod: const Duration(days: 30),
-      maxNrOfCacheObjects: 16000,
-    ),
-  );
-
   int imageIndex = 0;
   bool fallbackQueued = false;
 
@@ -140,7 +133,15 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
     if (currentUrl.isEmpty) return fallback;
 
-    final cacheKey = '$stableKey:${widget.forceStatic ? 'static' : 'animated'}:$currentUrl';
+    final cacheKey = TwitchEmoteImageCacheManager.buildCacheKey(
+      providerLabel: widget.providerLabel.trim().isEmpty
+          ? (widget.isOfficial ? 'Twitch' : 'emote')
+          : widget.providerLabel,
+      id: widget.id,
+      name: widget.name,
+      staticVariant: widget.forceStatic,
+      url: currentUrl,
+    );
 
     return Opacity(
       opacity: widget.locked ? 0.62 : 1.0,
@@ -155,7 +156,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         fadeInDuration: const Duration(milliseconds: 80),
         fadeOutDuration: const Duration(milliseconds: 60),
         useOldImageOnUrlChange: true,
-        cacheManager: cacheManager,
+        cacheManager: TwitchEmoteImageCacheManager.instance,
         memCacheWidth: widget.memCacheWidth,
         memCacheHeight: widget.memCacheHeight,
         placeholder: (_, __) => widget.placeholder ?? const SizedBox.shrink(),
@@ -236,17 +237,6 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
       staticUrl,
       TwitchEmoteImage.officialStaticEmoteUrl(widget.id),
     ]);
-  }
-
-  String get stableKey {
-    final cleanId = widget.id.trim();
-    final provider = widget.providerLabel.trim().isEmpty
-        ? (widget.isOfficial ? 'Twitch' : 'emote')
-        : widget.providerLabel.trim();
-
-    return cleanId.isNotEmpty
-        ? '$provider:$cleanId'
-        : '$provider:${widget.name.trim().toLowerCase()}';
   }
 
   void debugLog(String message) {
