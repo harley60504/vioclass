@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_third_party_emote_stage233_static_animated_urls
+
 enum TwitchThirdPartyEmoteProvider {
   bttv,
   ffz,
@@ -14,10 +16,19 @@ enum TwitchThirdPartyEmoteScope {
 class TwitchThirdPartyEmote {
   final String id;
   final String name;
+
+  /// Preferred animated/render URL for normal visible chat rendering.
   final String imageUrl;
+
+  /// Static fallback URL used while chat is scrolling or when the row is not
+  /// actively rendered. This avoids creating animated image codecs for 7TV/BTTV
+  /// emotes while the user is rapidly scanning chat.
+  final String staticImageUrl;
+
   final TwitchThirdPartyEmoteProvider provider;
   final TwitchThirdPartyEmoteScope scope;
   final bool isZeroWidth;
+  final bool isAnimated;
   final int? width;
   final int? height;
 
@@ -25,12 +36,20 @@ class TwitchThirdPartyEmote {
     required this.id,
     required this.name,
     required this.imageUrl,
+    this.staticImageUrl = '',
     required this.provider,
     this.scope = TwitchThirdPartyEmoteScope.other,
     this.isZeroWidth = false,
+    this.isAnimated = false,
     this.width,
     this.height,
   });
+
+  String get effectiveStaticImageUrl {
+    final staticUrl = staticImageUrl.trim();
+    if (staticUrl.isNotEmpty) return staticUrl;
+    return imageUrl;
+  }
 
   double get aspectRatio {
     final w = width ?? 0;
@@ -74,9 +93,11 @@ class TwitchThirdPartyEmote {
       'id': id,
       'name': name,
       'imageUrl': imageUrl,
+      'staticImageUrl': staticImageUrl,
       'provider': provider.name,
       'scope': scope.name,
       'isZeroWidth': isZeroWidth,
+      'isAnimated': isAnimated,
       'width': width,
       'height': height,
     };
