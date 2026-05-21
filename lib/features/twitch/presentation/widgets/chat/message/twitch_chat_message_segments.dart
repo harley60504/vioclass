@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_chat_message_segments_stage233_emote_animation_policy
+
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_render_segment.dart';
@@ -14,6 +16,7 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
   required TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
   required TwitchOfficialEmoteCacheService? officialEmotes,
   required TwitchChatMessageVisualMetrics metrics,
+  bool animateEmotes = true,
 }) {
   final resolver = _ChatInlineEmoteResolver(
     officialEmotes: officialEmotes,
@@ -31,6 +34,7 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
           text: segment.content,
           resolver: resolver,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         break;
       case TwitchChatRenderSegmentType.link:
@@ -42,6 +46,7 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
           segment: segment,
           resolver: resolver,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         break;
       case TwitchChatRenderSegmentType.cheermote:
@@ -58,6 +63,7 @@ void _appendTwitchEmoteSegment({
   required TwitchChatRenderSegment segment,
   required _ChatInlineEmoteResolver resolver,
   required TwitchChatMessageVisualMetrics metrics,
+  required bool animateEmotes,
 }) {
   final byName = resolver.lookup(segment.content.trim());
   if (byName != null) {
@@ -68,6 +74,7 @@ void _appendTwitchEmoteSegment({
           emote: byName.official!,
           fallbackText: segment.content,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         return;
       case _ResolvedInlineEmoteKind.thirdParty:
@@ -75,12 +82,17 @@ void _appendTwitchEmoteSegment({
           spans: spans,
           emote: byName.thirdParty!,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         return;
     }
   }
 
-  spans.add(_twitchEmoteSpan(segment: segment, metrics: metrics));
+  spans.add(_twitchEmoteSpan(
+    segment: segment,
+    metrics: metrics,
+    animateEmotes: animateEmotes,
+  ));
 }
 
 void _appendTextWithInlineEmotes({
@@ -88,6 +100,7 @@ void _appendTextWithInlineEmotes({
   required String text,
   required _ChatInlineEmoteResolver resolver,
   required TwitchChatMessageVisualMetrics metrics,
+  required bool animateEmotes,
 }) {
   if (text.isEmpty) return;
 
@@ -121,6 +134,7 @@ void _appendTextWithInlineEmotes({
           emote: resolved.official!,
           fallbackText: token.lookupText,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         break;
       case _ResolvedInlineEmoteKind.thirdParty:
@@ -128,6 +142,7 @@ void _appendTextWithInlineEmotes({
           spans: spans,
           emote: resolved.thirdParty!,
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         break;
     }
@@ -177,7 +192,7 @@ class _ChatInlineEmoteResolver {
 
     void add(TwitchOfficialEmote emote) {
       final name = emote.name.trim();
-      final url = _officialImageUrl(emote);
+      final url = _officialImageUrl(emote, animateEmotes: true);
       if (name.isEmpty || url.isEmpty) return;
       byName.putIfAbsent(name, () => emote.copyWith(imageUrl: url));
     }
@@ -360,8 +375,9 @@ void _appendOfficialEmoteSpan({
   required TwitchOfficialEmote emote,
   required String fallbackText,
   required TwitchChatMessageVisualMetrics metrics,
+  required bool animateEmotes,
 }) {
-  final imageUrl = _officialImageUrl(emote);
+  final imageUrl = _officialImageUrl(emote, animateEmotes: animateEmotes);
 
   if (imageUrl.isEmpty) {
     spans.add(TextSpan(text: fallbackText, style: _normalTextStyle(metrics)));
@@ -379,8 +395,10 @@ void _appendOfficialEmoteSpan({
             id: emote.id,
             name: emote.name,
             imageUrl: imageUrl,
+            staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(emote.id),
             providerLabel: emote.sourceLabel,
             isOfficial: true,
+            animate: animateEmotes,
             width: size,
             height: size,
             fallbackText: fallbackText.isEmpty ? emote.name : fallbackText,
@@ -392,24 +410,36 @@ void _appendOfficialEmoteSpan({
   );
 }
 
-String _officialImageUrl(TwitchOfficialEmote emote) {
+String _officialImageUrl(
+  TwitchOfficialEmote emote, {
+  required bool animateEmotes,
+}) {
+  if (!animateEmotes) {
+    final staticUrl = TwitchEmoteImage.officialStaticEmoteUrl(emote.id);
+    if (staticUrl.isNotEmpty) return staticUrl;
+  }
+
   final direct = emote.imageUrl.trim();
   if (direct.isNotEmpty) return direct;
 
   final id = emote.id.trim();
   if (id.isEmpty) return '';
 
-  return 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
+  return animateEmotes
+      ? 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0'
+      : TwitchEmoteImage.officialStaticEmoteUrl(id);
 }
 
 void _appendThirdPartyEmoteSpan({
   required List<InlineSpan> spans,
   required TwitchThirdPartyEmote emote,
   required TwitchChatMessageVisualMetrics metrics,
+  required bool animateEmotes,
 }) {
   final image = _ThirdPartyInlineEmoteImage(
     emote: emote,
     metrics: metrics,
+    animate: animateEmotes,
   );
 
   if (emote.isZeroWidth && spans.isNotEmpty) {
@@ -448,6 +478,7 @@ void _appendThirdPartyEmoteSpan({
 WidgetSpan _twitchEmoteSpan({
   required TwitchChatRenderSegment segment,
   required TwitchChatMessageVisualMetrics metrics,
+  required bool animateEmotes,
 }) {
   final imageUrl = segment.url;
   if (imageUrl == null || imageUrl.isEmpty) {
@@ -470,8 +501,10 @@ WidgetSpan _twitchEmoteSpan({
           id: segment.emoteId ?? '',
           name: segment.content,
           imageUrl: imageUrl,
+          staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(segment.emoteId ?? ''),
           providerLabel: 'Twitch',
           isOfficial: true,
+          animate: animateEmotes,
           width: size,
           height: size,
           fallbackText: segment.content.isEmpty ? '[emote]' : segment.content,
@@ -485,10 +518,12 @@ WidgetSpan _twitchEmoteSpan({
 class _ThirdPartyInlineEmoteImage extends StatelessWidget {
   final TwitchThirdPartyEmote emote;
   final TwitchChatMessageVisualMetrics metrics;
+  final bool animate;
 
   const _ThirdPartyInlineEmoteImage({
     required this.emote,
     required this.metrics,
+    required this.animate,
   });
 
   @override
@@ -500,12 +535,17 @@ class _ThirdPartyInlineEmoteImage extends StatelessWidget {
         .clamp(height * 0.5, height * 4.0)
         .toDouble();
 
+    final shouldAnimate = animate || !emote.isAnimated;
+    final url = shouldAnimate ? emote.imageUrl : emote.effectiveStaticImageUrl;
+
     return _ChatMenuStyleEmoteImage(
       id: emote.id,
       name: emote.name,
-      imageUrl: emote.imageUrl,
+      imageUrl: url,
+      staticImageUrl: emote.effectiveStaticImageUrl,
       providerLabel: emote.providerLabel,
       isOfficial: false,
+      animate: shouldAnimate,
       width: width,
       height: height,
       fallbackText: emote.name,
@@ -518,8 +558,10 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
   final String id;
   final String name;
   final String imageUrl;
+  final String staticImageUrl;
   final String providerLabel;
   final bool isOfficial;
+  final bool animate;
   final double width;
   final double height;
   final String fallbackText;
@@ -529,8 +571,10 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
     required this.id,
     required this.name,
     required this.imageUrl,
+    required this.staticImageUrl,
     required this.providerLabel,
     required this.isOfficial,
+    required this.animate,
     required this.width,
     required this.height,
     required this.fallbackText,
@@ -551,8 +595,11 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
         id: id,
         name: name,
         imageUrl: url,
+        staticImageUrl: staticImageUrl,
         providerLabel: providerLabel,
         isOfficial: isOfficial,
+        preferStaticOfficial: !animate,
+        forceStatic: !animate,
         width: width,
         height: height,
         memCacheWidth: 144,
@@ -598,6 +645,7 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final TwitchOfficialEmoteCacheService? officialEmotes;
   final TwitchChatMessageVisualMetrics metrics;
+  final bool animateEmotes;
 
   const TwitchChatMessageSegmentView({
     super.key,
@@ -605,6 +653,7 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
     this.thirdPartyEmotes,
     this.officialEmotes,
     required this.metrics,
+    this.animateEmotes = true,
   });
 
   @override
@@ -621,13 +670,18 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
             thirdPartyEmotes: thirdPartyEmotes,
           ),
           metrics: metrics,
+          animateEmotes: animateEmotes,
         );
         return Text.rich(TextSpan(children: spans));
       case TwitchChatRenderSegmentType.link:
         return _LinkSegment(segment: segment, metrics: metrics);
       case TwitchChatRenderSegmentType.twitchEmote:
         return Text.rich(TextSpan(children: [
-          _twitchEmoteSpan(segment: segment, metrics: metrics),
+          _twitchEmoteSpan(
+            segment: segment,
+            metrics: metrics,
+            animateEmotes: animateEmotes,
+          ),
         ]));
       case TwitchChatRenderSegmentType.cheermote:
         return _CheermoteSegment(segment: segment, metrics: metrics);
