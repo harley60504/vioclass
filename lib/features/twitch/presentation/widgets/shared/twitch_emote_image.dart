@@ -1,23 +1,27 @@
+// PATCH VERSION: twitch_emote_image_stage233_static_policy_cache
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 /// Shared Twitch / third-party emote image renderer.
 ///
-/// Stable behavior:
-/// - Use the normal CachedNetworkImage / Flutter image pipeline only.
-/// - Official Twitch emotes use the original URL flow first so animated/default
-///   variants can display when Flutter's codec supports them.
-/// - If a candidate fails, the widget quickly falls back to the next candidate.
-/// - No Dart frame decoding is used here.
+/// Stage 233 behavior:
+/// - Normal visible chat can render animated URLs.
+/// - Scrolling / static policy can force a static URL without losing cache.
+/// - Static and animated variants use separate cache keys so Flutter does not
+///   accidentally reuse an animated codec while we are trying to stay static.
+/// - No custom Dart frame decoding is used here.
 class TwitchEmoteImage extends StatefulWidget {
   final String id;
   final String name;
   final String imageUrl;
+  final String staticImageUrl;
   final String providerLabel;
   final bool isOfficial;
   final bool locked;
   final bool preferStaticOfficial;
+  final bool forceStatic;
 
   /// Kept only for compatibility with existing call sites.
   /// This stable version intentionally ignores decoded rendering.
@@ -39,10 +43,12 @@ class TwitchEmoteImage extends StatefulWidget {
     required this.id,
     required this.name,
     required this.imageUrl,
+    this.staticImageUrl = '',
     this.providerLabel = '',
     this.isOfficial = false,
     this.locked = false,
     this.preferStaticOfficial = false,
+    this.forceStatic = false,
     this.tryDecodedAnimatedOfficial = false,
     this.decodedAnimatedOnlyForKnownProblemEmotes = true,
     this.fit = BoxFit.contain,
@@ -59,6 +65,24 @@ class TwitchEmoteImage extends StatefulWidget {
 
   @override
   State<TwitchEmoteImage> createState() => _TwitchEmoteImageState();
+
+  static String officialAnimatedEmoteUrl(String id) {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return '';
+    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/animated/dark/2.0';
+  }
+
+  static String officialDefaultEmoteUrl(String id) {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return '';
+    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/default/dark/2.0';
+  }
+
+  static String officialStaticEmoteUrl(String id) {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return '';
+    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/static/dark/2.0';
+  }
 }
 
 class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
@@ -80,9 +104,11 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     if (oldWidget.id != widget.id ||
         oldWidget.name != widget.name ||
         oldWidget.imageUrl != widget.imageUrl ||
+        oldWidget.staticImageUrl != widget.staticImageUrl ||
         oldWidget.providerLabel != widget.providerLabel ||
         oldWidget.isOfficial != widget.isOfficial ||
-        oldWidget.preferStaticOfficial != widget.preferStaticOfficial) {
+        oldWidget.preferStaticOfficial != widget.preferStaticOfficial ||
+        oldWidget.forceStatic != widget.forceStatic) {
       imageIndex = 0;
       fallbackQueued = false;
     }
@@ -107,13 +133,14 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
       debugLog(
         'network build name=${widget.name} id=${widget.id} '
         'provider=${widget.providerLabel} official=${widget.isOfficial} '
-        'index=$imageIndex currentUrl=$currentUrl candidates=${candidates.join(' | ')}',
+        'forceStatic=${widget.forceStatic} index=$imageIndex '
+        'currentUrl=$currentUrl candidates=${candidates.join(' | ')}',
       );
     }
 
     if (currentUrl.isEmpty) return fallback;
 
-    final cacheKey = '$stableKey:$currentUrl';
+    final cacheKey = '$stableKey:${widget.forceStatic ? 'static' : 'animated'}:$currentUrl';
 
     return Opacity(
       opacity: widget.locked ? 0.62 : 1.0,
@@ -125,9 +152,9 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         height: widget.height,
         fit: widget.fit,
         filterQuality: widget.filterQuality,
-        fadeInDuration: const Duration(milliseconds: 160),
-        fadeOutDuration: const Duration(milliseconds: 120),
-        useOldImageOnUrlChange: false,
+        fadeInDuration: const Duration(milliseconds: 80),
+        fadeOutDuration: const Duration(milliseconds: 60),
+        useOldImageOnUrlChange: true,
         cacheManager: cacheManager,
         memCacheWidth: widget.memCacheWidth,
         memCacheHeight: widget.memCacheHeight,
@@ -184,22 +211,30 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
   }
 
   List<String> get imageCandidates {
-    if (!widget.isOfficial) return uniqueUrls(<String>[widget.imageUrl]);
+    final staticUrl = widget.staticImageUrl.trim();
 
-    if (widget.preferStaticOfficial) {
+    if (!widget.isOfficial) {
+      if (widget.forceStatic) {
+        return uniqueUrls(<String>[staticUrl, widget.imageUrl]);
+      }
+      return uniqueUrls(<String>[widget.imageUrl, staticUrl]);
+    }
+
+    if (widget.forceStatic || widget.preferStaticOfficial) {
       return uniqueUrls(<String>[
-        officialStaticEmoteUrl(widget.id),
+        staticUrl,
+        TwitchEmoteImage.officialStaticEmoteUrl(widget.id),
         widget.imageUrl,
-        officialAnimatedEmoteUrl(widget.id),
-        officialDefaultEmoteUrl(widget.id),
+        TwitchEmoteImage.officialDefaultEmoteUrl(widget.id),
       ]);
     }
 
     return uniqueUrls(<String>[
       widget.imageUrl,
-      officialAnimatedEmoteUrl(widget.id),
-      officialDefaultEmoteUrl(widget.id),
-      officialStaticEmoteUrl(widget.id),
+      TwitchEmoteImage.officialAnimatedEmoteUrl(widget.id),
+      TwitchEmoteImage.officialDefaultEmoteUrl(widget.id),
+      staticUrl,
+      TwitchEmoteImage.officialStaticEmoteUrl(widget.id),
     ]);
   }
 
@@ -216,24 +251,6 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
   void debugLog(String message) {
     debugPrint('[${widget.debugTag}] $message', wrapWidth: 1024);
-  }
-
-  static String officialAnimatedEmoteUrl(String id) {
-    final cleanId = id.trim();
-    if (cleanId.isEmpty) return '';
-    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/animated/dark/2.0';
-  }
-
-  static String officialDefaultEmoteUrl(String id) {
-    final cleanId = id.trim();
-    if (cleanId.isEmpty) return '';
-    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/default/dark/2.0';
-  }
-
-  static String officialStaticEmoteUrl(String id) {
-    final cleanId = id.trim();
-    if (cleanId.isEmpty) return '';
-    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/static/dark/2.0';
   }
 
   static List<String> uniqueUrls(Iterable<String> urls) {
