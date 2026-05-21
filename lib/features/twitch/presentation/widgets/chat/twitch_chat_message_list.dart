@@ -1,9 +1,10 @@
-// PATCH VERSION: twitch_chat_message_list_stage233e_animation_policy_setting
+// PATCH VERSION: twitch_chat_message_list_stage233f_visible_row_animation
 
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:visibility_detector/visibility_detector.dart';
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
@@ -47,11 +48,13 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
   static const Duration _userScrollGuardDuration = Duration(milliseconds: 650);
   static const Duration _emoteAnimationResumeDelay = Duration(milliseconds: 260);
+  static const double _visibleAnimationFractionThreshold = 0.06;
 
   final ScrollController _scrollController = ScrollController();
   final Expando<String> _messageFingerprintCache = Expando<String>(
     'twitch-chat-message-fingerprint',
   );
+  final Set<String> _visibleMessageKeys = <String>{};
 
   bool _autoScroll = true;
   bool _programmaticScrollActive = false;
@@ -81,9 +84,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     return _effectivePolicy == TwitchEmoteAnimationPolicy.staticWhileScroll;
   }
 
-  bool get _shouldAnimateEmotesForTile {
+  bool _shouldAnimateEmotesForMessage(String messageKey) {
     switch (_effectivePolicy) {
       case TwitchEmoteAnimationPolicy.visibleAnimated:
+        return _visibleMessageKeys.contains(messageKey);
       case TwitchEmoteAnimationPolicy.alwaysAnimated:
         return true;
       case TwitchEmoteAnimationPolicy.staticWhileScroll:
@@ -116,6 +120,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (oldWidget.runtime != widget.runtime) {
       _bufferFlushTimer?.cancel();
       _pendingBufferedSourceMessages = null;
+      _visibleMessageKeys.clear();
       _setEmoteAnimationAllowed(true);
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
       _scheduleFollowLatest(animated: false);
@@ -166,6 +171,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     _lastSourceMessageCount = sourceMessages.length;
     _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
     _hiddenNewMessageCount = 0;
+    _removeStaleVisibleMessageKeys();
   }
 
   List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
@@ -232,6 +238,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _autoScroll = true;
         _hiddenNewMessageCount = 0;
         _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
+        _removeStaleVisibleMessageKeys();
       });
 
       _scheduleFollowLatest(animated: false);
@@ -352,6 +359,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _lastSourceMessageCount = runtime.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
         _hiddenNewMessageCount = 0;
+        _removeStaleVisibleMessageKeys();
       });
       _scheduleEmoteAnimationResume();
       _scheduleFollowLatest(animated: false);
@@ -364,6 +372,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       setState(() {
         _autoScroll = false;
         _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
+        _removeStaleVisibleMessageKeys();
       });
     }
   }
@@ -435,6 +444,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _lastSourceMessageCount = runtime.messages.length;
       _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
       _hiddenNewMessageCount = 0;
+      _removeStaleVisibleMessageKeys();
     });
 
     _scheduleEmoteAnimationResume();
@@ -458,6 +468,39 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       messages: contextMessages,
       thirdPartyEmotes: widget.thirdPartyEmoteCache,
     );
+  }
+
+  void _handleMessageVisibility({
+    required String messageKey,
+    required bool visible,
+  }) {
+    final contains = _visibleMessageKeys.contains(messageKey);
+    if (visible == contains) return;
+
+    if (!mounted) {
+      if (visible) {
+        _visibleMessageKeys.add(messageKey);
+      } else {
+        _visibleMessageKeys.remove(messageKey);
+      }
+      return;
+    }
+
+    setState(() {
+      if (visible) {
+        _visibleMessageKeys.add(messageKey);
+      } else {
+        _visibleMessageKeys.remove(messageKey);
+      }
+    });
+  }
+
+  void _removeStaleVisibleMessageKeys() {
+    if (_visibleMessageKeys.isEmpty) return;
+    final activeKeys = <String>{
+      for (final message in _visibleMessages) _messageStableKey(message),
+    };
+    _visibleMessageKeys.removeWhere((key) => !activeKeys.contains(key));
   }
 
   @override
@@ -507,17 +550,28 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
               itemBuilder: (context, index) {
                 final chronologicalIndex = visibleMessages.length - 1 - index;
                 final message = visibleMessages[chronologicalIndex];
+                final messageKey = _messageStableKey(message);
 
-                return TwitchRuntimeMessageTile(
-                  key: ValueKey<String>(_messageStableKey(message)),
-                  message: message,
-                  thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                  officialEmotes: widget.officialEmoteCache,
-                  showTimestamp: widget.showTimestamp,
-                  fontScale: widget.fontScale,
-                  compact: widget.compact,
-                  animateEmotes: _shouldAnimateEmotesForTile,
-                  onOpenContext: () => _openContextSheet(message),
+                return VisibilityDetector(
+                  key: ValueKey<String>('visible-chat-message:$messageKey'),
+                  onVisibilityChanged: (info) {
+                    _handleMessageVisibility(
+                      messageKey: messageKey,
+                      visible: info.visibleFraction >=
+                          _visibleAnimationFractionThreshold,
+                    );
+                  },
+                  child: TwitchRuntimeMessageTile(
+                    key: ValueKey<String>(messageKey),
+                    message: message,
+                    thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                    officialEmotes: widget.officialEmoteCache,
+                    showTimestamp: widget.showTimestamp,
+                    fontScale: widget.fontScale,
+                    compact: widget.compact,
+                    animateEmotes: _shouldAnimateEmotesForMessage(messageKey),
+                    onOpenContext: () => _openContextSheet(message),
+                  ),
                 );
               },
             ),
