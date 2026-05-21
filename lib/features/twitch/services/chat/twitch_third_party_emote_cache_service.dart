@@ -1,5 +1,6 @@
-// PATCH VERSION: twitch_third_party_emote_cache_service_stage233b_lookup_index
+// PATCH VERSION: twitch_third_party_emote_cache_service_stage233c_static_precache
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/emotes/twitch_third_party_emote_api_service.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
+import 'twitch_emote_image_cache_manager.dart';
 
 class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   final TwitchThirdPartyEmoteApiService api;
@@ -22,12 +24,14 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   static const String favoriteStorageKey = 'twitch_third_party_favorite_emotes_v1';
   static const String recentStorageKey = 'twitch_third_party_recent_emotes_v1';
   static const int maxRecentEmotes = 80;
+  static const int maxStaticPrecacheEmotes = 180;
 
   final Map<String, TwitchThirdPartyEmote> _byName = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _byLowerName = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _favorites = <String, TwitchThirdPartyEmote>{};
   final Map<String, TwitchThirdPartyEmote> _recent = <String, TwitchThirdPartyEmote>{};
   final Map<String, _CachedThirdPartyEmoteSet> _memoryCache = <String, _CachedThirdPartyEmoteSet>{};
+  final Set<String> _staticPrecacheKeys = <String>{};
 
   bool _favoritesLoaded = false;
   bool _recentLoaded = false;
@@ -361,6 +365,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       _replaceLoadedEmotes(cached.byName);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
+      _scheduleStaticPrecache(cid, _byName.values);
 
       _loading = false;
       _error = null;
@@ -390,6 +395,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       _replaceLoadedEmotes(next);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
+      _scheduleStaticPrecache(cid, _byName.values);
 
       _memoryCache[cid] = _CachedThirdPartyEmoteSet(
         byName: Map<String, TwitchThirdPartyEmote>.unmodifiable(next),
@@ -401,6 +407,36 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  void _scheduleStaticPrecache(
+    String channelId,
+    Iterable<TwitchThirdPartyEmote> source,
+  ) {
+    final cacheScopeKey = '$channelId:${source.length}';
+    if (_staticPrecacheKeys.contains(cacheScopeKey)) return;
+    _staticPrecacheKeys.add(cacheScopeKey);
+
+    final requests = source
+        .where((emote) => emote.effectiveStaticImageUrl.trim().isNotEmpty)
+        .map(
+          (emote) => TwitchEmoteStaticCacheRequest(
+            providerLabel: emote.providerLabel,
+            id: emote.id,
+            name: emote.name,
+            url: emote.effectiveStaticImageUrl,
+          ),
+        )
+        .toList(growable: false);
+
+    if (requests.isEmpty) return;
+
+    unawaited(
+      TwitchEmoteImageCacheManager.precacheStaticUrls(
+        requests,
+        maxCount: maxStaticPrecacheEmotes,
+      ),
+    );
   }
 
   void clear() {
@@ -431,6 +467,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       'staticFallbackCount': emotes
           .where((emote) => emote.staticImageUrl.trim().isNotEmpty)
           .length,
+      'staticPrecacheScopes': _staticPrecacheKeys.length,
       'scopeSample': emotes.take(40).map((emote) => emote.toJson()).toList(),
     };
   }
