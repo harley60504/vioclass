@@ -1,7 +1,8 @@
-// PATCH VERSION: twitch_chat_message_context_sheet_stage165_card_extracted
+// PATCH VERSION: twitch_chat_message_context_sheet_stage248_font_scale
 //
 // Chat message context sheet. Reply-thread construction and card UI live in
 // chat_message_context/* so this file stays as the sheet entry/list composer.
+// Stage 248 passes the active chat font scale into the reply history cards.
 
 import 'package:flutter/material.dart';
 
@@ -16,6 +17,7 @@ Future<void> showTwitchChatMessageContextSheet({
   required TwitchChatRuntimeMessage selectedMessage,
   required List<TwitchChatRuntimeMessage> messages,
   TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
+  double fontScale = 1.0,
 }) {
   final entries = TwitchReplyThreadBuilder.build(
     selectedMessage: selectedMessage,
@@ -25,7 +27,7 @@ Future<void> showTwitchChatMessageContextSheet({
   return showTwitchUnifiedSheet<void>(
     context: context,
     title: '回覆串 · ${entries.length}',
-    subtitle: '依 reply 關係顯示；@tag 只標記，不聚集',
+    subtitle: '依 reply 關係顯示；提及標記不聚集',
     icon: Icons.reply_rounded,
     size: TwitchUnifiedSheetSize.medium,
     showRefresh: false,
@@ -33,6 +35,7 @@ Future<void> showTwitchChatMessageContextSheet({
       selectedMessage: selectedMessage,
       entries: entries,
       thirdPartyEmotes: thirdPartyEmotes,
+      fontScale: fontScale,
     ),
   );
 }
@@ -41,11 +44,13 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
   final TwitchChatRuntimeMessage selectedMessage;
   final List<TwitchReplyThreadEntry> entries;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final double fontScale;
 
   const _TwitchChatMessageContextSheet({
     required this.selectedMessage,
     required this.entries,
     required this.thirdPartyEmotes,
+    required this.fontScale,
   });
 
   @override
@@ -58,10 +63,25 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
         final entry = entries[index];
         return TwitchReplyThreadMessageCard(
           entry: entry,
-          selected: entry.message.id == selectedMessage.id,
+          selected: _isSelectedEntry(entry.message),
           thirdPartyEmotes: thirdPartyEmotes,
+          fontScale: fontScale,
         );
       },
     );
+  }
+
+  bool _isSelectedEntry(TwitchChatRuntimeMessage message) {
+    final selectedId = selectedMessage.id.trim();
+    final messageId = message.id.trim();
+
+    if (selectedId.isNotEmpty && messageId.isNotEmpty) {
+      return selectedId == messageId;
+    }
+
+    return identical(message, selectedMessage) ||
+        (message.userLogin == selectedMessage.userLogin &&
+            message.receivedAt == selectedMessage.receivedAt &&
+            message.message == selectedMessage.message);
   }
 }
