@@ -79,6 +79,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
 class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   static const Duration _closedPredictionAutoHideDelay = Duration(seconds: 15);
   static const Duration _manualPredictionAutoHideDelay = Duration(seconds: 15);
+  static const Duration _initialPredictionSuppressWindow = Duration(seconds: 12);
 
   static final Map<String, bool> _showPinnedByChannel = <String, bool>{};
   static final Map<String, bool> _showPredictionByChannel = <String, bool>{};
@@ -89,6 +90,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
   Timer? _predictionAutoHideTimer;
+
+  late DateTime _predictionPanelMountedAt;
+  bool _hasObservedPredictionThisSession = false;
 
   bool showPinned = true;
   bool showPrediction = false;
@@ -107,6 +111,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   @override
   void initState() {
     super.initState();
+    _predictionPanelMountedAt = DateTime.now();
     _appearanceController.load();
     _visiblePrediction = _bestPredictionForPanel(widget.prediction);
     _restoreEngagementVisibility();
@@ -124,6 +129,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     _visiblePrediction = _bestPredictionForPanel(widget.prediction);
 
     if (_visibilityKey != _keyForWidget(oldWidget)) {
+      _predictionPanelMountedAt = DateTime.now();
+      _hasObservedPredictionThisSession = false;
       _cancelPredictionAutoHide();
       _restoreEngagementVisibility();
       _syncClosedPredictionAutoHide(_visiblePrediction);
@@ -148,10 +155,16 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   TwitchPredictionSnapshot? _bestPredictionForPanel(
     TwitchPredictionSnapshot? fallback,
   ) {
+    // Do not seed a newly mounted panel from the global latest Hermes value when
+    // the WatchPage has no GQL/snapshot prediction yet. That value can belong to
+    // the previous watch session and makes the first real snapshot look like a
+    // new prediction, causing the card to pop on entry.
+    if (fallback == null || !fallback.hasPrediction) return fallback;
+
     final realtime = TwitchPredictionHermesRealtimeBus.latestPrediction;
     if (realtime != null &&
         realtime.hasPrediction &&
-        _shouldAcceptRealtimePrediction(realtime, current: fallback)) {
+        _samePredictionFamily(fallback, realtime)) {
       return realtime;
     }
     return fallback;
@@ -220,14 +233,13 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       lastPredictionId = id;
       _lastPredictionIdByChannel[_visibilityKey] = id;
 
-      if (previousId.isEmpty) {
-        // First prediction observed after entering a stream is the initial
-        // baseline. It may arrive after the chat panel has already mounted via
-        // GQL or Hermes, so keep it hidden instead of treating it as a new
-        // broadcaster-created prediction.
-        _setShowPrediction(false, persist: true, rebuild: false);
-        _syncClosedPredictionAutoHide(prediction);
-        return;
+      if (!_hasObservedPredictionThisSession) {
+        _hasObservedPredictionThisSession = true;
+        if (_shouldSuppressFirstPredictionObservation(sourceRealtime: sourceRealtime)) {
+          _setShowPrediction(false, persist: true, rebuild: false);
+          _syncClosedPredictionAutoHide(prediction);
+          return;
+        }
       }
 
       // A later prediction replaces the previous one. Twitch only has one
@@ -262,22 +274,31 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     _syncClosedPredictionAutoHide(prediction);
   }
 
+  bool _shouldSuppressFirstPredictionObservation({
+    required bool sourceRealtime,
+  }) {
+    if (!sourceRealtime) return true;
+    final age = DateTime.now().difference(_predictionPanelMountedAt);
+    return age <= _initialPredictionSuppressWindow;
+  }
+
   void _restoreEngagementVisibility() {
     final key = _visibilityKey;
     final prediction = _visiblePrediction;
     final predictionId = prediction?.id.trim() ?? '';
-    final storedPredictionId = _lastPredictionIdByChannel[key];
 
     showPinned = _showPinnedByChannel[key] ?? true;
 
-    // Entering a watch page should not auto-open an already-active prediction.
-    // Keep only the latest id as a baseline; later ids can still pop the card
-    // open after this baseline exists.
+    // Each WatchPanel session must build its own prediction baseline. Do not
+    // reuse the previous session's stored id here; otherwise the first late
+    // GQL/Hermes snapshot can be compared against an old id and pop open.
     if (predictionId.isNotEmpty) {
       lastPredictionId = predictionId;
       _lastPredictionIdByChannel[key] = predictionId;
+      _hasObservedPredictionThisSession = true;
     } else {
-      lastPredictionId = storedPredictionId;
+      lastPredictionId = null;
+      _hasObservedPredictionThisSession = false;
     }
 
     showPrediction = false;
