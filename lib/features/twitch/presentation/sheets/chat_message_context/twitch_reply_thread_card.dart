@@ -1,7 +1,9 @@
-// PATCH VERSION: twitch_reply_thread_card_stage165
+// PATCH VERSION: twitch_reply_thread_card_stage248_font_scale_tags
 //
 // Reply-thread card UI for Twitch chat message context sheet. This owns the
 // card shell, relation chips and copy-to-clipboard behavior.
+// Stage 248 makes the reply history sheet respect the active chat font scale
+// and improves @tag readability.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,18 +17,22 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
   final TwitchReplyThreadEntry entry;
   final bool selected;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final double fontScale;
 
   const TwitchReplyThreadMessageCard({
     super.key,
     required this.entry,
     required this.selected,
     required this.thirdPartyEmotes,
+    this.fontScale = 1.0,
   });
 
   @override
   Widget build(BuildContext context) {
     final message = entry.message;
+    final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
     final depthIndent = (entry.depth * 12.0).clamp(0.0, 42.0).toDouble();
+    final compactBodyScale = (safeFontScale * 0.96).clamp(0.82, 1.45).toDouble();
 
     return RepaintBoundary(
       child: Padding(
@@ -56,17 +62,21 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
                   _ReplyThreadCardHeader(
                     entry: entry,
                     selected: selected,
+                    fontScale: safeFontScale,
                   ),
                   if (_hasRelation(message)) ...[
                     const SizedBox(height: 7),
-                    _RelationLine(message: message),
+                    _RelationLine(
+                      message: message,
+                      fontScale: safeFontScale,
+                    ),
                   ],
                   const SizedBox(height: 7),
                   TwitchRuntimeMessageTile(
                     message: message,
                     thirdPartyEmotes: thirdPartyEmotes,
                     showTimestamp: false,
-                    fontScale: 0.96,
+                    fontScale: compactBodyScale,
                     compact: true,
                   ),
                 ],
@@ -107,19 +117,25 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
 class _ReplyThreadCardHeader extends StatelessWidget {
   final TwitchReplyThreadEntry entry;
   final bool selected;
+  final double fontScale;
 
   const _ReplyThreadCardHeader({
     required this.entry,
     required this.selected,
+    required this.fontScale,
   });
 
   @override
   Widget build(BuildContext context) {
     final message = entry.message;
+    final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
 
     return Row(
       children: [
-        _EntryKindChip(kind: entry.kind),
+        _EntryKindChip(
+          kind: entry.kind,
+          fontScale: safeFontScale,
+        ),
         const SizedBox(width: 7),
         Expanded(
           child: Text(
@@ -130,7 +146,7 @@ class _ReplyThreadCardHeader extends StatelessWidget {
               color: selected
                   ? const Color(0xFFE4D4FF)
                   : const Color(0xFFD9C5FF),
-              fontSize: 12.5,
+              fontSize: 12.5 * safeFontScale,
               fontWeight: FontWeight.w900,
             ),
           ),
@@ -138,9 +154,9 @@ class _ReplyThreadCardHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           formatContextMessageTime(message.receivedAt),
-          style: const TextStyle(
-            color: Colors.white38,
-            fontSize: 10.5,
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 10.5 * safeFontScale,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -151,11 +167,16 @@ class _ReplyThreadCardHeader extends StatelessWidget {
 
 class _EntryKindChip extends StatelessWidget {
   final TwitchReplyThreadEntryKind kind;
+  final double fontScale;
 
-  const _EntryKindChip({required this.kind});
+  const _EntryKindChip({
+    required this.kind,
+    required this.fontScale,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
     final label = switch (kind) {
       TwitchReplyThreadEntryKind.ancestor => '上文',
       TwitchReplyThreadEntryKind.selected => '目前',
@@ -163,7 +184,7 @@ class _EntryKindChip extends StatelessWidget {
     };
 
     final color = switch (kind) {
-      TwitchReplyThreadEntryKind.ancestor => Colors.white54,
+      TwitchReplyThreadEntryKind.ancestor => Colors.white70,
       TwitchReplyThreadEntryKind.selected => const Color(0xFFBF94FF),
       TwitchReplyThreadEntryKind.directReply => const Color(0xFF57F287),
     };
@@ -173,13 +194,13 @@ class _EntryKindChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.28)),
+        border: Border.all(color: color.withOpacity(0.30)),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontSize: 10.5,
+          fontSize: 10.5 * safeFontScale,
           fontWeight: FontWeight.w900,
         ),
       ),
@@ -189,8 +210,12 @@ class _EntryKindChip extends StatelessWidget {
 
 class _RelationLine extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
+  final double fontScale;
 
-  const _RelationLine({required this.message});
+  const _RelationLine({
+    required this.message,
+    required this.fontScale,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -198,13 +223,25 @@ class _RelationLine extends StatelessWidget {
 
     final reply = _replyTargetLogin(message);
     if (reply.isNotEmpty) {
-      chips.add(_RelationChip(label: 'reply @${_stripAt(reply)}'));
+      chips.add(
+        _RelationChip(
+          label: 'reply @${_stripAt(reply)}',
+          type: _RelationChipType.reply,
+          fontScale: fontScale,
+        ),
+      );
     }
 
     for (final login in _mentionedLogins(message)) {
       final text = login.trim();
       if (text.isEmpty) continue;
-      chips.add(_RelationChip(label: 'tag @${_stripAt(text)}'));
+      chips.add(
+        _RelationChip(
+          label: 'tag @${_stripAt(text)}',
+          type: _RelationChipType.tag,
+          fontScale: fontScale,
+        ),
+      );
     }
 
     if (chips.isEmpty) return const SizedBox.shrink();
@@ -217,28 +254,52 @@ class _RelationLine extends StatelessWidget {
   }
 }
 
+enum _RelationChipType {
+  reply,
+  tag,
+}
+
 class _RelationChip extends StatelessWidget {
   final String label;
+  final _RelationChipType type;
+  final double fontScale;
 
-  const _RelationChip({required this.label});
+  const _RelationChip({
+    required this.label,
+    required this.type,
+    required this.fontScale,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isReply = label.startsWith('reply');
-    final color = isReply ? const Color(0xFFBF94FF) : const Color(0xFF57F287);
+    final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
+    final color = switch (type) {
+      _RelationChipType.reply => const Color(0xFFC9A8FF),
+      _RelationChipType.tag => const Color(0xFFD6CCEA),
+    };
+
+    final backgroundOpacity = switch (type) {
+      _RelationChipType.reply => 0.13,
+      _RelationChipType.tag => 0.16,
+    };
+
+    final borderOpacity = switch (type) {
+      _RelationChipType.reply => 0.30,
+      _RelationChipType.tag => 0.34,
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withOpacity(backgroundOpacity),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.22)),
+        border: Border.all(color: color.withOpacity(borderOpacity)),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontSize: 11,
+          fontSize: 11 * safeFontScale,
           fontWeight: FontWeight.w900,
         ),
       ),
