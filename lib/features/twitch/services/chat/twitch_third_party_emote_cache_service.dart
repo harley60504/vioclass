@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_third_party_emote_cache_service_stage233c_static_precache
+// PATCH VERSION: twitch_third_party_emote_cache_service_stage245b_defer_image_precache
 
 import 'dart:async';
 import 'dart:convert';
@@ -354,6 +354,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   Future<void> loadForChannel({
     required String channelId,
     required String channelLogin,
+    bool precacheStaticImages = false,
   }) async {
     final cid = channelId.trim();
     final login = channelLogin.trim().toLowerCase();
@@ -365,7 +366,9 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       _replaceLoadedEmotes(cached.byName);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-      _scheduleStaticPrecache(cid, _byName.values);
+      if (precacheStaticImages) {
+        _scheduleStaticPrecache(cid, _byName.values);
+      }
 
       _loading = false;
       _error = null;
@@ -395,7 +398,9 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
       _replaceLoadedEmotes(next);
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
-      _scheduleStaticPrecache(cid, _byName.values);
+      if (precacheStaticImages) {
+        _scheduleStaticPrecache(cid, _byName.values);
+      }
 
       _memoryCache[cid] = _CachedThirdPartyEmoteSet(
         byName: Map<String, TwitchThirdPartyEmote>.unmodifiable(next),
