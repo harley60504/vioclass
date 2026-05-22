@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_segments_stage233d_service_lookup_resolver
+// PATCH VERSION: twitch_chat_message_segments_stage242f_token_cache_low_layer_emotes
 
 import 'package:flutter/material.dart';
 
@@ -112,7 +112,7 @@ void _appendTextWithInlineEmotes({
   for (final token in _tokenizeChatText(text)) {
     if (token.text.isEmpty) continue;
 
-    if (token.isWhitespace) {
+    if (token.isWhitespace || !token.canLookup) {
       spans.add(TextSpan(text: token.text, style: _normalTextStyle(metrics)));
       continue;
     }
@@ -169,10 +169,8 @@ class _ChatInlineEmoteResolver {
 
   _ResolvedInlineEmote? lookup(String code) {
     final clean = code.trim();
-    if (clean.isEmpty) return null;
+    if (!_canMaybeBeEmoteCode(clean)) return null;
 
-    // Use the cache services' indexed lookups instead of rebuilding large
-    // exact/lowercase maps for every message tile build.
     final official = officialEmotes?.lookupRenderableByName(clean);
     if (official != null) return _ResolvedInlineEmote.official(official);
 
@@ -220,6 +218,7 @@ class _ChatTextToken {
   final String leading;
   final String lookupText;
   final String trailing;
+  final bool canLookup;
 
   const _ChatTextToken({
     required this.text,
@@ -227,14 +226,24 @@ class _ChatTextToken {
     this.leading = '',
     this.lookupText = '',
     this.trailing = '',
+    this.canLookup = false,
   });
 }
 
-List<_ChatTextToken> _tokenizeChatText(String text) {
-  final output = <_ChatTextToken>[];
-  final regex = RegExp(r'(\s+|\S+)');
+const int _tokenCacheLimit = 4096;
+final RegExp _chatTokenRegex = RegExp(r'(\s+|\S+)');
+final Map<String, List<_ChatTextToken>> _tokenCache = <String, List<_ChatTextToken>>{};
 
-  for (final match in regex.allMatches(text)) {
+List<_ChatTextToken> _tokenizeChatText(String text) {
+  final cached = _tokenCache.remove(text);
+  if (cached != null) {
+    _tokenCache[text] = cached;
+    return cached;
+  }
+
+  final output = <_ChatTextToken>[];
+
+  for (final match in _chatTokenRegex.allMatches(text)) {
     final raw = match.group(0) ?? '';
     if (raw.isEmpty) continue;
 
@@ -250,10 +259,38 @@ List<_ChatTextToken> _tokenizeChatText(String text) {
       leading: normalized.leading,
       lookupText: normalized.core,
       trailing: normalized.trailing,
+      canLookup: _canMaybeBeEmoteCode(normalized.core),
     ));
   }
 
-  return output;
+  if (_tokenCache.length >= _tokenCacheLimit) {
+    _tokenCache.remove(_tokenCache.keys.first);
+  }
+  final immutable = List<_ChatTextToken>.unmodifiable(output);
+  _tokenCache[text] = immutable;
+  return immutable;
+}
+
+bool _canMaybeBeEmoteCode(String value) {
+  final clean = value.trim();
+  if (clean.isEmpty || clean.length > 64) return false;
+
+  var hasMeaningfulAscii = false;
+  for (var i = 0; i < clean.length; i += 1) {
+    final unit = clean.codeUnitAt(i);
+    if (unit < 0x21 || unit > 0x7E) return false;
+    if (_isAsciiLetterOrDigit(unit) || unit == 0x5F) {
+      hasMeaningfulAscii = true;
+    }
+  }
+
+  return hasMeaningfulAscii;
+}
+
+bool _isAsciiLetterOrDigit(int codeUnit) {
+  return (codeUnit >= 0x30 && codeUnit <= 0x39) ||
+      (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
+      (codeUnit >= 0x61 && codeUnit <= 0x7A);
 }
 
 _NormalizedLookupToken _normalizeLookupToken(String token) {
@@ -331,20 +368,18 @@ void _appendOfficialEmoteSpan({
       alignment: PlaceholderAlignment.middle,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: RepaintBoundary(
-          child: _ChatMenuStyleEmoteImage(
-            id: emote.id,
-            name: emote.name,
-            imageUrl: imageUrl,
-            staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(emote.id),
-            providerLabel: emote.sourceLabel,
-            isOfficial: true,
-            animate: animateEmotes,
-            width: size,
-            height: size,
-            fallbackText: fallbackText.isEmpty ? emote.name : fallbackText,
-            metrics: metrics,
-          ),
+        child: _ChatMenuStyleEmoteImage(
+          id: emote.id,
+          name: emote.name,
+          imageUrl: imageUrl,
+          staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(emote.id),
+          providerLabel: emote.sourceLabel,
+          isOfficial: true,
+          animate: animateEmotes,
+          width: size,
+          height: size,
+          fallbackText: fallbackText.isEmpty ? emote.name : fallbackText,
+          metrics: metrics,
         ),
       ),
     ),
@@ -388,17 +423,15 @@ void _appendThirdPartyEmoteSpan({
     if (previous is WidgetSpan) {
       spans[spans.length - 1] = WidgetSpan(
         alignment: PlaceholderAlignment.middle,
-        child: RepaintBoundary(
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              previous.child,
-              Positioned.fill(
-                child: IgnorePointer(child: image),
-              ),
-            ],
-          ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            previous.child,
+            Positioned.fill(
+              child: IgnorePointer(child: image),
+            ),
+          ],
         ),
       );
       return;
@@ -410,7 +443,7 @@ void _appendThirdPartyEmoteSpan({
       alignment: PlaceholderAlignment.middle,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: RepaintBoundary(child: image),
+        child: image,
       ),
     ),
   );
@@ -437,20 +470,18 @@ WidgetSpan _twitchEmoteSpan({
     alignment: PlaceholderAlignment.middle,
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 1),
-      child: RepaintBoundary(
-        child: _ChatMenuStyleEmoteImage(
-          id: segment.emoteId ?? '',
-          name: segment.content,
-          imageUrl: imageUrl,
-          staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(segment.emoteId ?? ''),
-          providerLabel: 'Twitch',
-          isOfficial: true,
-          animate: animateEmotes,
-          width: size,
-          height: size,
-          fallbackText: segment.content.isEmpty ? '[emote]' : segment.content,
-          metrics: metrics,
-        ),
+      child: _ChatMenuStyleEmoteImage(
+        id: segment.emoteId ?? '',
+        name: segment.content,
+        imageUrl: imageUrl,
+        staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(segment.emoteId ?? ''),
+        providerLabel: 'Twitch',
+        isOfficial: true,
+        animate: animateEmotes,
+        width: size,
+        height: size,
+        fallbackText: segment.content.isEmpty ? '[emote]' : segment.content,
+        metrics: metrics,
       ),
     ),
   );
@@ -543,8 +574,8 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
         forceStatic: !animate,
         width: width,
         height: height,
-        memCacheWidth: 144,
-        memCacheHeight: 144,
+        memCacheWidth: 96,
+        memCacheHeight: 96,
         placeholder: const SizedBox.shrink(),
         errorPlaceholder: Text(
           fallbackText,
