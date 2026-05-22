@@ -29,6 +29,27 @@ import 'player/twitch_watch_stream_header.dart';
 import 'player/twitch_watch_top_action_bar.dart';
 import 'player/twitch_watch_top_buttons.dart';
 
+/// Repaint isolation switches for profiling the 2nd-entry FPS drop.
+///
+/// Run examples:
+/// flutter run --profile --dart-define=TWITCH_WATCH_DEBUG_VIDEO_PLACEHOLDER=true
+/// flutter run --profile --dart-define=TWITCH_WATCH_DEBUG_HIDE_OVERLAY=true
+/// flutter run --profile --dart-define=TWITCH_WATCH_DEBUG_VIDEO_PLACEHOLDER=true --dart-define=TWITCH_WATCH_DEBUG_HIDE_OVERLAY=true
+const bool _debugUseVideoPlaceholder = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_VIDEO_PLACEHOLDER',
+  defaultValue: false,
+);
+
+const bool _debugHidePlayerOverlay = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_HIDE_OVERLAY',
+  defaultValue: false,
+);
+
+const bool _debugShowPlayerIsolationLabel = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_SHOW_ISOLATION_LABEL',
+  defaultValue: true,
+);
+
 class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final Player? player;
@@ -115,8 +136,9 @@ class TwitchWatchPlayerArea extends StatelessWidget {
           inPipMode: state.inPipMode,
           video: _WatchPlayerVideoStage(
             controller: state.videoController,
+            usePlaceholder: _debugUseVideoPlaceholder,
           ),
-          overlay: state.shouldShowControlsOverlay
+          overlay: state.shouldShowControlsOverlay && !_debugHidePlayerOverlay
               ? WatchControlsOverlay(
                   loading: state.overlayLoading,
                   error: error,
@@ -145,7 +167,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                   onToggleFullscreen: onToggleFullscreen,
                 )
               : null,
-          waitingOverlay: state.shouldShowWaitingOverlay
+          waitingOverlay: state.shouldShowWaitingOverlay && !_debugHidePlayerOverlay
               ? _WatchControlsNotReadyOverlay(
                   metadata: metadata,
                   loading: loading || playerRuntime.loading,
@@ -153,9 +175,20 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                   onReload: onReload,
                 )
               : null,
+          debugLabel: _debugShowPlayerIsolationLabel
+              ? _buildIsolationDebugLabel()
+              : null,
         );
       },
     );
+  }
+
+  String _buildIsolationDebugLabel() {
+    final parts = <String>[];
+    if (_debugUseVideoPlaceholder) parts.add('video=placeholder');
+    if (_debugHidePlayerOverlay) parts.add('overlay=hidden');
+    if (parts.isEmpty) parts.add('normal');
+    return 'Stage243A ${parts.join(' / ')}';
   }
 }
 
@@ -222,12 +255,14 @@ class _WatchPlayerShell extends StatelessWidget {
   final Widget video;
   final Widget? overlay;
   final Widget? waitingOverlay;
+  final String? debugLabel;
 
   const _WatchPlayerShell({
     required this.inPipMode,
     required this.video,
     required this.overlay,
     required this.waitingOverlay,
+    required this.debugLabel,
   });
 
   @override
@@ -240,6 +275,15 @@ class _WatchPlayerShell extends StatelessWidget {
           Positioned.fill(child: video),
           if (overlay != null) Positioned.fill(child: overlay!),
           if (waitingOverlay != null) Positioned.fill(child: waitingOverlay!),
+          if (debugLabel != null &&
+              (_debugUseVideoPlaceholder || _debugHidePlayerOverlay))
+            Positioned(
+              left: 10,
+              bottom: 10,
+              child: IgnorePointer(
+                child: _WatchPlayerIsolationLabel(text: debugLabel!),
+              ),
+            ),
         ],
       ),
     );
@@ -248,14 +292,73 @@ class _WatchPlayerShell extends StatelessWidget {
 
 class _WatchPlayerVideoStage extends StatelessWidget {
   final VideoController? controller;
+  final bool usePlaceholder;
 
-  const _WatchPlayerVideoStage({required this.controller});
+  const _WatchPlayerVideoStage({
+    required this.controller,
+    required this.usePlaceholder,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (usePlaceholder) {
+      return const _WatchVideoPlaceholderSurface();
+    }
+
     final controller = this.controller;
     if (controller == null) return const TwitchMediaKitVideoWaitingSurface();
     return TwitchMediaKitVideoSurface(controller: controller);
+  }
+}
+
+class _WatchVideoPlaceholderSurface extends StatelessWidget {
+  const _WatchVideoPlaceholderSurface();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: Text(
+          'Video placeholder\nmedia_kit / proxy still running',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            height: 1.35,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchPlayerIsolationLabel extends StatelessWidget {
+  final String text;
+
+  const _WatchPlayerIsolationLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
   }
 }
 
