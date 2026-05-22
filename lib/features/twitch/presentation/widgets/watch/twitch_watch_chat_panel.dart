@@ -220,18 +220,19 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       lastPredictionId = id;
       _lastPredictionIdByChannel[_visibilityKey] = id;
 
-      if (previousId.isEmpty && !sourceRealtime) {
-        // Initial GQL/snapshot prediction should not pop open when entering a
-        // stream. It is recorded as the current prediction family and stays
-        // hidden until the user opens it manually or a newer realtime event
-        // arrives.
+      if (previousId.isEmpty) {
+        // First prediction observed after entering a stream is the initial
+        // baseline. It may arrive after the chat panel has already mounted via
+        // GQL or Hermes, so keep it hidden instead of treating it as a new
+        // broadcaster-created prediction.
         _setShowPrediction(false, persist: true, rebuild: false);
         _syncClosedPredictionAutoHide(prediction);
         return;
       }
 
-      // A new prediction replaces the previous one. Twitch only has one active
-      // prediction per channel, so the new id should override the old card.
+      // A later prediction replaces the previous one. Twitch only has one
+      // active prediction per channel, so the new id should override the old
+      // card and pop open.
       _setShowPrediction(true, persist: true, rebuild: false);
       _syncClosedPredictionAutoHide(prediction);
       return;
@@ -270,8 +271,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     showPinned = _showPinnedByChannel[key] ?? true;
 
     // Entering a watch page should not auto-open an already-active prediction.
-    // Keep only the latest id as a baseline; realtime new ids can still pop the
-    // card open later.
+    // Keep only the latest id as a baseline; later ids can still pop the card
+    // open after this baseline exists.
     if (predictionId.isNotEmpty) {
       lastPredictionId = predictionId;
       _lastPredictionIdByChannel[key] = predictionId;
