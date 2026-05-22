@@ -78,6 +78,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
 
 class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   static const Duration _closedPredictionAutoHideDelay = Duration(seconds: 15);
+  static const Duration _manualPredictionAutoHideDelay = Duration(seconds: 15);
 
   static final Map<String, bool> _showPinnedByChannel = <String, bool>{};
   static final Map<String, bool> _showPredictionByChannel = <String, bool>{};
@@ -87,10 +88,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       TwitchChatAppearanceController();
 
   StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
-  Timer? _closedPredictionAutoHideTimer;
+  Timer? _predictionAutoHideTimer;
 
   bool showPinned = true;
-  bool showPrediction = true;
+  bool showPrediction = false;
 
   String? lastPredictionId;
   TwitchPredictionSnapshot? _visiblePrediction;
@@ -123,7 +124,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     _visiblePrediction = _bestPredictionForPanel(widget.prediction);
 
     if (_visibilityKey != _keyForWidget(oldWidget)) {
-      _cancelClosedPredictionAutoHide();
+      _cancelPredictionAutoHide();
       _restoreEngagementVisibility();
       _syncClosedPredictionAutoHide(_visiblePrediction);
       return;
@@ -132,12 +133,13 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     _syncPredictionVisibility(
       oldPrediction: oldPrediction,
       prediction: _visiblePrediction,
+      sourceRealtime: false,
     );
   }
 
   @override
   void dispose() {
-    _closedPredictionAutoHideTimer?.cancel();
+    _predictionAutoHideTimer?.cancel();
     _predictionSubscription?.cancel();
     _appearanceController.dispose();
     super.dispose();
@@ -167,6 +169,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       _syncPredictionVisibility(
         oldPrediction: oldPrediction,
         prediction: prediction,
+        sourceRealtime: true,
       );
     });
   }
@@ -205,15 +208,30 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   void _syncPredictionVisibility({
     required TwitchPredictionSnapshot? oldPrediction,
     required TwitchPredictionSnapshot? prediction,
+    required bool sourceRealtime,
   }) {
-    final id = prediction?.id ?? '';
+    final id = prediction?.id.trim() ?? '';
+    final previousId = lastPredictionId?.trim() ?? '';
     final shouldAutoHidePrediction = _shouldAutoHidePredictionBanner(prediction);
     final oldShouldAutoHidePrediction =
         _shouldAutoHidePredictionBanner(oldPrediction);
 
-    if (id.isNotEmpty && id != lastPredictionId) {
+    if (id.isNotEmpty && id != previousId) {
       lastPredictionId = id;
       _lastPredictionIdByChannel[_visibilityKey] = id;
+
+      if (previousId.isEmpty && !sourceRealtime) {
+        // Initial GQL/snapshot prediction should not pop open when entering a
+        // stream. It is recorded as the current prediction family and stays
+        // hidden until the user opens it manually or a newer realtime event
+        // arrives.
+        _setShowPrediction(false, persist: true, rebuild: false);
+        _syncClosedPredictionAutoHide(prediction);
+        return;
+      }
+
+      // A new prediction replaces the previous one. Twitch only has one active
+      // prediction per channel, so the new id should override the old card.
       _setShowPrediction(true, persist: true, rebuild: false);
       _syncClosedPredictionAutoHide(prediction);
       return;
@@ -221,7 +239,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     if (id.isNotEmpty &&
         oldShouldAutoHidePrediction &&
-        !shouldAutoHidePrediction) {
+        !shouldAutoHidePrediction &&
+        sourceRealtime) {
       _setShowPrediction(true, persist: true, rebuild: false);
       _syncClosedPredictionAutoHide(prediction);
       return;
@@ -231,7 +250,11 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
         !oldShouldAutoHidePrediction &&
         shouldAutoHidePrediction) {
       _setShowPrediction(true, persist: true, rebuild: false);
-      _scheduleClosedPredictionAutoHide(prediction);
+      _schedulePredictionAutoHide(
+        predictionId: id,
+        delay: _closedPredictionAutoHideDelay,
+        requireClosed: true,
+      );
       return;
     }
 
@@ -241,28 +264,23 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   void _restoreEngagementVisibility() {
     final key = _visibilityKey;
     final prediction = _visiblePrediction;
-    final predictionId = prediction?.id ?? '';
+    final predictionId = prediction?.id.trim() ?? '';
     final storedPredictionId = _lastPredictionIdByChannel[key];
 
     showPinned = _showPinnedByChannel[key] ?? true;
 
-    if (predictionId.isNotEmpty &&
-        storedPredictionId != null &&
-        storedPredictionId != predictionId) {
+    // Entering a watch page should not auto-open an already-active prediction.
+    // Keep only the latest id as a baseline; realtime new ids can still pop the
+    // card open later.
+    if (predictionId.isNotEmpty) {
       lastPredictionId = predictionId;
       _lastPredictionIdByChannel[key] = predictionId;
-      showPrediction = true;
-      _showPredictionByChannel[key] = showPrediction;
-      return;
+    } else {
+      lastPredictionId = storedPredictionId;
     }
 
-    lastPredictionId = predictionId.isNotEmpty ? predictionId : storedPredictionId;
-    if (predictionId.isNotEmpty) {
-      _lastPredictionIdByChannel[key] = predictionId;
-    }
-
-    showPrediction = _showPredictionByChannel[key] ??
-        !_shouldAutoHidePredictionBanner(prediction);
+    showPrediction = false;
+    _showPredictionByChannel[key] = false;
   }
 
   String _keyForWidget(TwitchWatchChatPanel widget) {
@@ -278,6 +296,22 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     setState(() => showPinned = value);
   }
 
+  void _togglePredictionVisibility() {
+    final next = !showPrediction;
+    final prediction = _visiblePrediction ?? widget.prediction;
+    final predictionId = prediction?.id.trim() ?? '';
+
+    _setShowPrediction(next);
+
+    if (next && predictionId.isNotEmpty) {
+      _schedulePredictionAutoHide(
+        predictionId: predictionId,
+        delay: _manualPredictionAutoHideDelay,
+        requireClosed: false,
+      );
+    }
+  }
+
   void _setShowPrediction(
     bool value, {
     bool persist = true,
@@ -285,6 +319,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   }) {
     if (persist) {
       _showPredictionByChannel[_visibilityKey] = value;
+    }
+    if (!value) {
+      _cancelPredictionAutoHide();
     }
     if (rebuild) {
       setState(() => showPrediction = value);
@@ -302,36 +339,46 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   void _syncClosedPredictionAutoHide(TwitchPredictionSnapshot? prediction) {
     if (prediction == null || !prediction.hasPrediction) {
-      _cancelClosedPredictionAutoHide();
+      _cancelPredictionAutoHide();
       return;
     }
 
     if (_shouldAutoHidePredictionBanner(prediction)) {
-      _scheduleClosedPredictionAutoHide(prediction);
-    } else {
-      _cancelClosedPredictionAutoHide();
+      final predictionId = prediction.id.trim();
+      if (predictionId.isNotEmpty) {
+        _schedulePredictionAutoHide(
+          predictionId: predictionId,
+          delay: _closedPredictionAutoHideDelay,
+          requireClosed: true,
+        );
+      }
+    } else if (!showPrediction) {
+      _cancelPredictionAutoHide();
     }
   }
 
-  void _scheduleClosedPredictionAutoHide(TwitchPredictionSnapshot? prediction) {
-    final predictionId = prediction?.id.trim() ?? '';
+  void _schedulePredictionAutoHide({
+    required String predictionId,
+    required Duration delay,
+    required bool requireClosed,
+  }) {
     if (predictionId.isEmpty) return;
 
-    _closedPredictionAutoHideTimer?.cancel();
-    _closedPredictionAutoHideTimer = Timer(_closedPredictionAutoHideDelay, () {
+    _predictionAutoHideTimer?.cancel();
+    _predictionAutoHideTimer = Timer(delay, () {
       if (!mounted) return;
       final current = _visiblePrediction ?? widget.prediction;
       final currentId = current?.id.trim() ?? '';
       if (currentId != predictionId) return;
-      if (!_shouldAutoHidePredictionBanner(current)) return;
+      if (requireClosed && !_shouldAutoHidePredictionBanner(current)) return;
 
       _setShowPrediction(false);
     });
   }
 
-  void _cancelClosedPredictionAutoHide() {
-    _closedPredictionAutoHideTimer?.cancel();
-    _closedPredictionAutoHideTimer = null;
+  void _cancelPredictionAutoHide() {
+    _predictionAutoHideTimer?.cancel();
+    _predictionAutoHideTimer = null;
   }
 
   @override
@@ -379,9 +426,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 onTogglePinned: () {
                   _setShowPinned(!showPinned);
                 },
-                onTogglePrediction: () {
-                  _setShowPrediction(!showPrediction);
-                },
+                onTogglePrediction: _togglePredictionVisibility,
                 onRefresh: widget.onRefreshEngagement,
                 onOpenAppearance: () => showTwitchChatAppearanceSheet(
                   context: context,
