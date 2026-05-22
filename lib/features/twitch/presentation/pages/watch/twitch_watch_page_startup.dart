@@ -121,10 +121,13 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     required String channel,
     required int generation,
   }) async {
-    // Stage 221E startup order:
-    // 1. Open player first for fastest watch-page first paint.
-    // 2. Connect chat second.
-    // 3. Resolve relationship / engagement / emotes in background.
+    // Stage 245A startup order:
+    // 1. Open player first for fastest first paint.
+    // 2. Start chat and engagement bootstrap at the same time.
+    //    Engagement covers channel points, prediction, and pinned chat. It is
+    //    background work, so the blocking mask still only waits on player/chat.
+    // 3. Relationship / emotes continue as background tasks after the startup
+    //    snapshot gives us channelId.
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
@@ -140,13 +143,15 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     await _yieldToUi();
     if (!_isCurrentWatchTask(generation, channel)) return;
 
-    setState(() => _chatBootstrapping = true);
-    await _runDeferredChatStartup(channel, generation);
-
-    await _yieldToUi();
-    if (!_isCurrentWatchTask(generation, channel)) return;
+    setState(() {
+      _chatBootstrapping = true;
+      _relationshipBootstrapping = true;
+      _engagementBootstrapping = true;
+      _emoteBootstrapping = true;
+    });
 
     unawaited(_runWatchBackgroundStartup(channel: channel, generation: generation));
+    await _runDeferredChatStartup(channel, generation);
   }
 
   Future<void> _runWatchBackgroundStartup({
@@ -154,12 +159,6 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     required int generation,
   }) async {
     if (!_isCurrentWatchTask(generation, channel)) return;
-
-    setState(() {
-      _relationshipBootstrapping = true;
-      _engagementBootstrapping = true;
-      _emoteBootstrapping = true;
-    });
 
     await _prepareWatchBackgroundSnapshot(generation, channel);
     if (!_isCurrentWatchTask(generation, channel)) return;
