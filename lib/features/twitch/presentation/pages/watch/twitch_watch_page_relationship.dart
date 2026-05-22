@@ -29,7 +29,17 @@ extension _TwitchWatchPageRelationshipMethods on _TwitchWatchPageState {
       if (!mounted) return;
       setState(() {
         _isFollowing = snapshot.isFollowing;
-        if (snapshot.userId.trim().isNotEmpty) _channelId = snapshot.userId.trim();
+        // Stage 245C:
+        // The chat startup snapshot is the authoritative channel id source for
+        // chat/emotes/pinned/prediction. Relationship runs in parallel now, so
+        // do not let it overwrite an existing channel id and race emote loading
+        // into a wrong/sub-related id. Use relationship's resolved id only as a
+        // fallback when startup has not produced an id yet.
+        final resolvedUserId = snapshot.userId.trim();
+        if ((_channelId == null || _channelId!.trim().isEmpty) &&
+            resolvedUserId.isNotEmpty) {
+          _channelId = resolvedUserId;
+        }
         _relationshipError = null;
       });
     } catch (error) {
@@ -64,7 +74,11 @@ extension _TwitchWatchPageRelationshipMethods on _TwitchWatchPageState {
       if (!mounted) return;
       setState(() {
         _isFollowing = snapshot.isFollowing;
-        if (snapshot.userId.trim().isNotEmpty) _channelId = snapshot.userId.trim();
+        final resolvedUserId = snapshot.userId.trim();
+        if ((_channelId == null || _channelId!.trim().isEmpty) &&
+            resolvedUserId.isNotEmpty) {
+          _channelId = resolvedUserId;
+        }
         _relationshipError = null;
       });
       _showSnack(_isFollowing ? '已追隨 $login' : '已取消追隨 $login');
