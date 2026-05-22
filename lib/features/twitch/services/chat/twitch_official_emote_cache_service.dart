@@ -1,3 +1,5 @@
+// PATCH VERSION: twitch_official_emote_cache_service_stage242c_lookup_indexes
+
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -37,6 +39,15 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   List<TwitchOfficialEmote> _lockedChannelEmotes = const <TwitchOfficialEmote>[];
   final Map<String, TwitchOfficialEmote> _favorites = <String, TwitchOfficialEmote>{};
   final Map<String, TwitchOfficialEmote> _recent = <String, TwitchOfficialEmote>{};
+
+  List<TwitchOfficialEmote>? _allKnownEmotesCache;
+  List<TwitchOfficialEmote>? _usableEmotesCache;
+  List<TwitchOfficialEmote>? _nonGlobalUsableEmotesCache;
+  Map<String, TwitchOfficialEmote>? _renderableByExactNameCache;
+  Map<String, TwitchOfficialEmote>? _renderableByLowerNameCache;
+  Map<String, TwitchOfficialEmote>? _usableByExactNameCache;
+  Map<String, TwitchOfficialEmote>? _usableByLowerNameCache;
+
   bool _favoritesLoaded = false;
   bool _recentLoaded = false;
 
@@ -74,7 +85,10 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   int get recentCount => _recent.length;
 
   List<TwitchOfficialEmote> get allKnownEmotes {
-    return _uniqueByName(<TwitchOfficialEmote>[
+    final cached = _allKnownEmotesCache;
+    if (cached != null) return cached;
+
+    final next = _uniqueByName(<TwitchOfficialEmote>[
       ..._globalEmotes,
       ..._channelEmotes,
       ..._userEmotes,
@@ -82,9 +96,15 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       ..._recent.values,
       ..._favorites.values,
     ]);
+
+    _allKnownEmotesCache = next;
+    return next;
   }
 
   List<TwitchOfficialEmote> get usableEmotes {
+    final cached = _usableEmotesCache;
+    if (cached != null) return cached;
+
     final byKey = <String, TwitchOfficialEmote>{};
 
     for (final emote in _globalEmotes) {
@@ -102,6 +122,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     final output = byKey.values.toList(growable: false)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
+    _usableEmotesCache = output;
     return output;
   }
 
@@ -115,6 +136,9 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   List<TwitchOfficialEmote> get nonGlobalUsableEmotes {
+    final cached = _nonGlobalUsableEmotesCache;
+    if (cached != null) return cached;
+
     final globalKeys = _globalEmotes.map(_key).toSet();
     final byKey = <String, TwitchOfficialEmote>{};
 
@@ -133,6 +157,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     final output = byKey.values.toList(growable: false)
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
+    _nonGlobalUsableEmotesCache = output;
     return output;
   }
 
@@ -141,33 +166,68 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   TwitchOfficialEmote? lookupUsableByName(String name) {
-    return _lookupByName(name, usableEmotes);
-  }
-
-  TwitchOfficialEmote? lookupRenderableByName(String name) {
-    return _lookupByName(name, renderableEmotes);
-  }
-
-  TwitchOfficialEmote? _lookupByName(
-    String name,
-    List<TwitchOfficialEmote> source,
-  ) {
     final clean = name.trim();
     if (clean.isEmpty) return null;
 
-    TwitchOfficialEmote? caseInsensitiveMatch;
-    final lower = clean.toLowerCase();
+    _ensureUsableLookupIndexes();
+    return _usableByExactNameCache![clean] ??
+        _usableByLowerNameCache![clean.toLowerCase()];
+  }
 
-    for (final emote in source) {
-      final emoteName = emote.name.trim();
-      if (emoteName.isEmpty || _imageUrlFor(emote).isEmpty) continue;
-      if (emoteName == clean) return emote.copyWith(imageUrl: _imageUrlFor(emote));
-      if (caseInsensitiveMatch == null && emoteName.toLowerCase() == lower) {
-        caseInsensitiveMatch = emote.copyWith(imageUrl: _imageUrlFor(emote));
-      }
+  TwitchOfficialEmote? lookupRenderableByName(String name) {
+    final clean = name.trim();
+    if (clean.isEmpty) return null;
+
+    _ensureRenderableLookupIndexes();
+    return _renderableByExactNameCache![clean] ??
+        _renderableByLowerNameCache![clean.toLowerCase()];
+  }
+
+  void _ensureRenderableLookupIndexes() {
+    if (_renderableByExactNameCache != null && _renderableByLowerNameCache != null) {
+      return;
     }
 
-    return caseInsensitiveMatch;
+    final exact = <String, TwitchOfficialEmote>{};
+    final lower = <String, TwitchOfficialEmote>{};
+
+    for (final emote in renderableEmotes) {
+      final normalized = _normalizedRenderableEmote(emote);
+      if (normalized == null) continue;
+      final name = normalized.name.trim();
+      exact.putIfAbsent(name, () => normalized);
+      lower.putIfAbsent(name.toLowerCase(), () => normalized);
+    }
+
+    _renderableByExactNameCache = exact;
+    _renderableByLowerNameCache = lower;
+  }
+
+  void _ensureUsableLookupIndexes() {
+    if (_usableByExactNameCache != null && _usableByLowerNameCache != null) {
+      return;
+    }
+
+    final exact = <String, TwitchOfficialEmote>{};
+    final lower = <String, TwitchOfficialEmote>{};
+
+    for (final emote in usableEmotes) {
+      final normalized = _normalizedRenderableEmote(emote);
+      if (normalized == null) continue;
+      final name = normalized.name.trim();
+      exact.putIfAbsent(name, () => normalized);
+      lower.putIfAbsent(name.toLowerCase(), () => normalized);
+    }
+
+    _usableByExactNameCache = exact;
+    _usableByLowerNameCache = lower;
+  }
+
+  TwitchOfficialEmote? _normalizedRenderableEmote(TwitchOfficialEmote emote) {
+    final name = emote.name.trim();
+    final imageUrl = _imageUrlFor(emote);
+    if (name.isEmpty || imageUrl.isEmpty) return null;
+    return emote.copyWith(imageUrl: imageUrl);
   }
 
   bool isUsable(TwitchOfficialEmote emote) {
@@ -188,6 +248,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _favorites[key] = emote.copyWith(imageUrl: _imageUrlFor(emote));
     }
 
+    _invalidateDerivedCaches();
     notifyListeners();
     _saveFavoriteEmotes();
   }
@@ -212,6 +273,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       ..clear()
       ..addAll(next);
 
+    _invalidateDerivedCaches();
     notifyListeners();
     _saveRecentEmotes();
   }
@@ -242,6 +304,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _favorites
         ..clear()
         ..addAll(next);
+      _invalidateDerivedCaches();
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
     } catch (e) {
       debugPrint('Load official favorite emotes failed: $e');
@@ -288,6 +351,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _recent
         ..clear()
         ..addAll(next);
+      _invalidateDerivedCaches();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
     } catch (e) {
       debugPrint('Load official recent emotes failed: $e');
@@ -309,6 +373,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
   Future<void> clearRecentEmotes() async {
     _recent.clear();
+    _invalidateDerivedCaches();
     notifyListeners();
 
     try {
@@ -321,6 +386,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
   Future<void> clearFavoriteEmotes() async {
     _favorites.clear();
+    _invalidateDerivedCaches();
     notifyListeners();
 
     try {
@@ -375,6 +441,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         _channelEmotes = const <TwitchOfficialEmote>[];
         _userEmotes = const <TwitchOfficialEmote>[];
         _lockedChannelEmotes = const <TwitchOfficialEmote>[];
+        _invalidateDerivedCaches();
         return;
       }
 
@@ -434,6 +501,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       _channelEmotes = channel;
       _userEmotes = _unique(user, unlocked: true);
       _lockedChannelEmotes = locked;
+      _invalidateDerivedCaches();
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
       _refreshRecentEmoteSnapshotsFromLoadedEmotes();
 
@@ -567,6 +635,17 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     _userEmotes = cached.userEmotes;
     _lockedChannelEmotes = cached.lockedChannelEmotes;
     _userEmotesUnavailable = cached.userEmotesUnavailable;
+    _invalidateDerivedCaches();
+  }
+
+  void _invalidateDerivedCaches() {
+    _allKnownEmotesCache = null;
+    _usableEmotesCache = null;
+    _nonGlobalUsableEmotesCache = null;
+    _renderableByExactNameCache = null;
+    _renderableByLowerNameCache = null;
+    _usableByExactNameCache = null;
+    _usableByLowerNameCache = null;
   }
 
   String _favoriteKey(TwitchOfficialEmote emote) {
@@ -599,6 +678,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     _favorites
       ..clear()
       ..addAll(next);
+    _invalidateDerivedCaches();
     _saveFavoriteEmotes();
   }
 
@@ -626,6 +706,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     _recent
       ..clear()
       ..addAll(next);
+    _invalidateDerivedCaches();
     _saveRecentEmotes();
   }
 
@@ -674,6 +755,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     _channelId = '';
     _viewerId = '';
     _userEmotesUnavailable = false;
+    _invalidateDerivedCaches();
     notifyListeners();
   }
 
@@ -696,6 +778,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       'recentCount': recentCount,
       'recentLoaded': recentLoaded,
       'userEmotesUnavailable': userEmotesUnavailable,
+      'lookupIndexBuilt': _renderableByExactNameCache != null,
       'channelSample': channelEmotes
           .take(20)
           .map((emote) => <String, dynamic>{
