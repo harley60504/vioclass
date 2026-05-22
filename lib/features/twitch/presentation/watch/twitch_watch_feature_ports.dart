@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage232_seamless_proxy_switch
+// PATCH VERSION: twitch_watch_feature_ports_stage245b_lazy_emote_image_preload
 //
 // Feature-facing ports for Watch composition.
 //
@@ -139,11 +139,13 @@ class TwitchWatchEmotePort {
     required String channelLogin,
     required String viewerId,
     bool forceRefresh = false,
+    bool precacheThirdPartyStaticImages = false,
   }) async {
     await Future.wait<void>([
       services.thirdPartyEmotes.loadForChannel(
         channelId: channelId,
         channelLogin: channelLogin,
+        precacheStaticImages: precacheThirdPartyStaticImages,
       ),
       services.officialEmotes.loadForChannel(
         channelId: channelId,
@@ -163,6 +165,7 @@ class TwitchWatchEmotePort {
       channelLogin: channelLogin,
       viewerId: viewerId,
       forceRefresh: true,
+      precacheThirdPartyStaticImages: true,
     );
   }
 
