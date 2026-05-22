@@ -1,6 +1,8 @@
-// PATCH VERSION: twitch_chat_message_reply_preview_stage154
+// PATCH VERSION: twitch_chat_message_reply_preview_stage249_bright_mentions
 //
 // Reply preview widget used by runtime chat message content.
+// Stage 249 highlights @mentions in the compact reply preview so tags remain
+// readable on dark chat cards.
 
 import 'package:flutter/material.dart';
 
@@ -29,16 +31,97 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(left: 2, bottom: 3),
-      child: Text(
-        name.isEmpty && body.isEmpty ? 'reply' : '$name: $body',
+      child: Text.rich(
+        TextSpan(children: _buildPreviewSpans(name: name, body: body)),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.left,
-        style: TextStyle(
-          color: Colors.white38,
-          fontSize: metrics.metaFontSize,
-        ),
       ),
     );
   }
+
+  List<InlineSpan> _buildPreviewSpans({
+    required String name,
+    required String body,
+  }) {
+    final cleanName = name.trim();
+    final cleanBody = body.trim();
+
+    if (cleanName.isEmpty && cleanBody.isEmpty) {
+      return <InlineSpan>[
+        TextSpan(text: 'reply', style: _baseStyle()),
+      ];
+    }
+
+    final spans = <InlineSpan>[];
+
+    if (cleanName.isNotEmpty) {
+      spans.add(TextSpan(
+        text: cleanBody.isEmpty ? cleanName : '$cleanName: ',
+        style: _nameStyle(),
+      ));
+    }
+
+    if (cleanBody.isNotEmpty) {
+      _appendMentionAwareText(spans, cleanBody);
+    }
+
+    return spans;
+  }
+
+  void _appendMentionAwareText(List<InlineSpan> spans, String text) {
+    var cursor = 0;
+
+    for (final match in _mentionRegex.allMatches(text)) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(
+          text: text.substring(cursor, match.start),
+          style: _baseStyle(),
+        ));
+      }
+
+      spans.add(TextSpan(
+        text: match.group(0) ?? '',
+        style: _mentionStyle(),
+      ));
+
+      cursor = match.end;
+    }
+
+    if (cursor < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(cursor),
+        style: _baseStyle(),
+      ));
+    }
+  }
+
+  TextStyle _nameStyle() {
+    return TextStyle(
+      color: Colors.white60,
+      fontSize: metrics.metaFontSize,
+      fontWeight: FontWeight.w800,
+      height: 1.15,
+    );
+  }
+
+  TextStyle _baseStyle() {
+    return TextStyle(
+      color: Colors.white54,
+      fontSize: metrics.metaFontSize,
+      fontWeight: FontWeight.w700,
+      height: 1.15,
+    );
+  }
+
+  TextStyle _mentionStyle() {
+    return TextStyle(
+      color: const Color(0xFFD6CCEA),
+      fontSize: metrics.metaFontSize,
+      fontWeight: FontWeight.w900,
+      height: 1.15,
+    );
+  }
 }
+
+final RegExp _mentionRegex = RegExp(r'@[A-Za-z0-9_]{3,25}');
