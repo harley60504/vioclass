@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_official_emote_cache_service_stage242c_lookup_indexes
+// PATCH VERSION: twitch_official_emote_cache_service_stage242e_fast_lookup_stage119_user_emotes
 
 import 'dart:convert';
 
@@ -127,11 +127,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   List<TwitchOfficialEmote> get renderableEmotes {
-    // Rendering chat messages is not the same thing as permission to send an
-    // emote. If another viewer already sent a channel emote, we can render it as
-    // long as the channel/global/user catalog gives us an image URL. Therefore
-    // this intentionally includes locked channel emotes and known recent/favorite
-    // snapshots instead of depending only on usableEmotes.
     return allKnownEmotes;
   }
 
@@ -458,6 +453,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
           ).catchError((_) => <TwitchOfficialEmote>[]),
           _fetchUserEmotesSafe(
             userId: cleanViewerId,
+            broadcasterId: cleanChannelId,
             accessToken: accessToken,
             clientId: clientId,
           ),
@@ -465,13 +461,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       );
 
       final global = _unique(results[0], unlocked: true);
-      final rawUser = _unique(results[2], unlocked: true);
-      final ownerNames = await _fetchOwnerDisplayNamesSafe(
-        userEmotes: rawUser,
-        accessToken: accessToken,
-        clientId: clientId,
-      );
-      final user = _applyOwnerDisplayNames(rawUser, ownerNames);
+      final user = _unique(results[2], unlocked: true);
       final userKeys = user.map(_key).toSet();
       final globalKeys = global.map(_key).toSet();
 
@@ -523,6 +513,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
   Future<List<TwitchOfficialEmote>> _fetchUserEmotesSafe({
     required String userId,
+    required String broadcasterId,
     required String accessToken,
     required String clientId,
   }) async {
@@ -531,54 +522,15 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     try {
       return await api.fetchUserEmotes(
         userId: userId,
+        broadcasterId: broadcasterId,
         accessToken: accessToken,
         clientId: clientId,
+        includeBroadcasterFilter: broadcasterId.trim().isNotEmpty,
       );
     } catch (_) {
       _userEmotesUnavailable = true;
       return const <TwitchOfficialEmote>[];
     }
-  }
-
-  Future<Map<String, String>> _fetchOwnerDisplayNamesSafe({
-    required List<TwitchOfficialEmote> userEmotes,
-    required String accessToken,
-    required String clientId,
-  }) async {
-    final ownerIds = userEmotes
-        .map((emote) => emote.ownerId.trim())
-        .where((id) => id.isNotEmpty)
-        .toSet();
-
-    if (ownerIds.isEmpty) return const <String, String>{};
-
-    try {
-      return await api.fetchUserDisplayNamesByIds(
-        userIds: ownerIds,
-        accessToken: accessToken,
-        clientId: clientId,
-      );
-    } catch (e) {
-      debugPrint('Fetch official emote owner display names failed: $e');
-      return const <String, String>{};
-    }
-  }
-
-  List<TwitchOfficialEmote> _applyOwnerDisplayNames(
-    List<TwitchOfficialEmote> source,
-    Map<String, String> ownerNames,
-  ) {
-    if (source.isEmpty || ownerNames.isEmpty) return source;
-
-    return source
-        .map((emote) {
-          final ownerName = ownerNames[emote.ownerId.trim()]?.trim() ?? '';
-          final base = emote.copyWith(imageUrl: _imageUrlFor(emote));
-          if (ownerName.isEmpty) return base;
-          return base.copyWith(ownerDisplayName: ownerName);
-        })
-        .toList(growable: false)
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
 
   List<TwitchOfficialEmote> _unique(
@@ -786,15 +738,6 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
                 'id': emote.id,
                 'imageUrl': emote.imageUrl,
                 'locked': emote.locked,
-                'emoteType': emote.emoteType,
-              })
-          .toList(growable: false),
-      'userOwnerSample': userEmotes
-          .take(20)
-          .map((emote) => <String, dynamic>{
-                'name': emote.name,
-                'ownerId': emote.ownerId,
-                'ownerDisplayName': emote.ownerDisplayName,
                 'emoteType': emote.emoteType,
               })
           .toList(growable: false),
