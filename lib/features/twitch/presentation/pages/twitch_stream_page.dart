@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_stream_page_stage242_simple_stage119_like
+// PATCH VERSION: twitch_stream_page_stage242d_full_login_check
 
 import 'dart:async';
 
@@ -70,10 +70,11 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   TwitchHomeSection selectedSection = TwitchHomeSection.following;
 
   String searchText = '';
-  String loginStatus = '檢查中';
+  String loginStatus = '檢查登入狀態...';
   String viewerLabel = '未登入';
   int reloadTick = 0;
   bool loadingLoginState = true;
+  bool _loginStateLoadRunning = false;
 
   @override
   void initState() {
@@ -91,7 +92,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadStoredLoginState());
+      unawaited(_loadLoginState());
     });
   }
 
@@ -102,57 +103,61 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     super.dispose();
   }
 
-  Future<void> _loadStoredLoginState({bool refreshPages = false}) async {
-    if (!mounted) return;
+  Future<void> _loadLoginState({bool refreshPages = false}) async {
+    if (!mounted || _loginStateLoadRunning) return;
+
+    _loginStateLoadRunning = true;
 
     setState(() {
       loadingLoginState = true;
-      loginStatus = '檢查中';
+      loginStatus = '檢查登入狀態...';
     });
 
     try {
-      // Stage 242: keep home-page login state lightweight like Stage 119.
-      // Do not validate every token or repair every auth source here. The watch
-      // page / linked login page can handle detailed token repair when needed.
-      await authService.loadStoredSession();
+      await Future.wait<void>(<Future<void>>[
+        authService.loadStoredSession(),
+        dropsAuthService.loadStoredSession(),
+        webGqlAuthService.loadStoredSession(),
+      ]);
 
-      final user = authService.user;
-      final loggedIn = authService.isLoggedIn;
+      final token = await authService.getValidAccessToken();
+      var nextViewerLabel = '未登入';
+      var nextStatus = '未登入 Twitch';
+
+      if (token != null && token.trim().isNotEmpty) {
+        try {
+          final validation = await authApi.validateToken(token);
+          nextViewerLabel = validation.login.isEmpty ? '已登入' : '@${validation.login}';
+          final hasFollows = validation.scopes.contains('user:read:follows');
+          final hasChatRead = validation.scopes.contains('chat:read');
+          final hasChatEdit = validation.scopes.contains('chat:edit');
+          nextStatus = hasFollows && hasChatRead && hasChatEdit
+              ? '完整登入'
+              : '已登入，但權限不完整';
+        } catch (_) {
+          nextViewerLabel = 'Token 已保存';
+          nextStatus = '登入狀態待驗證';
+        }
+      }
 
       if (!mounted) return;
       setState(() {
-        viewerLabel = loggedIn
-            ? _buildUserLabel(
-                login: user?.login ?? '',
-                displayName: user?.displayName ?? '',
-              )
-            : '未登入';
-        loginStatus = loggedIn ? '已登入' : '未登入';
+        viewerLabel = nextViewerLabel;
+        loginStatus = nextStatus;
         loadingLoginState = false;
         if (refreshPages) reloadTick++;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         viewerLabel = '未登入';
-        loginStatus = '讀取失敗';
+        loginStatus = '登入狀態讀取失敗：$error';
         loadingLoginState = false;
         if (refreshPages) reloadTick++;
       });
+    } finally {
+      _loginStateLoadRunning = false;
     }
-  }
-
-  String _buildUserLabel({
-    required String login,
-    required String displayName,
-  }) {
-    final cleanLogin = login.trim();
-    if (cleanLogin.isNotEmpty) return '@$cleanLogin';
-
-    final cleanDisplayName = displayName.trim();
-    if (cleanDisplayName.isNotEmpty) return cleanDisplayName;
-
-    return '已登入';
   }
 
   Future<void> runLinkedTwitchLoginFlow() async {
@@ -170,11 +175,11 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     );
 
     if (!mounted) return;
-    await _loadStoredLoginState(refreshPages: true);
+    await _loadLoginState(refreshPages: true);
   }
 
   Future<void> refreshCurrentPage() async {
-    await _loadStoredLoginState();
+    await _loadLoginState();
     if (!mounted) return;
     setState(() => reloadTick++);
   }
