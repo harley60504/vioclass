@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_official_emote_cache_service_stage242e_fast_lookup_stage119_user_emotes
+// PATCH VERSION: twitch_official_emote_cache_service_stage246_user_emote_owner_name_enrichment
 
 import 'dart:convert';
 
@@ -461,7 +461,11 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       );
 
       final global = _unique(results[0], unlocked: true);
-      final user = _unique(results[2], unlocked: true);
+      final user = await _enrichUserEmoteOwnerDisplayNames(
+        _unique(results[2], unlocked: true),
+        accessToken: accessToken,
+        clientId: clientId,
+      );
       final userKeys = user.map(_key).toSet();
       final globalKeys = global.map(_key).toSet();
 
@@ -489,7 +493,7 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
       _globalEmotes = _unique(global, unlocked: true);
       _channelEmotes = channel;
-      _userEmotes = _unique(user, unlocked: true);
+      _userEmotes = user;
       _lockedChannelEmotes = locked;
       _invalidateDerivedCaches();
       _refreshFavoriteEmoteSnapshotsFromLoadedEmotes();
@@ -530,6 +534,43 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
     } catch (_) {
       _userEmotesUnavailable = true;
       return const <TwitchOfficialEmote>[];
+    }
+  }
+
+  Future<List<TwitchOfficialEmote>> _enrichUserEmoteOwnerDisplayNames(
+    List<TwitchOfficialEmote> source, {
+    required String accessToken,
+    required String clientId,
+  }) async {
+    if (source.isEmpty) return source;
+
+    final ownerIds = source
+        .map((emote) => emote.ownerId.trim())
+        .where((ownerId) => ownerId.isNotEmpty)
+        .toSet();
+
+    if (ownerIds.isEmpty) return source;
+
+    try {
+      final displayNames = await api.fetchUserDisplayNamesByIds(
+        userIds: ownerIds,
+        accessToken: accessToken,
+        clientId: clientId,
+      );
+
+      if (displayNames.isEmpty) return source;
+
+      return source
+          .map((emote) {
+            if (emote.ownerDisplayName.trim().isNotEmpty) return emote;
+            final ownerName = displayNames[emote.ownerId.trim()]?.trim() ?? '';
+            if (ownerName.isEmpty) return emote;
+            return emote.copyWith(ownerDisplayName: ownerName);
+          })
+          .toList(growable: false);
+    } catch (error) {
+      debugPrint('Enrich user emote owner display names failed: $error');
+      return source;
     }
   }
 
@@ -738,6 +779,17 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
                 'id': emote.id,
                 'imageUrl': emote.imageUrl,
                 'locked': emote.locked,
+                'emoteType': emote.emoteType,
+              })
+          .toList(growable: false),
+      'userSample': userEmotes
+          .take(20)
+          .map((emote) => <String, dynamic>{
+                'name': emote.name,
+                'id': emote.id,
+                'ownerId': emote.ownerId,
+                'ownerDisplayName': emote.ownerDisplayName,
+                'emoteSetId': emote.emoteSetId,
                 'emoteType': emote.emoteType,
               })
           .toList(growable: false),
