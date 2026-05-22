@@ -472,6 +472,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                           context: context,
                           selectedMessage: message,
                           messages: currentRuntime?.messages ?? const [],
+                          thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                          fontScale: chatFontScale,
                         ),
                       ),
                     ),
