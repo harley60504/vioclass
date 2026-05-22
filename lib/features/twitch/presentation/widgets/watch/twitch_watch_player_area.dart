@@ -123,10 +123,15 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pip = TwitchAndroidPipController.instance;
+    final stableVideoStage = _WatchPlayerVideoStage(
+      controller: videoController,
+      usePlaceholder: _debugUseVideoPlaceholder,
+    );
 
     return AnimatedBuilder(
       animation: Listenable.merge(<Listenable>[playerRuntime, pip]),
-      builder: (context, _) {
+      child: stableVideoStage,
+      builder: (context, child) {
         final state = _WatchPlayerAreaState.fromWidget(
           widget: this,
           pip: pip,
@@ -134,45 +139,46 @@ class TwitchWatchPlayerArea extends StatelessWidget {
 
         return _WatchPlayerShell(
           inPipMode: state.inPipMode,
-          video: _WatchPlayerVideoStage(
-            controller: state.videoController,
-            usePlaceholder: _debugUseVideoPlaceholder,
-          ),
+          video: child ?? stableVideoStage,
           overlay: state.shouldShowControlsOverlay && !_debugHidePlayerOverlay
-              ? WatchControlsOverlay(
-                  loading: state.overlayLoading,
-                  error: error,
-                  runtimeError: playerRuntime.error,
-                  metadata: metadata,
-                  isFollowing: isFollowing,
-                  followBusy: state.effectiveFollowBusy,
-                  onBack: onBack,
-                  onToggleFollow: onToggleFollow,
-                  onSubscribe: onSubscribe,
-                  onReload: onReload,
-                  onStop: onStop,
-                  player: state.player!,
-                  playerRuntime: playerRuntime,
-                  muted: muted,
-                  volume: volume,
-                  fullscreen: state.effectiveFullscreen,
-                  chatVisible: state.effectiveChatVisible,
-                  showFullscreenButton: showFullscreenButton,
-                  onToggleMute: onToggleMute,
-                  onVolumeChanged: onVolumeChanged,
-                  qualityVariants: state.effectiveQualityVariants,
-                  currentVariant: state.effectiveCurrentVariant,
-                  onQualityChanged: state.effectiveOnQualityChanged,
-                  onToggleChat: onToggleChat,
-                  onToggleFullscreen: onToggleFullscreen,
+              ? RepaintBoundary(
+                  child: WatchControlsOverlay(
+                    loading: state.overlayLoading,
+                    error: error,
+                    runtimeError: playerRuntime.error,
+                    metadata: metadata,
+                    isFollowing: isFollowing,
+                    followBusy: state.effectiveFollowBusy,
+                    onBack: onBack,
+                    onToggleFollow: onToggleFollow,
+                    onSubscribe: onSubscribe,
+                    onReload: onReload,
+                    onStop: onStop,
+                    player: state.player!,
+                    playerRuntime: playerRuntime,
+                    muted: muted,
+                    volume: volume,
+                    fullscreen: state.effectiveFullscreen,
+                    chatVisible: state.effectiveChatVisible,
+                    showFullscreenButton: showFullscreenButton,
+                    onToggleMute: onToggleMute,
+                    onVolumeChanged: onVolumeChanged,
+                    qualityVariants: state.effectiveQualityVariants,
+                    currentVariant: state.effectiveCurrentVariant,
+                    onQualityChanged: state.effectiveOnQualityChanged,
+                    onToggleChat: onToggleChat,
+                    onToggleFullscreen: onToggleFullscreen,
+                  ),
                 )
               : null,
           waitingOverlay: state.shouldShowWaitingOverlay && !_debugHidePlayerOverlay
-              ? _WatchControlsNotReadyOverlay(
-                  metadata: metadata,
-                  loading: loading || playerRuntime.loading,
-                  onBack: onBack,
-                  onReload: onReload,
+              ? RepaintBoundary(
+                  child: _WatchControlsNotReadyOverlay(
+                    metadata: metadata,
+                    loading: loading || playerRuntime.loading,
+                    onBack: onBack,
+                    onReload: onReload,
+                  ),
                 )
               : null,
           debugLabel: _debugShowPlayerIsolationLabel
@@ -188,7 +194,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     if (_debugUseVideoPlaceholder) parts.add('video=placeholder');
     if (_debugHidePlayerOverlay) parts.add('overlay=hidden');
     if (parts.isEmpty) parts.add('normal');
-    return 'Stage243A ${parts.join(' / ')}';
+    return 'Stage243C ${parts.join(' / ')}';
   }
 }
 
@@ -270,9 +276,11 @@ class _WatchPlayerShell extends StatelessWidget {
     return ColoredBox(
       color: inPipMode ? Colors.black : Colors.transparent,
       child: Stack(
-        clipBehavior: Clip.hardEdge,
+        clipBehavior: Clip.none,
         children: [
-          Positioned.fill(child: video),
+          Positioned.fill(
+            child: RepaintBoundary(child: video),
+          ),
           if (overlay != null) Positioned.fill(child: overlay!),
           if (waitingOverlay != null) Positioned.fill(child: waitingOverlay!),
           if (debugLabel != null &&
