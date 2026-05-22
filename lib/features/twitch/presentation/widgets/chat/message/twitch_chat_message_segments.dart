@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_message_segments_stage242f_token_cache_low_layer_emotes
+// PATCH VERSION: twitch_chat_message_segments_stage249_inline_mentions
 
 import 'package:flutter/material.dart';
 
@@ -105,7 +105,11 @@ void _appendTextWithInlineEmotes({
   if (text.isEmpty) return;
 
   if (!resolver.hasAnyEmotes) {
-    spans.add(TextSpan(text: text, style: _normalTextStyle(metrics)));
+    _appendMentionAwarePlainText(
+      spans: spans,
+      text: text,
+      metrics: metrics,
+    );
     return;
   }
 
@@ -113,18 +117,30 @@ void _appendTextWithInlineEmotes({
     if (token.text.isEmpty) continue;
 
     if (token.isWhitespace || !token.canLookup) {
-      spans.add(TextSpan(text: token.text, style: _normalTextStyle(metrics)));
+      _appendMentionAwarePlainText(
+        spans: spans,
+        text: token.text,
+        metrics: metrics,
+      );
       continue;
     }
 
     final resolved = resolver.lookup(token.lookupText);
     if (resolved == null) {
-      spans.add(TextSpan(text: token.text, style: _normalTextStyle(metrics)));
+      _appendMentionAwarePlainText(
+        spans: spans,
+        text: token.text,
+        metrics: metrics,
+      );
       continue;
     }
 
     if (token.leading.isNotEmpty) {
-      spans.add(TextSpan(text: token.leading, style: _normalTextStyle(metrics)));
+      _appendMentionAwarePlainText(
+        spans: spans,
+        text: token.leading,
+        metrics: metrics,
+      );
     }
 
     switch (resolved.kind) {
@@ -148,8 +164,44 @@ void _appendTextWithInlineEmotes({
     }
 
     if (token.trailing.isNotEmpty) {
-      spans.add(TextSpan(text: token.trailing, style: _normalTextStyle(metrics)));
+      _appendMentionAwarePlainText(
+        spans: spans,
+        text: token.trailing,
+        metrics: metrics,
+      );
     }
+  }
+}
+
+void _appendMentionAwarePlainText({
+  required List<InlineSpan> spans,
+  required String text,
+  required TwitchChatMessageVisualMetrics metrics,
+}) {
+  if (text.isEmpty) return;
+
+  var cursor = 0;
+  for (final match in _mentionRegex.allMatches(text)) {
+    if (match.start > cursor) {
+      spans.add(TextSpan(
+        text: text.substring(cursor, match.start),
+        style: _normalTextStyle(metrics),
+      ));
+    }
+
+    spans.add(TextSpan(
+      text: match.group(0) ?? '',
+      style: _mentionTextStyle(metrics),
+    ));
+
+    cursor = match.end;
+  }
+
+  if (cursor < text.length) {
+    spans.add(TextSpan(
+      text: text.substring(cursor),
+      style: _normalTextStyle(metrics),
+    ));
   }
 }
 
@@ -232,6 +284,7 @@ class _ChatTextToken {
 
 const int _tokenCacheLimit = 4096;
 final RegExp _chatTokenRegex = RegExp(r'(\s+|\S+)');
+final RegExp _mentionRegex = RegExp(r'@[A-Za-z0-9_]{3,25}');
 final Map<String, List<_ChatTextToken>> _tokenCache = <String, List<_ChatTextToken>>{};
 
 List<_ChatTextToken> _tokenizeChatText(String text) {
@@ -358,7 +411,11 @@ void _appendOfficialEmoteSpan({
   final imageUrl = _officialImageUrl(emote, animateEmotes: animateEmotes);
 
   if (imageUrl.isEmpty) {
-    spans.add(TextSpan(text: fallbackText, style: _normalTextStyle(metrics)));
+    _appendMentionAwarePlainText(
+      spans: spans,
+      text: fallbackText,
+      metrics: metrics,
+    );
     return;
   }
 
@@ -591,6 +648,15 @@ TextStyle _normalTextStyle(TwitchChatMessageVisualMetrics metrics) {
     color: Colors.white,
     fontSize: metrics.messageFontSize,
     height: metrics.lineHeight,
+  );
+}
+
+TextStyle _mentionTextStyle(TwitchChatMessageVisualMetrics metrics) {
+  return TextStyle(
+    color: const Color(0xFFD6CCEA),
+    fontSize: metrics.messageFontSize,
+    height: metrics.lineHeight,
+    fontWeight: FontWeight.w800,
   );
 }
 
