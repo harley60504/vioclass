@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../../models/special_actions/twitch_pending_special_message_stage250.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
@@ -31,6 +32,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final int emoteCount;
   final bool loadingEmotes;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
+  final TwitchPendingSpecialMessageStage250? pendingSpecialMessage;
   final List<dynamic> pinnedMessages;
   final TwitchPredictionSnapshot? prediction;
   final bool loadingEngagement;
@@ -43,6 +45,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final VoidCallback onRefreshEngagement;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
+  final VoidCallback? onCancelPendingSpecialMessage;
 
   const TwitchWatchChatPanel({
     super.key,
@@ -58,6 +61,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.emoteCount,
     required this.loadingEmotes,
     required this.channelPoints,
+    this.pendingSpecialMessage,
     required this.pinnedMessages,
     required this.prediction,
     required this.loadingEngagement,
@@ -70,6 +74,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.onRefreshEngagement,
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
+    this.onCancelPendingSpecialMessage,
   });
 
   @override
@@ -155,10 +160,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   TwitchPredictionSnapshot? _bestPredictionForPanel(
     TwitchPredictionSnapshot? fallback,
   ) {
-    // Do not seed a newly mounted panel from the global latest Hermes value when
-    // the WatchPage has no GQL/snapshot prediction yet. That value can belong to
-    // the previous watch session and makes the first real snapshot look like a
-    // new prediction, causing the card to pop on entry.
     if (fallback == null || !fallback.hasPrediction) return fallback;
 
     final realtime = TwitchPredictionHermesRealtimeBus.latestPrediction;
@@ -242,9 +243,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
         }
       }
 
-      // A later prediction replaces the previous one. Twitch only has one
-      // active prediction per channel, so the new id should override the old
-      // card and pop open.
       _setShowPrediction(true, persist: true, rebuild: false);
       _syncClosedPredictionAutoHide(prediction);
       return;
@@ -289,9 +287,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     showPinned = _showPinnedByChannel[key] ?? true;
 
-    // Each WatchPanel session must build its own prediction baseline. Do not
-    // reuse the previous session's stored id here; otherwise the first late
-    // GQL/Hermes snapshot can be compared against an old id and pop open.
     if (predictionId.isNotEmpty) {
       lastPredictionId = predictionId;
       _lastPredictionIdByChannel[key] = predictionId;
@@ -506,6 +501,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
               ),
               TwitchWatchChatInputSection(
                 channelPoints: widget.channelPoints,
+                pendingSpecialMessage: widget.pendingSpecialMessage,
                 messageController: widget.messageController,
                 loadingEmotes: widget.loadingEmotes,
                 compact: metrics.compactUtilityBar,
@@ -513,6 +509,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 sending: widget.sending,
                 onOpenChannelPoints: widget.onOpenChannelPoints,
                 onOpenEmotes: widget.onOpenEmotes,
+                onCancelPendingSpecialMessage: widget.onCancelPendingSpecialMessage,
                 onSend: widget.onSend,
               ),
             ],
