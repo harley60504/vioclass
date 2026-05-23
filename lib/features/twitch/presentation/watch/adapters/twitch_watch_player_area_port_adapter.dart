@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_port_adapters_stage250a_pending_action
+// PATCH VERSION: twitch_watch_port_adapters_stage250a_pending_action_entry
 
 import 'dart:async';
 
@@ -135,6 +135,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final VoidCallback onRefreshEngagement;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
+  final VoidCallback? onOpenSpecialActions;
   final VoidCallback? onCancelPendingSpecialMessage;
 
   const TwitchWatchChatPanelPortAdapter({
@@ -158,6 +159,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.onRefreshEngagement,
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
+    this.onOpenSpecialActions,
     this.onCancelPendingSpecialMessage,
   });
 
@@ -192,6 +194,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onRefreshEngagement: onRefreshEngagement,
       onOpenChannelPoints: onOpenChannelPoints,
       onOpenPrediction: onOpenPrediction,
+      onOpenSpecialActions: onOpenSpecialActions,
       onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
     );
   }
