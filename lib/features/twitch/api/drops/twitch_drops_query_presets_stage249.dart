@@ -41,6 +41,30 @@ class TwitchDropsQueryPresetsStage249 {
     );
   }
 
+  static String collectRewardJson({
+    required String dropInstanceId,
+    bool pretty = false,
+  }) {
+    return _encode(
+      <String, dynamic>{
+        'operationName': 'DropsPage_ClaimDropRewards',
+        'variables': <String, dynamic>{
+          'input': <String, dynamic>{
+            'dropInstanceID': dropInstanceId.trim(),
+          },
+        },
+        'extensions': const <String, dynamic>{
+          'persistedQuery': <String, dynamic>{
+            'version': 1,
+            'sha256Hash':
+                'a455deea71bdc9015b78eb49f4acfbce8baa7ccbedd28e549bb025bd0f751930',
+          },
+        },
+      },
+      pretty: pretty,
+    );
+  }
+
   static String _encode(
     Object value, {
     required bool pretty,
