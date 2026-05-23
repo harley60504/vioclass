@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_port_adapters_stage220i_nullable_player_handles
+// PATCH VERSION: twitch_watch_port_adapters_stage250a_pending_action
 
 import 'dart:async';
 
@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../models/special_actions/twitch_pending_special_message_stage250.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../widgets/watch/twitch_watch_chat_panel.dart';
@@ -120,6 +121,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final String? viewerId;
   final TwitchStreamHeaderMetadata metadata;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
+  final TwitchPendingSpecialMessageStage250? pendingSpecialMessage;
   final List<dynamic> pinnedMessages;
   final TwitchPredictionSnapshot? prediction;
   final bool loadingEmotes;
@@ -133,6 +135,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final VoidCallback onRefreshEngagement;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
+  final VoidCallback? onCancelPendingSpecialMessage;
 
   const TwitchWatchChatPanelPortAdapter({
     super.key,
@@ -141,6 +144,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.viewerId,
     required this.metadata,
     required this.channelPoints,
+    this.pendingSpecialMessage,
     required this.pinnedMessages,
     required this.prediction,
     required this.loadingEmotes,
@@ -154,6 +158,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.onRefreshEngagement,
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
+    this.onCancelPendingSpecialMessage,
   });
 
   @override
@@ -174,6 +179,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
           emotes.thirdParty.loading ||
           emotes.official.loading,
       channelPoints: channelPoints,
+      pendingSpecialMessage: pendingSpecialMessage,
       pinnedMessages: pinnedMessages,
       prediction: prediction,
       loadingEngagement: loadingEngagement,
@@ -186,6 +192,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onRefreshEngagement: onRefreshEngagement,
       onOpenChannelPoints: onOpenChannelPoints,
       onOpenPrediction: onOpenPrediction,
+      onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
     );
   }
 }
