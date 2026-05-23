@@ -18,6 +18,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../services/notifications/twitch_app_notification_service_stage249.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
