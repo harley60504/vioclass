@@ -164,6 +164,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final emotes = TwitchWatchPortScope.emotesOf(context);
+    final openAction = onOpenSpecialActions;
     return TwitchWatchChatPanel(
       runtime: runtime,
       viewerLogin: viewerLogin,
@@ -192,6 +193,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onRefreshEngagement: onRefreshEngagement,
       onOpenChannelPoints: onOpenChannelPoints,
       onOpenPrediction: onOpenPrediction,
+      onOpenSpecialActions: openAction,
       onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
     );
   }
