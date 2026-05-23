@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_stream_page_stage249_internal_notification_test
+// PATCH VERSION: twitch_stream_page_stage249_drops_probe_entry
 
 import 'dart:async';
 
@@ -12,6 +12,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/notifications/twitch_app_notification_service_stage249.dart';
 import 'twitch_browse_page.dart';
+import 'twitch_drops_probe_page_stage249.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
 
@@ -212,6 +213,18 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       title: 'Stage 249 程式內部通知測試',
       message: '$tokenLabel。之後 Drops 可領取、進度完成、token 失效都會先走這個 App 內通知。',
       duration: const Duration(seconds: 6),
+    );
+  }
+
+  Future<void> openStage249DropsProbePage() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TwitchDropsProbePageStage249(
+          apiClient: apiClient,
+          dropsAuthService: dropsAuthService,
+          webGqlAuthService: webGqlAuthService,
+        ),
+      ),
     );
   }
 
@@ -520,6 +533,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           case 'refresh':
             await refreshCurrentPage();
             break;
+          case 'drops_probe':
+            await openStage249DropsProbePage();
+            break;
           case 'test_app_notification':
             showStage249InternalNotificationTest();
             break;
@@ -538,6 +554,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           child: Text('重新檢查登入狀態'),
         ),
         PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'drops_probe',
+          child: Text('Stage 249 Drops Probe'),
+        ),
         PopupMenuItem<String>(
           value: 'test_app_notification',
           child: Text('測試程式內部通知'),
