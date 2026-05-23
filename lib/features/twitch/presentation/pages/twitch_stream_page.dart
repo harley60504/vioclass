@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_stream_page_stage242d_full_login_check
+// PATCH VERSION: twitch_stream_page_stage249_internal_notification_test
 
 import 'dart:async';
 
@@ -10,6 +10,7 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../../services/notifications/twitch_app_notification_service_stage249.dart';
 import 'twitch_browse_page.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
@@ -201,6 +202,17 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       loginStatus = '已登出';
       reloadTick++;
     });
+  }
+
+  void showStage249InternalNotificationTest() {
+    final hasDropsToken = dropsAuthService.accessToken?.trim().isNotEmpty ?? false;
+    final tokenLabel = hasDropsToken ? 'Drops token 已存在' : '尚未登入 Drops token';
+
+    twitchAppNotificationCenter.showSuccess(
+      title: 'Stage 249 程式內部通知測試',
+      message: '$tokenLabel。之後 Drops 可領取、進度完成、token 失效都會先走這個 App 內通知。',
+      duration: const Duration(seconds: 6),
+    );
   }
 
   void selectSection(TwitchHomeSection section) {
@@ -508,6 +520,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           case 'refresh':
             await refreshCurrentPage();
             break;
+          case 'test_app_notification':
+            showStage249InternalNotificationTest();
+            break;
           case 'logout':
             await logout();
             break;
@@ -521,6 +536,11 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
         PopupMenuItem<String>(
           value: 'refresh',
           child: Text('重新檢查登入狀態'),
+        ),
+        PopupMenuDivider(),
+        PopupMenuItem<String>(
+          value: 'test_app_notification',
+          child: Text('測試程式內部通知'),
         ),
         PopupMenuDivider(),
         PopupMenuItem<String>(
