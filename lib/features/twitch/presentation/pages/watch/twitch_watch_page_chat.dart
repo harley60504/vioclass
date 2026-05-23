@@ -71,6 +71,12 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     final message = _messageController.text.trim();
     if (message.isEmpty) return;
 
+    final pending = _pendingSpecialMessage;
+    if (pending != null) {
+      await _sendPendingSpecialMessagePreview(pending, message);
+      return;
+    }
+
     setState(() => _sending = true);
     try {
       await runtime.sendMessage(message);
@@ -80,6 +86,43 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _sendPendingSpecialMessagePreview(
+    TwitchPendingSpecialMessageStage250 pending,
+    String message,
+  ) async {
+    setState(() => _sending = true);
+    try {
+      // Stage 250A only verifies the unified composer flow. Do not call Twitch
+      // special-message APIs yet; later stages will dispatch by pending.kind.
+      _showSnack('特殊訊息預覽：${pending.describeForLog(message: message)}');
+      _messageController.clear();
+      _clearPendingSpecialMessage();
+    } catch (error) {
+      _showSnack('特殊訊息處理失敗：$error');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  void _setPreviewPendingSpecialMessage() {
+    setState(() {
+      _pendingSpecialMessage = TwitchPendingSpecialMessageStage250(
+        kind: TwitchPendingSpecialMessageKind.preview,
+        channelLogin: _channelLogin,
+        channelId: _channelId,
+        title: '特殊訊息流程測試',
+        subtitle: '這只會測試輸入欄上方提示與送出流程，不會真的發 Twitch 特殊訊息。',
+        costLabel: '測試',
+        previewOnly: true,
+      );
+    });
+  }
+
+  void _clearPendingSpecialMessage() {
+    if (_pendingSpecialMessage == null) return;
+    setState(() => _pendingSpecialMessage = null);
   }
 
   void _toggleChatVisibility() {
