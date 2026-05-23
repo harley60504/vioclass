@@ -86,7 +86,7 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     final claimId = channelPoints.availableClaimId?.trim();
     if (claimId == null || claimId.isEmpty) return;
 
-    final memoryKey = '$channelLogin:$claimId';
+    final memoryKey = '$_channelLogin:$claimId';
     if (_stage249LastNotifiedChannelPointClaimByState[hashCode] == memoryKey) {
       return;
     }
