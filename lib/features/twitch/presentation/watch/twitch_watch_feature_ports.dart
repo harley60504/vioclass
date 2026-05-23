@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage245b_lazy_emote_image_preload
+// PATCH VERSION: twitch_watch_feature_ports_stage250a_special_actions
 //
 // Feature-facing ports for Watch composition.
 //
@@ -294,6 +294,62 @@ class TwitchWatchEngagementPort {
       channelId: channelId,
       reward: reward,
       textInput: textInput,
+    );
+    return TwitchWatchRewardRedeemResult(title: title);
+  }
+
+  Future<TwitchWatchRewardRedeemResult> sendHighlightedMessage({
+    required String channelId,
+    required Map<String, dynamic> reward,
+    required String message,
+  }) async {
+    final title = reward['title']?.toString() ?? 'Highlighted Message';
+    await services.channelPointsRuntimeService.sendHighlightedMessage(
+      channelId: channelId,
+      reward: reward,
+      message: message,
+    );
+    return TwitchWatchRewardRedeemResult(title: title);
+  }
+
+  Future<TwitchWatchRewardRedeemResult> unlockRandomSubscriberEmote({
+    required String channelId,
+    required Map<String, dynamic> reward,
+  }) async {
+    final title = reward['title']?.toString() ?? 'Random Emote Unlock';
+    await services.channelPointsRuntimeService.unlockRandomSubscriberEmote(
+      channelId: channelId,
+      reward: reward,
+    );
+    return TwitchWatchRewardRedeemResult(title: title);
+  }
+
+  Future<TwitchWatchRewardRedeemResult> unlockChosenSubscriberEmote({
+    required String channelId,
+    required Map<String, dynamic> reward,
+    required String emoteId,
+  }) async {
+    final title = reward['title']?.toString() ?? 'Chosen Emote Unlock';
+    await services.channelPointsRuntimeService.unlockChosenSubscriberEmote(
+      channelId: channelId,
+      reward: reward,
+      emoteId: emoteId,
+    );
+    return TwitchWatchRewardRedeemResult(title: title);
+  }
+
+  Future<TwitchWatchRewardRedeemResult> unlockModifiedSubscriberEmote({
+    required String channelId,
+    required Map<String, dynamic> reward,
+    required String modifiedEmoteId,
+    String? modifierId,
+  }) async {
+    final title = reward['title']?.toString() ?? 'Modified Emote Unlock';
+    await services.channelPointsRuntimeService.unlockModifiedSubscriberEmote(
+      channelId: channelId,
+      reward: reward,
+      modifiedEmoteId: modifiedEmoteId,
+      modifierId: modifierId,
     );
     return TwitchWatchRewardRedeemResult(title: title);
   }
