@@ -70,6 +70,7 @@ class TwitchDropsProbeApiServiceStage249 {
     required TwitchDropsProbeTokenSlotStage249 tokenSlot,
     required String accessToken,
     required String clientId,
+    Map<String, String> extraHeaders = const <String, String>{},
   }) async {
     final body = <String, dynamic>{
       'operationName': 'Stage249DropsProbeCurrentUser',
@@ -90,6 +91,7 @@ class TwitchDropsProbeApiServiceStage249 {
       accessToken: accessToken,
       clientId: clientId,
       rawJsonBody: jsonEncode(body),
+      extraHeaders: extraHeaders,
       fallbackOperationName: 'Stage249DropsProbeCurrentUser',
     );
   }
@@ -99,6 +101,7 @@ class TwitchDropsProbeApiServiceStage249 {
     required String accessToken,
     required String clientId,
     required String rawJsonBody,
+    Map<String, String> extraHeaders = const <String, String>{},
     String fallbackOperationName = 'Stage249RawGqlProbe',
   }) async {
     final trimmedToken = accessToken.trim();
@@ -126,6 +129,7 @@ class TwitchDropsProbeApiServiceStage249 {
       options: _gqlOptions(
         clientId: trimmedClientId,
         accessToken: trimmedToken,
+        extraHeaders: extraHeaders,
       ),
     );
 
@@ -188,16 +192,94 @@ class TwitchDropsProbeApiServiceStage249 {
   static Options _gqlOptions({
     required String clientId,
     required String accessToken,
+    Map<String, String> extraHeaders = const <String, String>{},
   }) {
     return Options(
       responseType: ResponseType.json,
       validateStatus: (status) => status != null && status < 500,
       headers: <String, String>{
         ...TwitchApiConstants.twitchWebHeaders,
+        ..._sanitizeBrowserExtraHeaders(extraHeaders),
         'Client-ID': clientId,
         'Content-Type': 'application/json',
         'Authorization': 'OAuth $accessToken',
       },
     );
   }
+
+  static Map<String, String> parseSafeBrowserExtraHeaders(String rawHeaders) {
+    final result = <String, String>{};
+    final trimmed = rawHeaders.trim();
+    if (trimmed.isEmpty) return result;
+
+    final jsonHeaders = _tryParseHeadersJson(trimmed);
+    if (jsonHeaders != null) {
+      return _sanitizeBrowserExtraHeaders(jsonHeaders);
+    }
+
+    for (final rawLine in trimmed.split(RegExp(r'\r?\n'))) {
+      final line = rawLine.trim();
+      if (line.isEmpty || line.startsWith('#')) continue;
+
+      final index = line.indexOf(':');
+      if (index <= 0) continue;
+
+      final key = line.substring(0, index).trim();
+      final value = line.substring(index + 1).trim();
+      if (key.isEmpty || value.isEmpty) continue;
+      result[key] = value;
+    }
+
+    return _sanitizeBrowserExtraHeaders(result);
+  }
+
+  static Map<String, String>? _tryParseHeadersJson(String text) {
+    if (!text.startsWith('{')) return null;
+
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is! Map) return null;
+      final result = <String, String>{};
+      for (final entry in decoded.entries) {
+        final key = entry.key.toString().trim();
+        final value = entry.value?.toString().trim() ?? '';
+        if (key.isNotEmpty && value.isNotEmpty) {
+          result[key] = value;
+        }
+      }
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Map<String, String> _sanitizeBrowserExtraHeaders(
+    Map<String, String> headers,
+  ) {
+    final safe = <String, String>{};
+
+    for (final entry in headers.entries) {
+      final key = entry.key.trim();
+      final lower = key.toLowerCase();
+      final value = entry.value.trim();
+
+      if (key.isEmpty || value.isEmpty) continue;
+      if (!_allowedExtraHeaderKeys.contains(lower)) continue;
+
+      safe[key] = value;
+    }
+
+    return safe;
+  }
+
+  static const Set<String> _allowedExtraHeaderKeys = <String>{
+    'client-integrity',
+    'client-session-id',
+    'client-version',
+    'x-device-id',
+    'accept-language',
+    'sec-ch-ua',
+    'sec-ch-ua-mobile',
+    'sec-ch-ua-platform',
+  };
 }
