@@ -67,6 +67,73 @@ class TwitchChannelPointsRuntimeService {
     required Map<String, dynamic> reward,
     String textInput = '',
   }) {
+    final parsedReward = _parseRedeemableReward(reward);
+
+    return channelPointsApi.redeemReward(
+      channelId: channelId,
+      reward: parsedReward,
+      textInput: textInput,
+    );
+  }
+
+  Future<TwitchChannelRewardRedeemResult> sendHighlightedMessage({
+    required String channelId,
+    required Map<String, dynamic> reward,
+    required String message,
+  }) {
+    final parsedReward = _parseRedeemableReward(reward);
+
+    return channelPointsApi.sendHighlightedMessage(
+      channelId: channelId,
+      reward: parsedReward,
+      message: message,
+    );
+  }
+
+  Future<TwitchChannelRewardRedeemResult> unlockRandomSubscriberEmote({
+    required String channelId,
+    required Map<String, dynamic> reward,
+  }) {
+    final parsedReward = _parseRedeemableReward(reward);
+
+    return channelPointsApi.unlockRandomSubscriberEmote(
+      channelId: channelId,
+      reward: parsedReward,
+    );
+  }
+
+  Future<TwitchChannelRewardRedeemResult> unlockChosenSubscriberEmote({
+    required String channelId,
+    required Map<String, dynamic> reward,
+    required String emoteId,
+  }) {
+    final parsedReward = _parseRedeemableReward(reward);
+
+    return channelPointsApi.unlockChosenSubscriberEmote(
+      channelId: channelId,
+      reward: parsedReward,
+      emoteId: emoteId,
+    );
+  }
+
+  Future<TwitchChannelRewardRedeemResult> unlockModifiedSubscriberEmote({
+    required String channelId,
+    required Map<String, dynamic> reward,
+    required String modifiedEmoteId,
+    String? modifierId,
+  }) {
+    final parsedReward = _parseRedeemableReward(reward);
+
+    return channelPointsApi.unlockModifiedSubscriberEmote(
+      channelId: channelId,
+      reward: parsedReward,
+      // StreamNook-style: modifiedEmoteId is already the final id, e.g. 1022569_BW.
+      emoteId: modifiedEmoteId,
+      emoteModifierId: modifierId,
+    );
+  }
+
+  TwitchChannelReward _parseRedeemableReward(Map<String, dynamic> reward) {
     final source = reward['source']?.toString() ?? '';
     final isPublicFallback = source == 'publicFallback' ||
         reward['publicFallback'] == true ||
@@ -78,15 +145,9 @@ class TwitchChannelPointsRuntimeService {
       );
     }
 
-    final parsedReward = TwitchChannelReward.fromJson(
+    return TwitchChannelReward.fromJson(
       reward,
       source: source.isEmpty ? 'runtime' : source,
-    );
-
-    return channelPointsApi.redeemReward(
-      channelId: channelId,
-      reward: parsedReward,
-      textInput: textInput,
     );
   }
 
