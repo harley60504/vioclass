@@ -1,5 +1,8 @@
 part of twitch_watch_page;
 
+final Map<int, String> _stage249LastNotifiedChannelPointClaimByState =
+    <int, String>{};
+
 extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
   Future<void> _runDeferredEngagementStartup(int generation, String channel) async {
     try {
@@ -65,9 +68,41 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
       _loadingEngagement = false;
     });
 
+    _notifyAvailableChannelPointBonus(snapshot.channelPoints);
+
     if (lastError != null && showSnackOnError) {
       _showSnack('互動資料更新失敗：$lastError');
     }
+  }
+
+  void _notifyAvailableChannelPointBonus(
+    TwitchChannelPointsRuntimeSnapshot? channelPoints,
+  ) {
+    if (channelPoints == null || !channelPoints.hasAvailableClaim) {
+      _stage249LastNotifiedChannelPointClaimByState.remove(hashCode);
+      return;
+    }
+
+    final claimId = channelPoints.availableClaimId?.trim();
+    if (claimId == null || claimId.isEmpty) return;
+
+    final memoryKey = '$channelLogin:$claimId';
+    if (_stage249LastNotifiedChannelPointClaimByState[hashCode] == memoryKey) {
+      return;
+    }
+
+    _stage249LastNotifiedChannelPointClaimByState[hashCode] = memoryKey;
+
+    final points = channelPoints.availableClaimPoints;
+    final pointsText = points > 0 ? '$points 點' : '忠誠點數';
+    final name = channelPoints.pointsName?.trim();
+    final pointName = name == null || name.isEmpty ? '忠誠點數' : name;
+
+    twitchAppNotificationCenter.showInfo(
+      title: '可以領取 $pointName',
+      message: '$_channelLogin 有可領取的 $pointsText。先只通知，不會自動領取。',
+      duration: const Duration(seconds: 7),
+    );
   }
 
   Future<void> _openEmotePicker() {
