@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
+import 'features/twitch/presentation/widgets/notifications/twitch_app_notification_overlay_stage249.dart';
 
 class VioClassApp extends StatelessWidget {
   const VioClassApp({super.key});
@@ -18,6 +19,11 @@ class VioClassApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF0E0E10),
         useMaterial3: true,
       ),
+      builder: (context, child) {
+        return TwitchAppNotificationOverlayStage249(
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: const _StartupSafeHome(),
     );
   }
