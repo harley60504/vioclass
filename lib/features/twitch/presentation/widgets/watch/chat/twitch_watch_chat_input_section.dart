@@ -1,17 +1,16 @@
-// PATCH VERSION: twitch_watch_chat_input_section_stage209_single_translucent_layer
-//
-// Stage 209: remove the extra translucent shell layer around utility/input.
-// The whole chat panel is already translucent, so inner sections should not
-// stack another panel background.
+// PATCH VERSION: twitch_watch_chat_input_section_stage250a_pending_action
 
 import 'package:flutter/material.dart';
 
+import '../../../../models/special_actions/twitch_pending_special_message_stage250.dart';
 import '../../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../chat/twitch_chat_input_bar.dart';
+import 'twitch_pending_chat_action_banner_stage250.dart';
 import 'twitch_watch_chat_utility_bar.dart';
 
 class TwitchWatchChatInputSection extends StatelessWidget {
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
+  final TwitchPendingSpecialMessageStage250? pendingSpecialMessage;
   final TextEditingController messageController;
   final bool loadingEmotes;
   final bool compact;
@@ -19,11 +18,13 @@ class TwitchWatchChatInputSection extends StatelessWidget {
   final bool sending;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
+  final VoidCallback? onCancelPendingSpecialMessage;
   final VoidCallback onSend;
 
   const TwitchWatchChatInputSection({
     super.key,
     required this.channelPoints,
+    this.pendingSpecialMessage,
     required this.messageController,
     required this.loadingEmotes,
     required this.compact,
@@ -31,11 +32,14 @@ class TwitchWatchChatInputSection extends StatelessWidget {
     required this.sending,
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
+    this.onCancelPendingSpecialMessage,
     required this.onSend,
   });
 
   @override
   Widget build(BuildContext context) {
+    final pending = pendingSpecialMessage;
+
     return SafeArea(
       left: false,
       right: false,
@@ -56,6 +60,12 @@ class TwitchWatchChatInputSection extends StatelessWidget {
             onOpenChannelPoints: onOpenChannelPoints,
             onOpenEmotes: onOpenEmotes,
           ),
+          if (pending != null)
+            TwitchPendingChatActionBannerStage250(
+              pending: pending,
+              compact: compact,
+              onCancel: onCancelPendingSpecialMessage ?? () {},
+            ),
           TwitchChatInputBar(
             controller: messageController,
             enabled: enabled,
