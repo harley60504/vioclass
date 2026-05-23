@@ -56,7 +56,7 @@ class TwitchStreamHomeAccountMenuStage249 extends StatelessWidget {
         PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'streamnook_drops_connector',
-          child: Text('StreamNook Drops 連線測試'),
+          child: Text('Drops 頁面 / 可領取'),
         ),
         PopupMenuItem<String>(
           value: 'test_app_notification',
