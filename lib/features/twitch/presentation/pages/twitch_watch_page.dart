@@ -12,6 +12,7 @@ import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/engagement/twitch_prediction.dart';
+import '../../models/special_actions/twitch_pending_special_message_stage250.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -190,6 +191,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   String? _relationshipError;
 
   TwitchChannelPointsRuntimeSnapshot? _channelPointsSnapshot;
+  TwitchPendingSpecialMessageStage250? _pendingSpecialMessage;
   TwitchPredictionSnapshot? _prediction;
   List<dynamic> _pinnedMessages = const <dynamic>[];
 
@@ -334,6 +336,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       viewerId: _viewerId,
       metadata: metadata,
       channelPoints: _channelPointsSnapshot,
+      pendingSpecialMessage: _pendingSpecialMessage,
       pinnedMessages: _pinnedMessages,
       prediction: _prediction,
       loadingEmotes: _loadingEmotes || _emoteBootstrapping,
@@ -347,6 +350,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       onRefreshEngagement: () => _refreshEngagement(showSnackOnError: true),
       onOpenChannelPoints: _openChannelPointsSheet,
       onOpenPrediction: _openPredictionBetSheet,
+      onOpenSpecialActions: _setPreviewPendingSpecialMessage,
+      onCancelPendingSpecialMessage: _clearPendingSpecialMessage,
     );
 
     final scaffold = Scaffold(
