@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_watch_port_adapters_stage250a_pending_action_entry
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -194,7 +192,6 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onRefreshEngagement: onRefreshEngagement,
       onOpenChannelPoints: onOpenChannelPoints,
       onOpenPrediction: onOpenPrediction,
-      onOpenSpecialActions: onOpenSpecialActions,
       onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
     );
   }
