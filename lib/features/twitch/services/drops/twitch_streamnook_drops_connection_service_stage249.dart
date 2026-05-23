@@ -7,6 +7,7 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../api/drops/twitch_drops_query_presets_stage249.dart';
 import '../auth/twitch_drops_auth_service.dart';
 import 'twitch_streamnook_drops_connection_check_stage249.dart';
+import 'twitch_streamnook_drops_snapshot_stage249.dart';
 
 class TwitchStreamNookDropsConnectionServiceStage249 {
   final TwitchApiClient apiClient;
@@ -68,18 +69,28 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
         bodyJson: TwitchDropsQueryPresetsStage249.campaignsJson(),
       );
 
+      final inventoryHasErrors = _hasGqlErrors(inventory.data);
+      final campaignsHasErrors = _hasGqlErrors(campaigns.data);
+      final snapshot = !inventoryHasErrors && !campaignsHasErrors
+          ? TwitchStreamNookDropsSnapshotStage249.fromResponses(
+              inventoryResponse: inventory.data,
+              campaignsResponse: campaigns.data,
+            )
+          : null;
+
       return _result(
         hasToken: true,
         tokenValid: true,
         clientId: clientId,
         inventoryStatusCode: inventory.statusCode,
-        inventoryHasErrors: _hasGqlErrors(inventory.data),
+        inventoryHasErrors: inventoryHasErrors,
         inventoryRootSummary: _rootSummary(inventory.data),
         inventoryPreview: _preview(inventory.data),
         campaignsStatusCode: campaigns.statusCode,
-        campaignsHasErrors: _hasGqlErrors(campaigns.data),
+        campaignsHasErrors: campaignsHasErrors,
         campaignsRootSummary: _rootSummary(campaigns.data),
         campaignsPreview: _preview(campaigns.data),
+        snapshot: snapshot,
       );
     } catch (error) {
       return _result(
@@ -103,6 +114,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
     bool campaignsHasErrors = false,
     String campaignsRootSummary = '-',
     String campaignsPreview = '',
+    TwitchStreamNookDropsSnapshotStage249? snapshot,
     String? errorText,
   }) {
     return TwitchStreamNookDropsConnectionCheckStage249(
@@ -117,6 +129,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
       campaignsHasErrors: campaignsHasErrors,
       campaignsRootSummary: campaignsRootSummary,
       campaignsPreview: campaignsPreview,
+      snapshot: snapshot,
       errorText: errorText,
       checkedAt: DateTime.now(),
     );
