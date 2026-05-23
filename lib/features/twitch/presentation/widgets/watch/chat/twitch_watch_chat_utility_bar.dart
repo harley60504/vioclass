@@ -1,9 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_utility_bar_stage215_more_transparent_chips
-//
-// Stage 209: remove the extra section background. Only the actual chips/buttons
-// keep translucent styling.
-// Stage 215: make channel-points and emote chips lighter / more transparent so
-// they blend with the translucent chat panel instead of looking like solid pills.
+// PATCH VERSION: twitch_watch_chat_utility_bar_stage250a_pending_action_entry
 
 import 'package:flutter/material.dart';
 
@@ -22,6 +17,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
   final bool compact;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
+  final VoidCallback? onOpenSpecialActions;
 
   const TwitchWatchChatUtilityBar({
     super.key,
@@ -30,6 +26,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
     required this.compact,
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
+    this.onOpenSpecialActions,
   });
 
   @override
@@ -50,6 +47,14 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
             onTap: onOpenChannelPoints,
           ),
           if (!compact) const Spacer() else const SizedBox(width: 6),
+          _UtilityButton(
+            tooltip: '特殊動作測試',
+            icon: Icons.auto_awesome_rounded,
+            active: onOpenSpecialActions != null,
+            compact: compact,
+            onTap: onOpenSpecialActions,
+          ),
+          const SizedBox(width: 6),
           _UtilityButton(
             tooltip: loadingEmotes ? '貼圖載入中' : '貼圖',
             icon: loadingEmotes ? Icons.sync_rounded : Icons.tag_faces_rounded,
