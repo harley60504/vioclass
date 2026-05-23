@@ -104,6 +104,20 @@ class _TwitchStreamNookDropsConnectionPageStage249State
           ),
           const SizedBox(height: 14),
           _ResultCard(current: current),
+          if (current != null) ...<Widget>[
+            const SizedBox(height: 14),
+            _PreviewCard(
+              title: 'Inventory response preview',
+              subtitle: current.inventoryRootSummary,
+              text: current.inventoryPreview,
+            ),
+            const SizedBox(height: 14),
+            _PreviewCard(
+              title: 'Campaigns response preview',
+              subtitle: current.campaignsRootSummary,
+              text: current.campaignsPreview,
+            ),
+          ],
         ],
       ),
     );
@@ -264,6 +278,62 @@ class _ResultCard extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white70,
               fontSize: 12,
+              height: 1.35,
+              fontFamily: 'monospace',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String text;
+
+  const _PreviewCard({
+    required this.title,
+    required this.subtitle,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kStage249Panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SelectableText(
+            text.isEmpty ? '沒有 response preview。' : text,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 11.5,
               height: 1.35,
               fontFamily: 'monospace',
             ),
