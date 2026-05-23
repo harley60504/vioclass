@@ -4,10 +4,17 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
   final bool hasToken;
   final bool tokenValid;
   final String clientId;
+
   final int? inventoryStatusCode;
   final bool inventoryHasErrors;
+  final String inventoryRootSummary;
+  final String inventoryPreview;
+
   final int? campaignsStatusCode;
   final bool campaignsHasErrors;
+  final String campaignsRootSummary;
+  final String campaignsPreview;
+
   final String? errorText;
   final DateTime checkedAt;
 
@@ -17,8 +24,12 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
     required this.clientId,
     required this.inventoryStatusCode,
     required this.inventoryHasErrors,
+    required this.inventoryRootSummary,
+    required this.inventoryPreview,
     required this.campaignsStatusCode,
     required this.campaignsHasErrors,
+    required this.campaignsRootSummary,
+    required this.campaignsPreview,
     required this.errorText,
     required this.checkedAt,
   });
@@ -48,13 +59,16 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
 
   String get summary {
     return <String>[
+      'connected=$connected',
       'hasToken=$hasToken',
       'tokenValid=$tokenValid',
       'clientId=$clientId',
       'inventoryStatusCode=${inventoryStatusCode ?? '-'}',
       'inventoryHasErrors=$inventoryHasErrors',
+      'inventoryRoot=$inventoryRootSummary',
       'campaignsStatusCode=${campaignsStatusCode ?? '-'}',
       'campaignsHasErrors=$campaignsHasErrors',
+      'campaignsRoot=$campaignsRootSummary',
       if (errorText != null && errorText!.trim().isNotEmpty) 'error=$errorText',
     ].join('\n');
   }
@@ -68,8 +82,10 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
       'clientId': clientId,
       'inventoryStatusCode': inventoryStatusCode,
       'inventoryHasErrors': inventoryHasErrors,
+      'inventoryRootSummary': inventoryRootSummary,
       'campaignsStatusCode': campaignsStatusCode,
       'campaignsHasErrors': campaignsHasErrors,
+      'campaignsRootSummary': campaignsRootSummary,
       'errorText': errorText,
       'checkedAt': checkedAt.toIso8601String(),
     });
