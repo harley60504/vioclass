@@ -73,7 +73,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
 
     final pending = _pendingSpecialMessage;
     if (pending != null) {
-      await _sendPendingSpecialMessagePreview(pending, message);
+      await _sendPendingSpecialMessage(pending, message);
       return;
     }
 
@@ -88,15 +88,25 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     }
   }
 
-  Future<void> _sendPendingSpecialMessagePreview(
+  Future<void> _sendPendingSpecialMessage(
     TwitchPendingSpecialMessageStage250 pending,
     String message,
   ) async {
     setState(() => _sending = true);
     try {
-      // Stage 250A only verifies the unified composer flow. Do not call Twitch
-      // special-message APIs yet; later stages will dispatch by pending.kind.
-      _showSnack('特殊訊息預覽：${pending.describeForLog(message: message)}');
+      switch (pending.kind) {
+        case TwitchPendingSpecialMessageKind.highlightedMessage:
+        case TwitchPendingSpecialMessageKind.channelPointRewardMessage:
+          await _sendPendingChannelPointTextReward(pending, message);
+          break;
+        case TwitchPendingSpecialMessageKind.preview:
+        case TwitchPendingSpecialMessageKind.watchStreak:
+        case TwitchPendingSpecialMessageKind.resub:
+        case TwitchPendingSpecialMessageKind.officialSpecialMessage:
+          _showSnack('特殊訊息預覽：${pending.describeForLog(message: message)}');
+          break;
+      }
+
       _messageController.clear();
       _clearPendingSpecialMessage();
     } catch (error) {
@@ -104,6 +114,32 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _sendPendingChannelPointTextReward(
+    TwitchPendingSpecialMessageStage250 pending,
+    String message,
+  ) async {
+    final reward = pending.payload['reward'];
+    if (reward is! Map<String, dynamic>) {
+      throw StateError('缺少忠誠點 reward payload。');
+    }
+
+    final resolvedChannelId = pending.channelId?.trim().isNotEmpty == true
+        ? pending.channelId!.trim()
+        : _channelPointsSnapshot?.channelId ?? _channelId;
+    if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
+      throw StateError('沒有 channelId，不能兌換忠誠點數獎勵。');
+    }
+
+    final result = await _watchPorts.engagement.redeemReward(
+      channelId: resolvedChannelId,
+      reward: reward,
+      textInput: message,
+    );
+
+    _showSnack('已兌換：${result.title}');
+    await _refreshEngagement(showSnackOnError: false);
   }
 
   void _setPreviewPendingSpecialMessage() {
@@ -118,6 +154,11 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
         previewOnly: true,
       );
     });
+  }
+
+  void _setPendingSpecialMessage(TwitchPendingSpecialMessageStage250 pending) {
+    if (!mounted) return;
+    setState(() => _pendingSpecialMessage = pending);
   }
 
   void _clearPendingSpecialMessage() {
