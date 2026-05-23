@@ -142,6 +142,17 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     await _refreshEngagement(showSnackOnError: false);
   }
 
+  Future<void> _openSpecialMessageDebugProbeSheet() async {
+    await showTwitchSpecialMessageDebugProbeSheetStage251(
+      context: context,
+      onRunProbe: () => _watchServices.specialMessagesStage251.debugProbe.run(
+        channelLogin: _channelLogin,
+        channelId: _channelId,
+        viewerId: _viewerId,
+      ),
+    );
+  }
+
   void _setPreviewPendingSpecialMessage() {
     setState(() {
       _pendingSpecialMessage = TwitchPendingSpecialMessageStage250(
