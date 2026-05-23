@@ -34,10 +34,15 @@ class TwitchDropsProbePageStage249 extends StatefulWidget {
 class _TwitchDropsProbePageStage249State
     extends State<TwitchDropsProbePageStage249> {
   late final TwitchDropsProbeApiServiceStage249 probeApi;
+  late final TextEditingController rawGqlController;
 
   bool loadingState = true;
   bool probingWebGql = false;
   bool probingDrops = false;
+  bool runningRawGql = false;
+
+  TwitchDropsProbeTokenSlotStage249 rawTokenSlot =
+      TwitchDropsProbeTokenSlotStage249.webGql;
 
   String statusText = '正在讀取 Stage 249 Drops probe 狀態...';
   String? errorText;
@@ -50,10 +55,17 @@ class _TwitchDropsProbePageStage249State
   void initState() {
     super.initState();
     probeApi = TwitchDropsProbeApiServiceStage249(client: widget.apiClient);
+    rawGqlController = TextEditingController(text: _defaultRawGqlBody);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(loadTokenState());
     });
+  }
+
+  @override
+  void dispose() {
+    rawGqlController.dispose();
+    super.dispose();
   }
 
   Future<void> loadTokenState() async {
@@ -79,7 +91,7 @@ class _TwitchDropsProbePageStage249State
         webToken = nextWebToken;
         dropsToken = nextDropsToken;
         loadingState = false;
-        statusText = 'Token 狀態已讀取。先用 currentUser GQL 驗證哪個 token 可用。';
+        statusText = 'Token 狀態已讀取。兩個 token 都可先用 currentUser 或 raw GQL 測試。';
       });
     } catch (error) {
       if (!mounted) return;
@@ -98,13 +110,7 @@ class _TwitchDropsProbePageStage249State
         ? TwitchApiConstants.twitchWebClientId
         : widget.dropsAuthService.dropsClientId;
 
-    if (token == null || token.trim().isEmpty) {
-      twitchAppNotificationCenter.showWarning(
-        title: isWeb ? '缺少 Web/GQL token' : '缺少 Drops/Android token',
-        message: isWeb
-            ? '請先完成完整登入，或重新取得官方 Web/GQL token。'
-            : '請先完成 Drops / Android device flow 登入。',
-      );
+    if (!_hasTokenOrNotify(isWeb: isWeb, token: token)) {
       return;
     }
 
@@ -124,43 +130,18 @@ class _TwitchDropsProbePageStage249State
     try {
       final result = await probeApi.probeCurrentUser(
         tokenSlot: tokenSlot,
-        accessToken: token,
+        accessToken: token!,
         clientId: clientId,
       );
 
-      if (!mounted) return;
-      setState(() {
-        lastResult = result;
-        statusText = result.hasGraphQLErrors
-            ? 'GQL 有回應，但包含 errors。請看 raw response。'
-            : 'GQL currentUser 測試成功。下一步才適合找 Drops inventory operation。';
-      });
-
-      if (result.hasGraphQLErrors) {
-        twitchAppNotificationCenter.showWarning(
-          title: 'Stage 249 GQL probe 有 errors',
-          message: isWeb
-              ? 'Web/GQL token 有回應但不是乾淨成功，請看 raw response。'
-              : 'Drops/Android token 有回應但不是乾淨成功，請看 raw response。',
-        );
-      } else {
-        twitchAppNotificationCenter.showSuccess(
-          title: 'Stage 249 GQL probe 成功',
-          message: isWeb
-              ? 'Web/GQL token 可打 Twitch GQL currentUser。'
-              : 'Drops/Android token 可打 Twitch GQL currentUser。',
-        );
-      }
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        errorText = 'GQL probe 失敗：$error';
-        statusText = 'GQL probe 失敗。';
-      });
-      twitchAppNotificationCenter.showError(
-        title: 'Stage 249 GQL probe 失敗',
-        message: '$error',
+      handleProbeResult(
+        result: result,
+        successMessage: isWeb
+            ? 'Web/GQL token 可打 Twitch GQL currentUser。'
+            : 'Drops/Android token 可打 Twitch GQL currentUser。',
       );
+    } catch (error) {
+      handleProbeError(error, label: 'Stage 249 GQL probe');
     } finally {
       if (!mounted) return;
       setState(() {
@@ -173,12 +154,130 @@ class _TwitchDropsProbePageStage249State
     }
   }
 
+  Future<void> runRawGql() async {
+    final isWeb = rawTokenSlot == TwitchDropsProbeTokenSlotStage249.webGql;
+    final token = isWeb ? webToken : dropsToken;
+    final clientId = isWeb
+        ? TwitchApiConstants.twitchWebClientId
+        : widget.dropsAuthService.dropsClientId;
+
+    if (!_hasTokenOrNotify(isWeb: isWeb, token: token)) {
+      return;
+    }
+
+    final rawBody = rawGqlController.text.trim();
+    if (rawBody.isEmpty) {
+      twitchAppNotificationCenter.showWarning(
+        title: 'Raw GQL body 是空的',
+        message: '請貼上 DevTools 抓到的 Twitch GQL request body。',
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      runningRawGql = true;
+      errorText = null;
+      statusText = isWeb
+          ? '正在用 Web/GQL token 送出 raw GQL body...'
+          : '正在用 Drops/Android token 送出 raw GQL body...';
+    });
+
+    try {
+      final result = await probeApi.runRawGql(
+        tokenSlot: rawTokenSlot,
+        accessToken: token!,
+        clientId: clientId,
+        rawJsonBody: rawBody,
+      );
+
+      handleProbeResult(
+        result: result,
+        successMessage: isWeb
+            ? 'Raw GQL 已用 Web/GQL token 送出。'
+            : 'Raw GQL 已用 Drops/Android token 送出。',
+      );
+    } catch (error) {
+      handleProbeError(error, label: 'Stage 249 raw GQL');
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        runningRawGql = false;
+      });
+    }
+  }
+
+  bool _hasTokenOrNotify({
+    required bool isWeb,
+    required String? token,
+  }) {
+    if (token != null && token.trim().isNotEmpty) {
+      return true;
+    }
+
+    twitchAppNotificationCenter.showWarning(
+      title: isWeb ? '缺少 Web/GQL token' : '缺少 Drops/Android token',
+      message: isWeb
+          ? '請先完成完整登入，或重新取得官方 Web/GQL token。'
+          : '請先完成 Drops / Android device flow 登入。',
+    );
+    return false;
+  }
+
+  void handleProbeResult({
+    required TwitchDropsProbeResultStage249 result,
+    required String successMessage,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      lastResult = result;
+      statusText = result.hasGraphQLErrors
+          ? 'GQL 有回應，但包含 errors。請看 raw response。'
+          : 'GQL request 成功。請看 raw response 判斷 Drops 欄位。';
+    });
+
+    if (result.hasGraphQLErrors) {
+      twitchAppNotificationCenter.showWarning(
+        title: 'Stage 249 GQL 有 errors',
+        message: 'Twitch 有回應，但 GraphQL response 內含 errors。請看 raw response。',
+      );
+    } else {
+      twitchAppNotificationCenter.showSuccess(
+        title: 'Stage 249 GQL 成功',
+        message: successMessage,
+      );
+    }
+  }
+
+  void handleProbeError(
+    Object error, {
+    required String label,
+  }) {
+    if (!mounted) return;
+    setState(() {
+      errorText = '$label 失敗：$error';
+      statusText = '$label 失敗。';
+    });
+    twitchAppNotificationCenter.showError(
+      title: '$label 失敗',
+      message: '$error',
+    );
+  }
+
   void sendClaimableMockNotification() {
     twitchAppNotificationCenter.showSuccess(
       title: 'Drops 可以領取（模擬）',
       message: '這是 Stage 249 內部通知模擬。真正 Drops inventory 接上後會用同一個通知中心。',
       duration: const Duration(seconds: 7),
     );
+  }
+
+  void resetRawGqlBody() {
+    rawGqlController.text = _defaultRawGqlBody;
+    rawGqlController.selection = TextSelection.collapsed(
+      offset: rawGqlController.text.length,
+    );
+    setState(() {});
   }
 
   @override
@@ -208,6 +307,8 @@ class _TwitchDropsProbePageStage249State
                 _buildTokenCard(),
                 const SizedBox(height: 14),
                 _buildProbeActions(),
+                const SizedBox(height: 14),
+                _buildRawGqlCard(),
                 const SizedBox(height: 14),
                 _buildRawResultCard(),
               ],
@@ -245,7 +346,7 @@ class _TwitchDropsProbePageStage249State
               ),
             ),
           ),
-          if (loadingState || probingWebGql || probingDrops)
+          if (loadingState || probingWebGql || probingDrops || runningRawGql)
             const SizedBox(
               width: 18,
               height: 18,
@@ -346,6 +447,109 @@ class _TwitchDropsProbePageStage249State
     );
   }
 
+  Widget _buildRawGqlCard() {
+    return _Stage249Card(
+      title: 'Raw GQL Body 測試',
+      icon: Icons.terminal_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Text(
+            '從瀏覽器 DevTools → Network → gql request 複製 request payload，貼到下面。先不要貼 Authorization / Cookie，只貼 JSON body。',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 12.5,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              ChoiceChip(
+                label: const Text('Web/GQL token'),
+                selected: rawTokenSlot == TwitchDropsProbeTokenSlotStage249.webGql,
+                onSelected: runningRawGql
+                    ? null
+                    : (_) {
+                        setState(() {
+                          rawTokenSlot = TwitchDropsProbeTokenSlotStage249.webGql;
+                        });
+                      },
+                selectedColor: _kStage249Purple.withOpacity(0.24),
+              ),
+              ChoiceChip(
+                label: const Text('Drops/Android token'),
+                selected: rawTokenSlot ==
+                    TwitchDropsProbeTokenSlotStage249.dropsAndroid,
+                onSelected: runningRawGql
+                    ? null
+                    : (_) {
+                        setState(() {
+                          rawTokenSlot =
+                              TwitchDropsProbeTokenSlotStage249.dropsAndroid;
+                        });
+                      },
+                selectedColor: _kStage249Purple.withOpacity(0.24),
+              ),
+              TextButton.icon(
+                onPressed: runningRawGql ? null : resetRawGqlBody,
+                icon: const Icon(Icons.restore_rounded, size: 17),
+                label: const Text('重設 currentUser 範例'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: rawGqlController,
+            minLines: 8,
+            maxLines: 18,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              height: 1.28,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFF0E0E10),
+              hintText: '{"operationName":"...","variables":{},"query":"..."}',
+              hintStyle: const TextStyle(color: Colors.white30),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF2D2D35)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF2D2D35)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _kStage249Purple),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: runningRawGql ? null : () => unawaited(runRawGql()),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _kStage249Purple,
+                foregroundColor: Colors.white,
+              ),
+              icon: const Icon(Icons.send_rounded),
+              label: const Text('送出 Raw GQL'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRawResultCard() {
     final result = lastResult;
     final title = result == null
@@ -357,7 +561,7 @@ class _TwitchDropsProbePageStage249State
       icon: Icons.data_object_rounded,
       child: result == null
           ? const Text(
-              '尚未執行 probe。先按上方 Web/GQL 或 Drops/Android 測試。',
+              '尚未執行 probe。先按上方 Web/GQL、Drops/Android，或貼 raw GQL body 測試。',
               style: TextStyle(
                 color: Colors.white54,
                 fontSize: 13,
@@ -506,3 +710,9 @@ class _TokenRow extends StatelessWidget {
     );
   }
 }
+
+const String _defaultRawGqlBody = '''{
+  "operationName": "Stage249DropsProbeCurrentUser",
+  "variables": {},
+  "query": "query Stage249DropsProbeCurrentUser { currentUser { id login displayName } }"
+}''';
