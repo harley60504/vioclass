@@ -73,6 +73,7 @@ class TwitchWatchSheetPortLauncher {
       loading: loadingEngagement() || engagementBootstrapping(),
       onRefresh: () => refreshEngagement(showSnackOnError: true),
       onClaim: claimCommunityPoints,
+      onPrepareTextReward: prepareChannelPointTextReward,
       onRedeemReward: redeemChannelPointReward,
       onLoadChannelPointEmotes: enableChannelPointEmoteMenu
           ? (_) => loadChannelPointModifiableEmotes()
