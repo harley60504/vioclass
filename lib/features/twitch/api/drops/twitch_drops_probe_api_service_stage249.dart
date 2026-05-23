@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
+
 import '../core/twitch_api_client.dart';
 import '../core/twitch_api_constants.dart';
 import '../core/twitch_api_exception.dart';
