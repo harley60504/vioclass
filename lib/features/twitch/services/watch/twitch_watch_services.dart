@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_services_stage186a_feature_groups
+// PATCH VERSION: twitch_watch_services_stage250d_streamnook_channel_points_auth
 //
 // Owns the Watch composition dependency graph. WatchPage should assemble UI and
 // route lifecycle; feature services are exposed as small groups so Player,
@@ -134,8 +134,18 @@ class TwitchWatchServices {
     final channelPointsApi = TwitchChannelPointsApiService(
       gql: publicWebGqlApi,
       client: apiClient,
-      tokenProvider: webGqlAuthService.getToken,
-      actionClientIdProvider: () => TwitchApiConstants.twitchWebClientId,
+      tokenProvider: () async {
+        final dropsToken = await dropsAuthService.getToken();
+        if (dropsToken != null && dropsToken.trim().isNotEmpty) {
+          return dropsToken.trim();
+        }
+        return webGqlAuthService.getToken();
+      },
+      actionClientIdProvider: () {
+        final dropsClientId = dropsAuthService.dropsClientId.trim();
+        if (dropsClientId.isNotEmpty) return dropsClientId;
+        return TwitchApiConstants.twitchDefaultDropsClientId;
+      },
     );
     final relationshipApi = TwitchPrivateGqlRelationshipApiServiceV1(
       client: apiClient,
