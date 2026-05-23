@@ -6,6 +6,7 @@ import '../../api/core/twitch_api_client.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/drops/twitch_streamnook_drops_connection_check_stage249.dart';
 import '../../services/drops/twitch_streamnook_drops_connection_service_stage249.dart';
+import '../../services/drops/twitch_streamnook_drops_snapshot_stage249.dart';
 import '../../services/notifications/twitch_app_notification_service_stage249.dart';
 
 const Color _kStage249Purple = Color(0xFF9146FF);
@@ -62,11 +63,22 @@ class _TwitchStreamNookDropsConnectionPageStage249State
       statusText = next.title;
     });
 
+    final snapshot = next.snapshot;
     if (next.connected) {
-      twitchAppNotificationCenter.showSuccess(
-        title: 'StreamNook Drops 連線成功',
-        message: 'Drops token、Inventory、Campaigns 都已連上。',
-      );
+      if (snapshot != null && snapshot.hasReadyDrops) {
+        twitchAppNotificationCenter.showWarning(
+          title: '有 Drops 可領取',
+          message: '目前有 ${snapshot.readyDropCount} 個 Drops 可領取。',
+          duration: const Duration(seconds: 8),
+        );
+      } else {
+        twitchAppNotificationCenter.showSuccess(
+          title: 'StreamNook Drops 連線成功',
+          message: snapshot == null
+              ? 'Drops token、Inventory、Campaigns 都已連上。'
+              : '已整理 ${snapshot.inventoryCampaignCount} 個進行中 campaign、${snapshot.totalDropCount} 個 drop。',
+        );
+      }
     } else {
       twitchAppNotificationCenter.showWarning(
         title: next.title,
@@ -80,6 +92,7 @@ class _TwitchStreamNookDropsConnectionPageStage249State
   Widget build(BuildContext context) {
     final current = result;
     final connected = current?.connected ?? false;
+    final snapshot = current?.snapshot;
 
     return Scaffold(
       backgroundColor: _kStage249Background,
@@ -102,6 +115,10 @@ class _TwitchStreamNookDropsConnectionPageStage249State
             checking: checking,
             onRunCheck: runCheck,
           ),
+          if (snapshot != null) ...<Widget>[
+            const SizedBox(height: 14),
+            _SnapshotCard(snapshot: snapshot),
+          ],
           const SizedBox(height: 14),
           _ResultCard(current: current),
           if (current != null) ...<Widget>[
@@ -240,6 +257,196 @@ class _ActionCard extends StatelessWidget {
             label: Text(checking ? '測試中' : '開始測試'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SnapshotCard extends StatelessWidget {
+  final TwitchStreamNookDropsSnapshotStage249 snapshot;
+
+  const _SnapshotCard({required this.snapshot});
+
+  @override
+  Widget build(BuildContext context) {
+    final campaigns = snapshot.inventoryCampaigns;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kStage249Panel,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: snapshot.hasReadyDrops
+              ? const Color(0xFFFFC857).withOpacity(0.35)
+              : Colors.white.withOpacity(0.08),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const Text(
+            'Parsed Drops Snapshot',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            snapshot.compactSummary,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (campaigns.isEmpty)
+            const Text(
+              '目前 Inventory 沒有進行中的 Drops campaign。',
+              style: TextStyle(color: Colors.white54),
+            )
+          else
+            for (final campaign in campaigns.take(8)) ...<Widget>[
+              _CampaignTile(campaign: campaign),
+              const SizedBox(height: 10),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CampaignTile extends StatelessWidget {
+  final TwitchStreamNookDropCampaignStage249 campaign;
+
+  const _CampaignTile({required this.campaign});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.045),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  campaign.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              _MiniBadge(
+                text: campaign.isAccountConnected ? '已連結' : '未連結',
+                color: campaign.isAccountConnected
+                    ? const Color(0xFF5CFFB1)
+                    : const Color(0xFFFFC857),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${campaign.gameName}｜${campaign.status}｜${campaign.timeBasedDrops.length} drops',
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final drop in campaign.timeBasedDrops.take(6)) ...<Widget>[
+            _DropRow(drop: drop),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DropRow extends StatelessWidget {
+  final TwitchStreamNookDropStage249 drop;
+
+  const _DropRow({required this.drop});
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = drop.readyToCollect
+        ? const Color(0xFFFFC857)
+        : drop.isClaimed
+            ? const Color(0xFF5CFFB1)
+            : _kStage249Purple;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                drop.displayRewardName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            _MiniBadge(text: drop.statusLabel, color: accent),
+          ],
+        ),
+        const SizedBox(height: 5),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 6,
+            value: drop.progressRatio,
+            color: accent,
+            backgroundColor: Colors.white.withOpacity(0.10),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  final String text;
+  final Color color;
+
+  const _MiniBadge({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.13),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.32)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
