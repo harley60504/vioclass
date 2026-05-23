@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../../models/special_actions/twitch_pending_special_message_stage250.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../sheets/twitch_channel_points_sheet.dart';
 import '../../sheets/twitch_emote_picker_sheet.dart';
 import '../../sheets/twitch_prediction_bet_sheet.dart';
+import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import '../twitch_watch_feature_ports.dart';
 
 class TwitchWatchSheetPortLauncher {
@@ -13,6 +15,8 @@ class TwitchWatchSheetPortLauncher {
   final TwitchWatchEngagementPort engagement;
   final void Function(String message) showMessage;
   final void Function(String text) insertMessageText;
+  final void Function(TwitchPendingSpecialMessageStage250 pending)?
+      setPendingSpecialMessage;
   final Future<void> Function({bool showSnackOnError}) refreshEngagement;
   final Future<void> Function({bool forceRefresh}) refreshEmotes;
   final String Function() channelLogin;
@@ -30,6 +34,7 @@ class TwitchWatchSheetPortLauncher {
     required this.engagement,
     required this.showMessage,
     required this.insertMessageText,
+    this.setPendingSpecialMessage,
     required this.refreshEngagement,
     required this.refreshEmotes,
     required this.channelLogin,
@@ -68,6 +73,7 @@ class TwitchWatchSheetPortLauncher {
       loading: loadingEngagement() || engagementBootstrapping(),
       onRefresh: () => refreshEngagement(showSnackOnError: true),
       onClaim: claimCommunityPoints,
+      onPrepareTextReward: prepareChannelPointTextReward,
       onRedeemReward: redeemChannelPointReward,
       onLoadChannelPointEmotes: enableChannelPointEmoteMenu
           ? (_) => loadChannelPointModifiableEmotes()
@@ -85,6 +91,36 @@ class TwitchWatchSheetPortLauncher {
       showMessage('載入忠誠點數 emote 失敗：$error');
       return const <TwitchChannelPointEmoteOption>[];
     }
+  }
+
+  Future<void> prepareChannelPointTextReward(Map<String, dynamic> reward) async {
+    final setPending = setPendingSpecialMessage;
+    if (setPending == null) {
+      showMessage('尚未接上聊天室輸入欄。');
+      return;
+    }
+
+    final cost = readChannelPointInt(reward['cost']);
+    final title = channelPointRewardTitle(reward);
+    final type = channelPointRewardTypeKey(reward);
+
+    setPending(
+      TwitchPendingSpecialMessageStage250(
+        kind: type == 'SEND_HIGHLIGHTED_MESSAGE'
+            ? TwitchPendingSpecialMessageKind.highlightedMessage
+            : TwitchPendingSpecialMessageKind.channelPointRewardMessage,
+        channelLogin: channelLogin(),
+        channelId: channelPointsSnapshot()?.channelId ?? channelId(),
+        title: title,
+        subtitle: '在下方輸入欄輸入內容，按 Send 後兌換。',
+        costLabel: cost > 0 ? '$cost 點' : null,
+        payload: <String, dynamic>{
+          'reward': reward,
+        },
+      ),
+    );
+
+    showMessage('已準備：$title');
   }
 
   Future<void> claimCommunityPoints(String claimId) async {
