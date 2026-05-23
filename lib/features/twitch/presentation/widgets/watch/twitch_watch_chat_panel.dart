@@ -45,6 +45,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final VoidCallback onRefreshEngagement;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
+  final VoidCallback? onOpenSpecialActions;
   final VoidCallback? onCancelPendingSpecialMessage;
 
   const TwitchWatchChatPanel({
@@ -74,6 +75,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.onRefreshEngagement,
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
+    this.onOpenSpecialActions,
     this.onCancelPendingSpecialMessage,
   });
 
@@ -509,6 +511,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 sending: widget.sending,
                 onOpenChannelPoints: widget.onOpenChannelPoints,
                 onOpenEmotes: widget.onOpenEmotes,
+                onOpenSpecialActions: widget.onOpenSpecialActions,
                 onCancelPendingSpecialMessage: widget.onCancelPendingSpecialMessage,
                 onSend: widget.onSend,
               ),
