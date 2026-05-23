@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
+import '../../api/drops/twitch_drops_gql_operations_stage249.dart';
 import '../../api/drops/twitch_drops_probe_api_service_stage249.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -94,7 +95,7 @@ class _TwitchDropsProbePageStage249State
         webToken = nextWebToken;
         dropsToken = nextDropsToken;
         loadingState = false;
-        statusText = 'Token 狀態已讀取。兩個 token 都可先用 currentUser 或 raw GQL 測試。';
+        statusText = 'Token 狀態已讀取。可直接測 TwitchDropsMiner 相容 Drops query operations。';
       });
     } catch (error) {
       if (!mounted) return;
@@ -174,7 +175,7 @@ class _TwitchDropsProbePageStage249State
     if (rawBody.isEmpty) {
       twitchAppNotificationCenter.showWarning(
         title: 'Raw GQL body 是空的',
-        message: '請貼上 DevTools 抓到的 Twitch GQL request body。',
+        message: '請貼上或選擇一個 Twitch GQL request body。',
       );
       return;
     }
@@ -280,16 +281,36 @@ class _TwitchDropsProbePageStage249State
   }
 
   void resetRawGqlBody() {
-    rawGqlController.text = _defaultRawGqlBody;
+    _setRawGqlBody(_defaultRawGqlBody);
+  }
+
+  void clearExtraHeaders() {
+    extraHeadersController.clear();
+    setState(() {});
+  }
+
+  void _setRawGqlBody(String value) {
+    rawGqlController.text = value;
     rawGqlController.selection = TextSelection.collapsed(
       offset: rawGqlController.text.length,
     );
     setState(() {});
   }
 
-  void clearExtraHeaders() {
-    extraHeadersController.clear();
-    setState(() {});
+  void setInventoryOperation() {
+    _setRawGqlBody(TwitchDropsGqlOperationsStage249.inventoryJson());
+  }
+
+  void setCampaignsOperation() {
+    _setRawGqlBody(TwitchDropsGqlOperationsStage249.campaignsJson());
+  }
+
+  void setAvailableDropsOperation() {
+    _setRawGqlBody(TwitchDropsGqlOperationsStage249.availableDropsJson());
+  }
+
+  void setCurrentDropOperation() {
+    _setRawGqlBody(TwitchDropsGqlOperationsStage249.currentDropJson());
   }
 
   @override
@@ -319,6 +340,8 @@ class _TwitchDropsProbePageStage249State
                 _buildTokenCard(),
                 const SizedBox(height: 14),
                 _buildProbeActions(),
+                const SizedBox(height: 14),
+                _buildDropsOperationPresetsCard(),
                 const SizedBox(height: 14),
                 _buildExtraHeadersCard(),
                 const SizedBox(height: 14),
@@ -461,6 +484,54 @@ class _TwitchDropsProbePageStage249State
     );
   }
 
+  Widget _buildDropsOperationPresetsCard() {
+    return _Stage249Card(
+      title: 'TwitchDropsMiner 相容 Drops query operations',
+      icon: Icons.inventory_2_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Text(
+            '先測 Inventory / Campaigns。AvailableDrops / CurrentDrop 需要把 <channel_id> 改成實況主 channel id。這裡先只放查詢，不放領取 mutation。',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 12.5,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: <Widget>[
+              OutlinedButton.icon(
+                onPressed: setInventoryOperation,
+                icon: const Icon(Icons.inventory_rounded, size: 17),
+                label: const Text('填入 Inventory'),
+              ),
+              OutlinedButton.icon(
+                onPressed: setCampaignsOperation,
+                icon: const Icon(Icons.dashboard_rounded, size: 17),
+                label: const Text('填入 Campaigns'),
+              ),
+              OutlinedButton.icon(
+                onPressed: setAvailableDropsOperation,
+                icon: const Icon(Icons.live_tv_rounded, size: 17),
+                label: const Text('填入 AvailableDrops'),
+              ),
+              OutlinedButton.icon(
+                onPressed: setCurrentDropOperation,
+                icon: const Icon(Icons.play_circle_rounded, size: 17),
+                label: const Text('填入 CurrentDrop'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildExtraHeadersCard() {
     return _Stage249Card(
       title: '安全額外 Headers',
@@ -529,7 +600,7 @@ class _TwitchDropsProbePageStage249State
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const Text(
-            '從瀏覽器 DevTools → Network → gql request 複製 Request Payload，貼到下面。headers 請貼到上一格，body 只貼 JSON。',
+            '可以用上方預設 operation，或從瀏覽器 DevTools → Network → gql request 複製 Request Payload。headers 請貼到上一格，body 只貼 JSON。',
             style: TextStyle(
               color: Colors.white60,
               fontSize: 12.5,
@@ -590,7 +661,7 @@ class _TwitchDropsProbePageStage249State
             decoration: InputDecoration(
               filled: true,
               fillColor: const Color(0xFF0E0E10),
-              hintText: '{"operationName":"...","variables":{},"query":"..."}',
+              hintText: '{"operationName":"...","variables":{},"extensions":{"persistedQuery":{...}}}',
               hintStyle: const TextStyle(color: Colors.white30),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
