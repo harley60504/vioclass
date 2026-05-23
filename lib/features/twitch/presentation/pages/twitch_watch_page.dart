@@ -24,6 +24,7 @@ import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
 import '../dialogs/twitch_subscribe_webview_dialog_v1.dart';
+import '../sheets/twitch_special_message_debug_probe_sheet_stage251.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
 import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
@@ -351,7 +352,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       onRefreshEngagement: () => _refreshEngagement(showSnackOnError: true),
       onOpenChannelPoints: _openChannelPointsSheet,
       onOpenPrediction: _openPredictionBetSheet,
-      onOpenSpecialActions: _setPreviewPendingSpecialMessage,
+      onOpenSpecialActions: _openSpecialMessageDebugProbeSheet,
       onCancelPendingSpecialMessage: _clearPendingSpecialMessage,
     );
 
