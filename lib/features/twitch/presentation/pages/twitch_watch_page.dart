@@ -200,6 +200,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
         engagement: _watchPorts.engagement,
         showMessage: _showSnack,
         insertMessageText: _insertMessageText,
+        setPendingSpecialMessage: _setPendingSpecialMessage,
         refreshEngagement: _refreshEngagement,
         refreshEmotes: _loadThirdPartyEmotes,
         channelLogin: () => _channelLogin,
