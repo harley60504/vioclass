@@ -35,6 +35,7 @@ class _TwitchDropsProbePageStage249State
     extends State<TwitchDropsProbePageStage249> {
   late final TwitchDropsProbeApiServiceStage249 probeApi;
   late final TextEditingController rawGqlController;
+  late final TextEditingController extraHeadersController;
 
   bool loadingState = true;
   bool probingWebGql = false;
@@ -56,6 +57,7 @@ class _TwitchDropsProbePageStage249State
     super.initState();
     probeApi = TwitchDropsProbeApiServiceStage249(client: widget.apiClient);
     rawGqlController = TextEditingController(text: _defaultRawGqlBody);
+    extraHeadersController = TextEditingController(text: _defaultExtraHeadersText);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(loadTokenState());
@@ -65,6 +67,7 @@ class _TwitchDropsProbePageStage249State
   @override
   void dispose() {
     rawGqlController.dispose();
+    extraHeadersController.dispose();
     super.dispose();
   }
 
@@ -132,6 +135,8 @@ class _TwitchDropsProbePageStage249State
         tokenSlot: tokenSlot,
         accessToken: token!,
         clientId: clientId,
+        extraHeaders: TwitchDropsProbeApiServiceStage249
+            .parseSafeBrowserExtraHeaders(extraHeadersController.text),
       );
 
       handleProbeResult(
@@ -189,6 +194,8 @@ class _TwitchDropsProbePageStage249State
         accessToken: token!,
         clientId: clientId,
         rawJsonBody: rawBody,
+        extraHeaders: TwitchDropsProbeApiServiceStage249
+            .parseSafeBrowserExtraHeaders(extraHeadersController.text),
       );
 
       handleProbeResult(
@@ -280,6 +287,11 @@ class _TwitchDropsProbePageStage249State
     setState(() {});
   }
 
+  void clearExtraHeaders() {
+    extraHeadersController.clear();
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -307,6 +319,8 @@ class _TwitchDropsProbePageStage249State
                 _buildTokenCard(),
                 const SizedBox(height: 14),
                 _buildProbeActions(),
+                const SizedBox(height: 14),
+                _buildExtraHeadersCard(),
                 const SizedBox(height: 14),
                 _buildRawGqlCard(),
                 const SizedBox(height: 14),
@@ -447,6 +461,66 @@ class _TwitchDropsProbePageStage249State
     );
   }
 
+  Widget _buildExtraHeadersCard() {
+    return _Stage249Card(
+      title: '安全額外 Headers',
+      icon: Icons.http_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const Text(
+            '只會帶入白名單欄位：client-integrity、client-session-id、client-version、x-device-id、accept-language、sec-ch-ua。Authorization、Cookie、Client-ID 會被忽略，改用 App 內 token。',
+            style: TextStyle(
+              color: Colors.white60,
+              fontSize: 12.5,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          TextField(
+            controller: extraHeadersController,
+            minLines: 5,
+            maxLines: 10,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'monospace',
+              fontSize: 12.5,
+              height: 1.28,
+            ),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: const Color(0xFF0E0E10),
+              hintText: 'client-integrity: ...\nclient-session-id: ...\nclient-version: ...\nx-device-id: ...',
+              hintStyle: const TextStyle(color: Colors.white30),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF2D2D35)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF2D2D35)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _kStage249Purple),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: clearExtraHeaders,
+              icon: const Icon(Icons.clear_rounded, size: 17),
+              label: const Text('清空 headers'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRawGqlCard() {
     return _Stage249Card(
       title: 'Raw GQL Body 測試',
@@ -455,7 +529,7 @@ class _TwitchDropsProbePageStage249State
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           const Text(
-            '從瀏覽器 DevTools → Network → gql request 複製 request payload，貼到下面。先不要貼 Authorization / Cookie，只貼 JSON body。',
+            '從瀏覽器 DevTools → Network → gql request 複製 Request Payload，貼到下面。headers 請貼到上一格，body 只貼 JSON。',
             style: TextStyle(
               color: Colors.white60,
               fontSize: 12.5,
@@ -716,3 +790,11 @@ const String _defaultRawGqlBody = '''{
   "variables": {},
   "query": "query Stage249DropsProbeCurrentUser { currentUser { id login displayName } }"
 }''';
+
+const String _defaultExtraHeadersText = '''# 可貼 DevTools request headers，敏感欄位會被忽略
+# client-integrity: ...
+# client-session-id: ...
+# client-version: ...
+# x-device-id: ...
+# accept-language: zh-TW
+''';
