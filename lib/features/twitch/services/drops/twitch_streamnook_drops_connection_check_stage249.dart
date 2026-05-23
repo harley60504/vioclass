@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'twitch_streamnook_drops_snapshot_stage249.dart';
+
 class TwitchStreamNookDropsConnectionCheckStage249 {
   final bool hasToken;
   final bool tokenValid;
@@ -15,6 +17,7 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
   final String campaignsRootSummary;
   final String campaignsPreview;
 
+  final TwitchStreamNookDropsSnapshotStage249? snapshot;
   final String? errorText;
   final DateTime checkedAt;
 
@@ -30,6 +33,7 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
     required this.campaignsHasErrors,
     required this.campaignsRootSummary,
     required this.campaignsPreview,
+    required this.snapshot,
     required this.errorText,
     required this.checkedAt,
   });
@@ -69,6 +73,7 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
       'campaignsStatusCode=${campaignsStatusCode ?? '-'}',
       'campaignsHasErrors=$campaignsHasErrors',
       'campaignsRoot=$campaignsRootSummary',
+      if (snapshot != null) 'snapshot:\n${snapshot!.compactSummary}',
       if (errorText != null && errorText!.trim().isNotEmpty) 'error=$errorText',
     ].join('\n');
   }
@@ -86,6 +91,7 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
       'campaignsStatusCode': campaignsStatusCode,
       'campaignsHasErrors': campaignsHasErrors,
       'campaignsRootSummary': campaignsRootSummary,
+      'snapshot': snapshot?.toJson(),
       'errorText': errorText,
       'checkedAt': checkedAt.toIso8601String(),
     });
