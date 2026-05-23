@@ -9,6 +9,28 @@ import '../auth/twitch_drops_auth_service.dart';
 import 'twitch_streamnook_drops_connection_check_stage249.dart';
 import 'twitch_streamnook_drops_snapshot_stage249.dart';
 
+class TwitchStreamNookDropsCollectResultStage249 {
+  final bool ok;
+  final int? statusCode;
+  final bool hasGraphQLErrors;
+  final Object? data;
+  final String? errorText;
+
+  const TwitchStreamNookDropsCollectResultStage249({
+    required this.ok,
+    required this.statusCode,
+    required this.hasGraphQLErrors,
+    required this.data,
+    required this.errorText,
+  });
+
+  String get message {
+    if (ok) return 'Drop 領取請求成功';
+    if (errorText != null && errorText!.trim().isNotEmpty) return errorText!;
+    return 'Drop 領取請求失敗：HTTP ${statusCode ?? '-'}';
+  }
+}
+
 class TwitchStreamNookDropsConnectionServiceStage249 {
   final TwitchApiClient apiClient;
   final TwitchDropsAuthService dropsAuthService;
@@ -97,6 +119,83 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
         hasToken: hasToken,
         tokenValid: tokenValid,
         clientId: clientId,
+        errorText: '$error',
+      );
+    }
+  }
+
+  Future<TwitchStreamNookDropsCollectResultStage249> collectDrop({
+    required String dropInstanceId,
+  }) async {
+    final safeDropInstanceId = dropInstanceId.trim();
+    if (safeDropInstanceId.isEmpty) {
+      return const TwitchStreamNookDropsCollectResultStage249(
+        ok: false,
+        statusCode: null,
+        hasGraphQLErrors: false,
+        data: null,
+        errorText: 'Drop instance id is empty.',
+      );
+    }
+
+    try {
+      await dropsAuthService.loadStoredSession();
+      final token = await dropsAuthService.getToken();
+      final clientId = dropsAuthService.dropsClientId.trim();
+      if (token == null || token.trim().isEmpty) {
+        return const TwitchStreamNookDropsCollectResultStage249(
+          ok: false,
+          statusCode: null,
+          hasGraphQLErrors: false,
+          data: null,
+          errorText: 'No Drops token.',
+        );
+      }
+
+      final tokenValid = await dropsAuthService.validateToken();
+      if (!tokenValid) {
+        return const TwitchStreamNookDropsCollectResultStage249(
+          ok: false,
+          statusCode: null,
+          hasGraphQLErrors: false,
+          data: null,
+          errorText: 'Drops token validation failed.',
+        );
+      }
+
+      final validToken = await dropsAuthService.getToken();
+      if (validToken == null || validToken.trim().isEmpty) {
+        return const TwitchStreamNookDropsCollectResultStage249(
+          ok: false,
+          statusCode: null,
+          hasGraphQLErrors: false,
+          data: null,
+          errorText: 'Drops token disappeared after validation.',
+        );
+      }
+
+      final response = await _postGql(
+        token: validToken,
+        clientId: clientId,
+        bodyJson: TwitchDropsQueryPresetsStage249.collectRewardJson(
+          dropInstanceId: safeDropInstanceId,
+        ),
+      );
+      final hasErrors = _hasGqlErrors(response.data);
+      final statusCode = response.statusCode ?? 0;
+      return TwitchStreamNookDropsCollectResultStage249(
+        ok: statusCode >= 200 && statusCode < 300 && !hasErrors,
+        statusCode: response.statusCode,
+        hasGraphQLErrors: hasErrors,
+        data: response.data,
+        errorText: null,
+      );
+    } catch (error) {
+      return TwitchStreamNookDropsCollectResultStage249(
+        ok: false,
+        statusCode: null,
+        hasGraphQLErrors: false,
+        data: null,
         errorText: '$error',
       );
     }
