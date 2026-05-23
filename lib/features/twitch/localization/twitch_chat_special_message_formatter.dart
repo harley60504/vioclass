@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_special_message_formatter_stage126_localization_home
+// PATCH VERSION: twitch_chat_special_message_formatter_stage250c_resub_months
 //
 // Localizes Twitch IRC USERNOTICE / special message system text from msg-id and
 // msg-param-* tags. This keeps detailed special-message text out of model and UI layers.
@@ -76,8 +76,6 @@ String _formatSub({
   final cumulativeMonths = _readInt(tags, 'msg-param-cumulative-months');
   final streakMonths = _readInt(tags, 'msg-param-streak-months');
   final shouldShareStreak = _readBool(tags, 'msg-param-should-share-streak');
-  final durationMonths = _readInt(tags, 'msg-param-multimonth-duration');
-  final tenureMonths = _readInt(tags, 'msg-param-multimonth-tenure');
   final plan = _formatSubPlan(_read(tags, 'msg-param-sub-plan'));
   final planName = _read(tags, 'msg-param-sub-plan-name');
   final tierText = planName.isNotEmpty ? '$planName（$plan）' : plan;
@@ -99,14 +97,11 @@ String _formatSub({
     parts.add('目前連續訂閱 $streakMonths 個月');
   }
 
-  if (durationMonths != null && durationMonths > 1) {
-    parts.add('這次預付 $durationMonths 個月');
-  }
-
-  if (tenureMonths != null && tenureMonths > 0 && tenureMonths != cumulativeMonths) {
-    parts.add('總訂閱期數 $tenureMonths 個月');
-  }
-
+  // Do not display msg-param-multimonth-duration / msg-param-multimonth-tenure.
+  // They are useful raw Twitch metadata for some multi-month pledge cases, but
+  // showing them beside cumulative/streak months is confusing and can look
+  // contradictory in shared-chat/resub cards. Twitch's official chat card also
+  // keeps the visible summary focused on cumulative months, streak, and tier.
   return _joinSentence(parts);
 }
 
