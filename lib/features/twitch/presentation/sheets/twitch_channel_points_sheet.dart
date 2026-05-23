@@ -18,6 +18,7 @@ Future<void> showTwitchChannelPointsSheet({
   required Future<void> Function() onRefresh,
   required Future<void> Function(String claimId) onClaim,
   Future<void> Function(Map<String, dynamic> reward)? onRewardTap,
+  Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward,
   Future<void> Function(Map<String, dynamic> reward, String textInput)? onRedeemReward,
   TwitchChannelPointEmoteLoader? onLoadChannelPointEmotes,
 }) {
@@ -30,6 +31,7 @@ Future<void> showTwitchChannelPointsSheet({
       onRefresh: onRefresh,
       onClaim: onClaim,
       onRewardTap: onRewardTap,
+      onPrepareTextReward: onPrepareTextReward,
       onRedeemReward: onRedeemReward,
       onLoadChannelPointEmotes: onLoadChannelPointEmotes,
     ),
@@ -45,6 +47,14 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   /// Legacy callback. Kept so older WatchPage wiring still compiles.
   /// Prefer [onRedeemReward] for actual redeem actions.
   final Future<void> Function(Map<String, dynamic> reward)? onRewardTap;
+
+  /// Optional composer integration for rewards that are really chat messages,
+  /// such as Highlight My Message and sub-only bypass message.
+  ///
+  /// Keeping the final text input in the normal chat composer makes the flow
+  /// match StreamNook/Twitch: choose the special action first, type in the
+  /// regular chat box, then press Send once.
+  final Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward;
 
   /// Main redeem callback.
   ///
@@ -69,6 +79,7 @@ class TwitchChannelPointsSheet extends StatefulWidget {
     required this.onRefresh,
     required this.onClaim,
     this.onRewardTap,
+    this.onPrepareTextReward,
     this.onRedeemReward,
     this.onLoadChannelPointEmotes,
   });
@@ -154,6 +165,13 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     BuildContext context,
     Map<String, dynamic> reward,
   ) async {
+    final prepareTextReward = widget.onPrepareTextReward;
+    if (prepareTextReward != null && requiresChannelPointMessageInput(reward)) {
+      await prepareTextReward(reward);
+      if (context.mounted) Navigator.of(context).maybePop();
+      return;
+    }
+
     if (widget.onRedeemReward == null) {
       final legacyTap = widget.onRewardTap;
       if (legacyTap != null) {
