@@ -18,7 +18,6 @@ Future<void> showTwitchChannelPointsSheet({
   required Future<void> Function() onRefresh,
   required Future<void> Function(String claimId) onClaim,
   Future<void> Function(Map<String, dynamic> reward)? onRewardTap,
-  Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward,
   Future<void> Function(Map<String, dynamic> reward, String textInput)? onRedeemReward,
   TwitchChannelPointEmoteLoader? onLoadChannelPointEmotes,
 }) {
@@ -31,7 +30,6 @@ Future<void> showTwitchChannelPointsSheet({
       onRefresh: onRefresh,
       onClaim: onClaim,
       onRewardTap: onRewardTap,
-      onPrepareTextReward: onPrepareTextReward,
       onRedeemReward: onRedeemReward,
       onLoadChannelPointEmotes: onLoadChannelPointEmotes,
     ),
@@ -43,10 +41,25 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   final bool loading;
   final Future<void> Function() onRefresh;
   final Future<void> Function(String claimId) onClaim;
+
+  /// Legacy callback. Kept so older WatchPage wiring still compiles.
+  /// Prefer [onRedeemReward] for actual redeem actions.
   final Future<void> Function(Map<String, dynamic> reward)? onRewardTap;
-  final Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward;
+
+  /// Main redeem callback.
+  ///
+  /// The second argument is the action payload:
+  /// - custom reward with text input: message text
+  /// - Highlight / Sub-only: chat message text
+  /// - Choose / Gigantify: emote id
+  /// - Modify: JSON string with {emoteId, modifierId}; emoteId is the final
+  ///   modified emote id, StreamNook-style.
   final Future<void> Function(Map<String, dynamic> reward, String textInput)?
       onRedeemReward;
+
+  /// StreamNook-style source for Choose / Modify emote menus.
+  /// This must return Channel Points-selectable emotes, not the general chat
+  /// emote list and not all locked channel emotes.
   final TwitchChannelPointEmoteLoader? onLoadChannelPointEmotes;
 
   const TwitchChannelPointsSheet({
@@ -56,7 +69,6 @@ class TwitchChannelPointsSheet extends StatefulWidget {
     required this.onRefresh,
     required this.onClaim,
     this.onRewardTap,
-    this.onPrepareTextReward,
     this.onRedeemReward,
     this.onLoadChannelPointEmotes,
   });
@@ -142,13 +154,6 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     BuildContext context,
     Map<String, dynamic> reward,
   ) async {
-    final prepare = widget.onPrepareTextReward;
-    if (prepare != null && requiresChannelPointMessageInput(reward)) {
-      await prepare(reward);
-      if (context.mounted) Navigator.of(context).maybePop();
-      return;
-    }
-
     if (widget.onRedeemReward == null) {
       final legacyTap = widget.onRewardTap;
       if (legacyTap != null) {
