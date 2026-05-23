@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_input_section_stage250a_pending_action
+// PATCH VERSION: twitch_watch_chat_input_section_stage250a_pending_action_entry
 
 import 'package:flutter/material.dart';
 
@@ -18,6 +18,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
   final bool sending;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
+  final VoidCallback? onOpenSpecialActions;
   final VoidCallback? onCancelPendingSpecialMessage;
   final VoidCallback onSend;
 
@@ -32,6 +33,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
     required this.sending,
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
+    this.onOpenSpecialActions,
     this.onCancelPendingSpecialMessage,
     required this.onSend,
   });
@@ -59,6 +61,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
             compact: compact,
             onOpenChannelPoints: onOpenChannelPoints,
             onOpenEmotes: onOpenEmotes,
+            onOpenSpecialActions: onOpenSpecialActions,
           ),
           if (pending != null)
             TwitchPendingChatActionBannerStage250(
