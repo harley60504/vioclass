@@ -18,12 +18,16 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
   });
 
   Future<TwitchStreamNookDropsConnectionCheckStage249> checkConnection() async {
+    String clientId = dropsAuthService.dropsClientId.trim();
+    var hasToken = false;
+    var tokenValid = false;
+
     try {
       await dropsAuthService.loadStoredSession();
 
       final token = await dropsAuthService.getToken();
-      final clientId = dropsAuthService.dropsClientId.trim();
-      final hasToken = token != null && token.trim().isNotEmpty;
+      clientId = dropsAuthService.dropsClientId.trim();
+      hasToken = token != null && token.trim().isNotEmpty;
 
       if (!hasToken) {
         return _result(
@@ -33,7 +37,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
         );
       }
 
-      final tokenValid = await dropsAuthService.validateToken();
+      tokenValid = await dropsAuthService.validateToken();
       if (!tokenValid) {
         return _result(
           hasToken: true,
@@ -70,14 +74,18 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
         clientId: clientId,
         inventoryStatusCode: inventory.statusCode,
         inventoryHasErrors: _hasGqlErrors(inventory.data),
+        inventoryRootSummary: _rootSummary(inventory.data),
+        inventoryPreview: _preview(inventory.data),
         campaignsStatusCode: campaigns.statusCode,
         campaignsHasErrors: _hasGqlErrors(campaigns.data),
+        campaignsRootSummary: _rootSummary(campaigns.data),
+        campaignsPreview: _preview(campaigns.data),
       );
     } catch (error) {
       return _result(
-        hasToken: false,
-        tokenValid: false,
-        clientId: dropsAuthService.dropsClientId.trim(),
+        hasToken: hasToken,
+        tokenValid: tokenValid,
+        clientId: clientId,
         errorText: '$error',
       );
     }
@@ -89,8 +97,12 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
     required String clientId,
     int? inventoryStatusCode,
     bool inventoryHasErrors = false,
+    String inventoryRootSummary = '-',
+    String inventoryPreview = '',
     int? campaignsStatusCode,
     bool campaignsHasErrors = false,
+    String campaignsRootSummary = '-',
+    String campaignsPreview = '',
     String? errorText,
   }) {
     return TwitchStreamNookDropsConnectionCheckStage249(
@@ -99,8 +111,12 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
       clientId: clientId,
       inventoryStatusCode: inventoryStatusCode,
       inventoryHasErrors: inventoryHasErrors,
+      inventoryRootSummary: inventoryRootSummary,
+      inventoryPreview: inventoryPreview,
       campaignsStatusCode: campaignsStatusCode,
       campaignsHasErrors: campaignsHasErrors,
+      campaignsRootSummary: campaignsRootSummary,
+      campaignsPreview: campaignsPreview,
       errorText: errorText,
       checkedAt: DateTime.now(),
     );
@@ -144,5 +160,38 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
     }
 
     return false;
+  }
+
+  String _rootSummary(Object? data) {
+    if (data == null) return 'null';
+
+    if (data is Map) {
+      final keys = data.keys.map((key) => key.toString()).join(', ');
+      final hasData = data.containsKey('data');
+      final hasErrors = data.containsKey('errors');
+      return 'Map(keys=[$keys], hasData=$hasData, hasErrors=$hasErrors)';
+    }
+
+    if (data is List) {
+      return 'List(length=${data.length})';
+    }
+
+    return data.runtimeType.toString();
+  }
+
+  String _preview(Object? data) {
+    if (data == null) return 'null';
+
+    try {
+      final text = const JsonEncoder.withIndent('  ').convert(data);
+      return _truncate(text, 6000);
+    } catch (_) {
+      return _truncate(data.toString(), 6000);
+    }
+  }
+
+  String _truncate(String text, int maxLength) {
+    if (text.length <= maxLength) return text;
+    return '${text.substring(0, maxLength)}\n... <truncated ${text.length - maxLength} chars>';
   }
 }
