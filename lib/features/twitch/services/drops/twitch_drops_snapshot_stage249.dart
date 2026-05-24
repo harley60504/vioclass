@@ -23,6 +23,15 @@ class TwitchDropsSnapshotStage249 {
         _asList(inventory?['dropCampaignsInProgress']);
     final rawActiveCampaigns = _asList(campaignsUser?['dropCampaigns']);
 
+    final activeCampaigns = rawActiveCampaigns
+        .whereType<Map>()
+        .map(TwitchDropCampaignSummaryStage249.fromJson)
+        .where((campaign) => campaign.id.isNotEmpty)
+        .toList(growable: false);
+    final activeById = <String, TwitchDropCampaignSummaryStage249>{
+      for (final campaign in activeCampaigns) campaign.id: campaign,
+    };
+
     return TwitchDropsSnapshotStage249(
       viewerId: _string(inventoryUser?['id']).isNotEmpty
           ? _string(inventoryUser?['id'])
@@ -30,14 +39,17 @@ class TwitchDropsSnapshotStage249 {
       viewerLogin: _string(campaignsUser?['login']),
       inventoryCampaigns: rawInventoryCampaigns
           .whereType<Map>()
-          .map(TwitchDropCampaignStage249.fromJson)
+          .map((raw) {
+            final campaign = TwitchDropCampaignStage249.fromJson(raw);
+            final active = activeById[campaign.id];
+            if (active == null || active.imageUrl.isEmpty || campaign.imageUrl.isNotEmpty) {
+              return campaign;
+            }
+            return campaign.copyWith(imageUrl: active.imageUrl);
+          })
           .where((campaign) => campaign.id.isNotEmpty)
           .toList(growable: false),
-      activeCampaigns: rawActiveCampaigns
-          .whereType<Map>()
-          .map(TwitchDropCampaignSummaryStage249.fromJson)
-          .where((campaign) => campaign.id.isNotEmpty)
-          .toList(growable: false),
+      activeCampaigns: activeCampaigns,
     );
   }
 
@@ -155,7 +167,10 @@ class TwitchDropCampaignStage249 {
           ? _string(game?['name'])
           : _string(game?['displayName']),
       gameId: _string(game?['id']),
-      imageUrl: _string(raw['imageURL']),
+      // Twitch's official Drops detail card usually uses the game's poster / box art.
+      // The campaign imageURL can be a different banner/logo asset, so prefer game art
+      // when Twitch returns it and fall back to campaign imageURL.
+      imageUrl: _campaignDisplayImageUrl(raw: raw, game: game),
       detailsUrl: _string(raw['detailsURL']),
       accountLinkUrl: _string(raw['accountLinkURL']),
       startAt: _date(raw['startAt']),
@@ -180,6 +195,7 @@ class TwitchDropCampaignStage249 {
   }
 
   TwitchDropCampaignStage249 copyWith({
+    String? imageUrl,
     List<TwitchDropStage249>? timeBasedDrops,
   }) {
     return TwitchDropCampaignStage249(
@@ -188,7 +204,7 @@ class TwitchDropCampaignStage249 {
       status: status,
       gameName: gameName,
       gameId: gameId,
-      imageUrl: imageUrl,
+      imageUrl: imageUrl ?? this.imageUrl,
       detailsUrl: detailsUrl,
       accountLinkUrl: accountLinkUrl,
       startAt: startAt,
@@ -205,6 +221,7 @@ class TwitchDropCampaignStage249 {
       'status': status,
       'gameName': gameName,
       'gameId': gameId,
+      'imageUrl': imageUrl,
       'detailsUrl': detailsUrl,
       'accountLinkUrl': accountLinkUrl,
       'startAt': startAt?.toIso8601String(),
@@ -329,6 +346,7 @@ class TwitchDropStage249 {
       'gameName': gameName,
       'name': name,
       'rewardName': rewardName,
+      'rewardImageUrl': rewardImageUrl,
       'requiredMinutesWatched': requiredMinutesWatched,
       'currentMinutesWatched': currentMinutesWatched,
       'progressPercent': progressPercent,
@@ -349,6 +367,7 @@ class TwitchDropCampaignSummaryStage249 {
   final String status;
   final String gameName;
   final String gameId;
+  final String imageUrl;
   final String detailsUrl;
   final String accountLinkUrl;
   final DateTime? startAt;
@@ -361,6 +380,7 @@ class TwitchDropCampaignSummaryStage249 {
     required this.status,
     required this.gameName,
     required this.gameId,
+    required this.imageUrl,
     required this.detailsUrl,
     required this.accountLinkUrl,
     required this.startAt,
@@ -380,6 +400,7 @@ class TwitchDropCampaignSummaryStage249 {
           ? _string(game?['displayName'])
           : _string(game?['name']),
       gameId: _string(game?['id']),
+      imageUrl: _campaignDisplayImageUrl(raw: raw, game: game),
       detailsUrl: _string(raw['detailsURL']),
       accountLinkUrl: _string(raw['accountLinkURL']),
       startAt: _date(raw['startAt']),
@@ -387,6 +408,42 @@ class TwitchDropCampaignSummaryStage249 {
       isAccountConnected: self?['isAccountConnected'] == true,
     );
   }
+}
+
+String _campaignDisplayImageUrl({
+  required Map raw,
+  required Map? game,
+}) {
+  return _firstNonEmptyString(<String>[
+    _twitchImageUrl(_string(game?['boxArtURL']), width: 144, height: 192),
+    _twitchImageUrl(_string(game?['boxArtUrl']), width: 144, height: 192),
+    _twitchImageUrl(_string(game?['box_art_url']), width: 144, height: 192),
+    _twitchImageUrl(_string(raw['boxArtURL']), width: 144, height: 192),
+    _twitchImageUrl(_string(raw['boxArtUrl']), width: 144, height: 192),
+    _twitchImageUrl(_string(raw['imageURL']), width: 144, height: 192),
+    _twitchImageUrl(_string(raw['imageUrl']), width: 144, height: 192),
+    _twitchImageUrl(_string(raw['image_url']), width: 144, height: 192),
+  ]);
+}
+
+String _twitchImageUrl(
+  String raw, {
+  required int width,
+  required int height,
+}) {
+  var text = raw.trim();
+  if (text.isEmpty) return '';
+  text = text.replaceAll('{width}', width.toString());
+  text = text.replaceAll('{height}', height.toString());
+  return text;
+}
+
+String _firstNonEmptyString(List<String> values) {
+  for (final value in values) {
+    final text = value.trim();
+    if (text.isNotEmpty) return text;
+  }
+  return '';
 }
 
 Map? _asMap(Object? value) {
