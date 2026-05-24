@@ -731,72 +731,45 @@ class _CampaignTile extends StatelessWidget {
           color: (highlightReady || hasReady) ? _kStage249Gold.withOpacity(0.34) : Colors.white.withOpacity(0.08),
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 680;
+          final content = _CampaignDropsContent(
+            campaign: campaign,
+            sortedDrops: sortedDrops,
+            accent: accent,
+            claimingDropInstanceIds: claimingDropInstanceIds,
+            onClaimDrop: onClaimDrop,
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                _CampaignPoster(
+                  imageUrl: campaign.imageUrl,
+                  accent: accent,
+                  compact: true,
+                ),
+                const SizedBox(height: 14),
+                content,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              _CampaignThumbnail(
+              _CampaignPoster(
                 imageUrl: campaign.imageUrl,
                 accent: accent,
+                compact: false,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      campaign.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${campaign.gameName}｜${sortedDrops.length} drops',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              _MiniBadge(
-                text: campaign.status.isEmpty ? 'UNKNOWN' : campaign.status,
-                color: campaign.status.toUpperCase() == 'ACTIVE' ? _kStage249Green : _kStage249Gold,
-              ),
-              const SizedBox(width: 6),
-              _MiniBadge(
-                text: campaign.isAccountConnected ? '已連結' : '未連結',
-                color: campaign.isAccountConnected ? _kStage249Green : Colors.orangeAccent,
-              ),
+              const SizedBox(width: 16),
+              Expanded(child: content),
             ],
-          ),
-          const SizedBox(height: 12),
-          if (sortedDrops.isEmpty)
-            const Text(
-              '這個 campaign 沒有 time based drops。',
-              style: TextStyle(color: Colors.white54),
-            )
-          else
-            for (final drop in sortedDrops.take(8)) ...<Widget>[
-              _DropRow(
-                drop: drop,
-                claiming: claimingDropInstanceIds.contains(drop.dropInstanceId.trim()),
-                onClaimDrop: onClaimDrop,
-              ),
-              const SizedBox(height: 10),
-            ],
-        ],
+          );
+        },
       ),
     );
   }
@@ -809,49 +782,153 @@ class _CampaignTile extends StatelessWidget {
   }
 }
 
-class _CampaignThumbnail extends StatelessWidget {
+class _CampaignDropsContent extends StatelessWidget {
+  final TwitchDropCampaignStage249 campaign;
+  final List<TwitchDropStage249> sortedDrops;
+  final Color accent;
+  final Set<String> claimingDropInstanceIds;
+  final ValueChanged<TwitchDropStage249> onClaimDrop;
+
+  const _CampaignDropsContent({
+    required this.campaign,
+    required this.sortedDrops,
+    required this.accent,
+    required this.claimingDropInstanceIds,
+    required this.onClaimDrop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    campaign.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${campaign.gameName}｜${sortedDrops.length} drops',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            _MiniBadge(
+              text: campaign.status.isEmpty ? 'UNKNOWN' : campaign.status,
+              color: campaign.status.toUpperCase() == 'ACTIVE' ? _kStage249Green : _kStage249Gold,
+            ),
+            const SizedBox(width: 6),
+            _MiniBadge(
+              text: campaign.isAccountConnected ? '已連結' : '未連結',
+              color: campaign.isAccountConnected ? _kStage249Green : Colors.orangeAccent,
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (sortedDrops.isEmpty)
+          const Text(
+            '這個 campaign 沒有 time based drops。',
+            style: TextStyle(color: Colors.white54),
+          )
+        else
+          for (final drop in sortedDrops.take(8)) ...<Widget>[
+            _DropRow(
+              drop: drop,
+              claiming: claimingDropInstanceIds.contains(drop.dropInstanceId.trim()),
+              onClaimDrop: onClaimDrop,
+            ),
+            const SizedBox(height: 10),
+          ],
+      ],
+    );
+  }
+}
+
+class _CampaignPoster extends StatelessWidget {
   final String imageUrl;
   final Color accent;
+  final bool compact;
 
-  const _CampaignThumbnail({
+  const _CampaignPoster({
     required this.imageUrl,
     required this.accent,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
     final url = imageUrl.trim();
+    final width = compact ? double.infinity : 150.0;
+    final height = compact ? 170.0 : 210.0;
 
     return Container(
-      width: 42,
-      height: 42,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        color: accent.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withOpacity(0.22)),
+        color: accent.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: accent.withOpacity(0.24)),
       ),
       clipBehavior: Clip.antiAlias,
       child: url.isEmpty
-          ? Icon(Icons.extension_rounded, color: accent, size: 21)
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Icon(Icons.extension_rounded, color: accent, size: 21);
-              },
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: accent,
+          ? Icon(Icons.extension_rounded, color: accent, size: compact ? 42 : 54)
+          : Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                Image.network(
+                  url,
+                  fit: compact ? BoxFit.contain : BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.extension_rounded, color: accent, size: compact ? 42 : 54);
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accent,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.10),
+                        Colors.black.withOpacity(0.42),
+                      ],
                     ),
                   ),
-                );
-              },
+                ),
+              ],
             ),
     );
   }
