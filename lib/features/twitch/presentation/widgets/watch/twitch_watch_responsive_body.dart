@@ -243,6 +243,7 @@ class _SideChatLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final shellPadding = TwitchWatchResponsiveBody.shellPaddingFor(layout);
     final shellGap = TwitchWatchResponsiveBody.shellGapFor(layout);
+    final showResizeHandle = !layout.shouldDisableWatchChatResizeHandle;
     final usableWidth = (layout.width - shellPadding.horizontal - shellGap)
         .clamp(1.0, layout.width)
         .toDouble();
@@ -260,20 +261,22 @@ class _SideChatLayout extends StatelessWidget {
           if (chatVisible)
             SizedBox(
               width: shellGap,
-              child: TwitchWatchChatResizeHandle(
-                onDragStart: (_) {
-                  dragStartWidth = chatPanelWidth;
-                  accumulatedDx = 0.0;
-                },
-                onDragUpdate: (delta) {
-                  accumulatedDx += delta.delta.dx;
-                  onSetChatPanelWidthForViewport(
-                    viewportWidth: usableWidth,
-                    value: dragStartWidth - accumulatedDx,
-                  );
-                },
-                onDragEnd: onPersistChatPanelWidth,
-              ),
+              child: showResizeHandle
+                  ? TwitchWatchChatResizeHandle(
+                      onDragStart: (_) {
+                        dragStartWidth = chatPanelWidth;
+                        accumulatedDx = 0.0;
+                      },
+                      onDragUpdate: (delta) {
+                        accumulatedDx += delta.delta.dx;
+                        onSetChatPanelWidthForViewport(
+                          viewportWidth: usableWidth,
+                          value: dragStartWidth - accumulatedDx,
+                        );
+                      },
+                      onDragEnd: onPersistChatPanelWidth,
+                    )
+                  : const SizedBox.expand(),
             ),
           if (chatVisible)
             SizedBox(
