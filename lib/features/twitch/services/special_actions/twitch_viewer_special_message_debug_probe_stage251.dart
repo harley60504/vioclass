@@ -61,6 +61,66 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
     };
   }
 
+  Future<Map<String, dynamic>> runCustomPersistedOperation({
+    required String operationName,
+    required String sha256Hash,
+    required Map<String, dynamic> variables,
+  }) async {
+    final checkedAt = DateTime.now();
+    final webToken = await _safeToken(webTokenProvider);
+    final dropsToken = await _safeToken(dropsTokenProvider);
+    final dropsClientId = _safeString(dropsClientIdProvider);
+
+    try {
+      final result = await api.runCustomPersistedOperation(
+        operationName: operationName,
+        sha256Hash: sha256Hash,
+        variables: variables,
+      );
+      return <String, dynamic>{
+        'stage': '251D',
+        'feature': 'viewer_special_messages_custom_persisted_operation',
+        'checkedAt': checkedAt.toIso8601String(),
+        'ok': !result.hasErrors,
+        'auth': <String, dynamic>{
+          'hasWebToken': webToken != null && webToken.isNotEmpty,
+          'webTokenLength': webToken?.length ?? 0,
+          'hasDropsToken': dropsToken != null && dropsToken.isNotEmpty,
+          'dropsTokenLength': dropsToken?.length ?? 0,
+          'dropsClientId': dropsClientId,
+        },
+        'request': <String, dynamic>{
+          'operationName': operationName.trim(),
+          'sha256Hash': sha256Hash.trim(),
+          'hashLength': sha256Hash.trim().length,
+          'variables': variables,
+        },
+        'result': result.toJson(),
+      };
+    } catch (error) {
+      return <String, dynamic>{
+        'stage': '251D',
+        'feature': 'viewer_special_messages_custom_persisted_operation',
+        'checkedAt': checkedAt.toIso8601String(),
+        'ok': false,
+        'auth': <String, dynamic>{
+          'hasWebToken': webToken != null && webToken.isNotEmpty,
+          'webTokenLength': webToken?.length ?? 0,
+          'hasDropsToken': dropsToken != null && dropsToken.isNotEmpty,
+          'dropsTokenLength': dropsToken?.length ?? 0,
+          'dropsClientId': dropsClientId,
+        },
+        'request': <String, dynamic>{
+          'operationName': operationName.trim(),
+          'sha256Hash': sha256Hash.trim(),
+          'hashLength': sha256Hash.trim().length,
+          'variables': variables,
+        },
+        'error': error.toString(),
+      };
+    }
+  }
+
   Map<String, dynamic> _operationSummary(
     TwitchViewerSpecialMessageOperationConfigStage251 operations,
   ) {
