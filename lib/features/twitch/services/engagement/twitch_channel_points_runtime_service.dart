@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api_stage252.dart';
 
@@ -67,6 +69,16 @@ class TwitchChannelPointsRuntimeService {
     String textInput = '',
   }) {
     final parsedReward = _parseRedeemableReward(reward);
+
+    if (parsedReward.normalizedRewardType == 'CHOSEN_MODIFIED_SUB_EMOTE_UNLOCK') {
+      final selection = _parseModifiedEmoteSelection(textInput);
+      return unlockModifiedSubscriberEmote(
+        channelId: channelId,
+        reward: reward,
+        modifiedEmoteId: selection.emoteId,
+        modifierId: selection.modifierId,
+      );
+    }
 
     return channelPointsApi.redeemReward(
       channelId: channelId,
@@ -139,6 +151,35 @@ class TwitchChannelPointsRuntimeService {
       reward: parsedReward,
       emoteId: modifiedEmoteId,
       emoteModifierId: modifierId,
+    );
+  }
+
+  _TwitchModifiedEmoteSelection _parseModifiedEmoteSelection(String textInput) {
+    final clean = textInput.trim();
+    if (clean.isEmpty) {
+      throw StateError('Modify Emote requires a selected modified emote payload.');
+    }
+
+    try {
+      final decoded = jsonDecode(clean);
+      if (decoded is Map) {
+        final emoteId = decoded['emoteId']?.toString().trim() ?? '';
+        final modifierId = decoded['modifierId']?.toString().trim() ?? '';
+        if (emoteId.isNotEmpty) {
+          return _TwitchModifiedEmoteSelection(
+            emoteId: emoteId,
+            modifierId: modifierId,
+          );
+        }
+      }
+    } catch (_) {
+      // Backward compatibility: older callers may pass the final modified emote
+      // id directly instead of the JSON selection object.
+    }
+
+    return _TwitchModifiedEmoteSelection(
+      emoteId: clean,
+      modifierId: '',
     );
   }
 
@@ -228,6 +269,16 @@ class TwitchChannelPointsRuntimeService {
       rewardsError: rewardsError,
     );
   }
+}
+
+class _TwitchModifiedEmoteSelection {
+  final String emoteId;
+  final String modifierId;
+
+  const _TwitchModifiedEmoteSelection({
+    required this.emoteId,
+    required this.modifierId,
+  });
 }
 
 class TwitchChannelPointsRuntimeSnapshot {
