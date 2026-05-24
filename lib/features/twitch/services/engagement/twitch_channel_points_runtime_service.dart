@@ -1,25 +1,17 @@
 import 'dart:convert';
 
 import '../../api/engagement/twitch_channel_points_api_service.dart';
-import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api_stage252.dart';
+import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api.dart';
 
 class TwitchChannelPointsRuntimeService {
   final TwitchChannelPointsApiService channelPointsApi;
-
-  /// Optional dedicated backend for Channel Points emote menus.
-  ///
-  /// If omitted, [channelPointsApi.emoteApi] is used. This keeps old wiring
-  /// compatible while allowing the menu backend to be tested or replaced
-  /// without touching reward redemption.
   final TwitchChannelPointsEmoteApiService? channelPointsEmoteApi;
-
-  final TwitchStreamNookModifiedEmoteRedeemApiStage252?
-      streamNookModifiedEmoteRedeemApiStage252;
+  final TwitchStreamNookModifiedEmoteRedeemApi? streamNookModifiedEmoteRedeemApi;
 
   const TwitchChannelPointsRuntimeService({
     required this.channelPointsApi,
     this.channelPointsEmoteApi,
-    this.streamNookModifiedEmoteRedeemApiStage252,
+    this.streamNookModifiedEmoteRedeemApi,
   });
 
   Future<TwitchChannelPointsClaimResult> claimBonus({
@@ -43,7 +35,6 @@ class TwitchChannelPointsRuntimeService {
           },
         );
       }
-
       rethrow;
     }
   }
@@ -69,7 +60,6 @@ class TwitchChannelPointsRuntimeService {
     String textInput = '',
   }) {
     final parsedReward = _parseRedeemableReward(reward);
-
     if (parsedReward.normalizedRewardType == 'CHOSEN_MODIFIED_SUB_EMOTE_UNLOCK') {
       final selection = _parseModifiedEmoteSelection(textInput);
       return unlockModifiedSubscriberEmote(
@@ -79,7 +69,6 @@ class TwitchChannelPointsRuntimeService {
         modifierId: selection.modifierId,
       );
     }
-
     return channelPointsApi.redeemReward(
       channelId: channelId,
       reward: parsedReward,
@@ -93,7 +82,6 @@ class TwitchChannelPointsRuntimeService {
     required String message,
   }) {
     final parsedReward = _parseRedeemableReward(reward);
-
     return channelPointsApi.sendHighlightedMessage(
       channelId: channelId,
       reward: parsedReward,
@@ -106,7 +94,6 @@ class TwitchChannelPointsRuntimeService {
     required Map<String, dynamic> reward,
   }) {
     final parsedReward = _parseRedeemableReward(reward);
-
     return channelPointsApi.unlockRandomSubscriberEmote(
       channelId: channelId,
       reward: parsedReward,
@@ -119,7 +106,6 @@ class TwitchChannelPointsRuntimeService {
     required String emoteId,
   }) {
     final parsedReward = _parseRedeemableReward(reward);
-
     return channelPointsApi.unlockChosenSubscriberEmote(
       channelId: channelId,
       reward: parsedReward,
@@ -134,18 +120,15 @@ class TwitchChannelPointsRuntimeService {
     String? modifierId,
   }) {
     final parsedReward = _parseRedeemableReward(reward);
-    final streamNookApi = streamNookModifiedEmoteRedeemApiStage252;
-
+    final streamNookApi = streamNookModifiedEmoteRedeemApi;
     if (streamNookApi != null) {
       return streamNookApi.unlockModifiedEmote(
         channelId: channelId,
         rewardId: parsedReward.id,
         cost: parsedReward.redeemCost,
-        // Twitch-style: modifiedEmoteId is already the final id, e.g. 1022569_BW.
         emoteId: modifiedEmoteId,
       );
     }
-
     return channelPointsApi.unlockModifiedSubscriberEmote(
       channelId: channelId,
       reward: parsedReward,
@@ -159,7 +142,6 @@ class TwitchChannelPointsRuntimeService {
     if (clean.isEmpty) {
       throw StateError('Modify Emote requires a selected modified emote payload.');
     }
-
     try {
       final decoded = jsonDecode(clean);
       if (decoded is Map) {
@@ -172,15 +154,8 @@ class TwitchChannelPointsRuntimeService {
           );
         }
       }
-    } catch (_) {
-      // Backward compatibility: older callers may pass the final modified emote
-      // id directly instead of the JSON selection object.
-    }
-
-    return _TwitchModifiedEmoteSelection(
-      emoteId: clean,
-      modifierId: '',
-    );
+    } catch (_) {}
+    return _TwitchModifiedEmoteSelection(emoteId: clean, modifierId: '');
   }
 
   TwitchChannelReward _parseRedeemableReward(Map<String, dynamic> reward) {
@@ -188,13 +163,11 @@ class TwitchChannelPointsRuntimeService {
     final isPublicFallback = source == 'publicFallback' ||
         reward['publicFallback'] == true ||
         reward['isRedeemable'] == false;
-
     if (isPublicFallback) {
       throw StateError(
         'This reward was loaded from the public fallback snapshot and cannot be redeemed safely. Refresh rewards with authenticated ChannelPointsContext first.',
       );
     }
-
     return TwitchChannelReward.fromJson(
       reward,
       source: source.isEmpty ? 'runtime' : source,
@@ -206,14 +179,11 @@ class TwitchChannelPointsRuntimeService {
     String? channelId,
   }) {
     final emoteApi = channelPointsEmoteApi ?? channelPointsApi.emoteApi;
-
     return emoteApi.getModifiableEmotes(
       channelLogin: channelLogin,
       channelId: channelId,
       resolveChannelId: ({required String channelLogin}) async {
-        final context = await channelPointsApi.getContext(
-          channelLogin: channelLogin,
-        );
+        final context = await channelPointsApi.getContext(channelLogin: channelLogin);
         return context.channelId;
       },
     );
@@ -224,7 +194,6 @@ class TwitchChannelPointsRuntimeService {
   }) async {
     final startedAt = DateTime.now();
     final login = channelLogin.trim().toLowerCase();
-
     Map<String, dynamic>? publicRead;
     String? publicError;
     TwitchChannelPointsContext? context;
@@ -240,19 +209,13 @@ class TwitchChannelPointsRuntimeService {
     } catch (error) {
       publicError = error.toString();
     }
-
     try {
-      context = await channelPointsApi.getContext(
-        channelLogin: login,
-      );
+      context = await channelPointsApi.getContext(channelLogin: login);
     } catch (error) {
       contextError = error.toString();
     }
-
     try {
-      rewardsResult = await channelPointsApi.getRewards(
-        channelLogin: login,
-      );
+      rewardsResult = await channelPointsApi.getRewards(channelLogin: login);
     } catch (error) {
       rewardsError = error.toString();
     }
@@ -274,7 +237,6 @@ class TwitchChannelPointsRuntimeService {
 class _TwitchModifiedEmoteSelection {
   final String emoteId;
   final String modifierId;
-
   const _TwitchModifiedEmoteSelection({
     required this.emoteId,
     required this.modifierId,
@@ -309,86 +271,65 @@ class TwitchChannelPointsRuntimeSnapshot {
   bool get rewardsOk => rewardsError == null;
   bool get usable => publicOk || contextOk || rewardsOk;
 
-  int get elapsedMilliseconds {
-    return completedAt.difference(startedAt).inMilliseconds;
-  }
-
+  int get elapsedMilliseconds => completedAt.difference(startedAt).inMilliseconds;
   int? get balance => context?.balance;
   String? get availableClaimId => context?.availableClaimId;
   int get availableClaimPoints => context?.availableClaimPoints ?? 0;
   bool get hasAvailableClaim => context?.hasAvailableClaim ?? false;
   String? get pointsName => context?.pointsName ?? rewardsResult?.pointsName;
-  String? get pointsIconUrl =>
-      context?.pointsIconUrl ?? rewardsResult?.pointsIconUrl;
+  String? get pointsIconUrl => context?.pointsIconUrl ?? rewardsResult?.pointsIconUrl;
   String? get channelId => context?.channelId ?? rewardsResult?.channelId;
 
   List<Map<String, dynamic>> get rewards {
     final channelRewards = rewardsResult;
     if (channelRewards != null && channelRewards.rewards.isNotEmpty) {
-      return channelRewards.rewards
-          .map((reward) => reward.toJson())
-          .toList(growable: false);
+      return channelRewards.rewards.map((reward) => reward.toJson()).toList(growable: false);
     }
-
     return _publicRewardsFallback();
   }
 
   List<Map<String, dynamic>> _publicRewardsFallback() {
     final public = publicRead;
     if (public == null) return const <Map<String, dynamic>>[];
-
     final snapshots = public['snapshots'];
     if (snapshots is! List) return const <Map<String, dynamic>>[];
-
     final byKey = <String, Map<String, dynamic>>{};
-
     for (final snapshot in snapshots) {
       if (snapshot is! Map) continue;
-
       final rawRewards = snapshot['rewards'];
       if (rawRewards is! List) continue;
-
       for (final reward in rawRewards) {
         if (reward is! Map) continue;
-
-        final mapped = reward.map(
-          (key, value) => MapEntry(key.toString(), value),
-        );
+        final mapped = reward.map((key, value) => MapEntry(key.toString(), value));
         final resolvedImageUrl = _resolveRewardImageUrl(mapped);
         if (resolvedImageUrl.isNotEmpty) {
           mapped['imageUrl'] = resolvedImageUrl;
           mapped['resolvedImageUrl'] = resolvedImageUrl;
         }
-
         mapped['isEnabled'] = mapped['isEnabled'] ?? true;
         mapped['isPaused'] = mapped['isPaused'] ?? false;
         mapped['isInStock'] = mapped['isInStock'] ?? true;
-        mapped['isBasicallyAvailable'] =
-            mapped['isBasicallyAvailable'] ?? true;
+        mapped['isBasicallyAvailable'] = mapped['isBasicallyAvailable'] ?? true;
         mapped['source'] = 'publicFallback';
         mapped['publicFallback'] = true;
         mapped['isRedeemable'] = false;
         mapped['supportsDirectCustomRewardRedeem'] = false;
-
         final id = mapped['id']?.toString() ?? '';
         final title = mapped['title']?.toString() ?? '';
         final key = id.isNotEmpty ? id : title;
-
         if (key.isEmpty) continue;
         byKey[key] = mapped;
       }
     }
-
     final output = byKey.values.toList(growable: false);
     output.sort((a, b) {
       final aCost = int.tryParse(a['cost']?.toString() ?? '') ?? 0;
       final bCost = int.tryParse(b['cost']?.toString() ?? '') ?? 0;
       if (aCost != bCost) return aCost.compareTo(bCost);
-      return (a['title']?.toString() ?? '')
-          .toLowerCase()
-          .compareTo((b['title']?.toString() ?? '').toLowerCase());
+      return (a['title']?.toString() ?? '').toLowerCase().compareTo(
+            (b['title']?.toString() ?? '').toLowerCase(),
+          );
     });
-
     return output;
   }
 
@@ -401,7 +342,6 @@ class TwitchChannelPointsRuntimeSnapshot {
         _readFlatString(reward, 'customImageUrl') ??
         _readFlatString(reward, 'imageUrl') ??
         _readFlatString(reward, 'image_url');
-
     if (_looksLikeImageUrl(custom)) return custom!.trim();
 
     final fallback =
@@ -417,7 +357,6 @@ class TwitchChannelPointsRuntimeSnapshot {
             _readNestedString(reward, const <String>['default_image', 'url']) ??
             _readFlatString(reward, 'defaultImageUrl') ??
             _readFlatString(reward, 'default_image_url');
-
     if (_looksLikeImageUrl(fallback)) return fallback!.trim();
     return '';
   }
@@ -429,12 +368,10 @@ class TwitchChannelPointsRuntimeSnapshot {
 
   String? _readNestedString(Map<String, dynamic> map, List<String> path) {
     Object? current = map;
-
     for (final key in path) {
       if (current is! Map) return null;
       current = current[key];
     }
-
     final text = current?.toString().trim();
     return text == null || text.isEmpty ? null : text;
   }
