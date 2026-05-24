@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
-import '../../../models/special_actions/twitch_pending_special_message_stage250.dart';
+import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../widgets/watch/twitch_watch_chat_panel.dart';
@@ -119,7 +119,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final String? viewerId;
   final TwitchStreamHeaderMetadata metadata;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
-  final TwitchPendingSpecialMessageStage250? pendingSpecialMessage;
+  final TwitchPendingSpecialMessage? pendingSpecialMessage;
   final List<dynamic> pinnedMessages;
   final TwitchPredictionSnapshot? prediction;
   final bool loadingEmotes;
@@ -176,9 +176,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       thirdPartyEmoteCache: emotes.thirdParty,
       officialEmoteCache: emotes.official,
       emoteCount: emotes.thirdParty.count,
-      loadingEmotes: loadingEmotes ||
-          emotes.thirdParty.loading ||
-          emotes.official.loading,
+      loadingEmotes: loadingEmotes || emotes.thirdParty.loading || emotes.official.loading,
       channelPoints: channelPoints,
       pendingSpecialMessage: pendingSpecialMessage,
       pinnedMessages: pinnedMessages,
