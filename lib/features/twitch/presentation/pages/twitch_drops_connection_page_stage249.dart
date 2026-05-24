@@ -849,6 +849,11 @@ class _DropRow extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
+              _DropRewardThumbnail(
+                imageUrl: drop.rewardImageUrl,
+                accent: accent,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   drop.displayRewardName,
@@ -920,6 +925,54 @@ class _DropRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DropRewardThumbnail extends StatelessWidget {
+  final String imageUrl;
+  final Color accent;
+
+  const _DropRewardThumbnail({
+    required this.imageUrl,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl.trim();
+
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withOpacity(0.22)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: url.isEmpty
+          ? Icon(Icons.card_giftcard_rounded, color: accent, size: 22)
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(Icons.card_giftcard_rounded, color: accent, size: 22);
+              },
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: accent,
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
