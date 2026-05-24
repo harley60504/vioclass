@@ -245,11 +245,11 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   String get _startupMaskTitle {
-    if (_loadingAuth) return '甇?皞? Twitch 撌乩??挾...';
-    if (_loadingWatch) return '甇?皞?閫??...';
-    if (_enableWatchPlayer && _loadingPlayer) return '甇????剜??..';
-    if (_chatBootstrapping || _connectingChat) return '甇?????予摰?..';
-    return '甇?頛...';
+    if (_loadingAuth) return '正在準備 Twitch 工作階段...';
+    if (_loadingWatch) return '正在準備觀看頁...';
+    if (_enableWatchPlayer && _loadingPlayer) return '正在啟動播放器...';
+    if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
+    return '正在載入...';
   }
 
   @override
@@ -340,7 +340,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       onError: (message) {
         if (!mounted) return;
         setState(() => _playerError = message);
-        _showSnack('?剜?冽?雿仃??$message');
+        _showSnack('播放器操作失敗：$message');
       },
     );
 
@@ -398,8 +398,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
               child: TwitchWatchBlockingStartupOverlay(
                 title: _startupMaskTitle,
                 subtitle: _enableWatchPlayer
-                    ? 'Loading player and chat services...'
-                    : 'Loading chat services...',
+                    ? '先啟動播放器，再連線聊天室；互動資料與貼圖會在背景補上。'
+                    : '正在連線聊天室；互動資料與貼圖會在背景補上。',
               ),
             ),
         ],

@@ -1,9 +1,9 @@
-// PATCH VERSION: streamnook_relationship_token_split_v15
-// StreamNook-aligned Twitch relationship API service.
+// PATCH VERSION: relationship_token_split_v15
+// Twitch-aligned Twitch relationship API service.
 //
 // Notes:
 // - Follow status uses the main OAuth token and Helix /channels/followed first.
-// - Follow / unfollow now mirrors the provided StreamNook twitch_service.rs:
+// - Follow / unfollow now mirrors the provided Twitch twitch_service.rs:
 //   DropsAuthService token + TWITCH_ANDROID_CLIENT_ID + OAuth prefix + APQ hashes.
 // - Do not use full mutation query fallback for follow / unfollow.
 // - v13 reads the same SharedPreferences keys as TwitchDropsAuthService when
@@ -24,7 +24,7 @@ typedef TwitchRelationshipTokenProvider = Future<String?> Function();
 
 typedef TwitchRelationshipStringProvider = Future<String?> Function();
 
-class _StreamNookDropsPrefsKeys {
+class _DropsPrefsKeys {
   static const String tokenStorageKey = 'new_twitch_app_twitch_drops_token';
   static const String clientIdStorageKey = 'new_twitch_app_twitch_drops_client_id';
 }
@@ -159,7 +159,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
   /// Main app OAuth token. Used for Helix /channels/followed status checks.
   final TwitchRelationshipTokenProvider? oauthTokenProvider;
 
-  /// StreamNook-compatible Drops / Android token provider.
+  /// Twitch-compatible Drops / Android token provider.
   ///
   /// Important: v15 no longer treats [webTokenProvider] as a Drops fallback.
   /// Relationship mutations must not consume kimne/Web tokens.
@@ -175,13 +175,13 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
   /// Main app Client-ID used with Helix. Prefer TwitchAuthService.clientId.
   final TwitchRelationshipStringProvider? oauthClientIdProvider;
 
-  /// StreamNook-compatible Android / Drops Client-ID provider.
+  /// Twitch-compatible Android / Drops Client-ID provider.
   final TwitchRelationshipStringProvider? dropsClientIdProvider;
 
   /// Twitch Web GQL Client-ID, used only for read-only fallback GQL queries.
   final String gqlClientId;
 
-  /// APQ hashes captured from the StreamNook twitch_service.rs supplied by the user.
+  /// APQ hashes captured from the Twitch twitch_service.rs supplied by the user.
   /// Build-time defines can override these if Twitch rotates the hashes.
   static const String _followApqHash = String.fromEnvironment(
     'TWITCH_FOLLOW_APQ_HASH',
@@ -356,9 +356,9 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       final raw = await client.postJson<dynamic>(
         TwitchApiConstants.gqlEndpoint,
         data: <String, dynamic>{
-          'operationName': 'StreamNookRelationshipResolveUser',
+          'operationName': 'DropsRelationshipResolveUser',
           'query': r'''
-            query StreamNookRelationshipResolveUser($login: String!) {
+            query DropsRelationshipResolveUser($login: String!) {
               user(login: $login) {
                 id
                 login
@@ -443,9 +443,9 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
         final raw = await client.postJson<dynamic>(
           TwitchApiConstants.gqlEndpoint,
           data: <String, dynamic>{
-            'operationName': 'StreamNookRelationshipCheckFollowing',
+            'operationName': 'DropsRelationshipCheckFollowing',
             'query': r'''
-              query StreamNookRelationshipCheckFollowing($login: String!) {
+              query DropsRelationshipCheckFollowing($login: String!) {
                 user(login: $login) {
                   id
                   self {
@@ -660,7 +660,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
           token: safeDropsToken,
           authorizationPrefix: 'OAuth',
           clientId: expectedClientId,
-          label: 'streamnook-drops-token/oauth-prefix/android-client',
+          label: 'drops-token/oauth-prefix/android-client',
           tokenSource: dropsTokenResult.source,
           clientIdSource: dropsClientIdResult.source,
           validateSummary: validation.toSummary(),
@@ -820,7 +820,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     required String requestMode,
   }) {
     return <String, Object?>{
-      'patch': 'streamnook_relationship_token_split_v15',
+      'patch': 'relationship_token_split_v15',
       'action': actionLabel,
       'operationName': operationName,
       'requestMode': requestMode,
@@ -828,7 +828,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       'unfollowApqHashConfigured': _unfollowApqHash.trim().isNotEmpty,
       'runtimeApqDiscovery': _runtimeApqDiscoveryDebug[operationName] ??
           'not started or cache hit unavailable',
-      'tokenRule': 'follow/unfollow uses StreamNook-style drops/android token; status check still uses main OAuth Helix',
+      'tokenRule': 'follow/unfollow uses Twitch-style drops/android token; status check still uses main OAuth Helix',
       'nextStep': 'if Twitch returns failed integrity check even with v11 APQ hashes, compare live Twitch request headers/client context',
     };
   }
@@ -851,7 +851,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     final stored = await _loadDropsTokenFromSharedPreferences();
     final safeStored = stored?.trim();
     if (safeStored != null && safeStored.isNotEmpty) {
-      return _RelationshipValueSource<String?>(safeStored, 'sharedPreferences:${_StreamNookDropsPrefsKeys.tokenStorageKey}');
+      return _RelationshipValueSource<String?>(safeStored, 'sharedPreferences:${_DropsPrefsKeys.tokenStorageKey}');
     }
 
     return const _RelationshipValueSource<String?>(null, 'missing');
@@ -873,7 +873,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     if (safeStored != null &&
         safeStored.isNotEmpty &&
         !_looksLikeTwitchWebClientId(safeStored)) {
-      return _RelationshipValueSource<String>(safeStored, 'sharedPreferences:${_StreamNookDropsPrefsKeys.clientIdStorageKey}');
+      return _RelationshipValueSource<String>(safeStored, 'sharedPreferences:${_DropsPrefsKeys.clientIdStorageKey}');
     }
 
     final fromConstants = TwitchApiConstants.twitchDefaultDropsClientId.trim();
@@ -910,7 +910,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
   Future<String?> _loadDropsTokenFromSharedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_StreamNookDropsPrefsKeys.tokenStorageKey);
+      final raw = prefs.getString(_DropsPrefsKeys.tokenStorageKey);
       if (raw == null || raw.trim().isEmpty) return null;
 
       final parsed = jsonDecode(raw);
@@ -930,7 +930,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
   Future<String?> _loadDropsClientIdFromSharedPreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(_StreamNookDropsPrefsKeys.clientIdStorageKey);
+      return prefs.getString(_DropsPrefsKeys.clientIdStorageKey);
     } catch (_) {
       return null;
     }

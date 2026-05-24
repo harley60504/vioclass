@@ -462,7 +462,7 @@ int _resolveRewardCost(
       _readInt(json, const <String>['default_price']);
 
   if (lowerSource == 'automatic') {
-    // Match StreamNook: built-in rewards use the raw reward cost first.
+    // Match Twitch: built-in rewards use the raw reward cost first.
     // minimumCost is only the fallback lower-bound, not the configured price.
     if (cost != null && cost > 0) return cost;
     if (minimumCost != null && minimumCost > 0) return minimumCost;
@@ -495,7 +495,7 @@ int _resolveRewardRedeemCost(
       _readInt(json, const <String>['default_price']);
 
   if (lowerSource == 'automatic') {
-    // Match StreamNook redemption payloads exactly: cost -> minimumCost -> defaultCost.
+    // Match Twitch redemption payloads exactly: cost -> minimumCost -> defaultCost.
     if (cost != null && cost > 0) return cost;
     if (minimumCost != null && minimumCost > 0) return minimumCost;
     if (defaultCost != null && defaultCost > 0) return defaultCost;
@@ -527,7 +527,7 @@ bool _shouldDisplayReward({
   required Map<String, dynamic> raw,
   required TwitchChannelReward reward,
 }) {
-  // Match StreamNook: skip disabled rewards only. Do not hide rewards just
+  // Match Twitch: skip disabled rewards only. Do not hide rewards just
   // because Twitch marks them hidden-for-subs/viewer; the tile can still show
   // locked/unavailable state in UI.
   if (!reward.isEnabled) return false;

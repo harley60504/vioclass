@@ -1,7 +1,7 @@
 // PATCH VERSION: twitch_user_profile_cache_service_stage146
 //
 // Small in-memory profile cache for avatar/name enrichment. This mirrors the
-// StreamNook direction: pinned/chat UI should not assume the pinned author is
+// Twitch direction: pinned/chat UI should not assume the pinned author is
 // the broadcaster; resolve arbitrary users by id/login when avatar is missing.
 
 import '../../api/users/twitch_user_profile_api_service.dart';

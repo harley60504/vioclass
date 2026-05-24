@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../api/core/twitch_api_client.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
-import '../../services/drops/twitch_streamnook_drops_connection_check_stage249.dart';
-import '../../services/drops/twitch_streamnook_drops_connection_service_stage249.dart';
-import '../../services/drops/twitch_streamnook_drops_snapshot_stage249.dart';
+import '../../services/drops/twitch_drops_connection_check_stage249.dart';
+import '../../services/drops/twitch_drops_connection_service_stage249.dart';
+import '../../services/drops/twitch_drops_snapshot_stage249.dart';
 import '../../services/notifications/twitch_app_notification_service_stage249.dart';
 
 const Color _kStage249Purple = Color(0xFF9146FF);
@@ -17,26 +17,26 @@ const Color _kStage249Background = Color(0xFF0E0E10);
 const Color _kStage249Green = Color(0xFF5CFFB1);
 const Color _kStage249Gold = Color(0xFFFFC857);
 
-class TwitchStreamNookDropsConnectionPageStage249 extends StatefulWidget {
+class TwitchDropsConnectionPageStage249 extends StatefulWidget {
   final TwitchApiClient apiClient;
   final TwitchDropsAuthService dropsAuthService;
 
-  const TwitchStreamNookDropsConnectionPageStage249({
+  const TwitchDropsConnectionPageStage249({
     super.key,
     required this.apiClient,
     required this.dropsAuthService,
   });
 
   @override
-  State<TwitchStreamNookDropsConnectionPageStage249> createState() =>
-      _TwitchStreamNookDropsConnectionPageStage249State();
+  State<TwitchDropsConnectionPageStage249> createState() =>
+      _TwitchDropsConnectionPageStage249State();
 }
 
-class _TwitchStreamNookDropsConnectionPageStage249State
-    extends State<TwitchStreamNookDropsConnectionPageStage249> {
-  late final TwitchStreamNookDropsConnectionServiceStage249 service;
+class _TwitchDropsConnectionPageStage249State
+    extends State<TwitchDropsConnectionPageStage249> {
+  late final TwitchDropsConnectionServiceStage249 service;
 
-  TwitchStreamNookDropsConnectionCheckStage249? result;
+  TwitchDropsConnectionCheckStage249? result;
   final Set<String> claimingDropInstanceIds = <String>{};
   bool checking = false;
   bool showDebug = false;
@@ -45,7 +45,7 @@ class _TwitchStreamNookDropsConnectionPageStage249State
   @override
   void initState() {
     super.initState();
-    service = TwitchStreamNookDropsConnectionServiceStage249(
+    service = TwitchDropsConnectionServiceStage249(
       apiClient: widget.apiClient,
       dropsAuthService: widget.dropsAuthService,
     );
@@ -98,7 +98,7 @@ class _TwitchStreamNookDropsConnectionPageStage249State
     }
   }
 
-  Future<void> claimDrop(TwitchStreamNookDropStage249 drop) async {
+  Future<void> claimDrop(TwitchDropStage249 drop) async {
     final dropInstanceId = drop.dropInstanceId.trim();
     if (dropInstanceId.isEmpty || claimingDropInstanceIds.contains(dropInstanceId)) {
       return;
@@ -240,7 +240,7 @@ class _HeroCard extends StatelessWidget {
   final bool connected;
   final bool checking;
   final String statusText;
-  final TwitchStreamNookDropsSnapshotStage249? snapshot;
+  final TwitchDropsSnapshotStage249? snapshot;
   final VoidCallback onRefresh;
 
   const _HeroCard({
@@ -326,7 +326,7 @@ class _HeroCard extends StatelessWidget {
               const SizedBox(height: 9),
               Text(
                 snapshot == null
-                    ? '從 StreamNook-style Drops API 載入 Inventory 與 Campaigns。'
+                    ? '從 Twitch-style Drops API 載入 Inventory 與 Campaigns。'
                     : 'Inventory $campaignCount 個 campaign，Active campaigns $activeCount，進行中 $watchingCount，可領取 $readyCount。',
                 style: const TextStyle(
                   color: Colors.white70,
@@ -450,9 +450,9 @@ class _EmptyDropsCard extends StatelessWidget {
 }
 
 class _DropsDashboard extends StatelessWidget {
-  final TwitchStreamNookDropsSnapshotStage249 snapshot;
+  final TwitchDropsSnapshotStage249 snapshot;
   final Set<String> claimingDropInstanceIds;
-  final ValueChanged<TwitchStreamNookDropStage249> onClaimDrop;
+  final ValueChanged<TwitchDropStage249> onClaimDrop;
 
   const _DropsDashboard({
     required this.snapshot,
@@ -516,10 +516,10 @@ class _DropsDashboard extends StatelessWidget {
     );
   }
 
-  List<TwitchStreamNookDropCampaignStage249> _sortedCampaigns(
-    List<TwitchStreamNookDropCampaignStage249> campaigns,
+  List<TwitchDropCampaignStage249> _sortedCampaigns(
+    List<TwitchDropCampaignStage249> campaigns,
   ) {
-    final sorted = List<TwitchStreamNookDropCampaignStage249>.from(campaigns);
+    final sorted = List<TwitchDropCampaignStage249>.from(campaigns);
     sorted.sort((a, b) {
       final priorityCompare = _campaignPriority(a).compareTo(_campaignPriority(b));
       if (priorityCompare != 0) return priorityCompare;
@@ -530,7 +530,7 @@ class _DropsDashboard extends StatelessWidget {
     return sorted;
   }
 
-  int _campaignPriority(TwitchStreamNookDropCampaignStage249 campaign) {
+  int _campaignPriority(TwitchDropCampaignStage249 campaign) {
     final hasReady = campaign.timeBasedDrops.any((drop) => drop.readyToCollect);
     if (hasReady) return 0;
     if (campaign.status.toUpperCase() == 'ACTIVE') return 1;
@@ -539,7 +539,7 @@ class _DropsDashboard extends StatelessWidget {
     return 3;
   }
 
-  int _campaignBestProgress(TwitchStreamNookDropCampaignStage249 campaign) {
+  int _campaignBestProgress(TwitchDropCampaignStage249 campaign) {
     if (campaign.timeBasedDrops.isEmpty) return 0;
     return campaign.timeBasedDrops
         .map((drop) => drop.progressPercent)
@@ -548,7 +548,7 @@ class _DropsDashboard extends StatelessWidget {
 }
 
 class _SummaryGrid extends StatelessWidget {
-  final TwitchStreamNookDropsSnapshotStage249 snapshot;
+  final TwitchDropsSnapshotStage249 snapshot;
 
   const _SummaryGrid({required this.snapshot});
 
@@ -699,10 +699,10 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _CampaignTile extends StatelessWidget {
-  final TwitchStreamNookDropCampaignStage249 campaign;
+  final TwitchDropCampaignStage249 campaign;
   final bool highlightReady;
   final Set<String> claimingDropInstanceIds;
-  final ValueChanged<TwitchStreamNookDropStage249> onClaimDrop;
+  final ValueChanged<TwitchDropStage249> onClaimDrop;
 
   const _CampaignTile({
     required this.campaign,
@@ -713,7 +713,7 @@ class _CampaignTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sortedDrops = List<TwitchStreamNookDropStage249>.from(campaign.timeBasedDrops)
+    final sortedDrops = List<TwitchDropStage249>.from(campaign.timeBasedDrops)
       ..sort((a, b) {
         final priorityCompare = _dropPriority(a).compareTo(_dropPriority(b));
         if (priorityCompare != 0) return priorityCompare;
@@ -807,7 +807,7 @@ class _CampaignTile extends StatelessWidget {
     );
   }
 
-  int _dropPriority(TwitchStreamNookDropStage249 drop) {
+  int _dropPriority(TwitchDropStage249 drop) {
     if (drop.readyToCollect) return 0;
     if (!drop.isClaimed && drop.progressComplete) return 1;
     if (!drop.isClaimed) return 2;
@@ -816,9 +816,9 @@ class _CampaignTile extends StatelessWidget {
 }
 
 class _DropRow extends StatelessWidget {
-  final TwitchStreamNookDropStage249 drop;
+  final TwitchDropStage249 drop;
   final bool claiming;
-  final ValueChanged<TwitchStreamNookDropStage249> onClaimDrop;
+  final ValueChanged<TwitchDropStage249> onClaimDrop;
 
   const _DropRow({
     required this.drop,
@@ -974,7 +974,7 @@ class _SimpleInfoCard extends StatelessWidget {
 }
 
 class _DebugResultCard extends StatelessWidget {
-  final TwitchStreamNookDropsConnectionCheckStage249 current;
+  final TwitchDropsConnectionCheckStage249 current;
 
   const _DebugResultCard({required this.current});
 

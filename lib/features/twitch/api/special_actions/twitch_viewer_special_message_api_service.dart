@@ -1,4 +1,4 @@
-﻿import '../../api/core/twitch_web_gql_persisted_api_service.dart';
+import '../../api/core/twitch_web_gql_persisted_api_service.dart';
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 
 class TwitchViewerSpecialMessageOperationStage251 {
@@ -42,7 +42,7 @@ class TwitchViewerSpecialMessageOperationConfigStage251 {
     required this.updateChatIdentity,
   });
 
-  static const streamNook = TwitchViewerSpecialMessageOperationConfigStage251(
+  static const defaultConfig = TwitchViewerSpecialMessageOperationConfigStage251(
     getWatchStreak: TwitchViewerSpecialMessageOperationStage251(
       operationName: 'RewardList',
       sha256Hash:
@@ -75,7 +75,7 @@ class TwitchViewerSpecialMessageOperationConfigStage251 {
     ),
   );
 
-  static const streamNookNamesOnly = streamNook;
+  static const defaultConfigNamesOnly = defaultConfig;
 }
 
 class TwitchViewerSpecialMessageApiServiceStage251 {
@@ -87,7 +87,7 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     required this.webGql,
     required this.androidGql,
     this.operations =
-        TwitchViewerSpecialMessageOperationConfigStage251.streamNook,
+        TwitchViewerSpecialMessageOperationConfigStage251.defaultConfig,
   });
 
   Future<TwitchWatchStreakStatusStage251> getWatchStreak({

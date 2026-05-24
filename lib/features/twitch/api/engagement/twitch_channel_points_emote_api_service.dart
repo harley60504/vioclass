@@ -15,13 +15,13 @@ typedef TwitchChannelPointsChannelIdResolver = Future<String> Function({
 ///
 /// Responsibility boundary:
 /// - API service: send Twitch GQL request and handle auth / transport errors.
-/// - Parser: normalize StreamNook-style subscriptionProducts response and apply
+/// - Parser: normalize Twitch-style subscriptionProducts response and apply
 ///   the Choose menu whitelist rules.
 ///
 /// This service must not merge normal chat emote caches, global emotes,
 /// third-party emotes, or lockedChannelEmotes into the Channel Points menu.
 class TwitchChannelPointsEmoteApiService {
-  /// StreamNook constant: EMOTE_PICKER_USER_SUBSCRIPTION_PRODUCTS_HASH.
+  /// Twitch constant: EMOTE_PICKER_USER_SUBSCRIPTION_PRODUCTS_HASH.
   static const String emotePickerUserSubscriptionProductsHash =
       '511bebfb513d0127d24a7fe49aa2b7717306a611e1f4269a93e0cc76e8a65a81';
 
@@ -69,7 +69,7 @@ class TwitchChannelPointsEmoteApiService {
       );
     }
 
-    final raw = await _postStreamNookSubscriptionProductsQuery(
+    final raw = await _postSubscriptionProductsQuery(
       channelOwnerId: ownerId,
     );
 
@@ -89,10 +89,10 @@ class TwitchChannelPointsEmoteApiService {
     return parsed.approvedEmotes;
   }
 
-  Future<dynamic> _postStreamNookSubscriptionProductsQuery({
+  Future<dynamic> _postSubscriptionProductsQuery({
     required String channelOwnerId,
   }) async {
-    // For this StreamNook-captured hash, sending the wrong operationName causes
+    // For this captured hash, sending the wrong operationName causes
     // Twitch to return: no operation with name "EmotePicker_UserSubscriptionProducts".
     // Therefore this request intentionally omits operationName and lets Twitch
     // execute the single operation bound to the persisted query hash.

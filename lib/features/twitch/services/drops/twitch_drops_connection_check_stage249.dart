@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'twitch_streamnook_drops_snapshot_stage249.dart';
+import 'twitch_drops_snapshot_stage249.dart';
 
-class TwitchStreamNookDropsConnectionCheckStage249 {
+class TwitchDropsConnectionCheckStage249 {
   final bool hasToken;
   final bool tokenValid;
   final String clientId;
@@ -17,11 +17,11 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
   final String campaignsRootSummary;
   final String campaignsPreview;
 
-  final TwitchStreamNookDropsSnapshotStage249? snapshot;
+  final TwitchDropsSnapshotStage249? snapshot;
   final String? errorText;
   final DateTime checkedAt;
 
-  const TwitchStreamNookDropsConnectionCheckStage249({
+  const TwitchDropsConnectionCheckStage249({
     required this.hasToken,
     required this.tokenValid,
     required this.clientId,
@@ -53,12 +53,12 @@ class TwitchStreamNookDropsConnectionCheckStage249 {
   }
 
   String get title {
-    if (connected) return 'StreamNook Drops 連線成功';
+    if (connected) return 'Drops 連線成功';
     if (!hasToken) return '尚未取得 Drops token';
     if (!tokenValid) return 'Drops token 驗證失敗';
     if (!inventoryOk) return 'Drops inventory 連線失敗';
     if (!campaignsOk) return 'Drops campaigns 連線失敗';
-    return 'StreamNook Drops 連線未完成';
+    return 'Drops 連線未完成';
   }
 
   String get summary {

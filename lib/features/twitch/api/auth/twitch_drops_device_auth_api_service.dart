@@ -6,7 +6,7 @@ typedef TwitchDropsClientIdProvider = String Function();
 
 /// Drops / channel-points device auth.
 ///
-/// This intentionally uses empty scopes, matching the StreamNook /
+/// This intentionally uses empty scopes, matching the Twitch /
 /// TwitchDropsMiner style flow. The Client-ID is configurable so we can test
 /// whether a normal Developer Client-ID works with the same flow.
 class TwitchDropsDeviceAuthApiService {

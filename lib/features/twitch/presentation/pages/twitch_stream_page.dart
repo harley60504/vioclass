@@ -5,7 +5,7 @@
 // - widgets/home/twitch_stream_home_sidebar_stage249.dart
 // - widgets/home/twitch_stream_home_toolbar_stage249.dart
 // - widgets/home/twitch_stream_home_account_menu_stage249.dart
-// - twitch_streamnook_drops_connection_page_stage249.dart
+// - twitch_drops_connection_page_stage249.dart
 //
 // 之後要改 Stage249 / Drops / settings menu，優先改小檔，不要再整份改這個主頁。
 
@@ -26,7 +26,7 @@ import 'twitch_browse_page.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
 import 'twitch_stream_home_models_stage249.dart';
-import 'twitch_streamnook_drops_connection_page_stage249.dart';
+import 'twitch_drops_connection_page_stage249.dart';
 
 const Color _kBackground = Color(0xFF0A0A0F);
 
@@ -200,10 +200,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     );
   }
 
-  Future<void> openStreamNookDropsConnectorPage() async {
+  Future<void> openDropsConnectorPage() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => TwitchStreamNookDropsConnectionPageStage249(
+        builder: (_) => TwitchDropsConnectionPageStage249(
           apiClient: apiClient,
           dropsAuthService: dropsAuthService,
         ),
@@ -270,7 +270,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
                       },
                       onRefresh: refreshCurrentPage,
                       onLogin: runLinkedTwitchLoginFlow,
-                      onOpenDropsConnector: openStreamNookDropsConnectorPage,
+                      onOpenDropsConnector: openDropsConnectorPage,
                       onTestAppNotification: showStage249InternalNotificationTest,
                       onLogout: logout,
                     ),

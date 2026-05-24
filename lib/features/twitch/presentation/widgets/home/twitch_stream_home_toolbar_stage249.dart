@@ -70,10 +70,15 @@ class TwitchStreamHomeToolbarStage249 extends StatelessWidget {
             onPressed: () => onRefresh(),
           ),
           const SizedBox(width: 4),
+          TwitchStreamHomeToolbarIconButtonStage249(
+            tooltip: 'Drops 連接',
+            icon: Icons.card_giftcard_rounded,
+            onPressed: () => onOpenDropsConnector(),
+          ),
+          const SizedBox(width: 4),
           TwitchStreamHomeAccountMenuStage249(
             onLogin: onLogin,
             onRefresh: onRefresh,
-            onOpenDropsConnector: onOpenDropsConnector,
             onTestAppNotification: onTestAppNotification,
             onLogout: onLogout,
           ),

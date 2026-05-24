@@ -84,7 +84,7 @@ class TwitchChannelPointsRewardParser {
     required Map<String, dynamic> raw,
     required TwitchChannelReward reward,
   }) {
-    // Match StreamNook: skip disabled rewards only. Do not hide rewards just
+    // Match Twitch: skip disabled rewards only. Do not hide rewards just
     // because Twitch marks them hidden-for-subs/viewer; UI can show locked state.
     if (!reward.isEnabled) return false;
     if (_readBool(raw, const <String>['isDisabled']) == true) return false;

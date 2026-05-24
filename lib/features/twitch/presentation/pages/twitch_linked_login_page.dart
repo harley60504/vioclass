@@ -931,7 +931,7 @@ class _LoginStateChecklist extends StatelessWidget {
           _LoginStateRow(
             done: dropsTokenReady,
             title: '3. Drops / Android token',
-            subtitle: 'StreamNook-style Follow / Unfollow / Drops APQ',
+            subtitle: 'Twitch-style Follow / Unfollow / Drops APQ',
           ),
         ],
       ),

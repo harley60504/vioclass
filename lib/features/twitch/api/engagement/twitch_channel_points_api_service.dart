@@ -356,7 +356,7 @@ query ChannelPointsContext($channelLogin: String!) {
   }
 
   /// Fetches channel-points reward list using the persisted ChannelPointsContext
-  /// operation observed from Twitch Web / StreamNook style clients.
+  /// operation observed from Twitch Web / Twitch style clients.
   Future<TwitchChannelRewardsResult> getRewards({
     required String channelLogin,
   }) async {
@@ -413,7 +413,7 @@ query ChannelPointsContext($channelLogin: String!) {
   }
 
 
-  /// StreamNook-style Channel Points emote menu source.
+  /// Twitch-style Channel Points emote menu source.
   ///
   /// Kept here as a compatibility wrapper. The actual GQL/menu backend lives in
   /// [TwitchChannelPointsEmoteApiService] so Channel Points reward redemption
@@ -800,7 +800,7 @@ mutation UnlockChosenSubscriberEmote($input: UnlockChosenSubscriberEmoteInput!) 
     if (cleanEmoteId == null || cleanEmoteId.isEmpty) {
       throw TwitchApiException('Modify Emote requires an emoteId.');
     }
-    // StreamNook sends the final modified emote id, for example `1022569_BW`,
+    // The API sends the final modified emote id, for example `1022569_BW`,
     // as emoteID. The modifier id is UI-only metadata and is not sent separately.
     final finalModifiedEmoteId = cleanEmoteId;
 
@@ -1114,7 +1114,7 @@ int _resolveRewardCost(
       _readInt(json, const <String>['default_price']);
 
   if (lowerSource == 'automatic') {
-    // Match StreamNook: built-in rewards use the raw reward cost first.
+    // Match Twitch: built-in rewards use the raw reward cost first.
     // minimumCost is only the fallback lower-bound, not the configured price.
     if (cost != null && cost > 0) return cost;
     if (minimumCost != null && minimumCost > 0) return minimumCost;
@@ -1147,7 +1147,7 @@ int _resolveRewardRedeemCost(
       _readInt(json, const <String>['default_price']);
 
   if (lowerSource == 'automatic') {
-    // Match StreamNook redemption payloads exactly: cost -> minimumCost -> defaultCost.
+    // Match Twitch redemption payloads exactly: cost -> minimumCost -> defaultCost.
     if (cost != null && cost > 0) return cost;
     if (minimumCost != null && minimumCost > 0) return minimumCost;
     if (defaultCost != null && defaultCost > 0) return defaultCost;
@@ -1179,7 +1179,7 @@ bool _shouldDisplayReward({
   required Map<String, dynamic> raw,
   required TwitchChannelReward reward,
 }) {
-  // Match StreamNook: skip disabled rewards only. Do not hide rewards just
+  // Match Twitch: skip disabled rewards only. Do not hide rewards just
   // because Twitch marks them hidden-for-subs/viewer; the tile can still show
   // locked/unavailable state in UI.
   if (!reward.isEnabled) return false;

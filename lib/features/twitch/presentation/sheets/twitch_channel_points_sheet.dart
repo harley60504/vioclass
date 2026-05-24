@@ -52,7 +52,7 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   /// such as Highlight My Message and sub-only bypass message.
   ///
   /// Keeping the final text input in the normal chat composer makes the flow
-  /// match StreamNook/Twitch: choose the special action first, type in the
+  /// match Twitch: choose the special action first, type in the
   /// regular chat box, then press Send once.
   final Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward;
 
@@ -63,11 +63,11 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   /// - Highlight / Sub-only: chat message text
   /// - Choose / Gigantify: emote id
   /// - Modify: JSON string with {emoteId, modifierId}; emoteId is the final
-  ///   modified emote id, StreamNook-style.
+  ///   modified emote id, Twitch-style.
   final Future<void> Function(Map<String, dynamic> reward, String textInput)?
       onRedeemReward;
 
-  /// StreamNook-style source for Choose / Modify emote menus.
+  /// Twitch-style source for Choose / Modify emote menus.
   /// This must return Channel Points-selectable emotes, not the general chat
   /// emote list and not all locked channel emotes.
   final TwitchChannelPointEmoteLoader? onLoadChannelPointEmotes;

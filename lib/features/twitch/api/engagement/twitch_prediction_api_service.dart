@@ -56,7 +56,7 @@ class TwitchPredictionApiService {
       final channelId = _readChannelIdFromPrediction(snapshot.rawPrediction) ??
           _readChannelIdFromObject(raw.response);
       if (channelId != null && channelId.trim().isNotEmpty) {
-        // StreamNook-style path: GQL is the initial active snapshot, Hermes is
+        // Twitch-style path: GQL is the initial active snapshot, Hermes is
         // the realtime prediction event stream. Pass viewerUserId when known so
         // Hermes can distinguish the current viewer's prediction-made / top
         // predictor entries from everyone else's bets.

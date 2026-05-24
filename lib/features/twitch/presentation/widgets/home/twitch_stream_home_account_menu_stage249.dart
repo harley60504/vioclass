@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 class TwitchStreamHomeAccountMenuStage249 extends StatelessWidget {
   final Future<void> Function() onLogin;
   final Future<void> Function() onRefresh;
-  final Future<void> Function() onOpenDropsConnector;
   final VoidCallback onTestAppNotification;
   final Future<void> Function() onLogout;
 
@@ -11,7 +10,6 @@ class TwitchStreamHomeAccountMenuStage249 extends StatelessWidget {
     super.key,
     required this.onLogin,
     required this.onRefresh,
-    required this.onOpenDropsConnector,
     required this.onTestAppNotification,
     required this.onLogout,
   });
@@ -33,9 +31,6 @@ class TwitchStreamHomeAccountMenuStage249 extends StatelessWidget {
           case 'refresh':
             await onRefresh();
             break;
-          case 'streamnook_drops_connector':
-            await onOpenDropsConnector();
-            break;
           case 'test_app_notification':
             onTestAppNotification();
             break;
@@ -54,10 +49,6 @@ class TwitchStreamHomeAccountMenuStage249 extends StatelessWidget {
           child: Text('重新檢查登入狀態'),
         ),
         PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'streamnook_drops_connector',
-          child: Text('Drops 頁面 / 可領取'),
-        ),
         PopupMenuItem<String>(
           value: 'test_app_notification',
           child: Text('測試程式內部通知'),

@@ -28,7 +28,7 @@ class TwitchChannelPointsRuntimeService {
       // Twitch's community-points bonus claim is effectively idempotent from a
       // UI perspective: the claim can disappear server-side even when the
       // response path reports an error such as already claimed / not found / no
-      // longer available. StreamNook-style handling treats these as a consumed
+      // longer available. Twitch-style handling treats these as a consumed
       // claim and lets the caller refresh the snapshot instead of keeping the
       // gift button around until the user reopens the stream.
       if (_looksLikeConsumedClaimError(error)) {
@@ -127,7 +127,7 @@ class TwitchChannelPointsRuntimeService {
     return channelPointsApi.unlockModifiedSubscriberEmote(
       channelId: channelId,
       reward: parsedReward,
-      // StreamNook-style: modifiedEmoteId is already the final id, e.g. 1022569_BW.
+      // Twitch-style: modifiedEmoteId is already the final id, e.g. 1022569_BW.
       emoteId: modifiedEmoteId,
       emoteModifierId: modifierId,
     );

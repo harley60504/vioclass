@@ -213,9 +213,9 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                   : choosingModifier
                   ? _ModifierGrid(emote: base, onSelected: onChooseModifier)
                   : emotes.isEmpty
-                  ? const _OverlayMessage(
-                      icon: Icons.search_off_rounded,
-                      message: '沒有可顯示的 Channel Points 貼圖。',
+                  ? _EmoteEmptyMessage(
+                      mode: mode,
+                      query: query,
                     )
                   : _EmoteGrid(emotes: emotes, onSelected: onChooseEmote),
             ),
@@ -299,6 +299,29 @@ class _EmoteGrid extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+
+class _EmoteEmptyMessage extends StatelessWidget {
+  final ChannelPointEmoteOverlayMode? mode;
+  final String query;
+
+  const _EmoteEmptyMessage({required this.mode, required this.query});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasQuery = query.trim().isNotEmpty;
+    if (mode == ChannelPointEmoteOverlayMode.modify && !hasQuery) {
+      return const _OverlayMessage(
+        icon: Icons.auto_fix_off_rounded,
+        message: '這個頻道目前沒有可修改的訂閱貼圖。',
+      );
+    }
+    return _OverlayMessage(
+      icon: Icons.search_off_rounded,
+      message: hasQuery ? '沒有符合搜尋條件的貼圖' : '沒有符合的 Channel Points 貼圖',
     );
   }
 }

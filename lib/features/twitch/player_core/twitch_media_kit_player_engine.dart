@@ -20,7 +20,7 @@ class TwitchMediaKitPlayerEngine {
 
   TwitchMediaKitPlayerEngine({
     required this.profile,
-    this.title = 'StreamNook Twitch Player',
+    this.title = 'Twitch Player',
   });
 
   bool get initialized => _player != null && _videoController != null;

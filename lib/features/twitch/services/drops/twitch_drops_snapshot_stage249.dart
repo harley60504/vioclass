@@ -1,17 +1,17 @@
-class TwitchStreamNookDropsSnapshotStage249 {
+class TwitchDropsSnapshotStage249 {
   final String viewerId;
   final String viewerLogin;
-  final List<TwitchStreamNookDropCampaignStage249> inventoryCampaigns;
-  final List<TwitchStreamNookDropCampaignSummaryStage249> activeCampaigns;
+  final List<TwitchDropCampaignStage249> inventoryCampaigns;
+  final List<TwitchDropCampaignSummaryStage249> activeCampaigns;
 
-  const TwitchStreamNookDropsSnapshotStage249({
+  const TwitchDropsSnapshotStage249({
     required this.viewerId,
     required this.viewerLogin,
     required this.inventoryCampaigns,
     required this.activeCampaigns,
   });
 
-  factory TwitchStreamNookDropsSnapshotStage249.fromResponses({
+  factory TwitchDropsSnapshotStage249.fromResponses({
     required Object? inventoryResponse,
     required Object? campaignsResponse,
   }) {
@@ -23,35 +23,35 @@ class TwitchStreamNookDropsSnapshotStage249 {
         _asList(inventory?['dropCampaignsInProgress']);
     final rawActiveCampaigns = _asList(campaignsUser?['dropCampaigns']);
 
-    return TwitchStreamNookDropsSnapshotStage249(
+    return TwitchDropsSnapshotStage249(
       viewerId: _string(inventoryUser?['id']).isNotEmpty
           ? _string(inventoryUser?['id'])
           : _string(campaignsUser?['id']),
       viewerLogin: _string(campaignsUser?['login']),
       inventoryCampaigns: rawInventoryCampaigns
           .whereType<Map>()
-          .map(TwitchStreamNookDropCampaignStage249.fromJson)
+          .map(TwitchDropCampaignStage249.fromJson)
           .where((campaign) => campaign.id.isNotEmpty)
           .toList(growable: false),
       activeCampaigns: rawActiveCampaigns
           .whereType<Map>()
-          .map(TwitchStreamNookDropCampaignSummaryStage249.fromJson)
+          .map(TwitchDropCampaignSummaryStage249.fromJson)
           .where((campaign) => campaign.id.isNotEmpty)
           .toList(growable: false),
     );
   }
 
-  List<TwitchStreamNookDropStage249> get allDrops {
+  List<TwitchDropStage249> get allDrops {
     return inventoryCampaigns
         .expand((campaign) => campaign.timeBasedDrops)
         .toList(growable: false);
   }
 
-  List<TwitchStreamNookDropStage249> get readyDrops {
+  List<TwitchDropStage249> get readyDrops {
     return allDrops.where((drop) => drop.readyToCollect).toList(growable: false);
   }
 
-  List<TwitchStreamNookDropStage249> get watchingDrops {
+  List<TwitchDropStage249> get watchingDrops {
     return allDrops
         .where((drop) => !drop.isClaimed && !drop.readyToCollect)
         .toList(growable: false);
@@ -113,7 +113,7 @@ class TwitchStreamNookDropsSnapshotStage249 {
   }
 }
 
-class TwitchStreamNookDropCampaignStage249 {
+class TwitchDropCampaignStage249 {
   final String id;
   final String name;
   final String status;
@@ -125,9 +125,9 @@ class TwitchStreamNookDropCampaignStage249 {
   final DateTime? startAt;
   final DateTime? endAt;
   final bool isAccountConnected;
-  final List<TwitchStreamNookDropStage249> timeBasedDrops;
+  final List<TwitchDropStage249> timeBasedDrops;
 
-  const TwitchStreamNookDropCampaignStage249({
+  const TwitchDropCampaignStage249({
     required this.id,
     required this.name,
     required this.status,
@@ -142,12 +142,12 @@ class TwitchStreamNookDropCampaignStage249 {
     required this.timeBasedDrops,
   });
 
-  factory TwitchStreamNookDropCampaignStage249.fromJson(Map raw) {
+  factory TwitchDropCampaignStage249.fromJson(Map raw) {
     final self = _asMap(raw['self']);
     final game = _asMap(raw['game']);
     final drops = _asList(raw['timeBasedDrops']);
 
-    final campaign = TwitchStreamNookDropCampaignStage249(
+    final campaign = TwitchDropCampaignStage249(
       id: _string(raw['id']),
       name: _string(raw['name']),
       status: _string(raw['status']),
@@ -161,13 +161,13 @@ class TwitchStreamNookDropCampaignStage249 {
       startAt: _date(raw['startAt']),
       endAt: _date(raw['endAt']),
       isAccountConnected: self?['isAccountConnected'] == true,
-      timeBasedDrops: const <TwitchStreamNookDropStage249>[],
+      timeBasedDrops: const <TwitchDropStage249>[],
     );
 
     return campaign.copyWith(
       timeBasedDrops: drops
           .whereType<Map>()
-          .map((drop) => TwitchStreamNookDropStage249.fromJson(
+          .map((drop) => TwitchDropStage249.fromJson(
                 drop,
                 campaignId: campaign.id,
                 campaignName: campaign.name,
@@ -179,10 +179,10 @@ class TwitchStreamNookDropCampaignStage249 {
     );
   }
 
-  TwitchStreamNookDropCampaignStage249 copyWith({
-    List<TwitchStreamNookDropStage249>? timeBasedDrops,
+  TwitchDropCampaignStage249 copyWith({
+    List<TwitchDropStage249>? timeBasedDrops,
   }) {
-    return TwitchStreamNookDropCampaignStage249(
+    return TwitchDropCampaignStage249(
       id: id,
       name: name,
       status: status,
@@ -215,7 +215,7 @@ class TwitchStreamNookDropCampaignStage249 {
   }
 }
 
-class TwitchStreamNookDropStage249 {
+class TwitchDropStage249 {
   final String id;
   final String campaignId;
   final String campaignName;
@@ -232,7 +232,7 @@ class TwitchStreamNookDropStage249 {
   final DateTime? startAt;
   final DateTime? endAt;
 
-  const TwitchStreamNookDropStage249({
+  const TwitchDropStage249({
     required this.id,
     required this.campaignId,
     required this.campaignName,
@@ -250,7 +250,7 @@ class TwitchStreamNookDropStage249 {
     required this.endAt,
   });
 
-  factory TwitchStreamNookDropStage249.fromJson(
+  factory TwitchDropStage249.fromJson(
     Map raw, {
     required String campaignId,
     required String campaignName,
@@ -264,7 +264,7 @@ class TwitchStreamNookDropStage249 {
         : null;
     final benefit = _asMap(firstBenefitEdge?['benefit']);
 
-    return TwitchStreamNookDropStage249(
+    return TwitchDropStage249(
       id: _string(raw['id']),
       campaignId: campaignId,
       campaignName: campaignName,
@@ -343,7 +343,7 @@ class TwitchStreamNookDropStage249 {
   }
 }
 
-class TwitchStreamNookDropCampaignSummaryStage249 {
+class TwitchDropCampaignSummaryStage249 {
   final String id;
   final String name;
   final String status;
@@ -355,7 +355,7 @@ class TwitchStreamNookDropCampaignSummaryStage249 {
   final DateTime? endAt;
   final bool isAccountConnected;
 
-  const TwitchStreamNookDropCampaignSummaryStage249({
+  const TwitchDropCampaignSummaryStage249({
     required this.id,
     required this.name,
     required this.status,
@@ -368,11 +368,11 @@ class TwitchStreamNookDropCampaignSummaryStage249 {
     required this.isAccountConnected,
   });
 
-  factory TwitchStreamNookDropCampaignSummaryStage249.fromJson(Map raw) {
+  factory TwitchDropCampaignSummaryStage249.fromJson(Map raw) {
     final self = _asMap(raw['self']);
     final game = _asMap(raw['game']);
 
-    return TwitchStreamNookDropCampaignSummaryStage249(
+    return TwitchDropCampaignSummaryStage249(
       id: _string(raw['id']),
       name: _string(raw['name']),
       status: _string(raw['status']),

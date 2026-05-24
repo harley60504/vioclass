@@ -6,17 +6,17 @@ import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../api/drops/twitch_drops_query_presets_stage249.dart';
 import '../auth/twitch_drops_auth_service.dart';
-import 'twitch_streamnook_drops_connection_check_stage249.dart';
-import 'twitch_streamnook_drops_snapshot_stage249.dart';
+import 'twitch_drops_connection_check_stage249.dart';
+import 'twitch_drops_snapshot_stage249.dart';
 
-class TwitchStreamNookDropsCollectResultStage249 {
+class TwitchDropsCollectResultStage249 {
   final bool ok;
   final int? statusCode;
   final bool hasGraphQLErrors;
   final Object? data;
   final String? errorText;
 
-  const TwitchStreamNookDropsCollectResultStage249({
+  const TwitchDropsCollectResultStage249({
     required this.ok,
     required this.statusCode,
     required this.hasGraphQLErrors,
@@ -31,16 +31,16 @@ class TwitchStreamNookDropsCollectResultStage249 {
   }
 }
 
-class TwitchStreamNookDropsConnectionServiceStage249 {
+class TwitchDropsConnectionServiceStage249 {
   final TwitchApiClient apiClient;
   final TwitchDropsAuthService dropsAuthService;
 
-  const TwitchStreamNookDropsConnectionServiceStage249({
+  const TwitchDropsConnectionServiceStage249({
     required this.apiClient,
     required this.dropsAuthService,
   });
 
-  Future<TwitchStreamNookDropsConnectionCheckStage249> checkConnection() async {
+  Future<TwitchDropsConnectionCheckStage249> checkConnection() async {
     String clientId = dropsAuthService.dropsClientId.trim();
     var hasToken = false;
     var tokenValid = false;
@@ -94,7 +94,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
       final inventoryHasErrors = _hasGqlErrors(inventory.data);
       final campaignsHasErrors = _hasGqlErrors(campaigns.data);
       final snapshot = !inventoryHasErrors && !campaignsHasErrors
-          ? TwitchStreamNookDropsSnapshotStage249.fromResponses(
+          ? TwitchDropsSnapshotStage249.fromResponses(
               inventoryResponse: inventory.data,
               campaignsResponse: campaigns.data,
             )
@@ -124,12 +124,12 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
     }
   }
 
-  Future<TwitchStreamNookDropsCollectResultStage249> collectDrop({
+  Future<TwitchDropsCollectResultStage249> collectDrop({
     required String dropInstanceId,
   }) async {
     final safeDropInstanceId = dropInstanceId.trim();
     if (safeDropInstanceId.isEmpty) {
-      return const TwitchStreamNookDropsCollectResultStage249(
+      return const TwitchDropsCollectResultStage249(
         ok: false,
         statusCode: null,
         hasGraphQLErrors: false,
@@ -143,7 +143,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
       final token = await dropsAuthService.getToken();
       final clientId = dropsAuthService.dropsClientId.trim();
       if (token == null || token.trim().isEmpty) {
-        return const TwitchStreamNookDropsCollectResultStage249(
+        return const TwitchDropsCollectResultStage249(
           ok: false,
           statusCode: null,
           hasGraphQLErrors: false,
@@ -154,7 +154,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
 
       final tokenValid = await dropsAuthService.validateToken();
       if (!tokenValid) {
-        return const TwitchStreamNookDropsCollectResultStage249(
+        return const TwitchDropsCollectResultStage249(
           ok: false,
           statusCode: null,
           hasGraphQLErrors: false,
@@ -165,7 +165,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
 
       final validToken = await dropsAuthService.getToken();
       if (validToken == null || validToken.trim().isEmpty) {
-        return const TwitchStreamNookDropsCollectResultStage249(
+        return const TwitchDropsCollectResultStage249(
           ok: false,
           statusCode: null,
           hasGraphQLErrors: false,
@@ -183,7 +183,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
       );
       final hasErrors = _hasGqlErrors(response.data);
       final statusCode = response.statusCode ?? 0;
-      return TwitchStreamNookDropsCollectResultStage249(
+      return TwitchDropsCollectResultStage249(
         ok: statusCode >= 200 && statusCode < 300 && !hasErrors,
         statusCode: response.statusCode,
         hasGraphQLErrors: hasErrors,
@@ -191,7 +191,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
         errorText: null,
       );
     } catch (error) {
-      return TwitchStreamNookDropsCollectResultStage249(
+      return TwitchDropsCollectResultStage249(
         ok: false,
         statusCode: null,
         hasGraphQLErrors: false,
@@ -201,7 +201,7 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
     }
   }
 
-  TwitchStreamNookDropsConnectionCheckStage249 _result({
+  TwitchDropsConnectionCheckStage249 _result({
     required bool hasToken,
     required bool tokenValid,
     required String clientId,
@@ -213,10 +213,10 @@ class TwitchStreamNookDropsConnectionServiceStage249 {
     bool campaignsHasErrors = false,
     String campaignsRootSummary = '-',
     String campaignsPreview = '',
-    TwitchStreamNookDropsSnapshotStage249? snapshot,
+    TwitchDropsSnapshotStage249? snapshot,
     String? errorText,
   }) {
-    return TwitchStreamNookDropsConnectionCheckStage249(
+    return TwitchDropsConnectionCheckStage249(
       hasToken: hasToken,
       tokenValid: tokenValid,
       clientId: clientId,

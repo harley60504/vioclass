@@ -12,7 +12,7 @@ import '../../services/chat/twitch_badge_cache_service.dart';
 /// - recent raw IRC
 /// - recent object / historical object
 ///
-/// 這層開始往 StreamNook 那種 render-ready model 靠攏：
+/// 這層開始往 render-ready model 靠攏：
 /// badge / fragments / segments / metadata 都先算好，UI 只負責畫。
 class TwitchChatMessageNormalizer {
   final TwitchBadgeCacheService badgeCache;

@@ -1,6 +1,6 @@
 /// Models and parser for Channel Points emote menus.
 ///
-/// This parser mirrors the StreamNook boundary: the Channel Points Choose menu
+/// This parser mirrors the Twitch boundary: the Channel Points Choose menu
 /// should be built from Twitch's subscriptionProducts emote payload, not from
 /// normal chat emote caches.  The parser is the only place where response-shape
 /// normalization and whitelist filtering should live.
@@ -74,7 +74,7 @@ class TwitchChannelPointsChooseMenuParseResult {
 class TwitchChannelPointsEmoteParser {
   const TwitchChannelPointsEmoteParser._();
 
-  /// Parse the Choose-an-emote whitelist from a StreamNook-style
+  /// Parse the Choose-an-emote whitelist from a Twitch-style
   /// subscriptionProducts response.
   ///
   /// Audit rules learned from the debug payload:
@@ -112,7 +112,7 @@ class TwitchChannelPointsEmoteParser {
     );
   }
 
-  /// Narrow StreamNook-style extraction from subscriptionProducts only.
+  /// Narrow Twitch-style extraction from subscriptionProducts only.
   static List<TwitchChannelPointEmoteOption> extractSubscriptionProductEmotes(
     Object? raw, {
     required bool filterTier1000BaseSet,
@@ -160,7 +160,7 @@ class TwitchChannelPointsEmoteParser {
         for (final item in list) {
           final itemMap = _asStringMap(item);
           if (itemMap == null) continue;
-          final option = _readStreamNookEmoteOption(
+          final option = _readEmoteOption(
             itemMap,
             productTier: productTier,
             requiredSetId: requiredSetId,
@@ -205,7 +205,7 @@ class TwitchChannelPointsEmoteParser {
 
 /// Backward-compatible top-level helper for code that already imports the old
 /// API file and calls this function directly.
-List<TwitchChannelPointEmoteOption> extractStreamNookSubscriptionProductEmotes(
+List<TwitchChannelPointEmoteOption> extractSubscriptionProductEmotes(
   Object? raw,
 ) {
   return TwitchChannelPointsEmoteParser.extractSubscriptionProductEmotes(
@@ -267,7 +267,7 @@ String _readEmoteSetId(Map<String, dynamic> map) {
   return value?.trim() ?? '';
 }
 
-TwitchChannelPointEmoteOption? _readStreamNookEmoteOption(
+TwitchChannelPointEmoteOption? _readEmoteOption(
   Map<String, dynamic> map, {
   required String productTier,
   required String requiredSetId,
@@ -309,7 +309,7 @@ TwitchChannelPointEmoteOption? _readStreamNookEmoteOption(
       ]) ??
       productTier;
 
-  final modifications = _readStreamNookModifications(map);
+  final modifications = _readModifications(map);
 
   return TwitchChannelPointEmoteOption(
     id: id,
@@ -319,7 +319,7 @@ TwitchChannelPointEmoteOption? _readStreamNookEmoteOption(
   );
 }
 
-List<TwitchChannelPointEmoteModification> _readStreamNookModifications(
+List<TwitchChannelPointEmoteModification> _readModifications(
   Map<String, dynamic> emote,
 ) {
   final output = <TwitchChannelPointEmoteModification>[];
@@ -336,7 +336,7 @@ List<TwitchChannelPointEmoteModification> _readStreamNookModifications(
     for (final item in list) {
       final map = _asStringMap(item);
       if (map == null) continue;
-      final modification = _readStreamNookModification(map);
+      final modification = _readModification(map);
       if (modification != null && seen.add(modification.id)) {
         output.add(modification);
       }
@@ -347,7 +347,7 @@ List<TwitchChannelPointEmoteModification> _readStreamNookModifications(
   return output;
 }
 
-TwitchChannelPointEmoteModification? _readStreamNookModification(
+TwitchChannelPointEmoteModification? _readModification(
   Map<String, dynamic> map,
 ) {
   final id = _firstNonEmptyString(map, const <List<String>>[
@@ -386,7 +386,7 @@ TwitchChannelPointEmoteModification? _readStreamNookModification(
   );
 }
 
-const bool _debugChannelPointEmoteMenu = false;
+const bool _debugChannelPointEmoteMenu = true;
 
 void _debugMenuAudit({
   required String channelOwnerId,
@@ -397,7 +397,7 @@ void _debugMenuAudit({
 
   // ignore: avoid_print
   print(
-    '[ChannelPointsEmoteMenu] source=StreamNook.subscriptionProducts.tier1000.baseSet '
+    '[ChannelPointsEmoteMenu] source=Twitch.subscriptionProducts.tier1000.baseSet '
     'channelOwnerID=$channelOwnerId raw=$rawCount approved=$approvedCount',
   );
 }

@@ -12,7 +12,7 @@ import '../../models/auth/twitch_auth_token.dart';
 /// Stores the Twitch Web / kimne GQL token separately from both:
 ///
 /// - main Twitch OAuth token: Helix / IRC / normal account actions
-/// - Drops Android token: StreamNook-style FollowButton_* APQ mutations
+/// - Drops Android token: Twitch-style FollowButton_* APQ mutations
 ///
 /// Earlier patches reused TwitchDropsAuthService for the Web interaction token.
 /// That polluted `new_twitch_app_twitch_drops_token` with a kimne/Web token and

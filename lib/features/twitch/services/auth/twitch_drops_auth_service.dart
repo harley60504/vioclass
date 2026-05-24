@@ -43,7 +43,7 @@ class TwitchDropsAuthService extends ChangeNotifier {
   String get dropsClientId => _dropsClientId.trim();
   bool get hasDropsClientId => dropsClientId.isNotEmpty;
 
-  /// StreamNook-style: do not proactively expire this token by expires_at.
+  /// Twitch-style: do not proactively expire this token by expires_at.
   ///
   /// Drops/channel-points auth uses the token until Twitch rejects it. This
   /// avoids fighting the Android/mobile public-client behavior.

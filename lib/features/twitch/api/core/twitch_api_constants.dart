@@ -7,20 +7,20 @@ class TwitchApiConstants {
 
   /// Twitch Web 公開 Client-ID。
   ///
-  /// StreamNook release workflow also injects this as TWITCH_WEB_CLIENT_ID.
+  /// Twitch release workflow also injects this as TWITCH_WEB_CLIENT_ID.
   /// 用於 Web GQL / playback token / ChannelPointsContext 類 public-web context。
   static const String twitchWebClientId = 'kimne78kx3ncx6brgo4mv6wki5h1ko';
 
-  /// Twitch Android / Drops-compatible public Client-ID used by StreamNook.
+  /// Twitch Android / Drops-compatible public Client-ID used by Twitch.
   ///
-  /// StreamNook release workflow injects this as TWITCH_ANDROID_CLIENT_ID.
+  /// Twitch release workflow injects this as TWITCH_ANDROID_CLIENT_ID.
   /// Used for empty-scope device flow, drops token, claim, prediction bet.
   static const String twitchAndroidPublicClientId =
       'kd1unb4b3q4t58fwlpcbzcbnm76a8fp';
 
   /// Drops / channel-points Client-ID.
   ///
-  /// Defaults to the StreamNook-compatible public Android Client-ID, but can be
+  /// Defaults to the Twitch-compatible public Android Client-ID, but can be
   /// overridden at build time:
   ///
   /// flutter run -d windows --dart-define=TWITCH_DROPS_CLIENT_ID=<client_id>

@@ -35,7 +35,7 @@ class TwitchThirdPartyEmoteApiService {
     for (final group in results) {
       for (final emote in group) {
         if (emote.name.trim().isEmpty || emote.imageUrl.trim().isEmpty) continue;
-        // StreamNook-style priority when names collide: 7TV > FFZ > BTTV.
+        // Twitch-style priority when names collide: 7TV > FFZ > BTTV.
         byName[emote.name] = emote;
       }
     }
