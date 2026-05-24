@@ -15,12 +15,16 @@ typedef TwitchChannelPointsChannelIdResolver = Future<String> Function({
 ///
 /// Responsibility boundary:
 /// - API service: send Twitch GQL request and handle auth / transport errors.
-/// - Parser: normalize Twitch-style subscriptionProducts response and apply
-///   the Choose menu whitelist rules.
+/// - Parser: normalize Twitch-style response shapes.
 ///
-/// This service must not merge normal chat emote caches, global emotes,
-/// third-party emotes, or lockedChannelEmotes into the Channel Points menu.
+/// Choose-an-emote still uses Twitch's subscriptionProducts whitelist.
+/// Modify-a-single-emote now follows StreamNook and uses ChannelPointsContext
+/// communityPointsSettings.emoteVariants, because that source carries the final
+/// modified emote IDs Twitch expects for redemption.
 class TwitchChannelPointsEmoteApiService {
+  static const String channelPointsContextHash =
+      '374314de591e69925fce3ddc2bcf085796f56ebb8cad67a0daa3165c03adc345';
+
   /// Twitch constant: EMOTE_PICKER_USER_SUBSCRIPTION_PRODUCTS_HASH.
   static const String emotePickerUserSubscriptionProductsHash =
       '511bebfb513d0127d24a7fe49aa2b7717306a611e1f4269a93e0cc76e8a65a81';
@@ -39,40 +43,68 @@ class TwitchChannelPointsEmoteApiService {
     required this.sessionId,
   });
 
-  /// Loads Twitch's viewer/channel-specific Channel Points emote whitelist.
+  /// Backward-compatible menu loader.
   ///
-  /// Choose menu whitelist is parsed by [TwitchChannelPointsEmoteParser].
-  /// It intentionally does not fall back to locked/global/chat emotes.
+  /// Historically this was used by both Choose and Modify. For safer behavior,
+  /// it now returns the StreamNook-style Modify source. Choose-specific callers
+  /// should use [getChooseEmotes].
   Future<List<TwitchChannelPointEmoteOption>> getModifiableEmotes({
+    required String channelLogin,
+    String? channelId,
+    TwitchChannelPointsChannelIdResolver? resolveChannelId,
+  }) {
+    return getModifyEmotes(
+      channelLogin: channelLogin,
+      channelId: channelId,
+      resolveChannelId: resolveChannelId,
+    );
+  }
+
+  Future<List<TwitchChannelPointEmoteOption>> getModifyEmotes({
     required String channelLogin,
     String? channelId,
     TwitchChannelPointsChannelIdResolver? resolveChannelId,
   }) async {
     final login = channelLogin.trim().toLowerCase();
-    var ownerId = channelId?.trim() ?? '';
-
-    if (login.isEmpty && ownerId.isEmpty) {
-      throw ArgumentError.value(
-        channelLogin,
-        'channelLogin',
-        'channelLogin or channelId is required',
-      );
-    }
-
-    if (ownerId.isEmpty && login.isNotEmpty && resolveChannelId != null) {
-      ownerId = (await resolveChannelId(channelLogin: login)).trim();
-    }
-
-    if (ownerId.isEmpty) {
-      throw TwitchApiException(
-        'Cannot resolve channelOwnerID for Channel Points emote menu.',
-      );
-    }
-
-    final raw = await _postSubscriptionProductsQuery(
-      channelOwnerId: ownerId,
+    final ownerId = await _resolveOwnerId(
+      channelLogin: login,
+      channelId: channelId,
+      resolveChannelId: resolveChannelId,
     );
 
+    final raw = await _postChannelPointsContextQuery(channelLogin: login);
+    final parsed = TwitchChannelPointsEmoteParser.parseModifiableEmoteVariants(
+      raw,
+      channelLogin: login.isNotEmpty ? login : ownerId,
+    );
+
+    if (parsed.isEmpty) {
+      throw TwitchApiException(
+        'Channel Points modify emote menu returned no unlockable emoteVariants.',
+        details: raw,
+      );
+    }
+
+    return parsed;
+  }
+
+  /// Loads Twitch's viewer/channel-specific Channel Points Choose whitelist.
+  ///
+  /// This remains intentionally based on subscriptionProducts and should not be
+  /// replaced by normal chat emotes or locked/global fallback lists.
+  Future<List<TwitchChannelPointEmoteOption>> getChooseEmotes({
+    required String channelLogin,
+    String? channelId,
+    TwitchChannelPointsChannelIdResolver? resolveChannelId,
+  }) async {
+    final login = channelLogin.trim().toLowerCase();
+    final ownerId = await _resolveOwnerId(
+      channelLogin: login,
+      channelId: channelId,
+      resolveChannelId: resolveChannelId,
+    );
+
+    final raw = await _postSubscriptionProductsQuery(channelOwnerId: ownerId);
     final parsed = TwitchChannelPointsEmoteParser.parseChooseMenu(
       raw,
       channelOwnerId: ownerId,
@@ -80,13 +112,51 @@ class TwitchChannelPointsEmoteApiService {
 
     if (parsed.approvedEmotes.isEmpty) {
       throw TwitchApiException(
-        'Channel Points emote menu returned no approved subscription product emotes. '
+        'Channel Points choose emote menu returned no approved subscription product emotes. '
         'The response was intentionally not replaced with locked/global/chat emotes.',
         details: raw,
       );
     }
 
     return parsed.approvedEmotes;
+  }
+
+  Future<String> _resolveOwnerId({
+    required String channelLogin,
+    required String? channelId,
+    required TwitchChannelPointsChannelIdResolver? resolveChannelId,
+  }) async {
+    var ownerId = channelId?.trim() ?? '';
+    if (channelLogin.isEmpty && ownerId.isEmpty) {
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin or channelId is required',
+      );
+    }
+
+    if (ownerId.isEmpty && channelLogin.isNotEmpty && resolveChannelId != null) {
+      ownerId = (await resolveChannelId(channelLogin: channelLogin)).trim();
+    }
+
+    if (ownerId.isEmpty) {
+      throw TwitchApiException(
+        'Cannot resolve channelOwnerID for Channel Points emote menu.',
+      );
+    }
+    return ownerId;
+  }
+
+  Future<dynamic> _postChannelPointsContextQuery({
+    required String channelLogin,
+  }) {
+    return _postPersistedQuery(
+      operationName: 'ChannelPointsContext',
+      sha256Hash: channelPointsContextHash,
+      variables: <String, dynamic>{
+        'channelLogin': channelLogin,
+      },
+    );
   }
 
   Future<dynamic> _postSubscriptionProductsQuery({
