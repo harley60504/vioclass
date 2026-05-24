@@ -12,7 +12,7 @@ import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/engagement/twitch_prediction.dart';
-import '../../models/special_actions/twitch_pending_special_message_stage250.dart';
+import '../../models/special_actions/twitch_pending_special_message.dart';
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
@@ -20,7 +20,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
-import '../../services/notifications/twitch_app_notification_service_stage249.dart';
+import '../../services/notifications/twitch_app_notification_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
@@ -200,7 +200,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
   TwitchChannelPointsRuntimeSnapshot? _channelPointsSnapshot;
   TwitchViewerSpecialMessagesSnapshotStage251? _specialMessagesSnapshot;
-  TwitchPendingSpecialMessageStage250? _pendingSpecialMessage;
+  TwitchPendingSpecialMessage? _pendingSpecialMessage;
   TwitchPredictionSnapshot? _prediction;
   List<dynamic> _pinnedMessages = const <dynamic>[];
 
