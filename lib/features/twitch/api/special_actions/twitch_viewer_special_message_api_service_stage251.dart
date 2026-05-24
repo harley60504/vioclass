@@ -18,9 +18,9 @@ class TwitchViewerSpecialMessageOperationStage251 {
       throw StateError('Operation $operationName is not configured.');
     }
     return TwitchWebGqlPersistedOperation(
-      operationName: operationName,
+      operationName: operationName.trim(),
       variables: variables,
-      sha256Hash: sha256Hash,
+      sha256Hash: sha256Hash.trim(),
     );
   }
 }
@@ -42,11 +42,6 @@ class TwitchViewerSpecialMessageOperationConfigStage251 {
     required this.updateChatIdentity,
   });
 
-  /// StreamNook command names mapped to Flutter backend method names.
-  ///
-  /// The persisted query hashes are intentionally left empty here. They should
-  /// be filled only after capturing the matching Twitch Web/StreamNook requests.
-  /// This keeps the backend structure compile-safe without guessing hashes.
   static const streamNookNamesOnly = TwitchViewerSpecialMessageOperationConfigStage251(
     getWatchStreak: TwitchViewerSpecialMessageOperationStage251(
       operationName: 'get_watch_streak',
@@ -206,6 +201,19 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
         'badgeVersion': badgeVersion.trim(),
       },
     );
+  }
+
+  Future<TwitchWebGqlPersistedResult> runCustomPersistedOperation({
+    required String operationName,
+    required String sha256Hash,
+    required Map<String, dynamic> variables,
+  }) async {
+    final operation = TwitchViewerSpecialMessageOperationStage251(
+      operationName: operationName,
+      sha256Hash: sha256Hash,
+    );
+    final result = await gql.single(operation.build(variables));
+    return result;
   }
 
   Future<dynamic> _single({
