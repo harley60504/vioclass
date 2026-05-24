@@ -1,10 +1,12 @@
-// PATCH VERSION: twitch_watch_feature_ports_stage250a_special_actions
+// PATCH VERSION: twitch_watch_feature_ports_stage252_force_modified_emote_route
 //
 // Feature-facing ports for Watch composition.
 //
 // A port is intentionally thinner than a controller. It exposes the operations
 // a UI feature needs so components can depend on their own interface instead of
 // depending on TwitchWatchPage callbacks.
+
+import 'dart:convert';
 
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -268,7 +270,7 @@ class TwitchWatchEngagementPort {
     required String channelLogin,
     required String? channelId,
   }) {
-    return services.channelPointsApi.getModifiableEmotes(
+    return services.channelPointsRuntimeService.getModifiableEmotes(
       channelLogin: channelLogin,
       channelId: channelId,
     );
@@ -290,12 +292,41 @@ class TwitchWatchEngagementPort {
     required String textInput,
   }) async {
     final title = reward['title']?.toString() ?? 'Reward';
+    final modifiedSelection = _tryReadModifiedEmoteSelection(textInput);
+    if (modifiedSelection != null) {
+      await services.channelPointsRuntimeService.unlockModifiedSubscriberEmote(
+        channelId: channelId,
+        reward: reward,
+        modifiedEmoteId: modifiedSelection.emoteId,
+        modifierId: modifiedSelection.modifierId,
+      );
+      return TwitchWatchRewardRedeemResult(title: title);
+    }
+
     await services.channelPointsRuntimeService.redeemReward(
       channelId: channelId,
       reward: reward,
       textInput: textInput,
     );
     return TwitchWatchRewardRedeemResult(title: title);
+  }
+
+  _TwitchWatchModifiedEmoteSelection? _tryReadModifiedEmoteSelection(String raw) {
+    final text = raw.trim();
+    if (text.isEmpty || !text.startsWith('{')) return null;
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is! Map) return null;
+      final emoteId = decoded['emoteId']?.toString().trim() ?? '';
+      final modifierId = decoded['modifierId']?.toString().trim() ?? '';
+      if (emoteId.isEmpty) return null;
+      return _TwitchWatchModifiedEmoteSelection(
+        emoteId: emoteId,
+        modifierId: modifierId,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<TwitchWatchRewardRedeemResult> sendHighlightedMessage({
@@ -377,6 +408,16 @@ class TwitchWatchEngagementPort {
       points: points,
     );
   }
+}
+
+class _TwitchWatchModifiedEmoteSelection {
+  final String emoteId;
+  final String modifierId;
+
+  const _TwitchWatchModifiedEmoteSelection({
+    required this.emoteId,
+    required this.modifierId,
+  });
 }
 
 class TwitchWatchRelationshipPort {
