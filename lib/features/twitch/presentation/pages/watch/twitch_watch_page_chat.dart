@@ -27,7 +27,9 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
 
       await _dropsAuthService.loadStoredSession();
       final validation = await _authApi.validateToken(token);
-      final startup = await _watchPorts.chat.fetchStartupSnapshot(channelLogin: channel);
+      final startup = await _watchPorts.chat.fetchStartupSnapshot(
+        channelLogin: channel,
+      );
       final runtime = TwitchChatRuntime(
         ircApi: TwitchIrcApiService(),
         writeIrcApi: TwitchIrcApiService(),
@@ -99,9 +101,13 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
         case TwitchPendingSpecialMessageKind.channelPointRewardMessage:
           await _sendPendingChannelPointTextReward(pending, message);
           break;
-        case TwitchPendingSpecialMessageKind.preview:
         case TwitchPendingSpecialMessageKind.watchStreak:
+          await _sendPendingWatchStreak(pending, message);
+          break;
         case TwitchPendingSpecialMessageKind.resub:
+          await _sendPendingResub(pending, message);
+          break;
+        case TwitchPendingSpecialMessageKind.preview:
         case TwitchPendingSpecialMessageKind.officialSpecialMessage:
           _showSnack('特殊訊息預覽：${pending.describeForLog(message: message)}');
           break;
@@ -142,6 +148,214 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     await _refreshEngagement(showSnackOnError: false);
   }
 
+  Future<void> _sendPendingWatchStreak(
+    TwitchPendingSpecialMessageStage250 pending,
+    String message,
+  ) async {
+    final status = pending.payload['watchStreak'];
+    if (status is! TwitchWatchStreakStatusStage251) {
+      throw StateError('Missing watch streak payload.');
+    }
+
+    final result = await _watchServices.specialMessagesStage251.runtime
+        .shareWatchStreak(
+          channelLogin: pending.channelLogin,
+          channelId: pending.channelId ?? _channelId,
+          viewerId: _viewerId,
+          status: status,
+          message: message,
+        );
+    if (!result.ok) {
+      throw StateError(
+        result.error?.toString() ?? 'Watch streak share failed.',
+      );
+    }
+    _showSnack('已分享連續觀看 ${status.streakCount ?? ''}${status.unitLabel}');
+    await _refreshSpecialMessages(autoSelectPending: false);
+  }
+
+  Future<void> _sendPendingResub(
+    TwitchPendingSpecialMessageStage250 pending,
+    String message,
+  ) async {
+    final resub = pending.payload['resub'];
+    if (resub is! TwitchResubNotificationStage251) {
+      throw StateError('Missing resub payload.');
+    }
+
+    final result = await _watchServices.specialMessagesStage251.runtime
+        .useResubToken(
+          channelLogin: pending.channelLogin,
+          channelId: pending.channelId ?? _channelId,
+          viewerId: _viewerId,
+          resub: resub,
+          message: message,
+        );
+    if (!result.ok) {
+      throw StateError(result.error?.toString() ?? 'Resub share failed.');
+    }
+    _showSnack('已分享訂閱 ${resub.cumulativeMonths ?? ''} 個月');
+    await _refreshSpecialMessages(autoSelectPending: false);
+  }
+
+  Future<void> _runDeferredSpecialMessagesStartup(
+    int generation,
+    String channel,
+  ) async {
+    await _refreshSpecialMessages(
+      generation: generation,
+      channel: channel,
+      autoSelectPending: true,
+      showSnackOnError: false,
+    );
+  }
+
+  Future<TwitchViewerSpecialMessagesSnapshotStage251?> _refreshSpecialMessages({
+    int? generation,
+    String? channel,
+    bool autoSelectPending = true,
+    bool showSnackOnError = true,
+  }) async {
+    final targetChannel = channel ?? _channelLogin;
+    if (generation != null && !_isCurrentWatchTask(generation, targetChannel)) {
+      return null;
+    }
+
+    setState(() => _loadingSpecialMessages = true);
+    try {
+      final snapshot = await _watchServices.specialMessagesStage251.runtime
+          .load(
+            channelLogin: targetChannel,
+            channelId: _channelId,
+            viewerId: _viewerId,
+          );
+      if (generation != null &&
+          !_isCurrentWatchTask(generation, targetChannel)) {
+        return null;
+      }
+      if (!mounted) return null;
+      setState(() {
+        _specialMessagesSnapshot = snapshot;
+        if (autoSelectPending &&
+            (_pendingSpecialMessage == null ||
+                _pendingSpecialMessage!.kind ==
+                    TwitchPendingSpecialMessageKind.watchStreak ||
+                _pendingSpecialMessage!.kind ==
+                    TwitchPendingSpecialMessageKind.resub)) {
+          _pendingSpecialMessage = _pendingFromSpecialMessages(snapshot);
+        }
+      });
+      return snapshot;
+    } catch (error) {
+      if (showSnackOnError) _showSnack('特殊訊息載入失敗：$error');
+      return null;
+    } finally {
+      if (mounted) setState(() => _loadingSpecialMessages = false);
+    }
+  }
+
+  TwitchPendingSpecialMessageStage250? _pendingFromSpecialMessages(
+    TwitchViewerSpecialMessagesSnapshotStage251 snapshot,
+  ) {
+    final resub = snapshot.resub;
+    if (resub != null && resub.canShare) return _pendingFromResub(resub);
+
+    final watchStreak = snapshot.watchStreak;
+    if (watchStreak != null && watchStreak.canShare) {
+      return _pendingFromWatchStreak(watchStreak);
+    }
+
+    return null;
+  }
+
+  TwitchPendingSpecialMessageStage250 _pendingFromWatchStreak(
+    TwitchWatchStreakStatusStage251 status,
+  ) {
+    final count = status.streakCount;
+    return TwitchPendingSpecialMessageStage250(
+      kind: TwitchPendingSpecialMessageKind.watchStreak,
+      channelLogin: _channelLogin,
+      channelId: _channelId ?? status.channelId,
+      title: count == null ? '分享連續觀看' : '連續觀看 $count${status.unitLabel}',
+      subtitle: '輸入訊息後送出，就會分享你的 Watch Streak。',
+      sendLabel: '分享',
+      costLabel: count == null ? null : '$count${status.unitLabel}',
+      payload: <String, dynamic>{'watchStreak': status},
+    );
+  }
+
+  TwitchPendingSpecialMessageStage250 _pendingFromResub(
+    TwitchResubNotificationStage251 resub,
+  ) {
+    final months = resub.cumulativeMonths;
+    return TwitchPendingSpecialMessageStage250(
+      kind: TwitchPendingSpecialMessageKind.resub,
+      channelLogin: _channelLogin,
+      channelId: _channelId ?? resub.channelId,
+      title: months == null ? '分享訂閱訊息' : '訂閱 $months 個月',
+      subtitle: '輸入訊息後送出，就會分享你的 Resub 訊息。',
+      sendLabel: '分享',
+      costLabel: months == null ? null : '$months 個月',
+      payload: <String, dynamic>{'resub': resub},
+    );
+  }
+
+  Future<void> _openSpecialMessagesSheet() async {
+    final snapshot =
+        _specialMessagesSnapshot ??
+        await _refreshSpecialMessages(
+          autoSelectPending: false,
+          showSnackOnError: false,
+        );
+    if (!mounted) return;
+
+    await showTwitchSpecialMessageSheetStage251(
+      context: context,
+      initialSnapshot: snapshot,
+      loading: _loadingSpecialMessages,
+      onRefresh: () => _refreshSpecialMessages(
+        autoSelectPending: false,
+        showSnackOnError: true,
+      ),
+      onShareWatchStreak: (status) {
+        setState(
+          () => _pendingSpecialMessage = _pendingFromWatchStreak(status),
+        );
+      },
+      onShareResub: (resub) {
+        setState(() {
+          _pendingSpecialMessage = _pendingFromResub(resub);
+          final defaultMessage = resub.defaultMessage?.trim();
+          if (_messageController.text.trim().isEmpty &&
+              defaultMessage != null &&
+              defaultMessage.isNotEmpty) {
+            _messageController.text = defaultMessage;
+          }
+        });
+      },
+      onSelectBadge: (badge) async {
+        final result = await _watchServices.specialMessagesStage251.runtime
+            .updateChatIdentity(
+              channelLogin: _channelLogin,
+              channelId: _channelId,
+              viewerId: _viewerId,
+              badge: badge,
+            );
+        if (!result.ok) {
+          _showSnack('徽章切換失敗：${result.error}');
+          return false;
+        }
+        _showSnack('已切換徽章：${badge.title}');
+        await _refreshSpecialMessages(
+          autoSelectPending: false,
+          showSnackOnError: false,
+        );
+        return true;
+      },
+      onOpenDebugProbe: _openSpecialMessageDebugProbeSheet,
+    );
+  }
+
   Future<void> _openSpecialMessageDebugProbeSheet() async {
     await showTwitchSpecialMessageDebugProbeSheetStage251(
       context: context,
@@ -150,16 +364,19 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
         channelId: _channelId,
         viewerId: _viewerId,
       ),
-      onRunCustomPersistedOperation: ({
-        required operationName,
-        required sha256Hash,
-        required variables,
-      }) =>
-          _watchServices.specialMessagesStage251.debugProbe.runCustomPersistedOperation(
-        operationName: operationName,
-        sha256Hash: sha256Hash,
-        variables: variables,
-      ),
+      onRunCustomPersistedOperation:
+          ({
+            required operationName,
+            required sha256Hash,
+            required variables,
+            useAndroidClient = false,
+          }) => _watchServices.specialMessagesStage251.debugProbe
+              .runCustomPersistedOperation(
+                operationName: operationName,
+                sha256Hash: sha256Hash,
+                variables: variables,
+                useAndroidClient: useAndroidClient,
+              ),
     );
   }
 

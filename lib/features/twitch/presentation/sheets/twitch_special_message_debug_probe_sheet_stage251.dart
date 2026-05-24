@@ -10,7 +10,9 @@ Future<void> showTwitchSpecialMessageDebugProbeSheetStage251({
     required String operationName,
     required String sha256Hash,
     required Map<String, dynamic> variables,
-  })? onRunCustomPersistedOperation,
+    bool useAndroidClient,
+  })?
+  onRunCustomPersistedOperation,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -33,7 +35,9 @@ class _TwitchSpecialMessageDebugProbeSheetStage251 extends StatefulWidget {
     required String operationName,
     required String sha256Hash,
     required Map<String, dynamic> variables,
-  })? onRunCustomPersistedOperation;
+    bool useAndroidClient,
+  })?
+  onRunCustomPersistedOperation;
 
   const _TwitchSpecialMessageDebugProbeSheetStage251({
     required this.onRunProbe,
@@ -54,6 +58,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
   );
 
   bool _running = false;
+  bool _useAndroidClient = false;
   String? _jsonText;
   String? _errorText;
 
@@ -140,7 +145,10 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   IconButton(
                     tooltip: '關閉',
                     onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                    ),
                   ),
                 ],
               ),
@@ -162,7 +170,8 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
-                    onPressed: _running || widget.onRunCustomPersistedOperation == null
+                    onPressed:
+                        _running || widget.onRunCustomPersistedOperation == null
                         ? null
                         : _runCustomPersistedOperation,
                     icon: const Icon(Icons.bolt_rounded, size: 18),
@@ -194,7 +203,9 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   decoration: BoxDecoration(
                     color: Colors.redAccent.withOpacity(0.10),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.22)),
+                    border: Border.all(
+                      color: Colors.redAccent.withOpacity(0.22),
+                    ),
                   ),
                   child: Text(
                     _errorText!,
@@ -253,7 +264,11 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
         children: <Widget>[
           Row(
             children: <Widget>[
-              const Icon(Icons.tune_rounded, color: Color(0xFFBF94FF), size: 17),
+              const Icon(
+                Icons.tune_rounded,
+                color: Color(0xFFBF94FF),
+                size: 17,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -268,6 +283,26 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
             ],
           ),
           const SizedBox(height: 8),
+          CheckboxListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            contentPadding: EdgeInsets.zero,
+            value: _useAndroidClient,
+            onChanged: (value) {
+              setState(() => _useAndroidClient = value ?? false);
+            },
+            title: Text(
+              'Use Android/Drops client',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.78),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            controlAffinity: ListTileControlAffinity.leading,
+            activeColor: const Color(0xFF9146FF),
+          ),
+          const SizedBox(height: 4),
           Row(
             children: <Widget>[
               Expanded(
@@ -318,8 +353,14 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
         isDense: true,
         labelText: label,
         hintText: hint,
-        labelStyle: TextStyle(color: Colors.white.withOpacity(0.60), fontSize: 11),
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.28), fontSize: 11),
+        labelStyle: TextStyle(
+          color: Colors.white.withOpacity(0.60),
+          fontSize: 11,
+        ),
+        hintStyle: TextStyle(
+          color: Colors.white.withOpacity(0.28),
+          fontSize: 11,
+        ),
         filled: true,
         fillColor: Colors.black.withOpacity(0.22),
         border: OutlineInputBorder(
@@ -393,7 +434,9 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
 
     Map<String, dynamic> variables;
     try {
-      final decoded = variablesText.isEmpty ? <String, dynamic>{} : jsonDecode(variablesText);
+      final decoded = variablesText.isEmpty
+          ? <String, dynamic>{}
+          : jsonDecode(variablesText);
       if (decoded is! Map) {
         setState(() => _errorText = 'variables JSON 必須是 object。');
         return;
@@ -414,6 +457,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
         operationName: operationName,
         sha256Hash: hash,
         variables: variables,
+        useAndroidClient: _useAndroidClient,
       );
       const encoder = JsonEncoder.withIndent('  ');
       setState(() {

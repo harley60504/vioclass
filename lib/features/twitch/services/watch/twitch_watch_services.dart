@@ -43,6 +43,7 @@ class TwitchWatchServices {
   final TwitchAuthApiService authApi;
   final TwitchGqlApiService publicGqlApi;
   final TwitchWebGqlPersistedApiService publicWebGqlApi;
+  final TwitchWebGqlPersistedApiService specialAndroidGqlApi;
   final TwitchPlaybackApiService playbackApi;
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final TwitchChatStartupApiService chatStartupApi;
@@ -58,7 +59,8 @@ class TwitchWatchServices {
   final TwitchDropsPredictionApiService dropsPredictionApi;
   final TwitchViewerSpecialMessageApiServiceStage251 specialMessageApiStage251;
   final TwitchViewerSpecialMessageRuntimeStage251 specialMessageRuntimeStage251;
-  final TwitchViewerSpecialMessageDebugProbeStage251 specialMessageDebugProbeStage251;
+  final TwitchViewerSpecialMessageDebugProbeStage251
+  specialMessageDebugProbeStage251;
   final TwitchMediaKitPlayerSession playerSession;
 
   final TwitchWatchCoreServices core;
@@ -78,6 +80,7 @@ class TwitchWatchServices {
     required this.authApi,
     required this.publicGqlApi,
     required this.publicWebGqlApi,
+    required this.specialAndroidGqlApi,
     required this.playbackApi,
     required this.playerRuntime,
     required this.chatStartupApi,
@@ -126,6 +129,13 @@ class TwitchWatchServices {
       client: apiClient,
       clientId: TwitchApiConstants.twitchWebClientId,
       accessTokenProvider: webGqlAuthService.getToken,
+    );
+    final specialAndroidGqlApi = TwitchWebGqlPersistedApiService(
+      client: apiClient,
+      clientId: dropsAuthService.dropsClientId.isNotEmpty
+          ? dropsAuthService.dropsClientId
+          : TwitchApiConstants.twitchDefaultDropsClientId,
+      accessTokenProvider: dropsAuthService.getToken,
     );
     final playbackApi = TwitchPlaybackApiService(gql: publicGqlApi);
     final playerRuntime = TwitchPlaylistPlayerRuntime(playbackApi: playbackApi);
@@ -179,24 +189,30 @@ class TwitchWatchServices {
       clientId: TwitchApiConstants.twitchWebClientId,
       accessTokenProvider: null,
     );
-    final publicPredictionApi = TwitchPredictionApiService(gql: publicWebGqlApi);
+    final publicPredictionApi = TwitchPredictionApiService(
+      gql: publicWebGqlApi,
+    );
     final dropsPredictionApi = TwitchDropsPredictionApiService(
       client: apiClient,
       tokenProvider: dropsAuthService.getToken,
     );
-    final specialMessageApiStage251 = TwitchViewerSpecialMessageApiServiceStage251(
-      gql: publicWebGqlApi,
-    );
-    final specialMessageRuntimeStage251 = TwitchViewerSpecialMessageRuntimeStage251(
-      api: specialMessageApiStage251,
-    );
-    final specialMessageDebugProbeStage251 = TwitchViewerSpecialMessageDebugProbeStage251(
-      api: specialMessageApiStage251,
-      runtime: specialMessageRuntimeStage251,
-      webTokenProvider: webGqlAuthService.getToken,
-      dropsTokenProvider: dropsAuthService.getToken,
-      dropsClientIdProvider: () => dropsAuthService.dropsClientId,
-    );
+    final specialMessageApiStage251 =
+        TwitchViewerSpecialMessageApiServiceStage251(
+          webGql: publicWebGqlApi,
+          androidGql: specialAndroidGqlApi,
+        );
+    final specialMessageRuntimeStage251 =
+        TwitchViewerSpecialMessageRuntimeStage251(
+          api: specialMessageApiStage251,
+        );
+    final specialMessageDebugProbeStage251 =
+        TwitchViewerSpecialMessageDebugProbeStage251(
+          api: specialMessageApiStage251,
+          runtime: specialMessageRuntimeStage251,
+          webTokenProvider: webGqlAuthService.getToken,
+          dropsTokenProvider: dropsAuthService.getToken,
+          dropsClientIdProvider: () => dropsAuthService.dropsClientId,
+        );
     final playerSession = TwitchMediaKitPlayerHost.acquire(title: playerTitle);
 
     final core = TwitchWatchCoreServices(
@@ -248,6 +264,7 @@ class TwitchWatchServices {
       authApi: authApi,
       publicGqlApi: publicGqlApi,
       publicWebGqlApi: publicWebGqlApi,
+      specialAndroidGqlApi: specialAndroidGqlApi,
       playbackApi: playbackApi,
       playerRuntime: playerRuntime,
       chatStartupApi: chatStartupApi,

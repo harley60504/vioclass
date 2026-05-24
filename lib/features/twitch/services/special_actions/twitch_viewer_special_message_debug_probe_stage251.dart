@@ -65,6 +65,7 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
     required String operationName,
     required String sha256Hash,
     required Map<String, dynamic> variables,
+    bool useAndroidClient = false,
   }) async {
     final checkedAt = DateTime.now();
     final webToken = await _safeToken(webTokenProvider);
@@ -76,6 +77,7 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
         operationName: operationName,
         sha256Hash: sha256Hash,
         variables: variables,
+        useAndroidClient: useAndroidClient,
       );
       return <String, dynamic>{
         'stage': '251D',
@@ -94,6 +96,7 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
           'sha256Hash': sha256Hash.trim(),
           'hashLength': sha256Hash.trim().length,
           'variables': variables,
+          'client': useAndroidClient ? 'androidGql' : 'webGql',
         },
         'result': result.toJson(),
       };
@@ -115,6 +118,7 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
           'sha256Hash': sha256Hash.trim(),
           'hashLength': sha256Hash.trim().length,
           'variables': variables,
+          'client': useAndroidClient ? 'androidGql' : 'webGql',
         },
         'error': error.toString(),
       };
@@ -129,7 +133,9 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
       'shareWatchStreak': _oneOperation(operations.shareWatchStreak),
       'getResubNotification': _oneOperation(operations.getResubNotification),
       'useResubToken': _oneOperation(operations.useResubToken),
-      'fetchChatIdentityBadges': _oneOperation(operations.fetchChatIdentityBadges),
+      'fetchChatIdentityBadges': _oneOperation(
+        operations.fetchChatIdentityBadges,
+      ),
       'updateChatIdentity': _oneOperation(operations.updateChatIdentity),
     };
   }
@@ -158,8 +164,8 @@ class TwitchViewerSpecialMessageDebugProbeStage251 {
   String? _safeString(String Function()? provider) {
     if (provider == null) return null;
     try {
-      final value = provider()?.trim();
-      return value == null || value.isEmpty ? null : value;
+      final value = provider().trim();
+      return value.isEmpty ? null : value;
     } catch (_) {
       return null;
     }

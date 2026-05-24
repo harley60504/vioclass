@@ -98,7 +98,8 @@ class TwitchWatchStreakStatusStage251 {
       'id',
       'streakId',
     ]);
-    final canShare = _readBoolAny(map, const <String>[
+    final canShare =
+        _readBoolAny(map, const <String>[
           'canShare',
           'isShareable',
           'shareable',
@@ -110,11 +111,16 @@ class TwitchWatchStreakStatusStage251 {
       channelLogin: channelLogin,
       channelId: channelId,
       streakCount: count,
-      unitLabel: _readStringAny(map, const <String>['unit', 'unitLabel']) ?? '場',
+      unitLabel:
+          _readStringAny(map, const <String>['unit', 'unitLabel']) ?? '場',
       canShare: canShare,
       shareToken: token,
       title: _readStringAny(map, const <String>['title', 'headline']),
-      description: _readStringAny(map, const <String>['description', 'subtitle', 'message']),
+      description: _readStringAny(map, const <String>[
+        'description',
+        'subtitle',
+        'message',
+      ]),
       raw: raw,
     );
   }
@@ -209,7 +215,8 @@ class TwitchResubNotificationStage251 {
       'notificationToken',
       'id',
     ]);
-    final canShare = _readBoolAny(map, const <String>[
+    final canShare =
+        _readBoolAny(map, const <String>[
           'canShare',
           'isShareable',
           'available',
@@ -236,11 +243,7 @@ class TwitchResubNotificationStage251 {
         'duration_months',
         'multiMonthDuration',
       ]),
-      subPlan: _readStringAny(map, const <String>[
-        'subPlan',
-        'plan',
-        'tier',
-      ]),
+      subPlan: _readStringAny(map, const <String>['subPlan', 'plan', 'tier']),
       canShare: canShare,
       token: token,
       defaultMessage: _readStringAny(map, const <String>[
@@ -290,21 +293,46 @@ class TwitchChatIdentityBadgeStage251 {
 
   factory TwitchChatIdentityBadgeStage251.fromRaw(dynamic raw) {
     final map = _asMap(raw) ?? const <String, dynamic>{};
-    final setId = _readStringAny(map, const <String>['setId', 'set_id', 'badgeSetId', 'id']) ?? '';
-    final version = _readStringAny(map, const <String>['version', 'badgeVersion', 'versionId']) ?? '';
-    final id = _readStringAny(map, const <String>['id', 'badgeId']) ?? '$setId:$version';
+    final setId =
+        _readStringAny(map, const <String>[
+          'setID',
+          'setId',
+          'set_id',
+          'badgeSetID',
+          'badgeSetId',
+        ]) ??
+        '';
+    final version =
+        _readStringAny(map, const <String>[
+          'version',
+          'badgeVersion',
+          'versionId',
+        ]) ??
+        '';
+    final id =
+        _readStringAny(map, const <String>['id', 'badgeId']) ??
+        '$setId:$version';
     return TwitchChatIdentityBadgeStage251(
       id: id,
       setId: setId,
       version: version,
-      title: _readStringAny(map, const <String>['title', 'name', 'label']) ?? setId,
+      title:
+          _readStringAny(map, const <String>['title', 'name', 'label']) ??
+          setId,
       imageUrl: _readStringAny(map, const <String>[
+        'image4x',
+        'image2x',
+        'image1x',
         'imageUrl',
         'image_url',
         'url',
         'image',
       ]),
-      selected: _readBoolAny(map, const <String>['selected', 'isSelected', 'active']),
+      selected: _readBoolAny(map, const <String>[
+        'selected',
+        'isSelected',
+        'active',
+      ]),
       raw: raw,
     );
   }
@@ -354,12 +382,38 @@ class TwitchChatIdentityStatusStage251 {
       'availableBadges',
       'chatBadges',
     });
+    final selectedRaw = _findFirstMap(raw, const <String>{
+      'selectedBadge',
+      'selectedGlobalBadge',
+      'selectedChannelAuthorityBadge',
+    });
+    final selected = selectedRaw == null
+        ? null
+        : TwitchChatIdentityBadgeStage251.fromRaw(selectedRaw);
 
     return TwitchChatIdentityStatusStage251(
       channelLogin: channelLogin,
       channelId: channelId,
       badges: (badgesRaw ?? const <dynamic>[])
-          .map(TwitchChatIdentityBadgeStage251.fromRaw)
+          .map((rawBadge) {
+            final badge = TwitchChatIdentityBadgeStage251.fromRaw(rawBadge);
+            if (selected == null) return badge;
+            final selectedById = badge.id.isNotEmpty && badge.id == selected.id;
+            final selectedBySet =
+                badge.setId.isNotEmpty &&
+                badge.setId == selected.setId &&
+                badge.version == selected.version;
+            if (!selectedById && !selectedBySet) return badge;
+            return TwitchChatIdentityBadgeStage251(
+              id: badge.id,
+              setId: badge.setId,
+              version: badge.version,
+              title: badge.title,
+              imageUrl: badge.imageUrl,
+              selected: true,
+              raw: badge.raw,
+            );
+          })
           .where((badge) => badge.setId.trim().isNotEmpty)
           .toList(growable: false),
       raw: raw,

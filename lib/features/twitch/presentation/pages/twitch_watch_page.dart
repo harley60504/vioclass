@@ -13,6 +13,7 @@ import '../../api/core/twitch_api_client.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../models/special_actions/twitch_pending_special_message_stage250.dart';
+import '../../models/special_actions/twitch_viewer_special_message_models_stage251.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -25,6 +26,7 @@ import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
 import '../dialogs/twitch_subscribe_webview_dialog_v1.dart';
 import '../sheets/twitch_special_message_debug_probe_sheet_stage251.dart';
+import '../sheets/twitch_special_message_sheet_stage251.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
 import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
@@ -55,7 +57,8 @@ const String _playerVolumePreferenceKey = 'twitch_watch_v2_player_volume';
 const String _playerMutedPreferenceKey = 'twitch_watch_v2_player_muted';
 const String _chatVisiblePreferenceKey = 'twitch_watch_v2_chat_visible';
 
-const String _legacyChatPanelWidthPreferenceKey = 'twitch_watch_chat_panel_width';
+const String _legacyChatPanelWidthPreferenceKey =
+    'twitch_watch_chat_panel_width';
 const String _legacyPlayerVolumePreferenceKey = 'twitch_watch_player_volume';
 const String _legacyPlayerMutedPreferenceKey = 'twitch_watch_player_muted';
 
@@ -92,7 +95,8 @@ class TwitchWatchPage extends StatefulWidget {
   });
 
   TwitchStreamHeaderMetadata get resolvedInitialMetadata {
-    final hasLegacyMetadata = initialChannelLogin != null ||
+    final hasLegacyMetadata =
+        initialChannelLogin != null ||
         initialStreamTitle != null ||
         initialGameName != null ||
         initialLanguage != null ||
@@ -125,7 +129,8 @@ class TwitchWatchPage extends StatefulWidget {
       tags: initialTags ?? initialMetadata.tags,
       isMature: initialIsMature ?? initialMetadata.isMature,
       viewerCount: initialViewerCount ?? initialMetadata.viewerCount,
-      profileImageUrl: legacyProfileImage != null && legacyProfileImage.isNotEmpty
+      profileImageUrl:
+          legacyProfileImage != null && legacyProfileImage.isNotEmpty
           ? legacyProfileImage
           : initialMetadata.profileImageUrl,
     );
@@ -147,7 +152,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   TwitchDropsAuthService get _dropsAuthService => _session.dropsAuthService;
   TwitchWebGqlAuthService get _webGqlAuthService => _session.webGqlAuthService;
   TwitchAuthApiService get _authApi => _session.authApi;
-  TwitchRecentMessagesApiService get _recentMessagesApi => _session.recentMessagesApi;
+  TwitchRecentMessagesApiService get _recentMessagesApi =>
+      _session.recentMessagesApi;
   TwitchMediaKitPlayerSession get _playerSession => _session.playerSession;
   Player get _player => _session.player;
 
@@ -177,6 +183,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   bool _engagementBootstrapping = false;
   bool _emoteBootstrapping = false;
   bool _relationshipBootstrapping = false;
+  bool _loadingSpecialMessages = false;
 
   double _chatPanelWidth = 430;
   double _chatPanelRatio = 0.34;
@@ -192,11 +199,13 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   String? _relationshipError;
 
   TwitchChannelPointsRuntimeSnapshot? _channelPointsSnapshot;
+  TwitchViewerSpecialMessagesSnapshotStage251? _specialMessagesSnapshot;
   TwitchPendingSpecialMessageStage250? _pendingSpecialMessage;
   TwitchPredictionSnapshot? _prediction;
   List<dynamic> _pinnedMessages = const <dynamic>[];
 
-  TwitchWatchSheetPortLauncher get _sheetLauncher => TwitchWatchSheetPortLauncher(
+  TwitchWatchSheetPortLauncher get _sheetLauncher =>
+      TwitchWatchSheetPortLauncher(
         emotes: _watchPorts.emotes,
         engagement: _watchPorts.engagement,
         showMessage: _showSnack,
@@ -302,14 +311,17 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   @override
   Widget build(BuildContext context) {
     final runtime = _chatRuntime;
-    final metadata = widget.resolvedInitialMetadata.copyWith(channelLogin: _channelLogin);
+    final metadata = widget.resolvedInitialMetadata.copyWith(
+      channelLogin: _channelLogin,
+    );
 
     final playerArea = TwitchWatchPlayerAreaPortAdapter(
       metadata: metadata,
       loading: _loadingPlayer,
       error: _playerError,
       isFollowing: _isFollowing,
-      relationshipBusy: _checkingRelationship || _followBusy || _relationshipBootstrapping,
+      relationshipBusy:
+          _checkingRelationship || _followBusy || _relationshipBootstrapping,
       relationshipError: _relationshipError,
       onToggleFollow: _toggleFollowChannel,
       onSubscribe: _openSubscribePage,
@@ -352,7 +364,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       onRefreshEngagement: () => _refreshEngagement(showSnackOnError: true),
       onOpenChannelPoints: _openChannelPointsSheet,
       onOpenPrediction: _openPredictionBetSheet,
-      onOpenSpecialActions: _openSpecialMessageDebugProbeSheet,
+      onOpenSpecialActions: _openSpecialMessagesSheet,
       onCancelPendingSpecialMessage: _clearPendingSpecialMessage,
     );
 
@@ -396,10 +408,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
     return TwitchWatchScope(
       services: _watchServices,
-      child: TwitchWatchPortScope(
-        ports: _watchPorts,
-        child: scaffold,
-      ),
+      child: TwitchWatchPortScope(ports: _watchPorts, child: scaffold),
     );
   }
 }

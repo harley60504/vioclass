@@ -44,6 +44,7 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       _engagementBootstrapping = false;
       _emoteBootstrapping = false;
       _relationshipBootstrapping = false;
+      _loadingSpecialMessages = false;
     });
 
     try {
@@ -51,7 +52,9 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       if (!_isCurrentWatchTask(generation, channel)) return;
 
       setState(() => _loadingWatch = false);
-      unawaited(_runWatchStartupPipeline(channel: channel, generation: generation));
+      unawaited(
+        _runWatchStartupPipeline(channel: channel, generation: generation),
+      );
     } catch (error) {
       if (mounted) _showSnack('載入 Watch Page 失敗：$error');
     } finally {
@@ -150,7 +153,9 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       _emoteBootstrapping = true;
     });
 
-    unawaited(_runWatchBackgroundStartup(channel: channel, generation: generation));
+    unawaited(
+      _runWatchBackgroundStartup(channel: channel, generation: generation),
+    );
     await _runDeferredChatStartup(channel, generation);
   }
 
@@ -167,6 +172,7 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       _runDeferredRelationshipStartup(generation, channel),
       _runDeferredEngagementStartup(generation, channel),
       _runDeferredEmoteStartup(generation, channel),
+      _runDeferredSpecialMessagesStartup(generation, channel),
     ]);
   }
 
@@ -179,7 +185,9 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     String channel,
   ) async {
     try {
-      final startup = await _watchPorts.chat.fetchStartupSnapshot(channelLogin: channel);
+      final startup = await _watchPorts.chat.fetchStartupSnapshot(
+        channelLogin: channel,
+      );
       if (!_isCurrentWatchTask(generation, channel)) return;
       final nextChannelId = startup.channelId.trim();
       if (nextChannelId.isNotEmpty && nextChannelId != _channelId) {
@@ -222,6 +230,8 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     setState(() {
       _channelId = null;
       _channelPointsSnapshot = null;
+      _specialMessagesSnapshot = null;
+      _pendingSpecialMessage = null;
       _prediction = null;
       _pinnedMessages = const <dynamic>[];
       _engagementError = null;
@@ -232,6 +242,7 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       _engagementBootstrapping = false;
       _emoteBootstrapping = false;
       _relationshipBootstrapping = false;
+      _loadingSpecialMessages = false;
     });
   }
 }

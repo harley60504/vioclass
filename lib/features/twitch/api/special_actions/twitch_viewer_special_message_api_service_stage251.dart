@@ -42,41 +42,52 @@ class TwitchViewerSpecialMessageOperationConfigStage251 {
     required this.updateChatIdentity,
   });
 
-  static const streamNookNamesOnly = TwitchViewerSpecialMessageOperationConfigStage251(
+  static const streamNook = TwitchViewerSpecialMessageOperationConfigStage251(
     getWatchStreak: TwitchViewerSpecialMessageOperationStage251(
-      operationName: 'get_watch_streak',
-      sha256Hash: '',
+      operationName: 'RewardList',
+      sha256Hash:
+          '0b1471876d7647993731b9e3c6a13bf304c67fb31d07f06a945d42286ee377c4',
     ),
     shareWatchStreak: TwitchViewerSpecialMessageOperationStage251(
-      operationName: 'share_watch_streak',
-      sha256Hash: '',
+      operationName: 'ShareMilestone',
+      sha256Hash:
+          '25d20e60945d10123e8d466e30f21a1f1f578dfdea52c72095030b118eda9f39',
     ),
     getResubNotification: TwitchViewerSpecialMessageOperationStage251(
-      operationName: 'get_resub_notification',
-      sha256Hash: '',
+      operationName: 'Chat_ShareResub_ChannelData',
+      sha256Hash:
+          'beb55e2ecdbae3dd29c51a60597014d526466bc8f94fb88f3c3482110f4da1aa',
     ),
     useResubToken: TwitchViewerSpecialMessageOperationStage251(
-      operationName: 'use_resub_token',
-      sha256Hash: '',
+      operationName: 'Chat_ShareResub_UseResubToken',
+      sha256Hash:
+          '61045d4a4bb10d25080bc0a01a74232f1fa67a6a530e0f2ebf05df2f1ba3fa59',
     ),
     fetchChatIdentityBadges: TwitchViewerSpecialMessageOperationStage251(
-      operationName: 'fetch_chat_identity_badges',
-      sha256Hash: '',
+      operationName: 'ChatSettings_Badges',
+      sha256Hash:
+          'f30c0381c916b81bad77302c3cf986094364fa2dfc63a598804cb5ee3743225c',
     ),
     updateChatIdentity: TwitchViewerSpecialMessageOperationStage251(
-      operationName: 'update_chat_identity',
-      sha256Hash: '',
+      operationName: 'ChatSettings_SelectGlobalBadge',
+      sha256Hash:
+          '5e1b7f0ba771ca8eb81c0fcd5b8f4ff559ec2dc71cc9256e04ec2665049fc4e5',
     ),
   );
+
+  static const streamNookNamesOnly = streamNook;
 }
 
 class TwitchViewerSpecialMessageApiServiceStage251 {
-  final TwitchWebGqlPersistedApiService gql;
+  final TwitchWebGqlPersistedApiService webGql;
+  final TwitchWebGqlPersistedApiService androidGql;
   final TwitchViewerSpecialMessageOperationConfigStage251 operations;
 
   const TwitchViewerSpecialMessageApiServiceStage251({
-    required this.gql,
-    this.operations = TwitchViewerSpecialMessageOperationConfigStage251.streamNookNamesOnly,
+    required this.webGql,
+    required this.androidGql,
+    this.operations =
+        TwitchViewerSpecialMessageOperationConfigStage251.streamNook,
   });
 
   Future<TwitchWatchStreakStatusStage251> getWatchStreak({
@@ -85,12 +96,12 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     String? viewerId,
   }) async {
     final raw = await _single(
+      gql: webGql,
       operation: operations.getWatchStreak,
-      variables: _channelVariables(
-        channelLogin: channelLogin,
-        channelId: channelId,
-        viewerId: viewerId,
-      ),
+      variables: <String, dynamic>{
+        'channelID': _requiredValue(channelId, 'channelId'),
+        'shouldIncludeAllSuspendedStreaks': false,
+      },
     );
     return TwitchWatchStreakStatusStage251.fromRaw(
       channelLogin: channelLogin,
@@ -107,16 +118,14 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     String message = '',
   }) {
     return _single(
+      gql: webGql,
       operation: operations.shareWatchStreak,
       variables: <String, dynamic>{
-        ..._channelVariables(
-          channelLogin: channelLogin,
-          channelId: channelId,
-          viewerId: viewerId,
-        ),
-        if (shareToken != null && shareToken.trim().isNotEmpty)
-          'token': shareToken.trim(),
-        if (message.trim().isNotEmpty) 'message': message.trim(),
+        'input': <String, dynamic>{
+          'milestoneID': _requiredValue(shareToken, 'shareToken'),
+          'channelID': _requiredValue(channelId, 'channelId'),
+          'messageBody': message,
+        },
       },
     );
   }
@@ -127,12 +136,13 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     String? viewerId,
   }) async {
     final raw = await _single(
+      gql: androidGql,
       operation: operations.getResubNotification,
-      variables: _channelVariables(
-        channelLogin: channelLogin,
-        channelId: channelId,
-        viewerId: viewerId,
-      ),
+      variables: <String, dynamic>{
+        'channelLogin': _requiredLogin(channelLogin),
+        'giftRecipientLogin': '',
+        'withStandardGifting': false,
+      },
     );
     return TwitchResubNotificationStage251.fromRaw(
       channelLogin: channelLogin,
@@ -149,15 +159,15 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     String message = '',
   }) {
     return _single(
+      gql: androidGql,
       operation: operations.useResubToken,
       variables: <String, dynamic>{
-        ..._channelVariables(
-          channelLogin: channelLogin,
-          channelId: channelId,
-          viewerId: viewerId,
-        ),
-        'token': token.trim(),
-        if (message.trim().isNotEmpty) 'message': message.trim(),
+        'input': <String, dynamic>{
+          'channelLogin': _requiredLogin(channelLogin),
+          'includeStreak': true,
+          'message': message,
+          'tokenID': _requiredValue(token, 'token'),
+        },
       },
     );
   }
@@ -168,12 +178,11 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     String? viewerId,
   }) async {
     final raw = await _single(
+      gql: androidGql,
       operation: operations.fetchChatIdentityBadges,
-      variables: _channelVariables(
-        channelLogin: channelLogin,
-        channelId: channelId,
-        viewerId: viewerId,
-      ),
+      variables: <String, dynamic>{
+        'channelLogin': _requiredLogin(channelLogin),
+      },
     );
     return TwitchChatIdentityStatusStage251.fromRaw(
       channelLogin: channelLogin,
@@ -190,15 +199,13 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     required String badgeVersion,
   }) {
     return _single(
+      gql: androidGql,
       operation: operations.updateChatIdentity,
       variables: <String, dynamic>{
-        ..._channelVariables(
-          channelLogin: channelLogin,
-          channelId: channelId,
-          viewerId: viewerId,
-        ),
-        'badgeSetId': badgeSetId.trim(),
-        'badgeVersion': badgeVersion.trim(),
+        'input': <String, dynamic>{
+          'badgeSetID': _requiredValue(badgeSetId, 'badgeSetId'),
+          'badgeSetVersion': _requiredValue(badgeVersion, 'badgeVersion'),
+        },
       },
     );
   }
@@ -207,16 +214,19 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
     required String operationName,
     required String sha256Hash,
     required Map<String, dynamic> variables,
+    bool useAndroidClient = false,
   }) async {
     final operation = TwitchViewerSpecialMessageOperationStage251(
       operationName: operationName,
       sha256Hash: sha256Hash,
     );
+    final gql = useAndroidClient ? androidGql : webGql;
     final result = await gql.single(operation.build(variables));
     return result;
   }
 
   Future<dynamic> _single({
+    required TwitchWebGqlPersistedApiService gql,
     required TwitchViewerSpecialMessageOperationStage251 operation,
     required Map<String, dynamic> variables,
   }) async {
@@ -228,27 +238,26 @@ class TwitchViewerSpecialMessageApiServiceStage251 {
 
     final result = await gql.single(operation.build(variables));
     if (result.hasErrors) {
-      throw StateError('${operation.operationName} returned GraphQL errors: ${result.response}');
+      throw StateError(
+        '${operation.operationName} returned GraphQL errors: ${result.response}',
+      );
     }
     return result.response;
   }
 
-  Map<String, dynamic> _channelVariables({
-    required String channelLogin,
-    String? channelId,
-    String? viewerId,
-  }) {
+  String _requiredLogin(String channelLogin) {
     final login = channelLogin.trim().toLowerCase();
-    return <String, dynamic>{
-      if (login.isNotEmpty) 'channelLogin': login,
-      if (channelId != null && channelId.trim().isNotEmpty)
-        'channelID': channelId.trim(),
-      if (channelId != null && channelId.trim().isNotEmpty)
-        'channelId': channelId.trim(),
-      if (viewerId != null && viewerId.trim().isNotEmpty)
-        'viewerID': viewerId.trim(),
-      if (viewerId != null && viewerId.trim().isNotEmpty)
-        'viewerId': viewerId.trim(),
-    };
+    if (login.isEmpty) {
+      throw StateError('channelLogin is required.');
+    }
+    return login;
+  }
+
+  String _requiredValue(String? value, String name) {
+    final safe = value?.trim();
+    if (safe == null || safe.isEmpty) {
+      throw StateError('$name is required.');
+    }
+    return safe;
   }
 }
