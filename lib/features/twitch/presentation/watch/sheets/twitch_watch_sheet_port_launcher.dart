@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
-import '../../../models/special_actions/twitch_pending_special_message_stage250.dart';
+import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../sheets/twitch_channel_points_sheet.dart';
 import '../../sheets/twitch_emote_picker_sheet.dart';
@@ -15,8 +15,7 @@ class TwitchWatchSheetPortLauncher {
   final TwitchWatchEngagementPort engagement;
   final void Function(String message) showMessage;
   final void Function(String text) insertMessageText;
-  final void Function(TwitchPendingSpecialMessageStage250 pending)?
-      setPendingSpecialMessage;
+  final void Function(TwitchPendingSpecialMessage pending)? setPendingSpecialMessage;
   final Future<void> Function({bool showSnackOnError}) refreshEngagement;
   final Future<void> Function({bool forceRefresh}) refreshEmotes;
   final String Function() channelLogin;
@@ -105,7 +104,7 @@ class TwitchWatchSheetPortLauncher {
     final type = channelPointRewardTypeKey(reward);
 
     setPending(
-      TwitchPendingSpecialMessageStage250(
+      TwitchPendingSpecialMessage(
         kind: type == 'SEND_HIGHLIGHTED_MESSAGE'
             ? TwitchPendingSpecialMessageKind.highlightedMessage
             : TwitchPendingSpecialMessageKind.channelPointRewardMessage,
