@@ -19,6 +19,7 @@ class TwitchStreamHomeToolbarStage249 extends StatelessWidget {
   final Future<void> Function() onOpenDropsConnector;
   final VoidCallback onTestAppNotification;
   final Future<void> Function() onLogout;
+  final bool forceTwoRows;
 
   const TwitchStreamHomeToolbarStage249({
     super.key,
@@ -33,10 +34,72 @@ class TwitchStreamHomeToolbarStage249 extends StatelessWidget {
     required this.onOpenDropsConnector,
     required this.onTestAppNotification,
     required this.onLogout,
+    this.forceTwoRows = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final actions = <Widget>[
+      if (selectedSection == TwitchHomeSection.browse) ...<Widget>[
+        TwitchStreamHomeToolbarIconButtonStage249(
+          tooltip: '遊戲分類',
+          icon: Icons.sports_esports_rounded,
+          onPressed: onShowGameMenu,
+        ),
+        const SizedBox(width: 4),
+      ],
+      TwitchStreamHomeToolbarIconButtonStage249(
+        tooltip: '語言篩選',
+        icon: Icons.tune_rounded,
+        onPressed: onShowLanguageMenu,
+      ),
+      const SizedBox(width: 4),
+      TwitchStreamHomeToolbarIconButtonStage249(
+        tooltip: '重新整理',
+        icon: Icons.refresh_rounded,
+        onPressed: () => onRefresh(),
+      ),
+      const SizedBox(width: 4),
+      TwitchStreamHomeToolbarIconButtonStage249(
+        tooltip: 'Drops 連接',
+        icon: Icons.card_giftcard_rounded,
+        onPressed: () => onOpenDropsConnector(),
+      ),
+      const SizedBox(width: 4),
+      TwitchStreamHomeAccountMenuStage249(
+        onLogin: onLogin,
+        onRefresh: onRefresh,
+        onTestAppNotification: onTestAppNotification,
+        onLogout: onLogout,
+      ),
+    ];
+
+    if (forceTwoRows) {
+      return Container(
+        height: 124,
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.30),
+          border: Border(
+            bottom: BorderSide(color: _kTwitchPurple.withOpacity(0.22)),
+          ),
+        ),
+        child: Column(
+          children: <Widget>[
+            SizedBox(height: 50, child: _buildSearchField()),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 46,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(children: actions),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       height: 74,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
@@ -50,38 +113,7 @@ class TwitchStreamHomeToolbarStage249 extends StatelessWidget {
         children: <Widget>[
           Expanded(child: _buildSearchField()),
           const SizedBox(width: 8),
-          if (selectedSection == TwitchHomeSection.browse) ...<Widget>[
-            TwitchStreamHomeToolbarIconButtonStage249(
-              tooltip: '遊戲分類',
-              icon: Icons.sports_esports_rounded,
-              onPressed: onShowGameMenu,
-            ),
-            const SizedBox(width: 4),
-          ],
-          TwitchStreamHomeToolbarIconButtonStage249(
-            tooltip: '語言篩選',
-            icon: Icons.tune_rounded,
-            onPressed: onShowLanguageMenu,
-          ),
-          const SizedBox(width: 4),
-          TwitchStreamHomeToolbarIconButtonStage249(
-            tooltip: '重新整理',
-            icon: Icons.refresh_rounded,
-            onPressed: () => onRefresh(),
-          ),
-          const SizedBox(width: 4),
-          TwitchStreamHomeToolbarIconButtonStage249(
-            tooltip: 'Drops 連接',
-            icon: Icons.card_giftcard_rounded,
-            onPressed: () => onOpenDropsConnector(),
-          ),
-          const SizedBox(width: 4),
-          TwitchStreamHomeAccountMenuStage249(
-            onLogin: onLogin,
-            onRefresh: onRefresh,
-            onTestAppNotification: onTestAppNotification,
-            onLogout: onLogout,
-          ),
+          ...actions,
         ],
       ),
     );
