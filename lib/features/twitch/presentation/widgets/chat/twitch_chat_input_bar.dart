@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_input_bar_stage249_safe_async_send
+// PATCH VERSION: twitch_chat_input_bar_safe_async_send
 
 import 'dart:async';
 

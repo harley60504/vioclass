@@ -1,7 +1,7 @@
-// PATCH VERSION: twitch_chat_message_reply_preview_stage249_bright_mentions
+// PATCH VERSION: twitch_chat_message_reply_preview_bright_mentions
 //
 // Reply preview widget used by runtime chat message content.
-// Stage 249 highlights @mentions in the compact reply preview so tags remain
+// Highlights @mentions in the compact reply preview so tags remain
 // readable on dark chat cards.
 
 import 'package:flutter/material.dart';

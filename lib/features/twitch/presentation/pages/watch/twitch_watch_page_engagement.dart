@@ -1,12 +1,12 @@
 part of twitch_watch_page;
 
-final Map<int, String> _stage249LastNotifiedChannelPointClaimByState =
+final Map<int, String> _lastNotifiedChannelPointClaimByState =
     <int, String>{};
-final Map<int, int> _stage249LastChannelPointBalanceByState = <int, int>{};
-final Map<int, Timer> _stage249ChannelPointPollingTimerByState = <int, Timer>{};
-final Map<int, Set<String>> _stage249ProcessingChannelPointBonusByState =
+final Map<int, int> _lastChannelPointBalanceByState = <int, int>{};
+final Map<int, Timer> _channelPointPollingTimerByState = <int, Timer>{};
+final Map<int, Set<String>> _processingChannelPointBonusByState =
     <int, Set<String>>{};
-final Map<int, Set<String>> _stage249DoneChannelPointBonusByState =
+final Map<int, Set<String>> _doneChannelPointBonusByState =
     <int, Set<String>>{};
 
 extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
@@ -29,21 +29,21 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     required String channel,
   }) {
     final key = hashCode;
-    final existing = _stage249ChannelPointPollingTimerByState[key];
+    final existing = _channelPointPollingTimerByState[key];
     if (existing != null && existing.isActive) return;
 
-    _stage249ChannelPointPollingTimerByState[key] = Timer.periodic(
+    _channelPointPollingTimerByState[key] = Timer.periodic(
       const Duration(seconds: 30),
       (timer) {
         if (!_isCurrentWatchTask(generation, channel)) {
           timer.cancel();
-          if (_stage249ChannelPointPollingTimerByState[key] == timer) {
-            _stage249ChannelPointPollingTimerByState.remove(key);
+          if (_channelPointPollingTimerByState[key] == timer) {
+            _channelPointPollingTimerByState.remove(key);
           }
-          _stage249ProcessingChannelPointBonusByState.remove(key);
-          _stage249DoneChannelPointBonusByState.remove(key);
-          _stage249LastNotifiedChannelPointClaimByState.remove(key);
-          _stage249LastChannelPointBalanceByState.remove(key);
+          _processingChannelPointBonusByState.remove(key);
+          _doneChannelPointBonusByState.remove(key);
+          _lastNotifiedChannelPointClaimByState.remove(key);
+          _lastChannelPointBalanceByState.remove(key);
           return;
         }
 
@@ -130,9 +130,9 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     final key = hashCode;
 
     if (channelPoints == null || !channelPoints.hasAvailableClaim) {
-      _stage249LastNotifiedChannelPointClaimByState.remove(key);
-      _stage249ProcessingChannelPointBonusByState[key]?.clear();
-      _stage249DoneChannelPointBonusByState[key]?.clear();
+      _lastNotifiedChannelPointClaimByState.remove(key);
+      _processingChannelPointBonusByState[key]?.clear();
+      _doneChannelPointBonusByState[key]?.clear();
       return;
     }
 
@@ -148,9 +148,9 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     }
 
     final bonusKey = '$_channelLogin:$claimId';
-    final processing = _stage249ProcessingChannelPointBonusByState
+    final processing = _processingChannelPointBonusByState
         .putIfAbsent(key, () => <String>{});
-    final done = _stage249DoneChannelPointBonusByState
+    final done = _doneChannelPointBonusByState
         .putIfAbsent(key, () => <String>{});
 
     if (processing.contains(bonusKey) || done.contains(bonusKey)) return;
@@ -182,7 +182,7 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
         claimId: claimId,
       );
 
-      _stage249DoneChannelPointBonusByState
+      _doneChannelPointBonusByState
           .putIfAbsent(stateKey, () => <String>{})
           .add(bonusKey);
 
@@ -206,7 +206,7 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
         duration: const Duration(seconds: 8),
       );
     } finally {
-      _stage249ProcessingChannelPointBonusByState[stateKey]?.remove(bonusKey);
+      _processingChannelPointBonusByState[stateKey]?.remove(bonusKey);
     }
   }
 
@@ -214,7 +214,7 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     TwitchChannelPointsRuntimeSnapshot? channelPoints,
   ) {
     if (channelPoints == null || !channelPoints.hasAvailableClaim) {
-      _stage249LastNotifiedChannelPointClaimByState.remove(hashCode);
+      _lastNotifiedChannelPointClaimByState.remove(hashCode);
       return;
     }
 
@@ -222,11 +222,11 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     if (claimId == null || claimId.isEmpty) return;
 
     final memoryKey = '$_channelLogin:$claimId';
-    if (_stage249LastNotifiedChannelPointClaimByState[hashCode] == memoryKey) {
+    if (_lastNotifiedChannelPointClaimByState[hashCode] == memoryKey) {
       return;
     }
 
-    _stage249LastNotifiedChannelPointClaimByState[hashCode] = memoryKey;
+    _lastNotifiedChannelPointClaimByState[hashCode] = memoryKey;
 
     final points = channelPoints.availableClaimPoints;
     final pointsText = points > 0 ? '$points 點' : '忠誠點數';
@@ -248,8 +248,8 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     if (channelPoints == null || balance == null) return;
 
     final key = hashCode;
-    final previousBalance = _stage249LastChannelPointBalanceByState[key];
-    _stage249LastChannelPointBalanceByState[key] = balance;
+    final previousBalance = _lastChannelPointBalanceByState[key];
+    _lastChannelPointBalanceByState[key] = balance;
 
     if (!notifyBalanceDelta || previousBalance == null) return;
     final delta = balance - previousBalance;

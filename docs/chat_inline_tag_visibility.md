@@ -1,4 +1,4 @@
-# Stage 249 — 聊天室內 tag 顏色可讀性調整
+# Chat inline tag visibility — 聊天室內 tag 顏色可讀性調整
 
 ## 背景
 
@@ -8,7 +8,7 @@
 
 - `lib/features/twitch/presentation/widgets/chat/message/twitch_chat_message_reply_preview.dart`
 - `lib/features/twitch/presentation/widgets/chat/message/twitch_chat_message_segments.dart`
-- `docs/stage_249_chat_inline_tag_visibility.md`
+- `docs/chat_inline_tag_visibility.md`
 
 ## 修改內容
 

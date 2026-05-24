@@ -91,7 +91,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
   }
 
   Future<void> _sendPendingSpecialMessage(
-    TwitchPendingSpecialMessageStage250 pending,
+    TwitchPendingSpecialMessage pending,
     String message,
   ) async {
     setState(() => _sending = true);
@@ -123,7 +123,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
   }
 
   Future<void> _sendPendingChannelPointTextReward(
-    TwitchPendingSpecialMessageStage250 pending,
+    TwitchPendingSpecialMessage pending,
     String message,
   ) async {
     final reward = pending.payload['reward'];
@@ -149,7 +149,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
   }
 
   Future<void> _sendPendingWatchStreak(
-    TwitchPendingSpecialMessageStage250 pending,
+    TwitchPendingSpecialMessage pending,
     String message,
   ) async {
     final status = pending.payload['watchStreak'];
@@ -175,7 +175,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
   }
 
   Future<void> _sendPendingResub(
-    TwitchPendingSpecialMessageStage250 pending,
+    TwitchPendingSpecialMessage pending,
     String message,
   ) async {
     final resub = pending.payload['resub'];
@@ -254,7 +254,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     }
   }
 
-  TwitchPendingSpecialMessageStage250? _pendingFromSpecialMessages(
+  TwitchPendingSpecialMessage? _pendingFromSpecialMessages(
     TwitchViewerSpecialMessagesSnapshotStage251 snapshot,
   ) {
     final resub = snapshot.resub;
@@ -268,11 +268,11 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     return null;
   }
 
-  TwitchPendingSpecialMessageStage250 _pendingFromWatchStreak(
+  TwitchPendingSpecialMessage _pendingFromWatchStreak(
     TwitchWatchStreakStatusStage251 status,
   ) {
     final count = status.streakCount;
-    return TwitchPendingSpecialMessageStage250(
+    return TwitchPendingSpecialMessage(
       kind: TwitchPendingSpecialMessageKind.watchStreak,
       channelLogin: _channelLogin,
       channelId: _channelId ?? status.channelId,
@@ -284,11 +284,11 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     );
   }
 
-  TwitchPendingSpecialMessageStage250 _pendingFromResub(
+  TwitchPendingSpecialMessage _pendingFromResub(
     TwitchResubNotificationStage251 resub,
   ) {
     final months = resub.cumulativeMonths;
-    return TwitchPendingSpecialMessageStage250(
+    return TwitchPendingSpecialMessage(
       kind: TwitchPendingSpecialMessageKind.resub,
       channelLogin: _channelLogin,
       channelId: _channelId ?? resub.channelId,
@@ -382,7 +382,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
 
   void _setPreviewPendingSpecialMessage() {
     setState(() {
-      _pendingSpecialMessage = TwitchPendingSpecialMessageStage250(
+      _pendingSpecialMessage = TwitchPendingSpecialMessage(
         kind: TwitchPendingSpecialMessageKind.preview,
         channelLogin: _channelLogin,
         channelId: _channelId,
@@ -394,7 +394,7 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
     });
   }
 
-  void _setPendingSpecialMessage(TwitchPendingSpecialMessageStage250 pending) {
+  void _setPendingSpecialMessage(TwitchPendingSpecialMessage pending) {
     if (!mounted) return;
     setState(() => _pendingSpecialMessage = pending);
   }

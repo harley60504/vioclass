@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_chat_special_message_formatter_stage250c_resub_months
+// PATCH VERSION: twitch_chat_special_message_formatter_resub_months
 //
 // Localizes Twitch IRC USERNOTICE / special message system text from msg-id and
 // msg-param-* tags. This keeps detailed special-message text out of model and UI layers.

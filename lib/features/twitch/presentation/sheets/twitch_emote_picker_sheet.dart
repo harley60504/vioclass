@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_emote_picker_sheet_stage249_shared_emote_image
+// PATCH VERSION: twitch_emote_picker_sheet_shared_emote_image
 
 import 'package:flutter/material.dart';
 

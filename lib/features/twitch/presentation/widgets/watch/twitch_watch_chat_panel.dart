@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
-import '../../../models/special_actions/twitch_pending_special_message_stage250.dart';
+import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
@@ -32,7 +32,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final int emoteCount;
   final bool loadingEmotes;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
-  final TwitchPendingSpecialMessageStage250? pendingSpecialMessage;
+  final TwitchPendingSpecialMessage? pendingSpecialMessage;
   final List<dynamic> pinnedMessages;
   final TwitchPredictionSnapshot? prediction;
   final bool loadingEngagement;

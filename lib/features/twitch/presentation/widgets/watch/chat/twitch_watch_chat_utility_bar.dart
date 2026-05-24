@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_chat_utility_bar_stage250a_pending_action_entry
+// PATCH VERSION: twitch_watch_chat_utility_bar_pending_action_entry
 
 import 'package:flutter/material.dart';
 

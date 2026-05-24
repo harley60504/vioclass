@@ -1,16 +1,16 @@
-// PATCH VERSION: twitch_watch_chat_input_section_stage250a_pending_action_entry
+// PATCH VERSION: twitch_watch_chat_input_section_pending_action_entry
 
 import 'package:flutter/material.dart';
 
-import '../../../../models/special_actions/twitch_pending_special_message_stage250.dart';
+import '../../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../chat/twitch_chat_input_bar.dart';
-import 'twitch_pending_chat_action_banner_stage250.dart';
+import 'twitch_pending_chat_action_banner.dart';
 import 'twitch_watch_chat_utility_bar.dart';
 
 class TwitchWatchChatInputSection extends StatelessWidget {
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
-  final TwitchPendingSpecialMessageStage250? pendingSpecialMessage;
+  final TwitchPendingSpecialMessage? pendingSpecialMessage;
   final TextEditingController messageController;
   final bool loadingEmotes;
   final bool compact;
@@ -64,7 +64,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
             onOpenSpecialActions: onOpenSpecialActions,
           ),
           if (pending != null)
-            TwitchPendingChatActionBannerStage250(
+            TwitchPendingChatActionBanner(
               pending: pending,
               compact: compact,
               onCancel: onCancelPendingSpecialMessage ?? () {},
