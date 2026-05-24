@@ -1,4 +1,5 @@
 import '../../api/engagement/twitch_channel_points_api_service.dart';
+import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api_stage252.dart';
 
 class TwitchChannelPointsRuntimeService {
   final TwitchChannelPointsApiService channelPointsApi;
@@ -10,9 +11,13 @@ class TwitchChannelPointsRuntimeService {
   /// without touching reward redemption.
   final TwitchChannelPointsEmoteApiService? channelPointsEmoteApi;
 
+  final TwitchStreamNookModifiedEmoteRedeemApiStage252?
+      streamNookModifiedEmoteRedeemApiStage252;
+
   const TwitchChannelPointsRuntimeService({
     required this.channelPointsApi,
     this.channelPointsEmoteApi,
+    this.streamNookModifiedEmoteRedeemApiStage252,
   });
 
   Future<TwitchChannelPointsClaimResult> claimBonus({
@@ -25,12 +30,6 @@ class TwitchChannelPointsRuntimeService {
         claimId: claimId,
       );
     } catch (error) {
-      // Twitch's community-points bonus claim is effectively idempotent from a
-      // UI perspective: the claim can disappear server-side even when the
-      // response path reports an error such as already claimed / not found / no
-      // longer available. Twitch-style handling treats these as a consumed
-      // claim and lets the caller refresh the snapshot instead of keeping the
-      // gift button around until the user reopens the stream.
       if (_looksLikeConsumedClaimError(error)) {
         return TwitchChannelPointsClaimResult(
           ok: true,
@@ -123,11 +122,21 @@ class TwitchChannelPointsRuntimeService {
     String? modifierId,
   }) {
     final parsedReward = _parseRedeemableReward(reward);
+    final streamNookApi = streamNookModifiedEmoteRedeemApiStage252;
+
+    if (streamNookApi != null) {
+      return streamNookApi.unlockModifiedEmote(
+        channelId: channelId,
+        rewardId: parsedReward.id,
+        cost: parsedReward.redeemCost,
+        // Twitch-style: modifiedEmoteId is already the final id, e.g. 1022569_BW.
+        emoteId: modifiedEmoteId,
+      );
+    }
 
     return channelPointsApi.unlockModifiedSubscriberEmote(
       channelId: channelId,
       reward: parsedReward,
-      // Twitch-style: modifiedEmoteId is already the final id, e.g. 1022569_BW.
       emoteId: modifiedEmoteId,
       emoteModifierId: modifierId,
     );
