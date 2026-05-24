@@ -6,6 +6,11 @@ import 'package:flutter/services.dart';
 Future<void> showTwitchSpecialMessageDebugProbeSheetStage251({
   required BuildContext context,
   required Future<Map<String, dynamic>> Function() onRunProbe,
+  Future<Map<String, dynamic>> Function({
+    required String operationName,
+    required String sha256Hash,
+    required Map<String, dynamic> variables,
+  })? onRunCustomPersistedOperation,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -17,15 +22,22 @@ Future<void> showTwitchSpecialMessageDebugProbeSheetStage251({
     ),
     builder: (_) => _TwitchSpecialMessageDebugProbeSheetStage251(
       onRunProbe: onRunProbe,
+      onRunCustomPersistedOperation: onRunCustomPersistedOperation,
     ),
   );
 }
 
 class _TwitchSpecialMessageDebugProbeSheetStage251 extends StatefulWidget {
   final Future<Map<String, dynamic>> Function() onRunProbe;
+  final Future<Map<String, dynamic>> Function({
+    required String operationName,
+    required String sha256Hash,
+    required Map<String, dynamic> variables,
+  })? onRunCustomPersistedOperation;
 
   const _TwitchSpecialMessageDebugProbeSheetStage251({
     required this.onRunProbe,
+    this.onRunCustomPersistedOperation,
   });
 
   @override
@@ -35,9 +47,23 @@ class _TwitchSpecialMessageDebugProbeSheetStage251 extends StatefulWidget {
 
 class _TwitchSpecialMessageDebugProbeSheetStage251State
     extends State<_TwitchSpecialMessageDebugProbeSheetStage251> {
+  final TextEditingController _operationController = TextEditingController();
+  final TextEditingController _hashController = TextEditingController();
+  final TextEditingController _variablesController = TextEditingController(
+    text: const JsonEncoder.withIndent('  ').convert(<String, dynamic>{}),
+  );
+
   bool _running = false;
   String? _jsonText;
   String? _errorText;
+
+  @override
+  void dispose() {
+    _operationController.dispose();
+    _hashController.dispose();
+    _variablesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +74,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
       child: Padding(
         padding: EdgeInsets.fromLTRB(14, 10, 14, 14 + bottomInset),
         child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.72,
+          height: MediaQuery.sizeOf(context).height * 0.82,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
@@ -136,6 +162,18 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
+                    onPressed: _running || widget.onRunCustomPersistedOperation == null
+                        ? null
+                        : _runCustomPersistedOperation,
+                    icon: const Icon(Icons.bolt_rounded, size: 18),
+                    label: const Text('Run Custom'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                      side: BorderSide(color: Colors.white.withOpacity(0.16)),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
                     onPressed: _jsonText == null ? null : _copyJson,
                     icon: const Icon(Icons.copy_rounded, size: 18),
                     label: const Text('Copy'),
@@ -146,7 +184,9 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
+              _buildCustomOperationInputs(),
+              const SizedBox(height: 10),
               if (_errorText != null)
                 Container(
                   padding: const EdgeInsets.all(10),
@@ -199,12 +239,111 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
     );
   }
 
+  Widget _buildCustomOperationInputs() {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.035),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              const Icon(Icons.tune_rounded, color: Color(0xFFBF94FF), size: 17),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Custom Persisted Query',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.86),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: _buildTextField(
+                  controller: _operationController,
+                  label: 'operationName',
+                  hint: '例如 GetViewerSpecialMessage',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildTextField(
+                  controller: _hashController,
+                  label: 'sha256Hash',
+                  hint: '貼 persisted query hash',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _buildTextField(
+            controller: _variablesController,
+            label: 'variables JSON',
+            hint: '{"channelLogin":"..."}',
+            maxLines: 4,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    int maxLines = 1,
+  }) {
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      minLines: maxLines,
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontFamily: 'monospace',
+      ),
+      decoration: InputDecoration(
+        isDense: true,
+        labelText: label,
+        hintText: hint,
+        labelStyle: TextStyle(color: Colors.white.withOpacity(0.60), fontSize: 11),
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.28), fontSize: 11),
+        filled: true,
+        fillColor: Colors.black.withOpacity(0.22),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: Color(0xFF9146FF)),
+        ),
+      ),
+    );
+  }
+
   Widget _buildEmptyState() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Text(
-          '按 Run Probe 後會顯示 JSON。\n目前 hash 尚未補齊時，operations 會顯示 configured=false，snapshot.issues 會列出原因。',
+          '按 Run Probe 後會顯示 JSON。\n也可以貼 operationName / sha256Hash / variables 後按 Run Custom 直接測 persisted query。',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white.withOpacity(0.54),
@@ -225,6 +364,57 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
 
     try {
       final result = await widget.onRunProbe();
+      const encoder = JsonEncoder.withIndent('  ');
+      setState(() {
+        _jsonText = encoder.convert(result);
+      });
+    } catch (error) {
+      setState(() {
+        _errorText = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _running = false);
+      }
+    }
+  }
+
+  Future<void> _runCustomPersistedOperation() async {
+    final run = widget.onRunCustomPersistedOperation;
+    if (run == null) return;
+
+    final operationName = _operationController.text.trim();
+    final hash = _hashController.text.trim();
+    final variablesText = _variablesController.text.trim();
+    if (operationName.isEmpty || hash.isEmpty) {
+      setState(() => _errorText = 'operationName 和 sha256Hash 都要填。');
+      return;
+    }
+
+    Map<String, dynamic> variables;
+    try {
+      final decoded = variablesText.isEmpty ? <String, dynamic>{} : jsonDecode(variablesText);
+      if (decoded is! Map) {
+        setState(() => _errorText = 'variables JSON 必須是 object。');
+        return;
+      }
+      variables = decoded.map((key, value) => MapEntry(key.toString(), value));
+    } catch (error) {
+      setState(() => _errorText = 'variables JSON 解析失敗：$error');
+      return;
+    }
+
+    setState(() {
+      _running = true;
+      _errorText = null;
+    });
+
+    try {
+      final result = await run(
+        operationName: operationName,
+        sha256Hash: hash,
+        variables: variables,
+      );
       const encoder = JsonEncoder.withIndent('  ');
       setState(() {
         _jsonText = encoder.convert(result);
