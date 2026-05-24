@@ -1,17 +1,3 @@
-// PATCH VERSION: twitch_stream_page_stage254_mobile_shell
-//
-// 這份主頁已拆分：
-// - twitch_stream_home_models_stage249.dart
-// - widgets/home/twitch_stream_home_sidebar_stage249.dart
-// - widgets/home/twitch_stream_home_toolbar_stage249.dart
-// - widgets/home/twitch_stream_home_account_menu_stage249.dart
-// - twitch_drops_connection_page_stage249.dart
-//
-// Stage 254:
-// - 使用 TwitchResponsiveLayout 作為共用手機判定。
-// - 手機寬度時 sidebar 移到底部 NavigationBar。
-// - 手機寬度時 toolbar 會拆成兩排，避免按鈕擠爆。
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -22,16 +8,16 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
-import '../../services/notifications/twitch_app_notification_service_stage249.dart';
-import '../widgets/home/twitch_stream_home_bottom_nav_stage254.dart';
-import '../widgets/home/twitch_stream_home_sidebar_stage249.dart';
-import '../widgets/home/twitch_stream_home_toolbar_stage249.dart';
+import '../../services/notifications/twitch_app_notification_service.dart';
+import '../widgets/home/twitch_stream_home_bottom_nav.dart';
+import '../widgets/home/twitch_stream_home_sidebar.dart';
+import '../widgets/home/twitch_stream_home_toolbar.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import 'twitch_browse_page.dart';
+import 'twitch_drops_connection_page.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
-import 'twitch_stream_home_models_stage249.dart';
-import 'twitch_drops_connection_page_stage249.dart';
+import 'twitch_stream_home_models.dart';
 
 const Color _kBackground = Color(0xFF0A0A0F);
 
@@ -194,12 +180,12 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     });
   }
 
-  void showStage249InternalNotificationTest() {
+  void showInternalNotificationTest() {
     final hasDropsToken = dropsAuthService.accessToken?.trim().isNotEmpty ?? false;
     final tokenLabel = hasDropsToken ? 'Drops token 已存在' : '尚未登入 Drops token';
 
     twitchAppNotificationCenter.showSuccess(
-      title: 'Stage 249 程式內部通知測試',
+      title: '程式內部通知測試',
       message: '$tokenLabel。之後 Drops 可領取、進度完成、token 失效都會先走這個 App 內通知。',
       duration: const Duration(seconds: 6),
     );
@@ -208,7 +194,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Future<void> openDropsConnectorPage() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) => TwitchDropsConnectionPageStage249(
+        builder: (_) => TwitchDropsConnectionPage(
           apiClient: apiClient,
           dropsAuthService: dropsAuthService,
         ),
@@ -257,7 +243,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Widget _buildDesktopShell(TwitchResponsiveLayout layout) {
     return Row(
       children: <Widget>[
-        TwitchStreamHomeSidebarStage249(
+        TwitchStreamHomeSidebar(
           selectedSection: selectedSection,
           viewerLabel: viewerLabel,
           loginStatus: loginStatus,
@@ -273,7 +259,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     return Column(
       children: <Widget>[
         Expanded(child: _buildContentColumn(layout)),
-        TwitchStreamHomeBottomNavigationStage254(
+        TwitchStreamHomeBottomNavigation(
           selectedSection: selectedSection,
           onSelectSection: selectSection,
         ),
@@ -284,7 +270,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Widget _buildContentColumn(TwitchResponsiveLayout layout) {
     return Column(
       children: <Widget>[
-        TwitchStreamHomeToolbarStage249(
+        TwitchStreamHomeToolbar(
           selectedSection: selectedSection,
           searchController: searchController,
           forceTwoRows: layout.shouldUseTwoRowHomeToolbar,
@@ -308,7 +294,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           onRefresh: refreshCurrentPage,
           onLogin: runLinkedTwitchLoginFlow,
           onOpenDropsConnector: openDropsConnectorPage,
-          onTestAppNotification: showStage249InternalNotificationTest,
+          onTestAppNotification: showInternalNotificationTest,
           onLogout: logout,
         ),
         Expanded(child: _buildHomeContent()),
