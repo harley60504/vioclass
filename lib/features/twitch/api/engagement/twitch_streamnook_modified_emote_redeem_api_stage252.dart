@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import '../../models/engagement/twitch_channel_points_models.dart';
 import '../core/twitch_api_client.dart';
 import '../core/twitch_api_constants.dart';
@@ -36,9 +38,12 @@ class TwitchStreamNookModifiedEmoteRedeemApiStage252 {
     if (finalModifiedEmoteId.isEmpty) {
       throw TwitchApiException('Modify Emote requires a final modified emoteID.');
     }
+    if (cost <= 0) {
+      throw TwitchApiException('Modify Emote requires a positive StreamNook-style cost.');
+    }
 
     final token = await _requireAccessToken();
-    final transactionId = _transactionId();
+    final transactionId = _dashlessUuidLike();
 
     final raw = await client.postJson<dynamic>(
       '${TwitchApiConstants.gqlEndpoint}#origin=twilight',
@@ -90,13 +95,9 @@ class TwitchStreamNookModifiedEmoteRedeemApiStage252 {
   Future<String> _requireAccessToken() async {
     final token = (await tokenProvider())?.trim();
     if (token == null || token.isEmpty) {
-      throw TwitchApiException('Twitch OAuth token is missing for modified emote redeem.');
+      throw TwitchApiException('Drops OAuth token is missing for modified emote redeem.');
     }
     return token;
-  }
-
-  String _transactionId() {
-    return DateTime.now().microsecondsSinceEpoch.toRadixString(16) + deviceId;
   }
 
   Map<String, String> _headers({required String token}) {
@@ -106,9 +107,19 @@ class TwitchStreamNookModifiedEmoteRedeemApiStage252 {
       'Authorization': 'OAuth $token',
       'Content-Type': 'application/json',
       'Accept-Language': 'en-US',
-      'X-Device-Id': deviceId,
-      'Client-Session-Id': sessionId,
+      // StreamNook generates fresh dashless ids for these headers per request.
+      'X-Device-Id': _dashlessUuidLike(),
+      'Client-Session-Id': _dashlessUuidLike().substring(0, 16),
     };
+  }
+
+  String _dashlessUuidLike() {
+    final random = math.Random.secure();
+    return List<String>.generate(
+      32,
+      (_) => random.nextInt(16).toRadixString(16),
+      growable: false,
+    ).join();
   }
 
   void _throwGraphQlErrors(Object? raw) {
