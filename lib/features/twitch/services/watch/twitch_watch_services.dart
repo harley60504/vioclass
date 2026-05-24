@@ -1,11 +1,3 @@
-// PATCH VERSION: twitch_watch_services_stage252_streamnook_modified_emote
-//
-// Owns the Watch composition dependency graph. WatchPage should assemble UI and
-// route lifecycle; feature services are exposed as small groups so Player,
-// Chat, Emote, Engagement, SpecialMessage, and Relationship components can
-// receive their own dependency object instead of routing every API call through
-// TwitchWatchPage.
-
 import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/channel/twitch_private_gql_relationship_api_service_v1.dart';
 import '../../api/chat/twitch_chat_startup_api_service.dart';
@@ -20,7 +12,7 @@ import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../api/engagement/twitch_drops_prediction_api_service.dart';
 import '../../api/engagement/twitch_pinned_chat_api_service.dart';
 import '../../api/engagement/twitch_prediction_api_service.dart';
-import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api_stage252.dart';
+import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api.dart';
 import '../../api/engagement/twitch_subscribe_api_service_v1.dart';
 import '../../api/playback/twitch_playback_api_service.dart';
 import '../../api/special_actions/twitch_viewer_special_message_api_service.dart';
@@ -169,8 +161,8 @@ class TwitchWatchServices {
         return TwitchApiConstants.twitchDefaultDropsClientId;
       },
     );
-    final streamNookModifiedEmoteRedeemApiStage252 =
-        TwitchStreamNookModifiedEmoteRedeemApiStage252(
+    final streamNookModifiedEmoteRedeemApi =
+        TwitchStreamNookModifiedEmoteRedeemApi(
       client: apiClient,
       tokenProvider: () async {
         final dropsToken = await dropsAuthService.getToken();
@@ -201,8 +193,7 @@ class TwitchWatchServices {
     final subscribeApi = const TwitchSubscribeApiServiceV1();
     final channelPointsRuntimeService = TwitchChannelPointsRuntimeService(
       channelPointsApi: channelPointsApi,
-      streamNookModifiedEmoteRedeemApiStage252:
-          streamNookModifiedEmoteRedeemApiStage252,
+      streamNookModifiedEmoteRedeemApi: streamNookModifiedEmoteRedeemApi,
     );
     final pinnedChatApi = TwitchPinnedChatApiService(
       client: apiClient,
