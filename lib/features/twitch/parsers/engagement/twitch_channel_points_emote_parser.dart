@@ -1,9 +1,11 @@
 /// Models and parser for Channel Points emote menus.
 ///
-/// This parser mirrors the Twitch boundary: the Channel Points Choose menu
-/// should be built from Twitch's subscriptionProducts emote payload, not from
-/// normal chat emote caches.  The parser is the only place where response-shape
-/// normalization and whitelist filtering should live.
+/// This parser mirrors Twitch boundaries:
+/// - Choose-an-emote uses Twitch subscriptionProducts.
+/// - Modify-a-single-emote uses Twitch ChannelPointsContext emoteVariants.
+///
+/// Do not merge normal chat emote caches, global emotes, third-party emotes, or
+/// lockedChannelEmotes into these Channel Points menus.
 class TwitchChannelPointEmoteModification {
   final String id;
   final String modifierId;
@@ -82,9 +84,6 @@ class TwitchChannelPointsEmoteParser {
   /// - Do not recursively scan unrelated GQL siblings such as localEmoteSets.
   /// - For Choose menu, accept only Tier 1 product emotes.
   /// - For that product, accept only emotes whose setID equals product.emoteSetID.
-  ///
-  /// This removes animation/extra emote groups and higher-tier products that are
-  /// real Twitch emotes but are not part of the Channel Points Choose menu.
   static TwitchChannelPointsChooseMenuParseResult parseChooseMenu(
     Object? raw, {
     required String channelOwnerId,
@@ -101,7 +100,8 @@ class TwitchChannelPointsEmoteParser {
     );
 
     _debugMenuAudit(
-      channelOwnerId: channelOwnerId,
+      source: 'Twitch.subscriptionProducts.tier1000.baseSet',
+      channel: channelOwnerId,
       rawCount: rawCandidates.length,
       approvedCount: approved.length,
     );
@@ -110,6 +110,103 @@ class TwitchChannelPointsEmoteParser {
       rawCandidateEmotes: rawCandidates,
       approvedEmotes: approved,
     );
+  }
+
+  /// Parse the Modify-a-single-emote source used by StreamNook.
+  ///
+  /// Source shape:
+  /// ChannelPointsContext -> communityPointsSettings.emoteVariants[]
+  /// - variant.isUnlockable must be true.
+  /// - variant.emote is the base emote.
+  /// - variant.modifications[].emote.id is the final modified emote id, such
+  ///   as `1022569_BW`. That final id is what Twitch expects as emoteID.
+  static List<TwitchChannelPointEmoteOption> parseModifiableEmoteVariants(
+    Object? raw, {
+    required String channelLogin,
+  }) {
+    final variants = <Map<String, dynamic>>[];
+
+    void addVariantsAt(Object? root, List<String> path) {
+      final list = _readList(root, path);
+      for (final item in list) {
+        final map = _asStringMap(item);
+        if (map != null) variants.add(map);
+      }
+    }
+
+    addVariantsAt(
+      raw,
+      const <String>[
+        'data',
+        'community',
+        'channel',
+        'communityPointsSettings',
+        'emoteVariants',
+      ],
+    );
+    addVariantsAt(
+      raw,
+      const <String>['data', 'channel', 'communityPointsSettings', 'emoteVariants'],
+    );
+    addVariantsAt(
+      raw,
+      const <String>[
+        'data',
+        'user',
+        'channel',
+        'communityPointsSettings',
+        'emoteVariants',
+      ],
+    );
+
+    final output = <TwitchChannelPointEmoteOption>[];
+
+    for (final variant in variants) {
+      final unlockable = _readBool(variant, const <String>['isUnlockable']) ?? false;
+      if (!unlockable) continue;
+
+      final baseEmote = _asStringMap(variant['emote']);
+      if (baseEmote == null) continue;
+
+      final base = _readEmoteOption(
+        baseEmote,
+        productTier: 'SUBSCRIPTION',
+        requiredSetId: '',
+      );
+      if (base == null) continue;
+
+      final modifications = <TwitchChannelPointEmoteModification>[];
+      final seen = <String>{};
+      for (final item in _readList(variant, const <String>['modifications'])) {
+        final map = _asStringMap(item);
+        if (map == null) continue;
+        final modification = _readVariantModification(map);
+        if (modification != null && seen.add(modification.id)) {
+          modifications.add(modification);
+        }
+      }
+
+      if (modifications.isEmpty) continue;
+      modifications.sort((a, b) => a.token.toLowerCase().compareTo(b.token.toLowerCase()));
+
+      output.add(
+        TwitchChannelPointEmoteOption(
+          id: base.id,
+          token: base.token,
+          emoteType: base.emoteType.isEmpty ? 'SUBSCRIPTION' : base.emoteType,
+          modifications: modifications,
+        ),
+      );
+    }
+
+    final approved = dedupeChannelPointEmotes(output);
+    _debugMenuAudit(
+      source: 'Twitch.ChannelPointsContext.emoteVariants',
+      channel: channelLogin,
+      rawCount: variants.length,
+      approvedCount: approved.length,
+    );
+    return approved;
   }
 
   /// Narrow Twitch-style extraction from subscriptionProducts only.
@@ -386,10 +483,53 @@ TwitchChannelPointEmoteModification? _readModification(
   );
 }
 
+TwitchChannelPointEmoteModification? _readVariantModification(
+  Map<String, dynamic> map,
+) {
+  final emote = _asStringMap(map['emote']) ?? map;
+  final modifier = _asStringMap(map['modifier']);
+
+  final id = _firstNonEmptyString(emote, const <List<String>>[
+    <String>['id'],
+    <String>['emoteID'],
+    <String>['emoteId'],
+    <String>['modifiedEmoteID'],
+    <String>['modifiedEmoteId'],
+  ]);
+  if (id == null || id.isEmpty || !_looksLikeTwitchEmoteId(id)) return null;
+
+  final token = _firstNonEmptyString(emote, const <List<String>>[
+        <String>['token'],
+        <String>['name'],
+        <String>['displayName'],
+      ]) ??
+      id;
+
+  final modifierId = _firstNonEmptyString(modifier, const <List<String>>[
+        <String>['id'],
+        <String>['modifierID'],
+        <String>['modifierId'],
+        <String>['type'],
+      ]) ??
+      _firstNonEmptyString(map, const <List<String>>[
+        <String>['modifierID'],
+        <String>['modifierId'],
+        <String>['type'],
+      ]) ??
+      '';
+
+  return TwitchChannelPointEmoteModification(
+    id: id,
+    modifierId: modifierId,
+    token: token,
+  );
+}
+
 const bool _debugChannelPointEmoteMenu = true;
 
 void _debugMenuAudit({
-  required String channelOwnerId,
+  required String source,
+  required String channel,
   required int rawCount,
   required int approvedCount,
 }) {
@@ -397,8 +537,8 @@ void _debugMenuAudit({
 
   // ignore: avoid_print
   print(
-    '[ChannelPointsEmoteMenu] source=Twitch.subscriptionProducts.tier1000.baseSet '
-    'channelOwnerID=$channelOwnerId raw=$rawCount approved=$approvedCount',
+    '[ChannelPointsEmoteMenu] source=$source channel=$channel '
+    'raw=$rawCount approved=$approvedCount',
   );
 }
 
@@ -431,6 +571,22 @@ String? _readString(Object? root, List<String> path) {
   }
   final text = current?.toString().trim();
   return text == null || text.isEmpty ? null : text;
+}
+
+bool? _readBool(Object? root, List<String> path) {
+  Object? current = root;
+  for (final key in path) {
+    final map = _asStringMap(current);
+    if (map == null) return null;
+    current = map[key];
+  }
+
+  if (current is bool) return current;
+  if (current == null) return null;
+  final text = current.toString().trim().toLowerCase();
+  if (text == 'true') return true;
+  if (text == 'false') return false;
+  return null;
 }
 
 List<Object?> _readList(Object? root, List<String> path) {
