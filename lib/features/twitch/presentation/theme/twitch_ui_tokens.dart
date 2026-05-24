@@ -6,6 +6,58 @@
 
 import 'package:flutter/material.dart';
 
+class TwitchUiBackplatePalette {
+  final Color fill;
+  final Color fillActive;
+  final Color border;
+  final Color borderActive;
+  final Color foreground;
+  final Color foregroundMuted;
+
+  const TwitchUiBackplatePalette({
+    required this.fill,
+    required this.fillActive,
+    required this.border,
+    required this.borderActive,
+    required this.foreground,
+    required this.foregroundMuted,
+  });
+}
+
+class TwitchUiSheetPalette {
+  final Color background;
+  final Color scrim;
+  final Color shellGradientStart;
+  final Color shellGradientEnd;
+  final Color headerGradientStart;
+  final Color headerGradientEnd;
+  final Color border;
+  final Color shadow;
+  final Color handle;
+  final Color cardFill;
+  final Color cardFillActive;
+  final Color cardBorder;
+  final Color cardBorderActive;
+  final TwitchUiBackplatePalette backplate;
+
+  const TwitchUiSheetPalette({
+    required this.background,
+    required this.scrim,
+    required this.shellGradientStart,
+    required this.shellGradientEnd,
+    required this.headerGradientStart,
+    required this.headerGradientEnd,
+    required this.border,
+    required this.shadow,
+    required this.handle,
+    required this.cardFill,
+    required this.cardFillActive,
+    required this.cardBorder,
+    required this.cardBorderActive,
+    required this.backplate,
+  });
+}
+
 class TwitchUiColors {
   const TwitchUiColors._();
 
@@ -18,6 +70,33 @@ class TwitchUiColors {
 
   static const Color primary = Color(0xFF9146FF);
   static const Color primarySoft = Color(0xFFBF94FF);
+
+  static const TwitchUiBackplatePalette purpleBackplate =
+      TwitchUiBackplatePalette(
+        fill: Color(0xFF241632),
+        fillActive: Color(0xFF241632),
+        border: Color(0x66865CFF),
+        borderActive: Color(0x99BF94FF),
+        foreground: Color(0xFFBF94FF),
+        foregroundMuted: Color(0xCCC9BDEC),
+      );
+
+  static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
+    background: surface,
+    scrim: Color(0xA3000000),
+    shellGradientStart: Color(0xFA231336),
+    shellGradientEnd: Color(0xFC101016),
+    headerGradientStart: Color(0xEB2A1740),
+    headerGradientEnd: Color(0xF515141C),
+    border: Color(0x339146FF),
+    shadow: Color(0x299146FF),
+    handle: Color(0x2EFFFFFF),
+    cardFill: Color(0xFF241632),
+    cardFillActive: Color(0x664A267A),
+    cardBorder: Color(0x66865CFF),
+    cardBorderActive: Color(0x9E9146FF),
+    backplate: purpleBackplate,
+  );
 
   static const Color textPrimary = Color(0xFFFFFFFF);
   static const Color textSecondary = Color(0x99FFFFFF);
@@ -77,10 +156,6 @@ class TwitchUiShadows {
   const TwitchUiShadows._();
 
   static const List<BoxShadow> soft = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x33000000),
-      blurRadius: 10,
-      offset: Offset(0, 4),
-    ),
+    BoxShadow(color: Color(0x33000000), blurRadius: 10, offset: Offset(0, 4)),
   ];
 }

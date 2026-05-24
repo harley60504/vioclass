@@ -1,5 +1,5 @@
-import 'twitch_viewer_special_message_runtime_stage251.dart';
-import '../../api/special_actions/twitch_viewer_special_message_api_service_stage251.dart';
+﻿import 'twitch_viewer_special_message_runtime.dart';
+import '../../api/special_actions/twitch_viewer_special_message_api_service.dart';
 
 class TwitchViewerSpecialMessageDebugProbeStage251 {
   final TwitchViewerSpecialMessageApiServiceStage251 api;

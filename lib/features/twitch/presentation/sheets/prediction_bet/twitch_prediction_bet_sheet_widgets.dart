@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import 'twitch_prediction_bet_helpers.dart';
 
 class TwitchPredictionBetMetaRow extends StatelessWidget {
@@ -34,9 +35,9 @@ class TwitchPredictionBetMetaRow extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.050),
+        color: TwitchUiColors.sheet.cardFill,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.18)),
+        border: Border.all(color: TwitchUiColors.sheet.backplate.border),
       ),
       child: Wrap(
         spacing: 7,
@@ -98,19 +99,21 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final total = totalPoints <= 0 ? outcome.points : totalPoints;
     final percent = total <= 0 ? 0.0 : (outcome.points / total).clamp(0.0, 1.0);
-    final odds = outcome.points <= 0 || total <= 0 ? null : total / outcome.points;
+    final odds = outcome.points <= 0 || total <= 0
+        ? null
+        : total / outcome.points;
     final accent = outcome.isWinner || selectedByViewer
         ? Colors.greenAccent
         : lockedByViewerChoice
-            ? Colors.white38
-            : const Color(0xFFBF94FF);
+        ? Colors.white38
+        : TwitchUiColors.sheet.backplate.foreground;
     final borderColor = outcome.isWinner
         ? Colors.greenAccent.withOpacity(0.58)
         : selectedByViewer
-            ? Colors.greenAccent.withOpacity(0.58)
-            : lockedByViewerChoice
-                ? Colors.white.withOpacity(0.10)
-                : const Color(0xFF9146FF).withOpacity(0.34);
+        ? Colors.greenAccent.withOpacity(0.58)
+        : lockedByViewerChoice
+        ? Colors.white.withOpacity(0.10)
+        : TwitchUiColors.sheet.backplate.borderActive;
     final opacity = lockedByViewerChoice ? 0.62 : 1.0;
 
     return Opacity(
@@ -130,15 +133,17 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                 colors: <Color>[
                   selectedByViewer
                       ? const Color(0xFF162C22).withOpacity(0.98)
-                      : const Color(0xFF241632).withOpacity(0.96),
-                  const Color(0xFF15151D).withOpacity(0.98),
+                      : TwitchUiColors.sheet.cardFillActive,
+                  TwitchUiColors.sheet.shellGradientEnd,
                 ],
               ),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(color: borderColor),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: accent.withOpacity(enabled || selectedByViewer ? 0.18 : 0.04),
+                  color: accent.withOpacity(
+                    enabled || selectedByViewer ? 0.18 : 0.04,
+                  ),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
@@ -186,13 +191,13 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                       selectedByViewer
                           ? Icons.check_circle_rounded
                           : enabled
-                              ? Icons.arrow_forward_ios_rounded
-                              : Icons.lock_rounded,
+                          ? Icons.arrow_forward_ios_rounded
+                          : Icons.lock_rounded,
                       color: selectedByViewer
                           ? Colors.greenAccent
                           : enabled
-                              ? Colors.white60
-                              : Colors.white24,
+                          ? Colors.white60
+                          : Colors.white24,
                       size: 15,
                     ),
                   ],
@@ -203,11 +208,11 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                   child: LinearProgressIndicator(
                     value: percent,
                     minHeight: 9,
-                    backgroundColor: Colors.white.withOpacity(0.08),
+                    backgroundColor: TwitchUiColors.sheet.cardBorder,
                     valueColor: AlwaysStoppedAnimation<Color>(
                       outcome.isWinner || selectedByViewer
                           ? Colors.greenAccent
-                          : const Color(0xFF9146FF),
+                          : TwitchUiColors.primary,
                     ),
                   ),
                 ),
@@ -216,22 +221,28 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                   spacing: 7,
                   runSpacing: 7,
                   children: [
-                    TwitchPredictionBetChip(label: '${(percent * 100).round()}%'),
                     TwitchPredictionBetChip(
-                      label: '${twitchPredictionFormatCompact(outcome.points)} 點',
+                      label: '${(percent * 100).round()}%',
                     ),
                     TwitchPredictionBetChip(
-                      label: '${twitchPredictionFormatCompact(outcome.users)} 人',
+                      label:
+                          '${twitchPredictionFormatCompact(outcome.points)} 點',
+                    ),
+                    TwitchPredictionBetChip(
+                      label:
+                          '${twitchPredictionFormatCompact(outcome.users)} 人',
                     ),
                     if (outcome.viewerPoints > 0)
                       TwitchPredictionBetChip(
-                        label: '我的 ${twitchPredictionFormatCompact(outcome.viewerPoints)} 點',
+                        label:
+                            '我的 ${twitchPredictionFormatCompact(outcome.viewerPoints)} 點',
                         color: Colors.greenAccent,
                       ),
                     if (odds != null)
                       TwitchPredictionBetChip(
-                        label: '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x 賠率',
-                        color: const Color(0xFFBFA8FF),
+                        label:
+                            '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x 賠率',
+                        color: TwitchUiColors.sheet.backplate.foreground,
                       ),
                   ],
                 ),
@@ -251,7 +262,7 @@ class TwitchPredictionBetChip extends StatelessWidget {
   const TwitchPredictionBetChip({
     super.key,
     required this.label,
-    this.color = const Color(0xFFBF94FF),
+    this.color = TwitchUiColors.primarySoft,
   });
 
   @override
@@ -263,10 +274,7 @@ class TwitchPredictionBetChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: color.withOpacity(0.38)),
         boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 8,
-          ),
+          BoxShadow(color: color.withOpacity(0.08), blurRadius: 8),
         ],
       ),
       child: Text(

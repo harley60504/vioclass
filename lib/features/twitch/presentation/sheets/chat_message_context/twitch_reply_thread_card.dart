@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../../widgets/chat/twitch_runtime_message_tile.dart';
 import 'twitch_reply_thread_builder.dart';
 
@@ -32,7 +33,9 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
     final message = entry.message;
     final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
     final depthIndent = (entry.depth * 12.0).clamp(0.0, 42.0).toDouble();
-    final compactBodyScale = (safeFontScale * 0.96).clamp(0.82, 1.45).toDouble();
+    final compactBodyScale = (safeFontScale * 0.96)
+        .clamp(0.82, 1.45)
+        .toDouble();
 
     return RepaintBoundary(
       child: Padding(
@@ -47,13 +50,13 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
               decoration: BoxDecoration(
                 color: selected
-                    ? const Color(0xFF241B32)
-                    : const Color(0xFF1B1B23),
+                    ? TwitchUiColors.sheet.cardFillActive
+                    : TwitchUiColors.surfaceCard,
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(
                   color: selected
-                      ? const Color(0xFF9146FF).withOpacity(0.62)
-                      : Colors.white.withOpacity(0.08),
+                      ? TwitchUiColors.sheet.cardBorderActive
+                      : TwitchUiColors.sheet.cardBorder,
                 ),
               ),
               child: Column(
@@ -66,10 +69,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
                   ),
                   if (_hasRelation(message)) ...[
                     const SizedBox(height: 7),
-                    _RelationLine(
-                      message: message,
-                      fontScale: safeFontScale,
-                    ),
+                    _RelationLine(message: message, fontScale: safeFontScale),
                   ],
                   const SizedBox(height: 7),
                   TwitchRuntimeMessageTile(
@@ -99,9 +99,9 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
   ) async {
     await Clipboard.setData(ClipboardData(text: _copyText(message)));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已複製這則聊天室訊息')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製這則聊天室訊息')));
   }
 
   String _copyText(TwitchChatRuntimeMessage message) {
@@ -132,10 +132,7 @@ class _ReplyThreadCardHeader extends StatelessWidget {
 
     return Row(
       children: [
-        _EntryKindChip(
-          kind: entry.kind,
-          fontScale: safeFontScale,
-        ),
+        _EntryKindChip(kind: entry.kind, fontScale: safeFontScale),
         const SizedBox(width: 7),
         Expanded(
           child: Text(
@@ -144,8 +141,8 @@ class _ReplyThreadCardHeader extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: selected
-                  ? const Color(0xFFE4D4FF)
-                  : const Color(0xFFD9C5FF),
+                  ? TwitchUiColors.textPrimary
+                  : TwitchUiColors.sheet.backplate.foreground,
               fontSize: 12.5 * safeFontScale,
               fontWeight: FontWeight.w900,
             ),
@@ -169,10 +166,7 @@ class _EntryKindChip extends StatelessWidget {
   final TwitchReplyThreadEntryKind kind;
   final double fontScale;
 
-  const _EntryKindChip({
-    required this.kind,
-    required this.fontScale,
-  });
+  const _EntryKindChip({required this.kind, required this.fontScale});
 
   @override
   Widget build(BuildContext context) {
@@ -185,7 +179,8 @@ class _EntryKindChip extends StatelessWidget {
 
     final color = switch (kind) {
       TwitchReplyThreadEntryKind.ancestor => Colors.white70,
-      TwitchReplyThreadEntryKind.selected => const Color(0xFFBF94FF),
+      TwitchReplyThreadEntryKind.selected =>
+        TwitchUiColors.sheet.backplate.foreground,
       TwitchReplyThreadEntryKind.directReply => const Color(0xFF57F287),
     };
 
@@ -212,10 +207,7 @@ class _RelationLine extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
   final double fontScale;
 
-  const _RelationLine({
-    required this.message,
-    required this.fontScale,
-  });
+  const _RelationLine({required this.message, required this.fontScale});
 
   @override
   Widget build(BuildContext context) {
@@ -246,18 +238,11 @@ class _RelationLine extends StatelessWidget {
 
     if (chips.isEmpty) return const SizedBox.shrink();
 
-    return Wrap(
-      spacing: 6,
-      runSpacing: 5,
-      children: chips,
-    );
+    return Wrap(spacing: 6, runSpacing: 5, children: chips);
   }
 }
 
-enum _RelationChipType {
-  reply,
-  tag,
-}
+enum _RelationChipType { reply, tag }
 
 class _RelationChip extends StatelessWidget {
   final String label;
@@ -274,8 +259,8 @@ class _RelationChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
     final color = switch (type) {
-      _RelationChipType.reply => const Color(0xFFC9A8FF),
-      _RelationChipType.tag => const Color(0xFFD6CCEA),
+      _RelationChipType.reply => TwitchUiColors.sheet.backplate.foreground,
+      _RelationChipType.tag => TwitchUiColors.textSecondary,
     };
 
     final backgroundOpacity = switch (type) {

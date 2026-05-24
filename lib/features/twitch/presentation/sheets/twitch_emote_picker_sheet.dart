@@ -6,6 +6,7 @@ import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_emote_image.dart';
 
@@ -92,7 +93,8 @@ class _TwitchUnifiedEmotePickerSheetState
         if (official != null) official,
       ]),
       builder: (context, _) {
-        final loading = widget.loading ||
+        final loading =
+            widget.loading ||
             widget.cache.loading ||
             (official?.loading ?? false);
 
@@ -131,7 +133,9 @@ class _TwitchUnifiedEmotePickerSheetState
                       children: [
                         for (final tab in tabs)
                           _ProviderPage(
-                            key: PageStorageKey<String>('provider-${tab.label}'),
+                            key: PageStorageKey<String>(
+                              'provider-${tab.label}',
+                            ),
                             tab: tab,
                             query: _query,
                             loading: loading,
@@ -159,8 +163,9 @@ class _TwitchUnifiedEmotePickerSheetState
           label: 'Recent',
           entries: <_EmoteEntry>[
             ...widget.cache.recentEmotes.map(_thirdPartyEntry),
-            ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[])
-                .map(_officialEntry),
+            ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[]).map(
+              _officialEntry,
+            ),
           ],
         ),
       ],
@@ -176,8 +181,9 @@ class _TwitchUnifiedEmotePickerSheetState
           label: 'Favorite',
           entries: <_EmoteEntry>[
             ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
-            ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[])
-                .map(_officialEntry),
+            ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[]).map(
+              _officialEntry,
+            ),
           ],
         ),
       ],
@@ -210,16 +216,18 @@ class _TwitchUnifiedEmotePickerSheetState
     final globalKeys = global.map(_officialKey).toSet();
     final currentChannelId = official.channelId.trim();
 
-    final userOnly = user.where((emote) {
-      final key = _officialKey(emote);
-      if (channelKeys.contains(key)) return false;
-      if (globalKeys.contains(key)) return false;
-      if (currentChannelId.isNotEmpty &&
-          emote.ownerId.trim() == currentChannelId) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
+    final userOnly = user
+        .where((emote) {
+          final key = _officialKey(emote);
+          if (channelKeys.contains(key)) return false;
+          if (globalKeys.contains(key)) return false;
+          if (currentChannelId.isNotEmpty &&
+              emote.ownerId.trim() == currentChannelId) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
 
     final unlocked = _uniqueOfficial(
       userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
@@ -427,7 +435,7 @@ class _SearchBar extends StatelessWidget {
             fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
-          cursorColor: const Color(0xFFBF94FF),
+          cursorColor: TwitchUiColors.sheet.backplate.foreground,
           decoration: InputDecoration(
             isDense: true,
             hintText: '搜尋貼圖名稱',
@@ -442,12 +450,15 @@ class _SearchBar extends StatelessWidget {
               minHeight: 34,
             ),
             filled: true,
-            fillColor: const Color(0xFF0E0E10),
+            fillColor: TwitchUiColors.surfaceAlt,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
           ),
         ),
       ),
@@ -464,15 +475,19 @@ class _MainTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return TabBar(
       isScrollable: true,
-      labelColor: const Color(0xFFD9C5FF),
+      labelColor: TwitchUiColors.sheet.backplate.foreground,
       unselectedLabelColor: Colors.white60,
-      indicatorColor: const Color(0xFF9146FF),
+      indicatorColor: TwitchUiColors.primary,
       indicatorSize: TabBarIndicatorSize.label,
       labelPadding: const EdgeInsets.symmetric(horizontal: 10),
       labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900),
-      unselectedLabelStyle:
-          const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-      tabs: [for (final tab in tabs) Tab(text: '${tab.label} ${tab.totalCount}')],
+      unselectedLabelStyle: const TextStyle(
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+      ),
+      tabs: [
+        for (final tab in tabs) Tab(text: '${tab.label} ${tab.totalCount}'),
+      ],
     );
   }
 }
@@ -513,15 +528,19 @@ class _ProviderPageState extends State<_ProviderPage>
               height: 34,
               child: TabBar(
                 isScrollable: true,
-                labelColor: const Color(0xFFD9C5FF),
+                labelColor: TwitchUiColors.sheet.backplate.foreground,
                 unselectedLabelColor: Colors.white54,
-                indicatorColor: const Color(0xFF9146FF),
+                indicatorColor: TwitchUiColors.primary,
                 indicatorSize: TabBarIndicatorSize.label,
                 labelPadding: const EdgeInsets.symmetric(horizontal: 10),
-                labelStyle:
-                    const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
-                unselectedLabelStyle:
-                    const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
+                labelStyle: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                ),
                 tabs: [
                   for (final page in tab.pages)
                     Tab(text: '${page.label} ${page.entries.length}'),
@@ -534,10 +553,14 @@ class _ProviderPageState extends State<_ProviderPage>
               children: [
                 for (final page in tab.pages)
                   _EmoteSection(
-                    key: PageStorageKey<String>('section-${tab.label}-${page.label}'),
+                    key: PageStorageKey<String>(
+                      'section-${tab.label}-${page.label}',
+                    ),
                     entries: page.entries,
                     query: widget.query,
-                    emptyText: widget.loading ? 'Loading emotes...' : 'No emotes',
+                    emptyText: widget.loading
+                        ? 'Loading emotes...'
+                        : 'No emotes',
                     onSelect: widget.onSelect,
                     onLongPress: widget.onLongPress,
                   ),
@@ -626,11 +649,14 @@ class _EmoteSectionState extends State<_EmoteSection>
     if (query.isEmpty) {
       return widget.entries.take(_initialGridCount).toList(growable: false);
     }
-    return widget.entries.where((entry) {
-      return entry.name.toLowerCase().contains(query) ||
-          entry.id.toLowerCase().contains(query) ||
-          entry.providerLabel.toLowerCase().contains(query);
-    }).take(_searchGridLimit).toList(growable: false);
+    return widget.entries
+        .where((entry) {
+          return entry.name.toLowerCase().contains(query) ||
+              entry.id.toLowerCase().contains(query) ||
+              entry.providerLabel.toLowerCase().contains(query);
+        })
+        .take(_searchGridLimit)
+        .toList(growable: false);
   }
 
   @override
@@ -664,14 +690,14 @@ class _EmoteTile extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.fromLTRB(8, 9, 8, 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.055),
+              color: TwitchUiColors.sheet.cardFill,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: entry.favorite
                     ? const Color(0xFFEAB308).withOpacity(0.78)
                     : locked
-                        ? const Color(0xFFFFD166).withOpacity(0.38)
-                        : const Color(0xFF9146FF).withOpacity(0.30),
+                    ? const Color(0xFFFFD166).withOpacity(0.38)
+                    : TwitchUiColors.sheet.backplate.border,
               ),
               boxShadow: const <BoxShadow>[
                 BoxShadow(

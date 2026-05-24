@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../../localization/twitch_reward_localizer.dart';
+import '../../theme/twitch_ui_tokens.dart';
 
 import 'twitch_channel_points_sheet_utils.dart';
 
@@ -34,13 +35,11 @@ class ChannelPointsHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: <Color>[
-            const Color(0xFF2A1740).withOpacity(0.92),
-            const Color(0xFF15141C).withOpacity(0.96),
+            TwitchUiColors.sheet.headerGradientStart,
+            TwitchUiColors.sheet.headerGradientEnd,
           ],
         ),
-        border: Border(
-          bottom: BorderSide(color: const Color(0xFF9146FF).withOpacity(0.22)),
-        ),
+        border: Border(bottom: BorderSide(color: TwitchUiColors.sheet.border)),
       ),
       child: Row(
         children: [
@@ -56,7 +55,9 @@ class ChannelPointsHeader extends StatelessWidget {
           ),
           _StatusChip(
             iconUrl: iconUrl,
-            label: balance == null ? '--' : formatChannelPointFullNumber(balance!),
+            label: balance == null
+                ? '--'
+                : formatChannelPointFullNumber(balance!),
             highlight: balance != null,
           ),
           const SizedBox(width: 4),
@@ -88,10 +89,7 @@ class ChannelPointsErrorBanner extends StatelessWidget {
   final String label;
   final String message;
 
-  const ChannelPointsErrorBanner({
-    required this.label,
-    required this.message,
-  });
+  const ChannelPointsErrorBanner({required this.label, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -137,19 +135,26 @@ class ChannelPointsEmptyRewards extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.040),
+            color: TwitchUiColors.sheet.cardFill,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.14)),
+            border: Border.all(color: TwitchUiColors.sheet.backplate.border),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.redeem_rounded, color: Color(0xFFBF94FF), size: 30),
+              const Icon(
+                Icons.redeem_rounded,
+                color: TwitchUiColors.primarySoft,
+                size: 30,
+              ),
               const SizedBox(height: 10),
               Text(
                 hasSnapshot ? '目前沒有可顯示的忠誠點數獎勵。' : '尚未載入忠誠點數資料。',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               const SizedBox(height: 6),
               const Text(
@@ -186,8 +191,9 @@ class ChannelPointsRewardTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title =
-        TwitchRewardLocalizer.title(reward['title']?.toString() ?? 'Reward');
+    final title = TwitchRewardLocalizer.title(
+      reward['title']?.toString() ?? 'Reward',
+    );
     final prompt = reward['prompt']?.toString() ?? '';
     final imageUrl = resolveChannelPointRewardDisplayImageUrl(reward);
     final cost = readChannelPointInt(reward['cost']);
@@ -207,17 +213,17 @@ class ChannelPointsRewardTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(18),
           child: Ink(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.038),
+              color: TwitchUiColors.sheet.cardFill,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: available
-                    ? const Color(0xFF9146FF).withOpacity(0.26)
-                    : Colors.white.withOpacity(0.060),
+                    ? TwitchUiColors.sheet.backplate.border
+                    : TwitchUiColors.sheet.cardBorder,
               ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
                   color: available
-                      ? const Color(0xFF9146FF).withOpacity(0.070)
+                      ? TwitchUiColors.sheet.shadow
                       : Colors.black.withOpacity(0.080),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
@@ -269,7 +275,9 @@ class ChannelPointsRewardTile extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: color.withOpacity(0.82),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withOpacity(0.12)),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.12),
+                            ),
                             boxShadow: <BoxShadow>[
                               BoxShadow(
                                 color: color.withOpacity(0.18),
@@ -360,7 +368,9 @@ class _CostChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = enough ? const Color(0xFFBF94FF) : Colors.redAccent;
+    final color = enough
+        ? TwitchUiColors.sheet.backplate.foreground
+        : Colors.redAccent;
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 7 : 8,
@@ -371,10 +381,7 @@ class _CostChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
         border: Border.all(color: color.withOpacity(0.28)),
         boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 7,
-          ),
+          BoxShadow(color: color.withOpacity(0.08), blurRadius: 7),
         ],
       ),
       child: Row(
@@ -406,7 +413,7 @@ class _MiniBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: TwitchUiColors.sheet.cardFill,
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(
@@ -462,15 +469,15 @@ class _StatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = highlight ? const Color(0xFFBF94FF) : Colors.white70;
+    final color = highlight
+        ? TwitchUiColors.sheet.backplate.foreground
+        : Colors.white70;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
         color: color.withOpacity(highlight ? 0.13 : 0.06),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(
-          color: color.withOpacity(highlight ? 0.30 : 0.10),
-        ),
+        border: Border.all(color: color.withOpacity(highlight ? 0.30 : 0.10)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

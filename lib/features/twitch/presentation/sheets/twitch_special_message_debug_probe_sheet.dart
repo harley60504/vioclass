@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/twitch_ui_tokens.dart';
+
 Future<void> showTwitchSpecialMessageDebugProbeSheetStage251({
   required BuildContext context,
   required Future<Map<String, dynamic>> Function() onRunProbe,
@@ -17,8 +19,8 @@ Future<void> showTwitchSpecialMessageDebugProbeSheetStage251({
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: const Color(0xFF18181B),
-    barrierColor: Colors.black.withOpacity(0.62),
+    backgroundColor: TwitchUiColors.sheet.background,
+    barrierColor: TwitchUiColors.sheet.scrim,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
@@ -88,7 +90,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   width: 42,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
+                    color: TwitchUiColors.sheet.handle,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -101,15 +103,15 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                     height: 38,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF9146FF).withOpacity(0.16),
+                      color: TwitchUiColors.sheet.backplate.fillActive,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: const Color(0xFF9146FF).withOpacity(0.28),
+                        color: TwitchUiColors.sheet.backplate.border,
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.science_rounded,
-                      color: Color(0xFFBF94FF),
+                      color: TwitchUiColors.sheet.backplate.foreground,
                       size: 20,
                     ),
                   ),
@@ -178,7 +180,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                     label: const Text('Run Custom'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
-                      side: BorderSide(color: Colors.white.withOpacity(0.16)),
+                      side: BorderSide(color: TwitchUiColors.sheet.cardBorder),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -188,7 +190,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                     label: const Text('Copy'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: Colors.white70,
-                      side: BorderSide(color: Colors.white.withOpacity(0.16)),
+                      side: BorderSide(color: TwitchUiColors.sheet.cardBorder),
                     ),
                   ),
                 ],
@@ -220,9 +222,9 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.24),
+                    color: TwitchUiColors.surfaceAlt,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: TwitchUiColors.sheet.cardBorder),
                   ),
                   child: _jsonText == null
                       ? _buildEmptyState()
@@ -254,9 +256,9 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.035),
+        color: TwitchUiColors.sheet.cardFill,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: TwitchUiColors.sheet.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -266,7 +268,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
             children: <Widget>[
               const Icon(
                 Icons.tune_rounded,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
                 size: 17,
               ),
               const SizedBox(width: 6),
@@ -300,7 +302,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
               ),
             ),
             controlAffinity: ListTileControlAffinity.leading,
-            activeColor: const Color(0xFF9146FF),
+            activeColor: TwitchUiColors.primary,
           ),
           const SizedBox(height: 4),
           Row(
@@ -365,15 +367,15 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
         fillColor: Colors.black.withOpacity(0.22),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+          borderSide: BorderSide(color: TwitchUiColors.sheet.cardBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+          borderSide: BorderSide(color: TwitchUiColors.sheet.cardBorder),
         ),
         focusedBorder: const OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(12)),
-          borderSide: BorderSide(color: Color(0xFF9146FF)),
+          borderSide: BorderSide(color: TwitchUiColors.primary),
         ),
       ),
     );

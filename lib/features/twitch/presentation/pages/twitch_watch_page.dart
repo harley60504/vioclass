@@ -13,7 +13,7 @@ import '../../api/core/twitch_api_client.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../models/special_actions/twitch_pending_special_message_stage250.dart';
-import '../../models/special_actions/twitch_viewer_special_message_models_stage251.dart';
+import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -25,8 +25,8 @@ import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
 import '../dialogs/twitch_subscribe_webview_dialog_v1.dart';
-import '../sheets/twitch_special_message_debug_probe_sheet_stage251.dart';
-import '../sheets/twitch_special_message_sheet_stage251.dart';
+import '../sheets/twitch_special_message_debug_probe_sheet.dart';
+import '../sheets/twitch_special_message_sheet.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
 import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
@@ -245,11 +245,11 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   }
 
   String get _startupMaskTitle {
-    if (_loadingAuth) return '正在準備 Twitch 工作階段...';
-    if (_loadingWatch) return '正在準備觀看頁...';
-    if (_enableWatchPlayer && _loadingPlayer) return '正在啟動播放器...';
-    if (_chatBootstrapping || _connectingChat) return '正在連線聊天室...';
-    return '正在載入...';
+    if (_loadingAuth) return '甇?皞? Twitch 撌乩??挾...';
+    if (_loadingWatch) return '甇?皞?閫??...';
+    if (_enableWatchPlayer && _loadingPlayer) return '甇????剜??..';
+    if (_chatBootstrapping || _connectingChat) return '甇?????予摰?..';
+    return '甇?頛...';
   }
 
   @override
@@ -340,7 +340,7 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
       onError: (message) {
         if (!mounted) return;
         setState(() => _playerError = message);
-        _showSnack('播放器操作失敗：$message');
+        _showSnack('?剜?冽?雿仃??$message');
       },
     );
 
@@ -398,8 +398,8 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
               child: TwitchWatchBlockingStartupOverlay(
                 title: _startupMaskTitle,
                 subtitle: _enableWatchPlayer
-                    ? '先啟動播放器，再連線聊天室；互動資料與貼圖會在背景補上。'
-                    : '正在連線聊天室；互動資料與貼圖會在背景補上。',
+                    ? 'Loading player and chat services...'
+                    : 'Loading chat services...',
               ),
             ),
         ],

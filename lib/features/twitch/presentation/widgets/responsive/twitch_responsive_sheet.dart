@@ -3,12 +3,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-enum TwitchUnifiedSheetSize {
-  compact,
-  medium,
-  large,
-  wide,
-}
+import '../../theme/twitch_ui_tokens.dart';
+
+enum TwitchUnifiedSheetSize { compact, medium, large, wide }
 
 class TwitchUnifiedSheetSizeSpec {
   final double maxWidth;
@@ -74,7 +71,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
   double? maxWidth,
   double? portraitHeightFactor,
   double? landscapeHeightFactor,
-  Color backgroundColor = const Color(0xFF18181B),
+  Color backgroundColor = TwitchUiColors.surface,
 }) {
   final resolvedSize = _resolveUnifiedSheetSize(
     size: size,
@@ -92,22 +89,30 @@ Future<T?> showTwitchResponsiveSheet<T>({
   final availableDialogWidth = math.max(260.0, viewportSize.width - 20.0);
   final availableDialogHeight = math.max(
     180.0,
-    viewportSize.height - media.padding.top - media.padding.bottom -
+    viewportSize.height -
+        media.padding.top -
+        media.padding.bottom -
         (keyboardOpen ? 4.0 : 10.0),
   );
-  final effectiveMaxWidth = math.min(resolvedSize.maxWidth, availableDialogWidth);
+  final effectiveMaxWidth = math.min(
+    resolvedSize.maxWidth,
+    availableDialogWidth,
+  );
 
   if (landscapeCompact) {
     return showDialog<T>(
       context: context,
       useSafeArea: false,
-      barrierColor: Colors.black.withOpacity(0.66),
+      barrierColor: TwitchUiColors.sheet.scrim,
       builder: (dialogContext) {
         return SafeArea(
           left: false,
           right: false,
           child: Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
+            ),
             backgroundColor: Colors.transparent,
             child: Center(
               child: ConstrainedBox(
@@ -152,10 +157,13 @@ Future<T?> showTwitchResponsiveSheet<T>({
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: effectiveMaxWidth,
-                maxHeight: viewportSize.height * resolvedSize.portraitHeightFactor,
+                maxHeight:
+                    viewportSize.height * resolvedSize.portraitHeightFactor,
               ),
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 child: Material(
                   color: backgroundColor,
                   child: builder(sheetContext),
@@ -186,7 +194,7 @@ Future<T?> showTwitchUnifiedSheet<T>({
   double? maxWidth,
   double? portraitHeightFactor,
   double? landscapeHeightFactor,
-  Color backgroundColor = const Color(0xFF18181B),
+  Color backgroundColor = TwitchUiColors.surface,
 }) {
   final refreshHandler = onRefresh;
 
@@ -257,14 +265,14 @@ class TwitchUnifiedSheetScaffold extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: <Color>[
-            const Color(0xFF231336).withOpacity(0.98),
-            const Color(0xFF101016).withOpacity(0.99),
+            TwitchUiColors.sheet.shellGradientStart,
+            TwitchUiColors.sheet.shellGradientEnd,
           ],
         ),
-        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.20)),
+        border: Border.all(color: TwitchUiColors.sheet.border),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFF9146FF).withOpacity(0.16),
+            color: TwitchUiColors.sheet.shadow,
             blurRadius: 24,
             offset: const Offset(0, -8),
           ),
@@ -335,20 +343,15 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: <Color>[
-            const Color(0xFF2A1740).withOpacity(0.92),
-            const Color(0xFF15141C).withOpacity(0.96),
+            TwitchUiColors.sheet.headerGradientStart,
+            TwitchUiColors.sheet.headerGradientEnd,
           ],
         ),
-        border: Border(
-          bottom: BorderSide(color: const Color(0xFF9146FF).withOpacity(0.22)),
-        ),
+        border: Border(bottom: BorderSide(color: TwitchUiColors.sheet.border)),
       ),
       child: Row(
         children: [
-          _UnifiedSheetHeaderIcon(
-            icon: icon,
-            imageUrl: iconUrl,
-          ),
+          _UnifiedSheetHeaderIcon(icon: icon, imageUrl: iconUrl),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -383,10 +386,7 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            ...trailing,
-          ],
+          if (trailing.isNotEmpty) ...[const SizedBox(width: 8), ...trailing],
           if (showRefresh) ...[
             const SizedBox(width: 4),
             _SheetHeaderIconButton(
@@ -433,7 +433,7 @@ class _SheetHeaderIconButton extends StatelessWidget {
           height: 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.060),
+            color: TwitchUiColors.sheet.cardFill,
             shape: BoxShape.circle,
             border: Border.all(color: Colors.white.withOpacity(0.10)),
           ),
@@ -445,7 +445,9 @@ class _SheetHeaderIconButton extends StatelessWidget {
                 )
               : Icon(
                   icon,
-                  color: onPressed == null ? Colors.white24 : const Color(0xFFBF94FF),
+                  color: onPressed == null
+                      ? Colors.white24
+                      : TwitchUiColors.sheet.backplate.foreground,
                   size: 19,
                 ),
         ),
@@ -458,10 +460,7 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
   final IconData icon;
   final String imageUrl;
 
-  const _UnifiedSheetHeaderIcon({
-    required this.icon,
-    required this.imageUrl,
-  });
+  const _UnifiedSheetHeaderIcon({required this.icon, required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
@@ -471,9 +470,9 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
         height: 28,
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: const Color(0xFF9146FF).withOpacity(0.18),
+          color: TwitchUiColors.sheet.backplate.fillActive,
           shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.30)),
+          border: Border.all(color: TwitchUiColors.sheet.backplate.border),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(999),
@@ -500,11 +499,15 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
       height: 28,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: const Color(0xFF9146FF).withOpacity(0.20),
+        color: TwitchUiColors.sheet.backplate.fillActive,
         shape: BoxShape.circle,
-        border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.36)),
+        border: Border.all(color: TwitchUiColors.sheet.backplate.borderActive),
       ),
-      child: Icon(icon, color: const Color(0xFFBF94FF), size: 17),
+      child: Icon(
+        icon,
+        color: TwitchUiColors.sheet.backplate.foreground,
+        size: 17,
+      ),
     );
   }
 }

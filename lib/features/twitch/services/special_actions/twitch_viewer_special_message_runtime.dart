@@ -1,5 +1,5 @@
-import '../../api/special_actions/twitch_viewer_special_message_api_service_stage251.dart';
-import '../../models/special_actions/twitch_viewer_special_message_models_stage251.dart';
+﻿import '../../api/special_actions/twitch_viewer_special_message_api_service.dart';
+import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 
 class TwitchViewerSpecialMessageSendResultStage251 {
   final bool ok;

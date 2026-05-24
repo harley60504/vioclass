@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
 
 List<Map<String, dynamic>> sortChannelPointRewards(
   List<Map<String, dynamic>> rewards, {
@@ -33,7 +34,8 @@ bool isChannelPointRewardAvailable(
   if (readChannelPointBool(reward['isPaused'])) return false;
   if (!readChannelPointBool(reward['isInStock'], fallback: true)) return false;
   if (_isCoolingDown(reward)) return false;
-  if (balance != null && balance < readChannelPointInt(reward['cost'])) return false;
+  if (balance != null && balance < readChannelPointInt(reward['cost']))
+    return false;
 
   return true;
 }
@@ -42,14 +44,17 @@ String? channelPointRewardStatusText(
   Map<String, dynamic> reward, {
   required int? balance,
 }) {
-  if (!readChannelPointBool(reward['isEnabled'], fallback: true)) return 'Disabled';
+  if (!readChannelPointBool(reward['isEnabled'], fallback: true))
+    return 'Disabled';
   if (readChannelPointBool(reward['isPaused'])) return 'Paused';
-  if (!readChannelPointBool(reward['isInStock'], fallback: true)) return 'Out of stock';
+  if (!readChannelPointBool(reward['isInStock'], fallback: true))
+    return 'Out of stock';
 
   final cooldown = _cooldownText(reward);
   if (cooldown != null) return cooldown;
 
-  if (balance != null && balance < readChannelPointInt(reward['cost'])) return '點數不足';
+  if (balance != null && balance < readChannelPointInt(reward['cost']))
+    return '點數不足';
   if (readChannelPointBool(reward['isUserInputRequired'])) return '需要輸入';
   if (requiresChannelPointMessageInput(reward)) return '需要訊息';
   if (requiresChannelPointModifiedEmoteSelection(reward)) return '需要貼圖與效果';
@@ -95,7 +100,8 @@ bool requiresChannelPointModifiedEmoteSelection(Map<String, dynamic> reward) {
 }
 
 String channelPointRewardTypeKey(Map<String, dynamic> reward) {
-  final raw = reward['normalizedRewardType'] ??
+  final raw =
+      reward['normalizedRewardType'] ??
       reward['rewardType'] ??
       reward['type'] ??
       reward['automaticRewardType'] ??
@@ -242,16 +248,16 @@ bool readChannelPointBool(Object? value, {bool fallback = false}) {
 
 Color parseChannelPointColor(String? raw) {
   final clean = raw?.trim();
-  if (clean == null || clean.isEmpty) return const Color(0xFF9146FF);
+  if (clean == null || clean.isEmpty) return TwitchUiColors.primary;
 
   final hex = clean.startsWith('#') ? clean.substring(1) : clean;
   final parsed = int.tryParse(hex, radix: 16);
-  if (parsed == null) return const Color(0xFF9146FF);
+  if (parsed == null) return TwitchUiColors.primary;
 
   if (hex.length == 6) return Color(0xFF000000 | parsed);
   if (hex.length == 8) return Color(parsed);
 
-  return const Color(0xFF9146FF);
+  return TwitchUiColors.primary;
 }
 
 String formatChannelPointCost(int cost) {
@@ -306,7 +312,5 @@ String formatChannelPointCompactNumber(int value) {
 }
 
 void showChannelPointsSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
 }

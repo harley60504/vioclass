@@ -1,5 +1,5 @@
-import '../../api/core/twitch_web_gql_persisted_api_service.dart';
-import '../../models/special_actions/twitch_viewer_special_message_models_stage251.dart';
+﻿import '../../api/core/twitch_web_gql_persisted_api_service.dart';
+import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 
 class TwitchViewerSpecialMessageOperationStage251 {
   final String operationName;

@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
+import '../../theme/twitch_ui_tokens.dart';
 
 const int _channelPointEmoteGridCacheSize = 112;
 const int _channelPointModifierCacheSize = 84;
 
-enum ChannelPointEmoteOverlayMode {
-  choose,
-  modify,
-}
+enum ChannelPointEmoteOverlayMode { choose, modify }
 
 class ChannelPointEmoteMenuOverlay extends StatelessWidget {
   final ChannelPointEmoteOverlayMode mode;
@@ -44,16 +42,17 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final base = selectedBaseEmote;
-    final choosingModifier = mode == ChannelPointEmoteOverlayMode.modify && base != null;
+    final choosingModifier =
+        mode == ChannelPointEmoteOverlayMode.modify && base != null;
 
     return Material(
-      color: Colors.black.withOpacity(0.48),
+      color: TwitchUiColors.sheet.scrim,
       child: Container(
         margin: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: const Color(0xFF18181B),
+          color: TwitchUiColors.sheet.background,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.10)),
+          border: Border.all(color: TwitchUiColors.sheet.cardBorder),
           boxShadow: const <BoxShadow>[
             BoxShadow(
               blurRadius: 22,
@@ -91,7 +90,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                         minHeight: 34,
                       ),
                       filled: true,
-                      fillColor: const Color(0xFF0E0E10),
+                      fillColor: TwitchUiColors.surfaceAlt,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -138,9 +137,13 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
 
                 return Container(
                   padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF18181B),
-                    border: Border(bottom: BorderSide(color: Color(0xFF2A2A2D))),
+                  decoration: BoxDecoration(
+                    color: TwitchUiColors.sheet.background,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: TwitchUiColors.sheet.cardBorder,
+                      ),
+                    ),
                   ),
                   child: compact
                       ? Column(
@@ -203,24 +206,18 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
               child: loading
                   ? const Center(child: CircularProgressIndicator())
                   : error != null
-                      ? _OverlayMessage(
-                          icon: Icons.error_outline_rounded,
-                          message: '載入貼圖清單失敗：$error',
-                        )
-                      : choosingModifier
-                          ? _ModifierGrid(
-                              emote: base,
-                              onSelected: onChooseModifier,
-                            )
-                          : emotes.isEmpty
-                              ? const _OverlayMessage(
-                                  icon: Icons.search_off_rounded,
-                                  message: '沒有可顯示的 Channel Points 貼圖。',
-                                )
-                              : _EmoteGrid(
-                                  emotes: emotes,
-                                  onSelected: onChooseEmote,
-                                ),
+                  ? _OverlayMessage(
+                      icon: Icons.error_outline_rounded,
+                      message: '載入貼圖清單失敗：$error',
+                    )
+                  : choosingModifier
+                  ? _ModifierGrid(emote: base, onSelected: onChooseModifier)
+                  : emotes.isEmpty
+                  ? const _OverlayMessage(
+                      icon: Icons.search_off_rounded,
+                      message: '沒有可顯示的 Channel Points 貼圖。',
+                    )
+                  : _EmoteGrid(emotes: emotes, onSelected: onChooseEmote),
             ),
           ],
         ),
@@ -233,10 +230,7 @@ class _EmoteGrid extends StatelessWidget {
   final List<TwitchChannelPointEmoteOption> emotes;
   final ValueChanged<TwitchChannelPointEmoteOption> onSelected;
 
-  const _EmoteGrid({
-    required this.emotes,
-    required this.onSelected,
-  });
+  const _EmoteGrid({required this.emotes, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -245,10 +239,10 @@ class _EmoteGrid extends StatelessWidget {
         final crossAxisCount = constraints.maxWidth >= 760
             ? 6
             : constraints.maxWidth >= 560
-                ? 5
-                : constraints.maxWidth >= 420
-                    ? 4
-                    : 3;
+            ? 5
+            : constraints.maxWidth >= 420
+            ? 4
+            : 3;
         final itemExtent = constraints.maxWidth < 420 ? 96.0 : 108.0;
 
         return GridView.builder(
@@ -269,9 +263,11 @@ class _EmoteGrid extends StatelessWidget {
                 child: Container(
                   padding: EdgeInsets.all(constraints.maxWidth < 420 ? 6 : 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF242429),
+                    color: TwitchUiColors.sheet.cardFill,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.22)),
+                    border: Border.all(
+                      color: TwitchUiColors.sheet.backplate.border,
+                    ),
                   ),
                   child: Column(
                     children: [
@@ -311,10 +307,7 @@ class _ModifierGrid extends StatelessWidget {
   final TwitchChannelPointEmoteOption emote;
   final ValueChanged<TwitchChannelPointEmoteModification> onSelected;
 
-  const _ModifierGrid({
-    required this.emote,
-    required this.onSelected,
-  });
+  const _ModifierGrid({required this.emote, required this.onSelected});
 
   @override
   Widget build(BuildContext context) {
@@ -332,10 +325,10 @@ class _ModifierGrid extends StatelessWidget {
         final crossAxisCount = constraints.maxWidth >= 760
             ? 5
             : constraints.maxWidth >= 560
-                ? 4
-                : constraints.maxWidth >= 420
-                    ? 3
-                    : 2;
+            ? 4
+            : constraints.maxWidth >= 420
+            ? 3
+            : 2;
 
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
@@ -355,16 +348,18 @@ class _ModifierGrid extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF242429),
+                    color: TwitchUiColors.sheet.cardFill,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.10)),
+                    border: Border.all(color: TwitchUiColors.sheet.cardBorder),
                   ),
                   child: Column(
                     children: [
                       Expanded(
                         child: Center(
                           child: _OptimizedChannelPointEmoteImage(
-                            imageUrl: modifier.imageUrl.isNotEmpty ? modifier.imageUrl : emote.imageUrl,
+                            imageUrl: modifier.imageUrl.isNotEmpty
+                                ? modifier.imageUrl
+                                : emote.imageUrl,
                             cacheSize: _channelPointModifierCacheSize,
                             fallbackIcon: Icons.auto_fix_high_rounded,
                           ),
@@ -398,10 +393,7 @@ class _OverlayMessage extends StatelessWidget {
   final IconData icon;
   final String message;
 
-  const _OverlayMessage({
-    required this.icon,
-    required this.message,
-  });
+  const _OverlayMessage({required this.icon, required this.message});
 
   @override
   Widget build(BuildContext context) {
@@ -459,10 +451,7 @@ class _OptimizedChannelPointEmoteImage extends StatelessWidget {
         cacheWidth: cacheSize,
         cacheHeight: cacheSize,
         filterQuality: FilterQuality.low,
-        errorBuilder: (_, __, ___) => Icon(
-          fallbackIcon,
-          color: Colors.white54,
-        ),
+        errorBuilder: (_, __, ___) => Icon(fallbackIcon, color: Colors.white54),
       ),
     );
   }

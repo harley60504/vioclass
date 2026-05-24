@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_widgets.dart';
 
@@ -98,13 +99,9 @@ class TwitchChannelPointsClaimButton extends StatelessWidget {
         child: ElevatedButton.icon(
           onPressed: loading ? null : () async => onClaim(claimId),
           icon: const Icon(Icons.card_giftcard_rounded),
-          label: Text(
-            claimPoints > 0
-                ? '領取 $claimPoints 點忠誠點數'
-                : '領取可用忠誠點數獎勵',
-          ),
+          label: Text(claimPoints > 0 ? '領取 $claimPoints 點忠誠點數' : '領取可用忠誠點數獎勵'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF9146FF),
+            backgroundColor: TwitchUiColors.primary,
             foregroundColor: Colors.white,
           ),
         ),
@@ -134,8 +131,8 @@ class TwitchChannelPointsRewardGrid extends StatelessWidget {
         final crossAxisCount = constraints.maxWidth >= 760
             ? 4
             : constraints.maxWidth >= 520
-                ? 3
-                : 2;
+            ? 3
+            : 2;
 
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 18),
@@ -147,8 +144,8 @@ class TwitchChannelPointsRewardGrid extends StatelessWidget {
             mainAxisExtent: constraints.maxWidth < 420
                 ? 232
                 : constraints.maxWidth < 760
-                    ? 224
-                    : 216,
+                ? 224
+                : 216,
           ),
           itemBuilder: (context, index) {
             final reward = rewards[index];

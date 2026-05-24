@@ -5,6 +5,8 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../theme/twitch_ui_tokens.dart';
+
 class TwitchChatAppearanceSizeControl extends StatelessWidget {
   final double scale;
   final ValueChanged<double> onChanged;
@@ -78,9 +80,9 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 9 : 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF242429),
+        color: TwitchUiColors.sheet.cardFill,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: TwitchUiColors.sheet.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,7 +104,7 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
               Text(
                 'viewer123',
                 style: TextStyle(
-                  color: const Color(0xFFBF94FF),
+                  color: TwitchUiColors.sheet.backplate.foreground,
                   fontSize: fontSize,
                   fontWeight: FontWeight.w900,
                 ),
@@ -120,13 +122,10 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
                 height: emoteSize,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF9146FF).withOpacity(0.28),
+                  color: TwitchUiColors.sheet.backplate.fillActive,
                   borderRadius: BorderRadius.circular(5),
                 ),
-                child: Text(
-                  '😄',
-                  style: TextStyle(fontSize: emoteSize * 0.72),
-                ),
+                child: Text('😄', style: TextStyle(fontSize: emoteSize * 0.72)),
               ),
             ],
           ),

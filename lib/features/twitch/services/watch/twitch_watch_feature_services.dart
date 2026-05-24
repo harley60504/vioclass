@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_watch_feature_services_stage251b_special_message_debug
+﻿// PATCH VERSION: twitch_watch_feature_services_stage251b_special_message_debug
 //
 // Feature-facing service groups for Watch composition.
 //
@@ -19,7 +19,7 @@ import '../../api/engagement/twitch_pinned_chat_api_service.dart';
 import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../api/engagement/twitch_subscribe_api_service_v1.dart';
 import '../../api/playback/twitch_playback_api_service.dart';
-import '../../api/special_actions/twitch_viewer_special_message_api_service_stage251.dart';
+import '../../api/special_actions/twitch_viewer_special_message_api_service.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -28,8 +28,8 @@ import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
-import '../../services/special_actions/twitch_viewer_special_message_debug_probe_stage251.dart';
-import '../../services/special_actions/twitch_viewer_special_message_runtime_stage251.dart';
+import '../../services/special_actions/twitch_viewer_special_message_debug_probe.dart';
+import '../../services/special_actions/twitch_viewer_special_message_runtime.dart';
 
 class TwitchWatchCoreServices {
   final TwitchApiClient apiClient;

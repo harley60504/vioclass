@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
-import '../../models/special_actions/twitch_viewer_special_message_models_stage251.dart';
+import '../../models/special_actions/twitch_viewer_special_message_models.dart';
+import '../theme/twitch_ui_tokens.dart';
+import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 Future<void> showTwitchSpecialMessageSheetStage251({
   required BuildContext context,
@@ -15,14 +17,9 @@ Future<void> showTwitchSpecialMessageSheetStage251({
   onSelectBadge,
   required VoidCallback onOpenDebugProbe,
 }) {
-  return showModalBottomSheet<void>(
+  return showTwitchResponsiveSheet<void>(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: const Color(0xFF18181B),
-    barrierColor: Colors.black.withOpacity(0.62),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-    ),
+    size: TwitchUnifiedSheetSize.large,
     builder: (_) => _TwitchSpecialMessageSheetStage251(
       initialSnapshot: initialSnapshot,
       loading: loading,
@@ -83,116 +80,54 @@ class _TwitchSpecialMessageSheetStage251State
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final snapshot = _snapshot;
 
-    return SafeArea(
-      top: false,
+    return TwitchUnifiedSheetScaffold(
+      title: 'Special Messages',
+      subtitle: 'Watch Streak / Resub / Chat Identity',
+      icon: Icons.auto_awesome_rounded,
+      loading: _loading,
+      onRefresh: _loading ? null : _refresh,
+      trailing: <Widget>[
+        _TwitchSpecialMessageDebugButton(onPressed: widget.onOpenDebugProbe),
+      ],
       child: Padding(
-        padding: EdgeInsets.fromLTRB(14, 10, 14, 14 + bottomInset),
-        child: SizedBox(
-          height: MediaQuery.sizeOf(context).height * 0.82,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: <Widget>[
-                  const Icon(
-                    Icons.auto_awesome_rounded,
-                    color: Color(0xFFBF94FF),
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Special Messages',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Debug',
-                    onPressed: widget.onOpenDebugProbe,
-                    icon: const Icon(
-                      Icons.science_rounded,
-                      color: Colors.white70,
-                      size: 20,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '重新整理',
-                    onPressed: _loading ? null : _refresh,
-                    icon: _loading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(
-                            Icons.refresh_rounded,
-                            color: Colors.white70,
-                          ),
-                  ),
-                  IconButton(
-                    tooltip: '關閉',
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              if (_errorText != null) _ErrorBox(text: _errorText!),
-              Expanded(
-                child: snapshot == null && _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ListView(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        children: <Widget>[
-                          _ShareSection(
-                            snapshot: snapshot,
-                            onShareWatchStreak: (status) {
-                              widget.onShareWatchStreak(status);
-                              Navigator.of(context).maybePop();
-                            },
-                            onShareResub: (resub) {
-                              widget.onShareResub(resub);
-                              Navigator.of(context).maybePop();
-                            },
-                          ),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (_errorText != null) _ErrorBox(text: _errorText!),
+            Expanded(
+              child: snapshot == null && _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      children: <Widget>[
+                        _ShareSection(
+                          snapshot: snapshot,
+                          onShareWatchStreak: (status) {
+                            widget.onShareWatchStreak(status);
+                            Navigator.of(context).maybePop();
+                          },
+                          onShareResub: (resub) {
+                            widget.onShareResub(resub);
+                            Navigator.of(context).maybePop();
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _BadgeSection(
+                          snapshot: snapshot,
+                          selectingBadgeId: _selectingBadgeId,
+                          onSelectBadge: _selectBadge,
+                        ),
+                        if (snapshot?.hasIssues ?? false) ...<Widget>[
                           const SizedBox(height: 12),
-                          _BadgeSection(
-                            snapshot: snapshot,
-                            selectingBadgeId: _selectingBadgeId,
-                            onSelectBadge: _selectBadge,
-                          ),
-                          if (snapshot?.hasIssues ?? false) ...<Widget>[
-                            const SizedBox(height: 12),
-                            _IssuesSection(snapshot: snapshot!),
-                          ],
+                          _IssuesSection(snapshot: snapshot!),
                         ],
-                      ),
-              ),
-            ],
-          ),
+                      ],
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -237,6 +172,38 @@ class _TwitchSpecialMessageSheetStage251State
   }
 }
 
+class _TwitchSpecialMessageDebugButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const _TwitchSpecialMessageDebugButton({required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Debug',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+        onTap: onPressed,
+        child: Container(
+          width: 34,
+          height: 34,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: TwitchUiColors.sheet.cardFill,
+            shape: BoxShape.circle,
+            border: Border.all(color: TwitchUiColors.sheet.cardBorder),
+          ),
+          child: const Icon(
+            Icons.science_rounded,
+            color: TwitchUiColors.primarySoft,
+            size: 19,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ShareSection extends StatelessWidget {
   final TwitchViewerSpecialMessagesSnapshotStage251? snapshot;
   final void Function(TwitchWatchStreakStatusStage251 status)
@@ -255,15 +222,14 @@ class _ShareSection extends StatelessWidget {
     final resub = snapshot?.resub;
 
     return _Section(
-      title: '可分享訊息',
+      title: 'Shareable Messages',
       children: <Widget>[
         _ActionTile(
           icon: Icons.local_fire_department_rounded,
-          color: const Color(0xFF5CFFB1),
           title: _watchStreakTitle(watchStreak),
           subtitle: watchStreak?.canShare == true
-              ? '可以分享你的連續觀看訊息'
-              : '目前沒有可分享的連續觀看訊息',
+              ? 'Ready to share your watch streak message'
+              : 'No shareable watch streak message right now',
           value: watchStreak?.streakCount == null
               ? null
               : '${watchStreak!.streakCount}${watchStreak.unitLabel}',
@@ -275,12 +241,11 @@ class _ShareSection extends StatelessWidget {
         const SizedBox(height: 8),
         _ActionTile(
           icon: Icons.workspace_premium_rounded,
-          color: const Color(0xFFFF75E6),
           title: _resubTitle(resub),
           subtitle: _resubSubtitle(resub),
           value: resub?.cumulativeMonths == null
               ? null
-              : '${resub!.cumulativeMonths} 個月',
+              : '${resub!.cumulativeMonths} mo',
           enabled: resub?.canShare ?? false,
           onTap: resub == null ? null : () => onShareResub(resub),
         ),
@@ -290,27 +255,30 @@ class _ShareSection extends StatelessWidget {
 
   String _watchStreakTitle(TwitchWatchStreakStatusStage251? status) {
     final count = status?.streakCount;
-    if (count != null && count > 0) return '連續觀看 $count${status!.unitLabel}';
-    return '連續觀看';
+    if (count != null && count > 0)
+      return 'Watch Streak $count${status!.unitLabel}';
+    return 'Watch Streak';
   }
 
   String _resubTitle(TwitchResubNotificationStage251? resub) {
     final months = resub?.cumulativeMonths;
-    if (months != null && months > 0) return '訂閱 $months 個月';
-    return '訂閱訊息';
+    if (months != null && months > 0) return 'Resub $months mo';
+    return 'Resub Message';
   }
 
   String _resubSubtitle(TwitchResubNotificationStage251? resub) {
-    if (resub == null) return '目前沒有可分享的 Resub 訊息';
+    if (resub == null) return 'No shareable Resub message right now';
     final parts = <String>[];
     final streak = resub.streakMonths;
     final duration = resub.durationMonths;
-    if (streak != null && streak > 0) parts.add('連續訂閱 $streak 個月');
-    if (duration != null && duration > 0) parts.add('本次訂閱 $duration 個月');
+    if (streak != null && streak > 0) parts.add('streak $streak mo');
+    if (duration != null && duration > 0) parts.add('duration $duration mo');
     final plan = resub.subPlan?.trim();
-    if (plan != null && plan.isNotEmpty) parts.add('方案 $plan');
-    if (parts.isNotEmpty) return parts.join('，');
-    return resub.canShare ? '可以分享你的 Resub 訊息' : '目前沒有可分享的 Resub 訊息';
+    if (plan != null && plan.isNotEmpty) parts.add(plan);
+    if (parts.isNotEmpty) return parts.join(' / ');
+    return resub.canShare
+        ? 'Ready to share your Resub message'
+        : 'No shareable Resub message right now';
   }
 }
 
@@ -332,13 +300,13 @@ class _BadgeSection extends StatelessWidget {
         const <TwitchChatIdentityBadgeStage251>[];
 
     return _Section(
-      title: '聊天身份徽章',
+      title: 'Chat Identity Badges',
       children: <Widget>[
         if (badges.isEmpty)
           Text(
-            '目前沒有取得可切換的徽章。',
+            'No switchable badges loaded yet.',
             style: TextStyle(
-              color: Colors.white.withOpacity(0.58),
+              color: TwitchUiColors.textSecondary,
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
             ),
@@ -399,17 +367,17 @@ class _Section extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.035),
+        color: TwitchUiColors.sheet.cardFill,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: TwitchUiColors.sheet.cardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
             title,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.88),
+            style: const TextStyle(
+              color: TwitchUiColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w900,
             ),
@@ -424,7 +392,6 @@ class _Section extends StatelessWidget {
 
 class _ActionTile extends StatelessWidget {
   final IconData icon;
-  final Color color;
   final String title;
   final String subtitle;
   final String? value;
@@ -433,7 +400,6 @@ class _ActionTile extends StatelessWidget {
 
   const _ActionTile({
     required this.icon,
-    required this.color,
     required this.title,
     required this.subtitle,
     this.value,
@@ -450,18 +416,24 @@ class _ActionTile extends StatelessWidget {
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: enabled
-              ? color.withOpacity(0.10)
-              : Colors.black.withOpacity(0.12),
+              ? TwitchUiColors.sheet.backplate.fill
+              : TwitchUiColors.surfaceAlt,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: enabled
-                ? color.withOpacity(0.30)
-                : Colors.white.withOpacity(0.06),
+                ? TwitchUiColors.sheet.backplate.border
+                : TwitchUiColors.sheet.cardBorder,
           ),
         ),
         child: Row(
           children: <Widget>[
-            Icon(icon, color: enabled ? color : Colors.white38, size: 20),
+            Icon(
+              icon,
+              color: enabled
+                  ? TwitchUiColors.sheet.backplate.foreground
+                  : TwitchUiColors.textMuted,
+              size: 20,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -472,7 +444,9 @@ class _ActionTile extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: enabled ? Colors.white : Colors.white54,
+                      color: enabled
+                          ? TwitchUiColors.textPrimary
+                          : TwitchUiColors.textMuted,
                       fontSize: 13,
                       fontWeight: FontWeight.w900,
                     ),
@@ -483,7 +457,9 @@ class _ActionTile extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(enabled ? 0.62 : 0.38),
+                      color: enabled
+                          ? TwitchUiColors.textSecondary
+                          : TwitchUiColors.textFaint,
                       fontSize: 11.5,
                       height: 1.25,
                       fontWeight: FontWeight.w700,
@@ -497,7 +473,9 @@ class _ActionTile extends StatelessWidget {
               Text(
                 value!,
                 style: TextStyle(
-                  color: enabled ? color : Colors.white38,
+                  color: enabled
+                      ? TwitchUiColors.sheet.backplate.foreground
+                      : TwitchUiColors.textMuted,
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                 ),
@@ -533,13 +511,13 @@ class _BadgeChoice extends StatelessWidget {
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: badge.selected
-              ? const Color(0xFF9146FF).withOpacity(0.16)
-              : Colors.black.withOpacity(0.14),
+              ? TwitchUiColors.sheet.cardFillActive
+              : TwitchUiColors.sheet.cardFill,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: badge.selected
-                ? const Color(0xFFBF94FF).withOpacity(0.40)
-                : Colors.white.withOpacity(0.07),
+                ? TwitchUiColors.sheet.cardBorderActive
+                : TwitchUiColors.sheet.cardBorder,
           ),
         ),
         child: Row(
@@ -552,7 +530,7 @@ class _BadgeChoice extends StatelessWidget {
                   : imageUrl == null || imageUrl.isEmpty
                   ? const Icon(
                       Icons.workspace_premium_rounded,
-                      color: Colors.white60,
+                      color: TwitchUiColors.textSecondary,
                       size: 22,
                     )
                   : Image.network(imageUrl, fit: BoxFit.contain),
@@ -564,7 +542,9 @@ class _BadgeChoice extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: badge.selected ? Colors.white : Colors.white70,
+                  color: badge.selected
+                      ? TwitchUiColors.textPrimary
+                      : TwitchUiColors.textSecondary,
                   fontSize: 11.5,
                   height: 1.15,
                   fontWeight: FontWeight.w800,

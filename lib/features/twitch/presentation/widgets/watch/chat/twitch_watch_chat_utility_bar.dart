@@ -8,9 +8,6 @@ import '../../channel_points/twitch_channel_points_sheet_utils.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import '../../shared/twitch_default_channel_points_icon.dart';
 
-const Color _softAccent = Color(0xFF8F7CC0);
-const Color _softAccentText = Color(0xFFC9BDEC);
-
 class TwitchWatchChatUtilityBar extends StatelessWidget {
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
   final bool loadingEmotes;
@@ -50,7 +47,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
           _UtilityButton(
             tooltip: '特殊動作測試',
             icon: Icons.auto_awesome_rounded,
-            active: onOpenSpecialActions != null,
+            active: false,
             compact: compact,
             onTap: onOpenSpecialActions,
           ),
@@ -85,8 +82,13 @@ class _ChannelPointsCompactButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = balance == null ? '--' : formatChannelPointCompactNumber(balance!);
-    final fullLabel = balance == null ? '--' : formatChannelPointFullNumber(balance!);
+    final label = balance == null
+        ? '--'
+        : formatChannelPointCompactNumber(balance!);
+    final fullLabel = balance == null
+        ? '--'
+        : formatChannelPointFullNumber(balance!);
+    final palette = TwitchUiColors.sheet.backplate;
 
     return Tooltip(
       message: hasClaim ? '忠誠點數 $fullLabel · 有可領獎勵' : '忠誠點數 $fullLabel',
@@ -95,31 +97,31 @@ class _ChannelPointsCompactButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           height: compact ? 30 : 34,
-          padding: EdgeInsets.fromLTRB(compact ? 8 : 10, 0, compact ? 9 : 12, 0),
+          padding: EdgeInsets.fromLTRB(
+            compact ? 8 : 10,
+            0,
+            compact ? 9 : 12,
+            0,
+          ),
           decoration: BoxDecoration(
-            color: hasClaim
-                ? _softAccent.withOpacity(0.075)
-                : Colors.white.withOpacity(0.024),
+            color: hasClaim ? palette.fillActive : palette.fill,
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
-              color: hasClaim
-                  ? _softAccentText.withOpacity(0.18)
-                  : Colors.white.withOpacity(0.050),
+              color: hasClaim ? palette.borderActive : palette.border,
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ChannelPointsIcon(
-                iconUrl: iconUrl,
-                hasClaim: hasClaim,
-              ),
+              _ChannelPointsIcon(iconUrl: iconUrl, hasClaim: hasClaim),
               if (balance != null) ...[
                 SizedBox(width: compact ? 5 : 7),
                 Text(
                   label,
                   style: TextStyle(
-                    color: hasClaim ? const Color(0xFFD8CEF2) : Colors.white60,
+                    color: hasClaim
+                        ? palette.foreground
+                        : palette.foregroundMuted,
                     fontSize: compact ? 11 : 12.5,
                     fontWeight: TwitchUiFontWeight.heavy,
                   ),
@@ -137,10 +139,7 @@ class _ChannelPointsIcon extends StatelessWidget {
   final String? iconUrl;
   final bool hasClaim;
 
-  const _ChannelPointsIcon({
-    required this.iconUrl,
-    required this.hasClaim,
-  });
+  const _ChannelPointsIcon({required this.iconUrl, required this.hasClaim});
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +163,7 @@ class _ChannelPointsIcon extends StatelessWidget {
     if (hasClaim) {
       return const Icon(
         Icons.card_giftcard_rounded,
-        color: _softAccentText,
+        color: TwitchUiColors.primarySoft,
         size: 17,
       );
     }
@@ -190,6 +189,8 @@ class _UtilityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = TwitchUiColors.sheet.backplate;
+
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -200,20 +201,16 @@ class _UtilityButton extends StatelessWidget {
           height: compact ? 30 : 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: active
-                ? _softAccent.withOpacity(0.070)
-                : Colors.white.withOpacity(0.024),
+            color: active ? palette.fillActive : palette.fill,
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
-              color: active
-                  ? _softAccentText.withOpacity(0.17)
-                  : Colors.white.withOpacity(0.050),
+              color: active ? palette.borderActive : palette.border,
             ),
           ),
           child: Icon(
             icon,
             size: compact ? 15 : 17,
-            color: active ? _softAccentText : Colors.white54,
+            color: active ? palette.foreground : palette.foregroundMuted,
           ),
         ),
       ),
