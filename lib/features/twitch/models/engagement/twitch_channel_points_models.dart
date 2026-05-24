@@ -98,7 +98,6 @@ class TwitchChannelRewardsResult {
   }
 }
 
-
 class TwitchChannelReward {
   final String id;
   final String title;
@@ -108,9 +107,10 @@ class TwitchChannelReward {
 
   /// Cost sent to Twitch redemption mutations.
   ///
-  /// Built-in rewards can expose multiple cost-like fields. The UI-visible
-  /// price and mutation-required price may differ; sending the UI value can
-  /// cause REWARD_COST_MISMATCH.
+  /// Built-in rewards can expose multiple cost-like fields. Twitch expects the
+  /// streamer override `cost` when present, otherwise the current tiered
+  /// `defaultCost`. `minimumCost` is only a lower bound; sending it can produce
+  /// REWARD_COST_MISMATCH.
   final int redeemCost;
 
   final String imageUrl;
@@ -322,10 +322,6 @@ class TwitchChannelReward {
       source: source,
     );
 
-    // Preserve redeemCost when this factory is called from runtime with a
-    // reward map that was previously produced by toJson(). Without this,
-    // the runtime rebuild path loses the mutation-specific cost and falls
-    // back to the UI display cost, which can trigger REWARD_COST_MISMATCH.
     final serializedRedeemCost = _readInt(json, const <String>['redeemCost']) ??
         _readInt(json, const <String>['redeem_cost']);
     final redeemCost = serializedRedeemCost != null && serializedRedeemCost > 0
@@ -421,7 +417,6 @@ class TwitchChannelReward {
   }
 }
 
-
 class TwitchChannelRewardRedeemResult {
   final bool ok;
   final String rewardId;
@@ -462,11 +457,11 @@ int _resolveRewardCost(
       _readInt(json, const <String>['default_price']);
 
   if (lowerSource == 'automatic') {
-    // Match Twitch: built-in rewards use the raw reward cost first.
-    // minimumCost is only the fallback lower-bound, not the configured price.
+    // StreamNook parity: cost -> defaultCost -> minimumCost.
+    // minimumCost is only Twitch's floor, not the mutation price.
     if (cost != null && cost > 0) return cost;
-    if (minimumCost != null && minimumCost > 0) return minimumCost;
     if (defaultCost != null && defaultCost > 0) return defaultCost;
+    if (minimumCost != null && minimumCost > 0) return minimumCost;
     return 0;
   }
 
@@ -495,10 +490,11 @@ int _resolveRewardRedeemCost(
       _readInt(json, const <String>['default_price']);
 
   if (lowerSource == 'automatic') {
-    // Match Twitch redemption payloads exactly: cost -> minimumCost -> defaultCost.
+    // StreamNook parity: cost -> defaultCost -> minimumCost.
+    // Sending minimumCost before defaultCost causes REWARD_COST_MISMATCH.
     if (cost != null && cost > 0) return cost;
-    if (minimumCost != null && minimumCost > 0) return minimumCost;
     if (defaultCost != null && defaultCost > 0) return defaultCost;
+    if (minimumCost != null && minimumCost > 0) return minimumCost;
     if (displayCost > 0) return displayCost;
     return 0;
   }
@@ -536,8 +532,6 @@ bool _shouldDisplayReward({
 
   return true;
 }
-
-
 
 Map<String, dynamic>? _readMap(Object? root, List<String> path) {
   Object? current = root;
