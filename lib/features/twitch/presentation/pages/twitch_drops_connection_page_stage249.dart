@@ -736,15 +736,9 @@ class _CampaignTile extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              Container(
-                width: 42,
-                height: 42,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.13),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(Icons.extension_rounded, color: accent, size: 21),
+              _CampaignThumbnail(
+                imageUrl: campaign.imageUrl,
+                accent: accent,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -812,6 +806,54 @@ class _CampaignTile extends StatelessWidget {
     if (!drop.isClaimed && drop.progressComplete) return 1;
     if (!drop.isClaimed) return 2;
     return 3;
+  }
+}
+
+class _CampaignThumbnail extends StatelessWidget {
+  final String imageUrl;
+  final Color accent;
+
+  const _CampaignThumbnail({
+    required this.imageUrl,
+    required this.accent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl.trim();
+
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        color: accent.withOpacity(0.13),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: accent.withOpacity(0.22)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: url.isEmpty
+          ? Icon(Icons.extension_rounded, color: accent, size: 21)
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Icon(Icons.extension_rounded, color: accent, size: 21);
+              },
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: accent,
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
   }
 }
 
