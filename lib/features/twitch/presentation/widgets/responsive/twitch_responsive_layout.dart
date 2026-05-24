@@ -10,6 +10,7 @@ enum TwitchResponsiveLayoutMode {
 class TwitchResponsiveLayout {
   static const double homeBottomNavigationMaxWidth = 760;
   static const double homeTwoRowToolbarMaxWidth = 720;
+  static const double dropsHeaderStackMaxWidth = 760;
   static const double dropsCampaignStackMaxWidth = 680;
   static const double watchDisableResizeHandleMaxWidth = 920;
 
@@ -80,6 +81,10 @@ class TwitchResponsiveLayout {
 
   bool get shouldUseTwoRowHomeToolbar {
     return width < homeTwoRowToolbarMaxWidth;
+  }
+
+  bool get shouldStackDropsHeader {
+    return width < dropsHeaderStackMaxWidth;
   }
 
   bool get shouldStackDropsCampaignCard {
