@@ -8,6 +8,11 @@ enum TwitchResponsiveLayoutMode {
 }
 
 class TwitchResponsiveLayout {
+  static const double homeBottomNavigationMaxWidth = 760;
+  static const double homeTwoRowToolbarMaxWidth = 720;
+  static const double dropsCampaignStackMaxWidth = 680;
+  static const double watchDisableResizeHandleMaxWidth = 920;
+
   final double width;
   final double height;
   final double aspectRatio;
@@ -46,6 +51,13 @@ class TwitchResponsiveLayout {
     );
   }
 
+  static TwitchResponsiveLayout fromContext(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return TwitchResponsiveLayout.fromConstraints(
+      BoxConstraints.tight(size),
+    );
+  }
+
   bool get isPhone =>
       mode == TwitchResponsiveLayoutMode.phonePortrait ||
       mode == TwitchResponsiveLayoutMode.phoneLandscape;
@@ -60,7 +72,23 @@ class TwitchResponsiveLayout {
 
   bool get shouldUseBottomChat => !shouldUseSideChat;
 
-  bool get shouldUseIconSidebar => width < 760;
+  bool get shouldUseIconSidebar => width < homeBottomNavigationMaxWidth;
+
+  bool get shouldUseBottomHomeNavigation {
+    return width < homeBottomNavigationMaxWidth;
+  }
+
+  bool get shouldUseTwoRowHomeToolbar {
+    return width < homeTwoRowToolbarMaxWidth;
+  }
+
+  bool get shouldStackDropsCampaignCard {
+    return width < dropsCampaignStackMaxWidth;
+  }
+
+  bool get shouldDisableWatchChatResizeHandle {
+    return isPhoneLandscape || width < watchDisableResizeHandleMaxWidth;
+  }
 
   EdgeInsets get contentPadding {
     if (isPhone) return const EdgeInsets.fromLTRB(10, 10, 10, 12);
