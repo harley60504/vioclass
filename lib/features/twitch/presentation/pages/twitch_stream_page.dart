@@ -1,4 +1,4 @@
-// PATCH VERSION: twitch_stream_page_stage249_split_shell
+// PATCH VERSION: twitch_stream_page_stage254_mobile_shell
 //
 // 這份主頁已拆分：
 // - twitch_stream_home_models_stage249.dart
@@ -7,7 +7,10 @@
 // - widgets/home/twitch_stream_home_account_menu_stage249.dart
 // - twitch_drops_connection_page_stage249.dart
 //
-// 之後要改 Stage249 / Drops / settings menu，優先改小檔，不要再整份改這個主頁。
+// Stage 254:
+// - 使用 TwitchResponsiveLayout 作為共用手機判定。
+// - 手機寬度時 sidebar 移到底部 NavigationBar。
+// - 手機寬度時 toolbar 會拆成兩排，避免按鈕擠爆。
 
 import 'dart:async';
 
@@ -20,8 +23,10 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/notifications/twitch_app_notification_service_stage249.dart';
+import '../widgets/home/twitch_stream_home_bottom_nav_stage254.dart';
 import '../widgets/home/twitch_stream_home_sidebar_stage249.dart';
 import '../widgets/home/twitch_stream_home_toolbar_stage249.dart';
+import '../widgets/responsive/twitch_responsive_layout.dart';
 import 'twitch_browse_page.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
@@ -236,52 +241,78 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           ),
         ),
         child: SafeArea(
-          child: Row(
-            children: <Widget>[
-              TwitchStreamHomeSidebarStage249(
-                selectedSection: selectedSection,
-                viewerLabel: viewerLabel,
-                loginStatus: loginStatus,
-                loadingLoginState: loadingLoginState,
-                onSelectSection: selectSection,
-              ),
-              Expanded(
-                child: Column(
-                  children: <Widget>[
-                    TwitchStreamHomeToolbarStage249(
-                      selectedSection: selectedSection,
-                      searchController: searchController,
-                      onSearchChanged: (value) {
-                        setState(() => searchText = value.trim().toLowerCase());
-                      },
-                      onClearSearch: () {
-                        searchController.clear();
-                        setState(() => searchText = '');
-                      },
-                      onShowGameMenu: selectedSection == TwitchHomeSection.browse
-                          ? () => browsePageKey.currentState?.showGameMenu(context)
-                          : null,
-                      onShowLanguageMenu: () {
-                        if (selectedSection == TwitchHomeSection.following) {
-                          followingPageKey.currentState?.showLanguageMenu(context);
-                        } else {
-                          browsePageKey.currentState?.showLanguageMenu(context);
-                        }
-                      },
-                      onRefresh: refreshCurrentPage,
-                      onLogin: runLinkedTwitchLoginFlow,
-                      onOpenDropsConnector: openDropsConnectorPage,
-                      onTestAppNotification: showStage249InternalNotificationTest,
-                      onLogout: logout,
-                    ),
-                    Expanded(child: _buildHomeContent()),
-                  ],
-                ),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+              return layout.shouldUseBottomHomeNavigation
+                  ? _buildMobileShell(layout)
+                  : _buildDesktopShell(layout);
+            },
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDesktopShell(TwitchResponsiveLayout layout) {
+    return Row(
+      children: <Widget>[
+        TwitchStreamHomeSidebarStage249(
+          selectedSection: selectedSection,
+          viewerLabel: viewerLabel,
+          loginStatus: loginStatus,
+          loadingLoginState: loadingLoginState,
+          onSelectSection: selectSection,
+        ),
+        Expanded(child: _buildContentColumn(layout)),
+      ],
+    );
+  }
+
+  Widget _buildMobileShell(TwitchResponsiveLayout layout) {
+    return Column(
+      children: <Widget>[
+        Expanded(child: _buildContentColumn(layout)),
+        TwitchStreamHomeBottomNavigationStage254(
+          selectedSection: selectedSection,
+          onSelectSection: selectSection,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContentColumn(TwitchResponsiveLayout layout) {
+    return Column(
+      children: <Widget>[
+        TwitchStreamHomeToolbarStage249(
+          selectedSection: selectedSection,
+          searchController: searchController,
+          forceTwoRows: layout.shouldUseTwoRowHomeToolbar,
+          onSearchChanged: (value) {
+            setState(() => searchText = value.trim().toLowerCase());
+          },
+          onClearSearch: () {
+            searchController.clear();
+            setState(() => searchText = '');
+          },
+          onShowGameMenu: selectedSection == TwitchHomeSection.browse
+              ? () => browsePageKey.currentState?.showGameMenu(context)
+              : null,
+          onShowLanguageMenu: () {
+            if (selectedSection == TwitchHomeSection.following) {
+              followingPageKey.currentState?.showLanguageMenu(context);
+            } else {
+              browsePageKey.currentState?.showLanguageMenu(context);
+            }
+          },
+          onRefresh: refreshCurrentPage,
+          onLogin: runLinkedTwitchLoginFlow,
+          onOpenDropsConnector: openDropsConnectorPage,
+          onTestAppNotification: showStage249InternalNotificationTest,
+          onLogout: logout,
+        ),
+        Expanded(child: _buildHomeContent()),
+      ],
     );
   }
 
