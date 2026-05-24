@@ -150,6 +150,16 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
         channelId: _channelId,
         viewerId: _viewerId,
       ),
+      onRunCustomPersistedOperation: ({
+        required operationName,
+        required sha256Hash,
+        required variables,
+      }) =>
+          _watchServices.specialMessagesStage251.debugProbe.runCustomPersistedOperation(
+        operationName: operationName,
+        sha256Hash: sha256Hash,
+        variables: variables,
+      ),
     );
   }
 
