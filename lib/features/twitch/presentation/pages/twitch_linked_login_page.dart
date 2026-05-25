@@ -104,7 +104,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     var webReady = webToken != null && webToken.trim().isNotEmpty;
     if (webReady) {
       webReady = await widget.webGqlAuthService.validateToken();
-      if (webReady) webReady = await _verifyWebGqlToken(webToken!);
+      if (webReady) webReady = await _verifyWebGqlToken(webToken);
     }
 
     final mainToken = await widget.mainAuthService.getValidAccessToken();
@@ -122,7 +122,9 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
   }
 
   String _buildStatusText() {
-    if (_completeLogin) return '官方 Web/GQL、主 OAuth、Drops / Android 都已完成，可以進入 App。';
+    if (_completeLogin) {
+      return '官方 Web/GQL、主 OAuth、Drops / Android 都已完成，可以進入 App。';
+    }
 
     final missing = <String>[];
     if (!_webGqlTokenReady) missing.add('官方 Web / GQL token');
@@ -305,9 +307,7 @@ query ChannelPointsContext($channelLogin: String!) {
         data: <String, dynamic>{
           'operationName': 'ChannelPointsContext',
           'query': query,
-          'variables': <String, dynamic>{
-            'channelLogin': 'twitch',
-          },
+          'variables': <String, dynamic>{'channelLogin': 'twitch'},
         },
         headers: <String, String>{
           'Client-ID': TwitchApiConstants.twitchWebClientId,
@@ -363,7 +363,10 @@ query ChannelPointsContext($channelLogin: String!) {
                     IconButton(
                       tooltip: '關閉',
                       onPressed: () => Navigator.of(dialogContext).pop(false),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white54),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white54,
+                      ),
                     ),
                   ],
                 ),
@@ -416,7 +419,9 @@ query ChannelPointsContext($channelLogin: String!) {
       await widget.dropsAuthService.logout(clearClientId: false);
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(TwitchInteractionWebLoginPage.interactionGqlVerifiedStorageKey);
+      await prefs.remove(
+        TwitchInteractionWebLoginPage.interactionGqlVerifiedStorageKey,
+      );
       await prefs.remove('new_twitch_app_twitch_interaction_token');
       await prefs.remove('new_twitch_app_twitch_interaction_gql_verified_at');
       await prefs.remove('new_twitch_app_twitch_web_gql_token');
@@ -452,7 +457,6 @@ query ChannelPointsContext($channelLogin: String!) {
       }
     }
   }
-
 
   Future<void> _clearPlatformWebViewSession() async {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -499,7 +503,8 @@ query ChannelPointsContext($channelLogin: String!) {
   }
 
   Future<void> _clearDesktopWebViewUserDataFolder() async {
-    final path = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    final path =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
         'new_twitch_app_shared_twitch_desktop_webview_v30';
     try {
       final dir = Directory(path);
@@ -553,7 +558,9 @@ query ChannelPointsContext($channelLogin: String!) {
                 children: [
                   IconButton(
                     tooltip: '關閉',
-                    onPressed: busy ? null : () => Navigator.of(context).maybePop(false),
+                    onPressed: busy
+                        ? null
+                        : () => Navigator.of(context).maybePop(false),
                     icon: const Icon(Icons.close_rounded),
                   ),
                   const SizedBox(width: 8),
@@ -571,7 +578,10 @@ query ChannelPointsContext($channelLogin: String!) {
                       _statusText,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -581,7 +591,10 @@ query ChannelPointsContext($channelLogin: String!) {
               Container(
                 width: double.infinity,
                 color: const Color(0xFF2A120F),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 9,
+                ),
                 child: Text(
                   _errorText!,
                   maxLines: 3,
@@ -598,83 +611,85 @@ query ChannelPointsContext($channelLogin: String!) {
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 child: Center(
                   child: Container(
-                  constraints: const BoxConstraints(maxWidth: 820),
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF18181B),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
-                  ),
-                  child: _loadingStored
-                      ? const CircularProgressIndicator()
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (MediaQuery.sizeOf(context).height >= 520)
-                            Icon(
-                              _completeLogin
-                                  ? Icons.verified_rounded
-                                  : Icons.login_rounded,
-                              color: iconColor,
-                              size: 52,
-                            ),
-                            if (MediaQuery.sizeOf(context).height >= 520)
-                              const SizedBox(height: 14),
-                            Text(
-                              titleText,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 21,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              descriptionText,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white60,
-                                height: 1.4,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (_lastActionText != null) ...[
-                              const SizedBox(height: 10),
+                    constraints: const BoxConstraints(maxWidth: 820),
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF18181B),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: _loadingStored
+                        ? const CircularProgressIndicator()
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (MediaQuery.sizeOf(context).height >= 520)
+                                Icon(
+                                  _completeLogin
+                                      ? Icons.verified_rounded
+                                      : Icons.login_rounded,
+                                  color: iconColor,
+                                  size: 52,
+                                ),
+                              if (MediaQuery.sizeOf(context).height >= 520)
+                                const SizedBox(height: 14),
                               Text(
-                                _lastActionText!,
+                                titleText,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: _completeLogin
-                                      ? Colors.greenAccent
-                                      : Colors.white54,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w800,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
-                            ],
-                            const SizedBox(height: 18),
-                            _LoginStateChecklist(
-                              webGqlTokenReady: _webGqlTokenReady,
-                              mainLoggedIn: _mainLoggedIn,
-                              dropsTokenReady: _dropsTokenReady,
-                            ),
-                            const SizedBox(height: 20),
-                            _LoginActionButtons(
-                              busy: busy,
-                              runningUnifiedLogin: _runningUnifiedLogin,
-                              loggingOut: _loggingOut,
-                              completeLogin: _completeLogin,
-                              onUnifiedLogin: _runUnifiedLoginFlow,
-                              onReload: _loadStoredSession,
-                              onWebGqlLogin: _openWebGqlLogin,
-                              onMainLogin: _openMainLogin,
-                              onDropsLogin: _openDropsLogin,
-                              onLogout: _logoutTwitch,
-                              onFinish: _finish,
-                            ),
-                            /* Wrap(
+                              const SizedBox(height: 10),
+                              Text(
+                                descriptionText,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white60,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (_lastActionText != null) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  _lastActionText!,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _completeLogin
+                                        ? Colors.greenAccent
+                                        : Colors.white54,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 18),
+                              _LoginStateChecklist(
+                                webGqlTokenReady: _webGqlTokenReady,
+                                mainLoggedIn: _mainLoggedIn,
+                                dropsTokenReady: _dropsTokenReady,
+                              ),
+                              const SizedBox(height: 20),
+                              _LoginActionButtons(
+                                busy: busy,
+                                runningUnifiedLogin: _runningUnifiedLogin,
+                                loggingOut: _loggingOut,
+                                completeLogin: _completeLogin,
+                                onUnifiedLogin: _runUnifiedLoginFlow,
+                                onReload: _loadStoredSession,
+                                onWebGqlLogin: _openWebGqlLogin,
+                                onMainLogin: _openMainLogin,
+                                onDropsLogin: _openDropsLogin,
+                                onLogout: _logoutTwitch,
+                                onFinish: _finish,
+                              ),
+                              /* Wrap(
                               spacing: 10,
                               runSpacing: 10,
                               alignment: WrapAlignment.center,
@@ -735,8 +750,8 @@ query ChannelPointsContext($channelLogin: String!) {
                                 ),
                               ],
                             ), */
-                          ],
-                        ),
+                            ],
+                          ),
                   ),
                 ),
               ),
@@ -777,7 +792,8 @@ class _LoginActionButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compact = MediaQuery.sizeOf(context).width < 520 ||
+    final compact =
+        MediaQuery.sizeOf(context).width < 520 ||
         MediaQuery.sizeOf(context).height < 560;
 
     final primaryButtons = <Widget>[
@@ -912,7 +928,7 @@ class _LoginStateChecklist extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF111116),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         children: [
@@ -957,7 +973,9 @@ class _LoginStateRow extends StatelessWidget {
     return Row(
       children: [
         Icon(
-          done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+          done
+              ? Icons.check_circle_rounded
+              : Icons.radio_button_unchecked_rounded,
           color: color,
           size: 20,
         ),

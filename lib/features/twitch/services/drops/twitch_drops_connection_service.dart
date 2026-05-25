@@ -53,20 +53,12 @@ class TwitchDropsConnectionService {
       hasToken = token != null && token.trim().isNotEmpty;
 
       if (!hasToken) {
-        return _result(
-          hasToken: false,
-          tokenValid: false,
-          clientId: clientId,
-        );
+        return _result(hasToken: false, tokenValid: false, clientId: clientId);
       }
 
       tokenValid = await dropsAuthService.validateToken();
       if (!tokenValid) {
-        return _result(
-          hasToken: true,
-          tokenValid: false,
-          clientId: clientId,
-        );
+        return _result(hasToken: true, tokenValid: false, clientId: clientId);
       }
 
       final validToken = await dropsAuthService.getToken();

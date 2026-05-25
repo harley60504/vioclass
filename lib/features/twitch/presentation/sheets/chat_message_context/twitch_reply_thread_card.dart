@@ -187,9 +187,9 @@ class _EntryKindChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.30)),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
       child: Text(
         label,
@@ -276,9 +276,9 @@ class _RelationChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(backgroundOpacity),
+        color: color.withValues(alpha: backgroundOpacity),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(borderOpacity)),
+        border: Border.all(color: color.withValues(alpha: borderOpacity)),
       ),
       child: Text(
         label,

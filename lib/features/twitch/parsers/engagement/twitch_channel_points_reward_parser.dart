@@ -14,7 +14,8 @@ class TwitchChannelPointsRewardParser {
     required String channelLogin,
   }) {
     final normalizedRaw = _asStringMap(raw) ?? <String, dynamic>{};
-    final settings = _findMapContainingKey(normalizedRaw, 'customRewards') ??
+    final settings =
+        _findMapContainingKey(normalizedRaw, 'customRewards') ??
         _findMapContainingKey(normalizedRaw, 'automaticRewards') ??
         _findMapContainingKey(normalizedRaw, 'communityPointsSettings');
 
@@ -31,7 +32,9 @@ class TwitchChannelPointsRewardParser {
 
     final rewardsByKey = <String, TwitchChannelReward>{};
 
-    for (final rawReward in _readList(settings, const <String>['customRewards'])) {
+    for (final rawReward in _readList(settings, const <String>[
+      'customRewards',
+    ])) {
       final map = _asStringMap(rawReward);
       if (map == null) continue;
 
@@ -42,7 +45,9 @@ class TwitchChannelPointsRewardParser {
       rewardsByKey[reward.id.isNotEmpty ? reward.id : reward.title] = reward;
     }
 
-    for (final rawReward in _readList(settings, const <String>['automaticRewards'])) {
+    for (final rawReward in _readList(settings, const <String>[
+      'automaticRewards',
+    ])) {
       final map = _asStringMap(rawReward);
       if (map == null) continue;
 

@@ -42,10 +42,7 @@ class TwitchGqlApiService {
 
     final errors = body['errors'];
     if (errors is List && errors.isNotEmpty) {
-      throw TwitchApiException(
-        'Twitch GQL returned errors.',
-        details: errors,
-      );
+      throw TwitchApiException('Twitch GQL returned errors.', details: errors);
     }
 
     if (!requireData) return body;
@@ -82,13 +79,15 @@ class TwitchGqlApiService {
       );
     }
 
-    return response.map<Map<String, dynamic>>((item) {
-      if (item is Map<String, dynamic>) return item;
-      throw TwitchApiException(
-        'Unexpected GQL batch item type: ${item.runtimeType}.',
-        details: item,
-      );
-    }).toList(growable: false);
+    return response
+        .map<Map<String, dynamic>>((item) {
+          if (item is Map<String, dynamic>) return item;
+          throw TwitchApiException(
+            'Unexpected GQL batch item type: ${item.runtimeType}.',
+            details: item,
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<dynamic> rawRequest({

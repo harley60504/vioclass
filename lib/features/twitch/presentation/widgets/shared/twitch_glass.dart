@@ -49,7 +49,7 @@ class TwitchGlassSurface extends StatelessWidget {
     final effectiveBoxShadow = lowCostMobile ? const <BoxShadow>[] : boxShadow;
     final effectiveBackgroundColor = lowCostMobile
         ? Color.alphaBlend(
-            Colors.black.withOpacity(0.10),
+            Colors.black.withValues(alpha: 0.10),
             backgroundColor,
           )
         : backgroundColor;
@@ -61,10 +61,7 @@ class TwitchGlassSurface extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: effectiveBoxShadow,
       ),
-      child: Padding(
-        padding: padding,
-        child: child,
-      ),
+      child: Padding(padding: padding, child: child),
     );
 
     return ClipRRect(
@@ -89,7 +86,7 @@ class TwitchGlassPanelShadow {
   static List<BoxShadow> soft({double opacity = 0.34}) {
     return <BoxShadow>[
       BoxShadow(
-        color: Colors.black.withOpacity(opacity),
+        color: Colors.black.withValues(alpha: opacity),
         blurRadius: 24,
         offset: const Offset(0, 12),
       ),
@@ -99,7 +96,7 @@ class TwitchGlassPanelShadow {
   static List<BoxShadow> compact({double opacity = 0.24}) {
     return <BoxShadow>[
       BoxShadow(
-        color: Colors.black.withOpacity(opacity),
+        color: Colors.black.withValues(alpha: opacity),
         blurRadius: 14,
         offset: const Offset(0, 7),
       ),

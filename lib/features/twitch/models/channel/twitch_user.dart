@@ -42,15 +42,18 @@ class TwitchUser {
     return TwitchUser(
       id: json['id']?.toString() ?? '',
       login: json['login']?.toString() ?? '',
-      displayName: json['displayName']?.toString() ??
+      displayName:
+          json['displayName']?.toString() ??
           json['display_name']?.toString() ??
           json['login']?.toString() ??
           '',
       description: json['description']?.toString() ?? '',
-      profileImageUrl: json['profileImageURL']?.toString() ??
+      profileImageUrl:
+          json['profileImageURL']?.toString() ??
           json['profile_image_url']?.toString() ??
           '',
-      offlineImageUrl: json['offlineImageURL']?.toString() ??
+      offlineImageUrl:
+          json['offlineImageURL']?.toString() ??
           json['offline_image_url']?.toString() ??
           '',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? ''),

@@ -62,8 +62,9 @@ class TwitchChatMessage {
     TwitchChatMessageSource source = TwitchChatMessageSource.synthetic,
   }) {
     final safeLogin = userLogin.trim().isEmpty ? 'unknown' : userLogin.trim();
-    final safeDisplayName =
-        displayName.trim().isEmpty ? safeLogin : displayName.trim();
+    final safeDisplayName = displayName.trim().isEmpty
+        ? safeLogin
+        : displayName.trim();
     final safeChannel = channelLogin.trim().replaceFirst('#', '').toLowerCase();
 
     final mergedTags = <String, String>{

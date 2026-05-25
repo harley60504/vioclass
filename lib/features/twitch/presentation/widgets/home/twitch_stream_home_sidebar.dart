@@ -29,7 +29,7 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kPanel,
         border: Border(
-          right: BorderSide(color: _kTwitchPurple.withOpacity(0.24)),
+          right: BorderSide(color: _kTwitchPurple.withValues(alpha: 0.24)),
         ),
       ),
       child: Column(
@@ -62,11 +62,16 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.20),
+                    color: Colors.black.withValues(alpha: 0.20),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.24)),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.24),
+                    ),
                   ),
                   child: Text(
                     loadingLoginState ? '檢查中' : loginStatus,
@@ -130,12 +135,12 @@ class _SidebarButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? _kTwitchPurple.withOpacity(0.22)
+                ? _kTwitchPurple.withValues(alpha: 0.22)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? _kTwitchPurpleLight.withOpacity(0.38)
+                  ? _kTwitchPurpleLight.withValues(alpha: 0.38)
                   : Colors.transparent,
             ),
           ),

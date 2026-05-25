@@ -24,16 +24,14 @@ class TwitchChannelPointsModifiedEmoteSelection {
   });
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'emoteId': emoteId,
-      'modifierId': modifierId,
-    };
+    return <String, dynamic>{'emoteId': emoteId, 'modifierId': modifierId};
   }
 }
 
-typedef TwitchChannelPointEmoteLoader = Future<List<TwitchChannelPointEmoteOption>> Function(
-  Map<String, dynamic> reward,
-);
+typedef TwitchChannelPointEmoteLoader =
+    Future<List<TwitchChannelPointEmoteOption>> Function(
+      Map<String, dynamic> reward,
+    );
 
 class TwitchChannelPointEmoteCompleter {
   final Completer<Object?> _completer = Completer<Object?>();
@@ -52,10 +50,6 @@ List<TwitchChannelPointEmoteOption> filterChannelPointOverlayEmotes({
 }) {
   Iterable<TwitchChannelPointEmoteOption> output = emotes;
   final cleanQuery = query.trim().toLowerCase();
-
-  if (mode == ChannelPointEmoteOverlayMode.modify && selectedBaseEmote == null) {
-    output = output.where((emote) => emote.modifications.isNotEmpty);
-  }
 
   if (cleanQuery.isNotEmpty) {
     output = output.where((emote) {

@@ -26,10 +26,7 @@ class TwitchPlayerRuntime extends ChangeNotifier {
   final TwitchPlaybackService playbackService;
   final void Function(String message)? externalLog;
 
-  TwitchPlayerRuntime({
-    required this.playbackService,
-    this.externalLog,
-  });
+  TwitchPlayerRuntime({required this.playbackService, this.externalLog});
 
   static const Map<String, String> defaultUpstreamHeaders = <String, String>{
     'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
@@ -56,7 +53,8 @@ class TwitchPlayerRuntime extends ChangeNotifier {
 
   String get channelLogin => _channelLogin;
   TwitchPlaybackResult? get playbackResult => _playbackResult;
-  List<TwitchM3u8Variant> get variants => _playbackResult?.variants ?? const <TwitchM3u8Variant>[];
+  List<TwitchM3u8Variant> get variants =>
+      _playbackResult?.variants ?? const <TwitchM3u8Variant>[];
   TwitchM3u8Variant? get currentVariant => _currentVariant;
   TwitchDartHlsLowLatencyProxy? get proxy => _proxy;
   String? get proxyUrl => _proxyUrl;
@@ -78,7 +76,11 @@ class TwitchPlayerRuntime extends ChangeNotifier {
     final login = channelLogin.trim().toLowerCase();
 
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin cannot be empty',
+      );
     }
 
     _channelLogin = login;
@@ -96,7 +98,8 @@ class TwitchPlayerRuntime extends ChangeNotifier {
       _playbackResult = result;
 
       _addLog('Loaded ${result.variants.length} variants.');
-      final selected = preferredVariant ??
+      final selected =
+          preferredVariant ??
           _findVariantByName(result.variants, preferredVariantName) ??
           selectDefaultVariant(result.variants);
 
@@ -104,10 +107,7 @@ class TwitchPlayerRuntime extends ChangeNotifier {
         throw StateError('No playable Twitch m3u8 variant found.');
       }
 
-      await startProxyForVariant(
-        selected,
-        output: output,
-      );
+      await startProxyForVariant(selected, output: output);
 
       return _proxyUrl;
     } catch (e) {
@@ -195,21 +195,26 @@ class TwitchPlayerRuntime extends ChangeNotifier {
   TwitchM3u8Variant? selectDefaultVariant(List<TwitchM3u8Variant> variants) {
     if (variants.isEmpty) return null;
 
-    final videoVariants = variants.where((variant) => !variant.isAudioOnly).toList();
-    final cleanVideoVariants = videoVariants.where((variant) => !variant.hasAds).toList();
+    final videoVariants = variants
+        .where((variant) => !variant.isAudioOnly)
+        .toList();
+    final cleanVideoVariants = videoVariants
+        .where((variant) => !variant.hasAds)
+        .toList();
     final cleanVariants = variants.where((variant) => !variant.hasAds).toList();
 
     final preferredPool = cleanVideoVariants.isNotEmpty
         ? cleanVideoVariants
         : videoVariants.isNotEmpty
-            ? videoVariants
-            : cleanVariants.isNotEmpty
-                ? cleanVariants
-                : variants.toList();
+        ? videoVariants
+        : cleanVariants.isNotEmpty
+        ? cleanVariants
+        : variants.toList();
 
     TwitchM3u8Variant? source;
     for (final variant in preferredPool) {
-      final text = '${variant.name} ${variant.videoGroupId ?? ''}'.toLowerCase();
+      final text = '${variant.name} ${variant.videoGroupId ?? ''}'
+          .toLowerCase();
       if (text.contains('source') || text.contains('chunked')) {
         source = variant;
         break;

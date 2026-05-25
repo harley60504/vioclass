@@ -66,9 +66,7 @@ class TwitchDeviceTokenPollResult {
 class TwitchDeviceAuthApiService {
   final TwitchApiClient client;
 
-  const TwitchDeviceAuthApiService({
-    required this.client,
-  });
+  const TwitchDeviceAuthApiService({required this.client});
 
   Future<TwitchDeviceAuthorization> startDeviceAuthorization({
     required String clientId,

@@ -10,9 +10,9 @@ class PlayerErrorCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.16),
+        color: Colors.redAccent.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.36)),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.36)),
       ),
       child: SelectableText(
         message,

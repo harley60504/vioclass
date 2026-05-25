@@ -15,7 +15,8 @@ class TwitchWatchSheetPortLauncher {
   final TwitchWatchEngagementPort engagement;
   final void Function(String message) showMessage;
   final void Function(String text) insertMessageText;
-  final void Function(TwitchPendingSpecialMessage pending)? setPendingSpecialMessage;
+  final void Function(TwitchPendingSpecialMessage pending)?
+  setPendingSpecialMessage;
   final Future<void> Function({bool showSnackOnError}) refreshEngagement;
   final Future<void> Function({bool forceRefresh}) refreshEmotes;
   final String Function() channelLogin;
@@ -52,7 +53,8 @@ class TwitchWatchSheetPortLauncher {
       context: context,
       cache: emotes.thirdParty,
       officialCache: emotes.official,
-      loading: emotes.thirdParty.loading ||
+      loading:
+          emotes.thirdParty.loading ||
           emotes.official.loading ||
           loadingEmotes() ||
           emoteBootstrapping(),
@@ -80,7 +82,8 @@ class TwitchWatchSheetPortLauncher {
     );
   }
 
-  Future<List<TwitchChannelPointEmoteOption>> loadChannelPointModifiableEmotes() async {
+  Future<List<TwitchChannelPointEmoteOption>>
+  loadChannelPointModifiableEmotes() async {
     try {
       return await engagement.loadChannelPointEmotes(
         channelLogin: channelLogin(),
@@ -92,7 +95,9 @@ class TwitchWatchSheetPortLauncher {
     }
   }
 
-  Future<void> prepareChannelPointTextReward(Map<String, dynamic> reward) async {
+  Future<void> prepareChannelPointTextReward(
+    Map<String, dynamic> reward,
+  ) async {
     final setPending = setPendingSpecialMessage;
     if (setPending == null) {
       showMessage('尚未接上聊天室輸入欄。');
@@ -113,9 +118,7 @@ class TwitchWatchSheetPortLauncher {
         title: title,
         subtitle: '在下方輸入欄輸入內容，按 Send 後兌換。',
         costLabel: cost > 0 ? '$cost 點' : null,
-        payload: <String, dynamic>{
-          'reward': reward,
-        },
+        payload: <String, dynamic>{'reward': reward},
       ),
     );
 
@@ -175,9 +178,8 @@ class TwitchWatchSheetPortLauncher {
       context: context,
       prediction: prediction,
       onBet: placePredictionBet,
-      onRefreshPrediction: () => engagement.refreshPrediction(
-        channelLogin: channelLogin(),
-      ),
+      onRefreshPrediction: () =>
+          engagement.refreshPrediction(channelLogin: channelLogin()),
     );
   }
 

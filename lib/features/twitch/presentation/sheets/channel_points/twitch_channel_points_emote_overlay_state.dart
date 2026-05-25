@@ -27,13 +27,13 @@ class TwitchChannelPointsEmoteOverlayState {
   });
 
   const TwitchChannelPointsEmoteOverlayState.hidden()
-      : mode = null,
-        reward = null,
-        emotes = const <TwitchChannelPointEmoteOption>[],
-        selectedBaseEmote = null,
-        loading = false,
-        error = null,
-        query = '';
+    : mode = null,
+      reward = null,
+      emotes = const <TwitchChannelPointEmoteOption>[],
+      selectedBaseEmote = null,
+      loading = false,
+      error = null,
+      query = '';
 
   bool get isVisible => mode != null;
 

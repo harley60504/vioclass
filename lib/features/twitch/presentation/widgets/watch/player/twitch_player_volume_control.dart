@@ -36,12 +36,8 @@ class CompactInlineVolumeControl extends StatelessWidget {
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
               trackHeight: 2.4,
-              thumbShape: const RoundSliderThumbShape(
-                enabledThumbRadius: 5.5,
-              ),
-              overlayShape: const RoundSliderOverlayShape(
-                overlayRadius: 10,
-              ),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5.5),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
             ),
             child: Slider(
               value: volume.clamp(0.0, 100.0).toDouble(),

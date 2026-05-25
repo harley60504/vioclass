@@ -100,7 +100,8 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
 
   Future<void> claimDrop(TwitchDrop drop) async {
     final dropInstanceId = drop.dropInstanceId.trim();
-    if (dropInstanceId.isEmpty || claimingDropInstanceIds.contains(dropInstanceId)) {
+    if (dropInstanceId.isEmpty ||
+        claimingDropInstanceIds.contains(dropInstanceId)) {
       return;
     }
 
@@ -108,7 +109,9 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
       claimingDropInstanceIds.add(dropInstanceId);
     });
 
-    final claimResult = await service.collectDrop(dropInstanceId: dropInstanceId);
+    final claimResult = await service.collectDrop(
+      dropInstanceId: dropInstanceId,
+    );
 
     if (!mounted) return;
 
@@ -151,24 +154,23 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
               height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _kPurple.withOpacity(0.16),
+                color: _kPurple.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _kPurple.withOpacity(0.32)),
+                border: Border.all(color: _kPurple.withValues(alpha: 0.32)),
               ),
               child: const Icon(Icons.card_giftcard_rounded, size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Drops',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
+            const Text('Drops', style: TextStyle(fontWeight: FontWeight.w900)),
           ],
         ),
         actions: <Widget>[
           IconButton(
             tooltip: showDebug ? '隱藏 Debug' : '顯示 Debug',
             onPressed: () => setState(() => showDebug = !showDebug),
-            icon: Icon(showDebug ? Icons.bug_report : Icons.bug_report_outlined),
+            icon: Icon(
+              showDebug ? Icons.bug_report : Icons.bug_report_outlined,
+            ),
           ),
           IconButton(
             tooltip: '重新整理 Drops',
@@ -283,13 +285,13 @@ class _HeroCard extends StatelessWidget {
               readyCount > 0
                   ? Icons.notifications_active_rounded
                   : connected
-                      ? Icons.check_circle_rounded
-                      : Icons.cable_rounded,
+                  ? Icons.check_circle_rounded
+                  : Icons.cable_rounded,
               color: readyCount > 0
                   ? _kGold
                   : connected
-                      ? _kGreen
-                      : _kPurpleLight,
+                  ? _kGreen
+                  : _kPurpleLight,
               size: 28,
             ),
             const SizedBox(width: 10),
@@ -329,9 +331,7 @@ class _HeroCard extends StatelessWidget {
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
         minimumSize: const Size(142, 46),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
       icon: checking
           ? const SizedBox(
@@ -353,22 +353,18 @@ class _HeroCard extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            _kPurple.withOpacity(0.26),
-            _kPanel,
-            _kPanel,
-          ],
+          colors: <Color>[_kPurple.withValues(alpha: 0.26), _kPanel, _kPanel],
         ),
         border: Border.all(
           color: readyCount > 0
-              ? _kGold.withOpacity(0.48)
+              ? _kGold.withValues(alpha: 0.48)
               : connected
-                  ? _kGreen.withOpacity(0.32)
-                  : Colors.white.withOpacity(0.10),
+              ? _kGreen.withValues(alpha: 0.32)
+              : Colors.white.withValues(alpha: 0.10),
         ),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.24),
+            color: Colors.black.withValues(alpha: 0.24),
             blurRadius: 24,
             offset: const Offset(0, 12),
           ),
@@ -412,7 +408,7 @@ class _EmptyDropsCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kPanel,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         children: <Widget>[
@@ -465,7 +461,10 @@ class _DropsDashboard extends StatelessWidget {
   Widget build(BuildContext context) {
     final campaigns = _sortedCampaigns(snapshot.inventoryCampaigns);
     final readyCampaigns = campaigns
-        .where((campaign) => campaign.timeBasedDrops.any((drop) => drop.readyToCollect))
+        .where(
+          (campaign) =>
+              campaign.timeBasedDrops.any((drop) => drop.readyToCollect),
+        )
         .toList(growable: false);
     final activeCampaigns = campaigns
         .where((campaign) => campaign.status.toUpperCase() == 'ACTIVE')
@@ -497,7 +496,8 @@ class _DropsDashboard extends StatelessWidget {
         _SectionHeader(
           icon: Icons.play_circle_rounded,
           title: '進行中 / Inventory',
-          subtitle: '${snapshot.inventoryCampaignCount} 個 campaign，ACTIVE ${activeCampaigns.length} 個',
+          subtitle:
+              '${snapshot.inventoryCampaignCount} 個 campaign，ACTIVE ${activeCampaigns.length} 個',
           color: _kPurpleLight,
         ),
         const SizedBox(height: 10),
@@ -517,12 +517,18 @@ class _DropsDashboard extends StatelessWidget {
     );
   }
 
-  List<TwitchDropCampaign> _sortedCampaigns(List<TwitchDropCampaign> campaigns) {
+  List<TwitchDropCampaign> _sortedCampaigns(
+    List<TwitchDropCampaign> campaigns,
+  ) {
     final sorted = List<TwitchDropCampaign>.from(campaigns);
     sorted.sort((a, b) {
-      final priorityCompare = _campaignPriority(a).compareTo(_campaignPriority(b));
+      final priorityCompare = _campaignPriority(
+        a,
+      ).compareTo(_campaignPriority(b));
       if (priorityCompare != 0) return priorityCompare;
-      final progressCompare = _campaignBestProgress(b).compareTo(_campaignBestProgress(a));
+      final progressCompare = _campaignBestProgress(
+        b,
+      ).compareTo(_campaignBestProgress(a));
       if (progressCompare != 0) return progressCompare;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
     });
@@ -554,10 +560,30 @@ class _SummaryGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <_SummaryItem>[
-      _SummaryItem('可領取', snapshot.readyDropCount.toString(), Icons.card_giftcard_rounded, _kGold),
-      _SummaryItem('進行中', snapshot.watchingDropCount.toString(), Icons.timelapse_rounded, _kPurpleLight),
-      _SummaryItem('Drops', snapshot.totalDropCount.toString(), Icons.inventory_2_rounded, Colors.lightBlueAccent),
-      _SummaryItem('未連結', snapshot.unlinkedCampaignCount.toString(), Icons.link_off_rounded, Colors.orangeAccent),
+      _SummaryItem(
+        '可領取',
+        snapshot.readyDropCount.toString(),
+        Icons.card_giftcard_rounded,
+        _kGold,
+      ),
+      _SummaryItem(
+        '進行中',
+        snapshot.watchingDropCount.toString(),
+        Icons.timelapse_rounded,
+        _kPurpleLight,
+      ),
+      _SummaryItem(
+        'Drops',
+        snapshot.totalDropCount.toString(),
+        Icons.inventory_2_rounded,
+        Colors.lightBlueAccent,
+      ),
+      _SummaryItem(
+        '未連結',
+        snapshot.unlinkedCampaignCount.toString(),
+        Icons.link_off_rounded,
+        Colors.orangeAccent,
+      ),
     ];
 
     return LayoutBuilder(
@@ -565,8 +591,8 @@ class _SummaryGrid extends StatelessWidget {
         final columns = constraints.maxWidth >= 980
             ? 4
             : constraints.maxWidth >= 560
-                ? 2
-                : 1;
+            ? 2
+            : 1;
         return GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -605,7 +631,7 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kPanel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: item.color.withOpacity(0.22)),
+        border: Border.all(color: item.color.withValues(alpha: 0.22)),
       ),
       child: Row(
         children: <Widget>[
@@ -614,7 +640,7 @@ class _SummaryCard extends StatelessWidget {
             height: 42,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: item.color.withOpacity(0.13),
+              color: item.color.withValues(alpha: 0.13),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(item.icon, color: item.color, size: 22),
@@ -726,8 +752,8 @@ class _CampaignTile extends StatelessWidget {
     final accent = hasReady
         ? _kGold
         : campaign.status.toUpperCase() == 'ACTIVE'
-            ? _kGreen
-            : _kPurpleLight;
+        ? _kGreen
+        : _kPurpleLight;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -736,8 +762,8 @@ class _CampaignTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: (highlightReady || hasReady)
-              ? _kGold.withOpacity(0.34)
-              : Colors.white.withOpacity(0.08),
+              ? _kGold.withValues(alpha: 0.34)
+              : Colors.white.withValues(alpha: 0.08),
         ),
       ),
       child: LayoutBuilder(
@@ -844,12 +870,16 @@ class _CampaignDropsContent extends StatelessWidget {
             const SizedBox(width: 8),
             _MiniBadge(
               text: campaign.status.isEmpty ? 'UNKNOWN' : campaign.status,
-              color: campaign.status.toUpperCase() == 'ACTIVE' ? _kGreen : _kGold,
+              color: campaign.status.toUpperCase() == 'ACTIVE'
+                  ? _kGreen
+                  : _kGold,
             ),
             const SizedBox(width: 6),
             _MiniBadge(
               text: campaign.isAccountConnected ? '已連結' : '未連結',
-              color: campaign.isAccountConnected ? _kGreen : Colors.orangeAccent,
+              color: campaign.isAccountConnected
+                  ? _kGreen
+                  : Colors.orangeAccent,
             ),
           ],
         ),
@@ -863,7 +893,9 @@ class _CampaignDropsContent extends StatelessWidget {
           for (final drop in sortedDrops.take(8)) ...<Widget>[
             _DropRow(
               drop: drop,
-              claiming: claimingDropInstanceIds.contains(drop.dropInstanceId.trim()),
+              claiming: claimingDropInstanceIds.contains(
+                drop.dropInstanceId.trim(),
+              ),
               onClaimDrop: onClaimDrop,
             ),
             const SizedBox(height: 10),
@@ -894,13 +926,17 @@ class _CampaignPoster extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: accent.withOpacity(0.10),
+        color: accent.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: accent.withOpacity(0.24)),
+        border: Border.all(color: accent.withValues(alpha: 0.24)),
       ),
       clipBehavior: Clip.antiAlias,
       child: url.isEmpty
-          ? Icon(Icons.extension_rounded, color: accent, size: compact ? 42 : 54)
+          ? Icon(
+              Icons.extension_rounded,
+              color: accent,
+              size: compact ? 42 : 54,
+            )
           : Stack(
               fit: StackFit.expand,
               children: <Widget>[
@@ -908,7 +944,11 @@ class _CampaignPoster extends StatelessWidget {
                   url,
                   fit: compact ? BoxFit.contain : BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
-                    return Icon(Icons.extension_rounded, color: accent, size: compact ? 42 : 54);
+                    return Icon(
+                      Icons.extension_rounded,
+                      color: accent,
+                      size: compact ? 42 : 54,
+                    );
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -931,8 +971,8 @@ class _CampaignPoster extends StatelessWidget {
                       end: Alignment.bottomCenter,
                       colors: <Color>[
                         Colors.transparent,
-                        Colors.black.withOpacity(0.10),
-                        Colors.black.withOpacity(0.42),
+                        Colors.black.withValues(alpha: 0.10),
+                        Colors.black.withValues(alpha: 0.42),
                       ],
                     ),
                   ),
@@ -959,9 +999,10 @@ class _DropRow extends StatelessWidget {
     final accent = drop.readyToCollect
         ? _kGold
         : drop.isClaimed
-            ? _kGreen
-            : _kPurpleLight;
-    final canClaim = drop.readyToCollect && drop.dropInstanceId.trim().isNotEmpty;
+        ? _kGreen
+        : _kPurpleLight;
+    final canClaim =
+        drop.readyToCollect && drop.dropInstanceId.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -969,7 +1010,9 @@ class _DropRow extends StatelessWidget {
         color: _kPanelSoft,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: canClaim ? _kGold.withOpacity(0.32) : Colors.white.withOpacity(0.06),
+          color: canClaim
+              ? _kGold.withValues(alpha: 0.32)
+              : Colors.white.withValues(alpha: 0.06),
         ),
       ),
       child: Column(
@@ -1000,11 +1043,15 @@ class _DropRow extends StatelessWidget {
               SizedBox(
                 height: 34,
                 child: ElevatedButton.icon(
-                  onPressed: canClaim && !claiming ? () => onClaimDrop(drop) : null,
+                  onPressed: canClaim && !claiming
+                      ? () => onClaimDrop(drop)
+                      : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _kGold,
                     foregroundColor: Colors.black,
-                    disabledBackgroundColor: Colors.white.withOpacity(0.08),
+                    disabledBackgroundColor: Colors.white.withValues(
+                      alpha: 0.08,
+                    ),
                     disabledForegroundColor: Colors.white30,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(
@@ -1036,7 +1083,7 @@ class _DropRow extends StatelessWidget {
                     minHeight: 7,
                     value: drop.progressRatio,
                     color: accent,
-                    backgroundColor: Colors.white.withOpacity(0.10),
+                    backgroundColor: Colors.white.withValues(alpha: 0.10),
                   ),
                 ),
               ),
@@ -1061,10 +1108,7 @@ class _DropRewardThumbnail extends StatelessWidget {
   final String imageUrl;
   final Color accent;
 
-  const _DropRewardThumbnail({
-    required this.imageUrl,
-    required this.accent,
-  });
+  const _DropRewardThumbnail({required this.imageUrl, required this.accent});
 
   @override
   Widget build(BuildContext context) {
@@ -1074,9 +1118,9 @@ class _DropRewardThumbnail extends StatelessWidget {
       width: 46,
       height: 46,
       decoration: BoxDecoration(
-        color: accent.withOpacity(0.12),
+        color: accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withOpacity(0.22)),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
       ),
       clipBehavior: Clip.antiAlias,
       child: url.isEmpty
@@ -1085,7 +1129,11 @@ class _DropRewardThumbnail extends StatelessWidget {
               url,
               fit: BoxFit.cover,
               errorBuilder: (context, error, stackTrace) {
-                return Icon(Icons.card_giftcard_rounded, color: accent, size: 22);
+                return Icon(
+                  Icons.card_giftcard_rounded,
+                  color: accent,
+                  size: 22,
+                );
               },
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
@@ -1116,9 +1164,9 @@ class _MiniBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
+        color: color.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.32)),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
       ),
       child: Text(
         text,
@@ -1144,12 +1192,9 @@ class _SimpleInfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kPanel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(color: Colors.white54),
-      ),
+      child: Text(text, style: const TextStyle(color: Colors.white54)),
     );
   }
 }
@@ -1172,7 +1217,7 @@ class _DebugCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kPanel,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

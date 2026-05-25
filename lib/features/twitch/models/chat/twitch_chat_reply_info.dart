@@ -23,7 +23,10 @@ class TwitchChatReplyInfo {
 
   factory TwitchChatReplyInfo.fromTags(Map<String, String> tags) {
     return TwitchChatReplyInfo(
-      parentMsgId: tags['reply-parent-msg-id'] ?? tags['reply-thread-parent-msg-id'] ?? '',
+      parentMsgId:
+          tags['reply-parent-msg-id'] ??
+          tags['reply-thread-parent-msg-id'] ??
+          '',
       parentDisplayName: tags['reply-parent-display-name'] ?? '',
       parentMsgBody: tags['reply-parent-msg-body'] ?? '',
       parentUserId: tags['reply-parent-user-id'] ?? '',

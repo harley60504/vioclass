@@ -42,40 +42,40 @@ class _TextInputDialogState extends State<_TextInputDialog> {
         children: [
           Text(
             widget.title,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 14),
           TextField(
-        controller: _controller,
-        autofocus: true,
-        minLines: widget.minLines,
-        maxLines: widget.maxLines,
-        textInputAction: widget.maxLines == 1 ? TextInputAction.done : null,
-        onSubmitted: widget.maxLines == 1
-            ? (_) => Navigator.of(context).pop(_controller.text)
-            : null,
-        style: const TextStyle(color: Colors.white),
-        cursorColor: const Color(0xFFBF94FF),
-        decoration: InputDecoration(
-          labelText: widget.label,
-          hintText: widget.hintText,
-          labelStyle: const TextStyle(color: Colors.white70),
-          hintStyle: const TextStyle(color: Colors.white38),
-          filled: true,
-          fillColor: const Color(0xFF0E0E10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF2D2D35)),
+            controller: _controller,
+            autofocus: true,
+            minLines: widget.minLines,
+            maxLines: widget.maxLines,
+            textInputAction: widget.maxLines == 1 ? TextInputAction.done : null,
+            onSubmitted: widget.maxLines == 1
+                ? (_) => Navigator.of(context).pop(_controller.text)
+                : null,
+            style: const TextStyle(color: Colors.white),
+            cursorColor: const Color(0xFFBF94FF),
+            decoration: InputDecoration(
+              labelText: widget.label,
+              hintText: widget.hintText,
+              labelStyle: const TextStyle(color: Colors.white70),
+              hintStyle: const TextStyle(color: Colors.white38),
+              filled: true,
+              fillColor: const Color(0xFF0E0E10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF2D2D35)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF9146FF)),
+              ),
+            ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF9146FF)),
-          ),
-        ),
-      ),
           const SizedBox(height: 18),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,

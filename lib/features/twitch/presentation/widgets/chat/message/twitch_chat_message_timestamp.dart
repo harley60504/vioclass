@@ -44,7 +44,7 @@ class TwitchChatTimestampChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.09),
+        color: Colors.white.withValues(alpha: 0.09),
         borderRadius: BorderRadius.circular(99),
       ),
       child: Text(

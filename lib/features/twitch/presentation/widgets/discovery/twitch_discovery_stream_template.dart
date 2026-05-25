@@ -61,21 +61,19 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                 top: -180,
                 width: 520,
                 height: 520,
-                child: _DiscoveryGlowOrb(
-                  color: Color(0x559146FF),
-                ),
+                child: _DiscoveryGlowOrb(color: Color(0x559146FF)),
               ),
               const Positioned(
                 right: -220,
                 bottom: -240,
                 width: 620,
                 height: 620,
-                child: _DiscoveryGlowOrb(
-                  color: Color(0x335B2D91),
-                ),
+                child: _DiscoveryGlowOrb(color: Color(0x335B2D91)),
               ),
               CustomScrollView(
-                key: PageStorageKey<String>('twitch_discovery_grid_$sectionTitle'),
+                key: PageStorageKey<String>(
+                  'twitch_discovery_grid_$sectionTitle',
+                ),
                 controller: controller,
                 cacheExtent: 840,
                 physics: const AlwaysScrollableScrollPhysics(),
@@ -91,7 +89,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
                     sliver: SliverGrid(
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
+                        maxCrossAxisExtent:
+                            twitchStreamCardGridMaxCrossAxisExtent,
                         mainAxisExtent: mainAxisExtent,
                         crossAxisSpacing: twitchStreamCardGridSpacing,
                         mainAxisSpacing: twitchStreamCardGridSpacing,
@@ -160,10 +159,7 @@ class _DiscoveryGlowOrb extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           gradient: RadialGradient(
-            colors: <Color>[
-              color,
-              color.withOpacity(0.0),
-            ],
+            colors: <Color>[color, color.withValues(alpha: 0.0)],
           ),
         ),
       ),
@@ -194,12 +190,14 @@ class TwitchDiscoverySectionHeader extends StatelessWidget {
             height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFF9146FF).withOpacity(0.18),
+              color: const Color(0xFF9146FF).withValues(alpha: 0.18),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.28)),
+              border: Border.all(
+                color: const Color(0xFFBF94FF).withValues(alpha: 0.28),
+              ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: const Color(0xFF9146FF).withOpacity(0.26),
+                  color: const Color(0xFF9146FF).withValues(alpha: 0.26),
                   blurRadius: 18,
                   offset: const Offset(0, 6),
                 ),

@@ -19,10 +19,7 @@ class TwitchPinnedChatApiService {
     required String channelId,
     int count = 10,
   }) async {
-    final raw = await getPinnedChatRaw(
-      channelId: channelId,
-      count: count,
-    );
+    final raw = await getPinnedChatRaw(channelId: channelId, count: count);
 
     final messages = TwitchPinnedChatMessage.listFromGqlResponse(raw);
     return _enrichMissingUserAvatars(messages);
@@ -34,7 +31,11 @@ class TwitchPinnedChatApiService {
   }) async {
     final cid = channelId.trim();
     if (cid.isEmpty) {
-      throw ArgumentError.value(channelId, 'channelId', 'channelId cannot be empty');
+      throw ArgumentError.value(
+        channelId,
+        'channelId',
+        'channelId cannot be empty',
+      );
     }
 
     final headers = await _headers();
@@ -50,7 +51,8 @@ class TwitchPinnedChatApiService {
         'extensions': <String, dynamic>{
           'persistedQuery': <String, dynamic>{
             'version': 1,
-            'sha256Hash': '2d099d4c9b6af80a07d8440140c4f3dbb04d516b35c401aab7ce8f60765308d5',
+            'sha256Hash':
+                '2d099d4c9b6af80a07d8440140c4f3dbb04d516b35c401aab7ce8f60765308d5',
           },
         },
       },
@@ -67,8 +69,12 @@ class TwitchPinnedChatApiService {
     for (final message in messages) {
       final sender = message.sender;
       final pinnedBy = message.pinnedBy;
-      if (sender != null && sender.profileImageUrl.trim().isEmpty) users.add(sender);
-      if (pinnedBy != null && pinnedBy.profileImageUrl.trim().isEmpty) users.add(pinnedBy);
+      if (sender != null && sender.profileImageUrl.trim().isEmpty) {
+        users.add(sender);
+      }
+      if (pinnedBy != null && pinnedBy.profileImageUrl.trim().isEmpty) {
+        users.add(pinnedBy);
+      }
     }
 
     if (users.isEmpty) return messages;
@@ -84,27 +90,34 @@ class TwitchPinnedChatApiService {
         final profile = await _fetchUserProfile(id: id, login: login);
         if (profile == null) continue;
         if (profile.id.isNotEmpty) profiles['id:${profile.id}'] = profile;
-        if (profile.login.isNotEmpty) profiles['login:${profile.login}'] = profile;
+        if (profile.login.isNotEmpty) {
+          profiles['login:${profile.login}'] = profile;
+        }
       } catch (_) {}
     }
 
     TwitchPinnedChatUser? enrich(TwitchPinnedChatUser? user) {
       if (user == null || user.profileImageUrl.trim().isNotEmpty) return user;
-      final profile = profiles['id:${user.id.trim()}'] ??
+      final profile =
+          profiles['id:${user.id.trim()}'] ??
           profiles['login:${user.login.trim().toLowerCase()}'];
       if (profile == null || profile.profileImageUrl.isEmpty) return user;
       return user.copyWith(
         login: user.login.trim().isNotEmpty ? user.login : profile.login,
-        displayName: user.displayName.trim().isNotEmpty ? user.displayName : profile.displayName,
+        displayName: user.displayName.trim().isNotEmpty
+            ? user.displayName
+            : profile.displayName,
         profileImageUrl: profile.profileImageUrl,
       );
     }
 
     return messages
-        .map((message) => message.copyWith(
-              sender: enrich(message.sender),
-              pinnedBy: enrich(message.pinnedBy),
-            ))
+        .map(
+          (message) => message.copyWith(
+            sender: enrich(message.sender),
+            pinnedBy: enrich(message.pinnedBy),
+          ),
+        )
         .toList(growable: false);
   }
 
@@ -172,7 +185,8 @@ class _PinnedUserProfile {
       id: json['id']?.toString().trim() ?? '',
       login: json['login']?.toString().trim().toLowerCase() ?? '',
       displayName: json['displayName']?.toString().trim() ?? '',
-      profileImageUrl: json['profileImageURL']?.toString().trim() ??
+      profileImageUrl:
+          json['profileImageURL']?.toString().trim() ??
           json['profileImageUrl']?.toString().trim() ??
           '',
     );

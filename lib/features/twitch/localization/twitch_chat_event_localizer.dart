@@ -55,13 +55,25 @@ class TwitchChatEventLocalizer {
       case TwitchChatSpecialMessageKind.resub:
         return _subMessage(message, tags, resub: true) ?? original;
       case TwitchChatSpecialMessageKind.subGift:
-        return _subGiftMessage(message, tags, anonymous: msgId.contains('anon')) ??
+        return _subGiftMessage(
+              message,
+              tags,
+              anonymous: msgId.contains('anon'),
+            ) ??
             original;
       case TwitchChatSpecialMessageKind.subMysteryGift:
-        return _subMysteryGiftMessage(message, tags, anonymous: msgId.contains('anon')) ??
+        return _subMysteryGiftMessage(
+              message,
+              tags,
+              anonymous: msgId.contains('anon'),
+            ) ??
             original;
       case TwitchChatSpecialMessageKind.giftPaidUpgrade:
-        return _giftPaidUpgradeMessage(message, tags, anonymous: msgId.contains('anon')) ??
+        return _giftPaidUpgradeMessage(
+              message,
+              tags,
+              anonymous: msgId.contains('anon'),
+            ) ??
             original;
       case TwitchChatSpecialMessageKind.raid:
         return _raidMessage(message, tags) ?? original;
@@ -92,7 +104,9 @@ class TwitchChatEventLocalizer {
   static String? noticeMessage(TwitchChatRuntimeMessage message) {
     final msgId = message.metadata.msgId?.trim().toLowerCase() ?? '';
     final body = message.message.trim();
-    final fallback = body.isNotEmpty ? body : message.metadata.systemMessage?.trim();
+    final fallback = body.isNotEmpty
+        ? body
+        : message.metadata.systemMessage?.trim();
 
     switch (msgId) {
       case 'subs_on':
@@ -131,7 +145,9 @@ class TwitchChatEventLocalizer {
       case 'host_off':
         return '已停止主持。';
       default:
-        return fallback == null || fallback.isEmpty ? null : _translateCommonNotice(fallback);
+        return fallback == null || fallback.isEmpty
+            ? null
+            : _translateCommonNotice(fallback);
     }
   }
 
@@ -156,7 +172,8 @@ class TwitchChatEventLocalizer {
     required bool resub,
   }) {
     final name = _displayName(message);
-    final months = _intTag(tags, 'msg-param-cumulative-months') ??
+    final months =
+        _intTag(tags, 'msg-param-cumulative-months') ??
         _intTag(tags, 'msg-param-months');
     final tier = _subscriptionTier(_tag(tags, 'msg-param-sub-plan'));
     if (resub) {
@@ -190,7 +207,8 @@ class TwitchChatEventLocalizer {
     required bool anonymous,
   }) {
     final sender = anonymous ? '匿名使用者' : _displayName(message);
-    final count = _intTag(tags, 'msg-param-mass-gift-count') ??
+    final count =
+        _intTag(tags, 'msg-param-mass-gift-count') ??
         _intTag(tags, 'msg-param-sender-count');
     final tier = _subscriptionTier(_tag(tags, 'msg-param-sub-plan'));
 
@@ -209,8 +227,8 @@ class TwitchChatEventLocalizer {
     final sender = anonymous
         ? '匿名贈訂者'
         : (_tag(tags, 'msg-param-sender-name').isNotEmpty
-            ? _tag(tags, 'msg-param-sender-name')
-            : '贈訂者');
+              ? _tag(tags, 'msg-param-sender-name')
+              : '贈訂者');
     return '$name 延續了來自 $sender 的贈訂。';
   }
 
@@ -219,7 +237,8 @@ class TwitchChatEventLocalizer {
     Map<String, String> tags,
   ) {
     final name = _displayName(message);
-    final viewers = _intTag(tags, 'msg-param-viewerCount') ??
+    final viewers =
+        _intTag(tags, 'msg-param-viewerCount') ??
         _intTag(tags, 'msg-param-viewer-count');
     if (viewers != null && viewers > 0) {
       return '$name 帶著 $viewers 位觀眾揪團進來了。';

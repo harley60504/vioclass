@@ -19,7 +19,9 @@ class TwitchChatMessageContextBuilder {
         entries: <TwitchChatMessageContextEntry>[
           TwitchChatMessageContextEntry(
             message: selectedMessage,
-            mentionedLogins: selectedRelations.mentionedLogins.toList(growable: false),
+            mentionedLogins: selectedRelations.mentionedLogins.toList(
+              growable: false,
+            ),
             replyTargetLogin: selectedRelations.replyTargetLogin,
           ),
         ],
@@ -33,7 +35,9 @@ class TwitchChatMessageContextBuilder {
     }
 
     final selectedKey = selectedMessage.id;
-    final selectedIndex = indexed.indexWhere((item) => item.message.id == selectedKey);
+    final selectedIndex = indexed.indexWhere(
+      (item) => item.message.id == selectedKey,
+    );
     if (selectedIndex < 0) {
       return TwitchChatMessageContextGroup(
         selectedMessage: selectedMessage,
@@ -41,7 +45,9 @@ class TwitchChatMessageContextBuilder {
         entries: <TwitchChatMessageContextEntry>[
           TwitchChatMessageContextEntry(
             message: selectedMessage,
-            mentionedLogins: selectedRelations.mentionedLogins.toList(growable: false),
+            mentionedLogins: selectedRelations.mentionedLogins.toList(
+              growable: false,
+            ),
             replyTargetLogin: selectedRelations.replyTargetLogin,
           ),
         ],
@@ -71,14 +77,18 @@ class TwitchChatMessageContextBuilder {
 
     final entries = indexed
         .where((relation) => selectedMessageIds.contains(relation.message.id))
-        .map((relation) => TwitchChatMessageContextEntry(
-              message: relation.message,
-              mentionedLogins: relation.mentionedLogins.toList(growable: false),
-              replyTargetLogin: relation.replyTargetLogin,
-            ))
+        .map(
+          (relation) => TwitchChatMessageContextEntry(
+            message: relation.message,
+            mentionedLogins: relation.mentionedLogins.toList(growable: false),
+            replyTargetLogin: relation.replyTargetLogin,
+          ),
+        )
         .toList(growable: false);
 
-    entries.sort((a, b) => a.message.receivedAt.compareTo(b.message.receivedAt));
+    entries.sort(
+      (a, b) => a.message.receivedAt.compareTo(b.message.receivedAt),
+    );
 
     return TwitchChatMessageContextGroup(
       selectedMessage: selectedMessage,
@@ -90,7 +100,9 @@ class TwitchChatMessageContextBuilder {
   _MessageRelation _relationsFor(TwitchChatRuntimeMessage message) {
     final author = _normalizeLogin(message.userLogin);
     final mentioned = _extractMentionedLogins(message.message);
-    final replyTarget = _normalizeLogin(message.metadata.replyInfo?.parentUserLogin);
+    final replyTarget = _normalizeLogin(
+      message.metadata.replyInfo?.parentUserLogin,
+    );
 
     final participants = <String>{};
     if (author != null) participants.add(author);
@@ -149,5 +161,6 @@ class _MessageRelation {
     required this.replyTargetLogin,
   });
 
-  bool get hasRelation => mentionedLogins.isNotEmpty || replyTargetLogin != null;
+  bool get hasRelation =>
+      mentionedLogins.isNotEmpty || replyTargetLogin != null;
 }

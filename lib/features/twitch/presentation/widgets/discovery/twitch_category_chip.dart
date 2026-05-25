@@ -26,13 +26,13 @@ class TwitchCategoryChip extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: selected
-                ? const Color(0xFF9146FF).withOpacity(0.20)
+                ? const Color(0xFF9146FF).withValues(alpha: 0.20)
                 : const Color(0xFF18181B),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF9146FF).withOpacity(0.65)
-                  : Colors.white.withOpacity(0.08),
+                  ? const Color(0xFF9146FF).withValues(alpha: 0.65)
+                  : Colors.white.withValues(alpha: 0.08),
             ),
           ),
           child: Column(
@@ -46,7 +46,7 @@ class TwitchCategoryChip extends StatelessWidget {
                           game.boxArt(width: 188, height: 250),
                           fit: BoxFit.cover,
                           width: double.infinity,
-                          errorBuilder: (_, __, ___) =>
+                          errorBuilder: (_, _, _) =>
                               const ColoredBox(color: Color(0xFF242429)),
                         ),
                 ),

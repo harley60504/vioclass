@@ -66,7 +66,8 @@ class TwitchApiRouter {
   }
 
   TwitchWebGqlPersistedApiService? get viewerWebGql => _viewerWebGql;
-  TwitchChannelPointsApiService? get viewerChannelPoints => _viewerChannelPoints;
+  TwitchChannelPointsApiService? get viewerChannelPoints =>
+      _viewerChannelPoints;
   TwitchPredictionApiService? get viewerPrediction => _viewerPrediction;
 
   /// Old public name kept for call sites that still ask the router for the
@@ -98,9 +99,7 @@ class TwitchApiRouter {
     return channelPointsActions != null;
   }
 
-  void configureViewer({
-    required String oauthClientId,
-  }) {
+  void configureViewer({required String oauthClientId}) {
     final clientId = oauthClientId.trim();
 
     if (clientId.isEmpty || accessTokenProvider == null) {
@@ -142,8 +141,8 @@ class TwitchApiRouter {
       'channelPointsActionSource': _dropsChannelPoints != null
           ? 'dropsTokenProvider'
           : _viewerChannelPoints != null
-              ? 'viewerOAuth'
-              : null,
+          ? 'viewerOAuth'
+          : null,
       'twitchAndroidClientIdConfigured':
           TwitchApiConstants.hasTwitchAndroidClientId,
       'rules': const <String, String>{

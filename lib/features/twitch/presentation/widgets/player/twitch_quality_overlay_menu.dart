@@ -30,7 +30,7 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xF218181B),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.white.withOpacity(0.10)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
           boxShadow: const [
             BoxShadow(
               color: Color(0x88000000),
@@ -47,13 +47,15 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
               height: 48,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFF2A2A2D)),
-                ),
+                border: Border(bottom: BorderSide(color: Color(0xFF2A2A2D))),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.high_quality_rounded, size: 19, color: Color(0xFFBF94FF)),
+                  const Icon(
+                    Icons.high_quality_rounded,
+                    size: 19,
+                    color: Color(0xFFBF94FF),
+                  ),
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
@@ -67,7 +69,11 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
                   IconButton(
                     tooltip: '關閉',
                     onPressed: onClose,
-                    icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 20),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
                   ),
                 ],
               ),
@@ -101,7 +107,8 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
                             for (final variant in group.variants)
                               _QualityRow(
                                 variant: variant,
-                                selected: identical(variant, currentVariant) ||
+                                selected:
+                                    identical(variant, currentVariant) ||
                                     variant.url == currentVariant?.url,
                                 busy: busy,
                                 onTap: () => onSelected(variant),
@@ -125,7 +132,8 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
     final other = <TwitchM3u8Variant>[];
 
     for (final variant in variants) {
-      final text = '${variant.name} ${variant.videoGroupId ?? ''}'.toLowerCase();
+      final text = '${variant.name} ${variant.videoGroupId ?? ''}'
+          .toLowerCase();
       final isSource = text.contains('source') || text.contains('chunked');
 
       if (variant.isAudioOnly) {
@@ -200,7 +208,9 @@ class _QualityRow extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              selected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
               color: selected ? const Color(0xFFBF94FF) : Colors.white38,
               size: 18,
             ),

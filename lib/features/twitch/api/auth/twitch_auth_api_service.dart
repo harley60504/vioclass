@@ -48,9 +48,7 @@ class TwitchAuthApiService {
   Future<TwitchTokenValidation> validateToken(String accessToken) async {
     final response = await client.getJson<Map<String, dynamic>>(
       TwitchApiConstants.oauthValidateUrl,
-      headers: <String, String>{
-        'Authorization': 'OAuth ${accessToken.trim()}',
-      },
+      headers: <String, String>{'Authorization': 'OAuth ${accessToken.trim()}'},
     );
 
     final validation = TwitchTokenValidation.fromJson(response);

@@ -10,11 +10,7 @@ class AndroidPipButton extends StatefulWidget {
   final bool dense;
   final double size;
 
-  const AndroidPipButton({
-    super.key,
-    this.dense = false,
-    this.size = 23,
-  });
+  const AndroidPipButton({super.key, this.dense = false, this.size = 23});
 
   @override
   State<AndroidPipButton> createState() => _AndroidPipButtonState();
@@ -47,9 +43,9 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
       aspectRatioHeight: 9,
     );
     if (!entered && mounted) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        const SnackBar(content: Text('目前裝置不支援子母畫面')),
-      );
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援子母畫面')));
     }
   }
 

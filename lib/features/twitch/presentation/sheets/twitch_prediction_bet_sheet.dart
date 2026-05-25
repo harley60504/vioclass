@@ -12,7 +12,8 @@ import 'prediction_bet/twitch_prediction_bet_sheet_widgets.dart';
 Future<void> showTwitchPredictionBetSheet({
   required BuildContext context,
   required TwitchPredictionSnapshot prediction,
-  required Future<void> Function(TwitchPredictionOutcome outcome, int points) onBet,
+  required Future<void> Function(TwitchPredictionOutcome outcome, int points)
+  onBet,
   Future<TwitchPredictionSnapshot?> Function()? onRefreshPrediction,
 }) {
   TwitchPredictionHermesRealtimeBus.publishPrediction(prediction);
@@ -30,7 +31,8 @@ Future<void> showTwitchPredictionBetSheet({
 
 class TwitchPredictionBetSheet extends StatefulWidget {
   final TwitchPredictionSnapshot prediction;
-  final Future<void> Function(TwitchPredictionOutcome outcome, int points) onBet;
+  final Future<void> Function(TwitchPredictionOutcome outcome, int points)
+  onBet;
   final Future<TwitchPredictionSnapshot?> Function()? onRefreshPrediction;
 
   const TwitchPredictionBetSheet({
@@ -41,11 +43,14 @@ class TwitchPredictionBetSheet extends StatefulWidget {
   });
 
   @override
-  State<TwitchPredictionBetSheet> createState() => _TwitchPredictionBetSheetState();
+  State<TwitchPredictionBetSheet> createState() =>
+      _TwitchPredictionBetSheetState();
 }
 
 class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
-  final TextEditingController _pointsController = TextEditingController(text: '10');
+  final TextEditingController _pointsController = TextEditingController(
+    text: '10',
+  );
 
   StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
   Timer? _countdownTimer;
@@ -63,25 +68,28 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     super.initState();
     _visiblePrediction = _bestInitialPrediction();
     _rememberViewerPredictionFrom(_visiblePrediction);
-    _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream.listen(
-      (prediction) {
-        if (!mounted || prediction == null || !prediction.hasPrediction) return;
-        if (!_samePredictionFamily(_visiblePrediction, prediction)) return;
-        setState(() {
-          _visiblePrediction = _mergeIncomingPrediction(prediction);
+    _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream
+        .listen((prediction) {
+          if (!mounted || prediction == null || !prediction.hasPrediction) {
+            return;
+          }
+          if (!_samePredictionFamily(_visiblePrediction, prediction)) return;
+          setState(() {
+            _visiblePrediction = _mergeIncomingPrediction(prediction);
+          });
         });
-      },
-    );
     _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      final hasLiveTime = twitchPredictionEffectiveLocksAt(_visiblePrediction) != null ||
+      final hasLiveTime =
+          twitchPredictionEffectiveLocksAt(_visiblePrediction) != null ||
           _visiblePrediction.endedAt != null;
       if (hasLiveTime) setState(() {});
     });
     _gqlFallbackTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!mounted || _submitting || _refreshingGqlFallback) return;
       final status = _visiblePrediction.normalizedStatus;
-      final shouldRefresh = status == 'ACTIVE' ||
+      final shouldRefresh =
+          status == 'ACTIVE' ||
           status == 'OPEN' ||
           status.contains('LOCKED') ||
           status.contains('RESOLVE_PENDING') ||
@@ -192,13 +200,14 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     final helperText = !isActive
         ? '這個賭盤目前不能下注'
         : hasViewerChoice
-            ? '已下注「${viewerChoice?.title ?? viewerChoiceId}」，只能繼續加注同一邊，另一邊已鎖住'
-            : '選擇下方選項送出下注';
+        ? '已下注「${viewerChoice?.title ?? viewerChoiceId}」，只能繼續加注同一邊，另一邊已鎖住'
+        : '選擇下方選項送出下注';
 
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
         title: prediction.title.isEmpty ? '賭盤預測' : prediction.title,
-        subtitle: '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${twitchPredictionFormatCompact(totalPoints)} 點 · ${twitchPredictionFormatCompact(totalUsers)} 人${timeLabel == null ? '' : ' · $timeLabel'}',
+        subtitle:
+            '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${twitchPredictionFormatCompact(totalPoints)} 點 · ${twitchPredictionFormatCompact(totalUsers)} 人${timeLabel == null ? '' : ' · $timeLabel'}',
         icon: Icons.how_to_vote_rounded,
         showRefresh: false,
         child: Padding(
@@ -247,16 +256,17 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final outcome = prediction.outcomes[index];
-                    final outcomeIdentity = twitchPredictionOutcomeIdentity(outcome);
-                    final selectedByViewer = hasViewerChoice &&
+                    final outcomeIdentity = twitchPredictionOutcomeIdentity(
+                      outcome,
+                    );
+                    final selectedByViewer =
+                        hasViewerChoice &&
                         outcomeIdentity.isNotEmpty &&
                         outcomeIdentity == viewerChoiceId;
-                    final lockedByViewerChoice = isActive &&
-                        hasViewerChoice &&
-                        !selectedByViewer;
-                    final enabled = !_submitting &&
-                        isActive &&
-                        !lockedByViewerChoice;
+                    final lockedByViewerChoice =
+                        isActive && hasViewerChoice && !selectedByViewer;
+                    final enabled =
+                        !_submitting && isActive && !lockedByViewerChoice;
 
                     return TwitchPredictionOutcomeBetCard(
                       outcome: outcome,
@@ -278,7 +288,10 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     );
   }
 
-  Future<void> _submit(BuildContext context, TwitchPredictionOutcome outcome) async {
+  Future<void> _submit(
+    BuildContext context,
+    TwitchPredictionOutcome outcome,
+  ) async {
     final points = int.tryParse(_pointsController.text.trim()) ?? 0;
     if (points <= 0) return;
 
@@ -325,7 +338,8 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   Future<void> _refreshPredictionFromGqlFallback({
     bool showSyncIndicator = false,
   }) async {
-    final loader = widget.onRefreshPrediction ??
+    final loader =
+        widget.onRefreshPrediction ??
         TwitchPredictionApiService.refreshLastPredictionContext;
     if (_refreshingGqlFallback) return;
 

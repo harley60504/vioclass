@@ -78,13 +78,23 @@ class TwitchUserProfileApiService {
     }
 
     for (var start = 0; start < cleanIds.length; start += 100) {
-      final end = (start + 100) > cleanIds.length ? cleanIds.length : start + 100;
-      await fetchChunk(idChunk: cleanIds.sublist(start, end), loginChunk: const <String>[]);
+      final end = (start + 100) > cleanIds.length
+          ? cleanIds.length
+          : start + 100;
+      await fetchChunk(
+        idChunk: cleanIds.sublist(start, end),
+        loginChunk: const <String>[],
+      );
     }
 
     for (var start = 0; start < cleanLogins.length; start += 100) {
-      final end = (start + 100) > cleanLogins.length ? cleanLogins.length : start + 100;
-      await fetchChunk(idChunk: const <String>[], loginChunk: cleanLogins.sublist(start, end));
+      final end = (start + 100) > cleanLogins.length
+          ? cleanLogins.length
+          : start + 100;
+      await fetchChunk(
+        idChunk: const <String>[],
+        loginChunk: cleanLogins.sublist(start, end),
+      );
     }
 
     return TwitchUserProfileLookup(
@@ -98,14 +108,11 @@ class TwitchUserProfileLookup {
   final Map<String, TwitchUserProfile> byId;
   final Map<String, TwitchUserProfile> byLogin;
 
-  const TwitchUserProfileLookup({
-    required this.byId,
-    required this.byLogin,
-  });
+  const TwitchUserProfileLookup({required this.byId, required this.byLogin});
 
   const TwitchUserProfileLookup.empty()
-      : byId = const <String, TwitchUserProfile>{},
-        byLogin = const <String, TwitchUserProfile>{};
+    : byId = const <String, TwitchUserProfile>{},
+      byLogin = const <String, TwitchUserProfile>{};
 
   TwitchUserProfile? find({String? id, String? login}) {
     final cleanId = id?.trim() ?? '';
@@ -141,11 +148,13 @@ class TwitchUserProfile {
     return TwitchUserProfile(
       id: json['id']?.toString().trim() ?? '',
       login: json['login']?.toString().trim().toLowerCase() ?? '',
-      displayName: json['display_name']?.toString().trim() ??
+      displayName:
+          json['display_name']?.toString().trim() ??
           json['displayName']?.toString().trim() ??
           json['login']?.toString().trim() ??
           '',
-      profileImageUrl: json['profile_image_url']?.toString().trim() ??
+      profileImageUrl:
+          json['profile_image_url']?.toString().trim() ??
           json['profileImageUrl']?.toString().trim() ??
           '',
     );

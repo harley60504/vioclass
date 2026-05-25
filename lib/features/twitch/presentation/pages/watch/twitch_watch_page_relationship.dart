@@ -1,7 +1,12 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member
 
 extension _TwitchWatchPageRelationshipMethods on _TwitchWatchPageState {
-  Future<void> _runDeferredRelationshipStartup(int generation, String channel) async {
+  Future<void> _runDeferredRelationshipStartup(
+    int generation,
+    String channel,
+  ) async {
     try {
       await _refreshRelationshipStatus(channelLogin: channel);
     } finally {

@@ -80,9 +80,7 @@ class TwitchRecentMessagesApiService {
 
     final response = await client.getJson<Map<String, dynamic>>(
       uri.toString(),
-      headers: const <String, String>{
-        'Accept': 'application/json',
-      },
+      headers: const <String, String>{'Accept': 'application/json'},
     );
 
     final parsed = parser.parseMessagesField(

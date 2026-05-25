@@ -1,4 +1,6 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member
 
 extension _TwitchWatchPageUiMethods on _TwitchWatchPageState {
   Future<void> _enterMobileImmersiveByDefault() async {
@@ -22,6 +24,8 @@ extension _TwitchWatchPageUiMethods on _TwitchWatchPageState {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }

@@ -49,8 +49,8 @@ double twitchStreamCardGridMainAxisExtent(double viewportWidth) {
   final infoHeight = cardWidth < 330
       ? 174.0
       : cardWidth < 370
-          ? 164.0
-          : 154.0;
+      ? 164.0
+      : 154.0;
 
   return (thumbnailHeight + infoHeight).clamp(306.0, 392.0).toDouble();
 }
@@ -118,9 +118,9 @@ class TwitchStreamCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: <Color>[
-                          const Color(0xFF9146FF).withOpacity(0.0),
-                          const Color(0xFFBF94FF).withOpacity(0.70),
-                          const Color(0xFF9146FF).withOpacity(0.0),
+                          const Color(0xFF9146FF).withValues(alpha: 0.0),
+                          const Color(0xFFBF94FF).withValues(alpha: 0.70),
+                          const Color(0xFF9146FF).withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -129,10 +129,7 @@ class TwitchStreamCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _StreamThumbnail(
-                      stream: stream,
-                      colors: colors,
-                    ),
+                    _StreamThumbnail(stream: stream, colors: colors),
                     Expanded(
                       child: LayoutBuilder(
                         builder: (context, constraints) {
@@ -144,10 +141,7 @@ class TwitchStreamCard extends StatelessWidget {
                               13,
                               compact ? 9 : 12,
                             ),
-                            child: _StreamInfo(
-                              stream: stream,
-                              colors: colors,
-                            ),
+                            child: _StreamInfo(stream: stream, colors: colors),
                           );
                         },
                       ),
@@ -167,14 +161,14 @@ class _StreamThumbnail extends StatelessWidget {
   final TwitchLiveStream stream;
   final _StreamCardColors colors;
 
-  const _StreamThumbnail({
-    required this.stream,
-    required this.colors,
-  });
+  const _StreamThumbnail({required this.stream, required this.colors});
 
   @override
   Widget build(BuildContext context) {
-    final viewerCount = _readInt(stream, const <String>['viewerCount', 'viewer_count']);
+    final viewerCount = _readInt(stream, const <String>[
+      'viewerCount',
+      'viewer_count',
+    ]);
 
     return AspectRatio(
       aspectRatio: 16 / 9,
@@ -216,26 +210,19 @@ class _StreamThumbnail extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: <Color>[
-                      Colors.black.withOpacity(0.06),
-                      Colors.black.withOpacity(0.18),
-                      Colors.black.withOpacity(0.42),
+                      Colors.black.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.18),
+                      Colors.black.withValues(alpha: 0.42),
                     ],
                   ),
                 ),
               ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: _LiveBadge(colors: colors),
-              ),
+              Positioned(top: 8, left: 8, child: _LiveBadge(colors: colors)),
               if (viewerCount > 0)
                 Positioned(
                   right: 8,
                   bottom: 8,
-                  child: _ViewerBadge(
-                    viewerCount: viewerCount,
-                    colors: colors,
-                  ),
+                  child: _ViewerBadge(viewerCount: viewerCount, colors: colors),
                 ),
             ],
           );
@@ -257,10 +244,10 @@ class _LiveBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFE91916),
         borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFFE91916).withOpacity(0.48),
+            color: const Color(0xFFE91916).withValues(alpha: 0.48),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -283,22 +270,19 @@ class _ViewerBadge extends StatelessWidget {
   final int viewerCount;
   final _StreamCardColors colors;
 
-  const _ViewerBadge({
-    required this.viewerCount,
-    required this.colors,
-  });
+  const _ViewerBadge({required this.viewerCount, required this.colors});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.72),
+        color: Colors.black.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -320,29 +304,54 @@ class _StreamInfo extends StatelessWidget {
   final TwitchLiveStream stream;
   final _StreamCardColors colors;
 
-  const _StreamInfo({
-    required this.stream,
-    required this.colors,
-  });
+  const _StreamInfo({required this.stream, required this.colors});
 
   @override
   Widget build(BuildContext context) {
     final title = _readString(stream, const <String>['title']);
-    final gameName = _readString(stream, const <String>['gameName', 'game_name']);
-    final userName = _readString(stream, const <String>['userName', 'user_name', 'displayName']);
-    final userLogin = _readString(stream, const <String>['userLogin', 'user_login', 'channelLogin']);
-    final profileImageUrl = _readString(stream, const <String>['profileImageUrl', 'profile_image_url']);
+    final gameName = _readString(stream, const <String>[
+      'gameName',
+      'game_name',
+    ]);
+    final userName = _readString(stream, const <String>[
+      'userName',
+      'user_name',
+      'displayName',
+    ]);
+    final userLogin = _readString(stream, const <String>[
+      'userLogin',
+      'user_login',
+      'channelLogin',
+    ]);
+    final profileImageUrl = _readString(stream, const <String>[
+      'profileImageUrl',
+      'profile_image_url',
+    ]);
     final language = _readString(stream, const <String>['language']);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final height = constraints.maxHeight.isFinite ? constraints.maxHeight : 160.0;
+        final height = constraints.maxHeight.isFinite
+            ? constraints.maxHeight
+            : 160.0;
         final tight = height < 104;
         final compact = height < 124;
         final titleMaxLines = tight ? 1 : 2;
-        final titleFontSize = tight ? 12.1 : compact ? 12.6 : 13.2;
-        final gapAfterTitle = tight ? 4.0 : compact ? 5.0 : 8.0;
-        final gapAfterMeta = tight ? 5.0 : compact ? 6.0 : 10.0;
+        final titleFontSize = tight
+            ? 12.1
+            : compact
+            ? 12.6
+            : 13.2;
+        final gapAfterTitle = tight
+            ? 4.0
+            : compact
+            ? 5.0
+            : 8.0;
+        final gapAfterMeta = tight
+            ? 5.0
+            : compact
+            ? 6.0
+            : 10.0;
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,7 +367,7 @@ class _StreamInfo extends StatelessWidget {
                 fontWeight: FontWeight.w900,
                 shadows: <Shadow>[
                   Shadow(
-                    color: Colors.black.withOpacity(0.35),
+                    color: Colors.black.withValues(alpha: 0.35),
                     blurRadius: 8,
                   ),
                 ],
@@ -431,7 +440,7 @@ class _GameBadge extends StatelessWidget {
         border: Border.all(color: colors.gameBorder, width: 1.1),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFF9146FF).withOpacity(0.20),
+            color: const Color(0xFF9146FF).withValues(alpha: 0.20),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -523,11 +532,7 @@ class _StreamerFooter extends StatelessWidget {
 
     return Row(
       children: [
-        _Avatar(
-          imageUrl: profileImageUrl,
-          colors: colors,
-          size: avatarSize,
-        ),
+        _Avatar(imageUrl: profileImageUrl, colors: colors, size: avatarSize),
         const SizedBox(width: 9),
         Expanded(
           child: Column(
@@ -545,7 +550,9 @@ class _StreamerFooter extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              if (showLogin && login.isNotEmpty && login.toLowerCase() != displayName.toLowerCase()) ...[
+              if (showLogin &&
+                  login.isNotEmpty &&
+                  login.toLowerCase() != displayName.toLowerCase()) ...[
                 const SizedBox(height: 2),
                 Text(
                   login,
@@ -590,7 +597,7 @@ class _Avatar extends StatelessWidget {
         border: Border.all(color: colors.border),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFF9146FF).withOpacity(0.20),
+            color: const Color(0xFF9146FF).withValues(alpha: 0.20),
             blurRadius: 12,
           ),
         ],
@@ -647,20 +654,20 @@ class _StreamCardColors {
     const twitchPurple = Color(0xFF9146FF);
 
     return _StreamCardColors(
-      cardTop: const Color(0xFF23202D).withOpacity(0.98),
-      cardMiddle: const Color(0xFF191922).withOpacity(0.96),
-      cardBottom: const Color(0xFF15151C).withOpacity(0.98),
-      border: twitchPurple.withOpacity(0.24),
-      shadow: Colors.black.withOpacity(0.50),
-      purpleGlow: twitchPurple.withOpacity(0.20),
+      cardTop: const Color(0xFF23202D).withValues(alpha: 0.98),
+      cardMiddle: const Color(0xFF191922).withValues(alpha: 0.96),
+      cardBottom: const Color(0xFF15151C).withValues(alpha: 0.98),
+      border: twitchPurple.withValues(alpha: 0.24),
+      shadow: Colors.black.withValues(alpha: 0.50),
+      purpleGlow: twitchPurple.withValues(alpha: 0.20),
       thumbnailFallback: const Color(0xFF111116),
-      softFill: Colors.white.withOpacity(0.075),
+      softFill: Colors.white.withValues(alpha: 0.075),
       primaryText: Colors.white,
-      secondaryText: Colors.white.withOpacity(0.78),
-      mutedText: Colors.white.withOpacity(0.46),
+      secondaryText: Colors.white.withValues(alpha: 0.78),
+      mutedText: Colors.white.withValues(alpha: 0.46),
       accent: const Color(0xFFBF94FF),
-      gameBadge: twitchPurple.withOpacity(0.26),
-      gameBorder: twitchPurple.withOpacity(0.58),
+      gameBadge: twitchPurple.withValues(alpha: 0.26),
+      gameBorder: twitchPurple.withValues(alpha: 0.58),
       gameText: const Color(0xFFF0E7FF),
     );
   }
@@ -673,12 +680,22 @@ String _thumbnailUrl(
 }) {
   final dynamic value = stream;
 
-  for (final fn in <String>['thumbnail', 'getThumbnailUrl', 'thumbnailUrlFor']) {
+  for (final fn in <String>[
+    'thumbnail',
+    'getThumbnailUrl',
+    'thumbnailUrlFor',
+  ]) {
     try {
       final Object? url = switch (fn) {
         'thumbnail' => value.thumbnail(width: width, height: height),
-        'getThumbnailUrl' => value.getThumbnailUrl(width: width, height: height),
-        'thumbnailUrlFor' => value.thumbnailUrlFor(width: width, height: height),
+        'getThumbnailUrl' => value.getThumbnailUrl(
+          width: width,
+          height: height,
+        ),
+        'thumbnailUrlFor' => value.thumbnailUrlFor(
+          width: width,
+          height: height,
+        ),
         _ => null,
       };
       final text = url?.toString().trim() ?? '';
@@ -688,7 +705,10 @@ String _thumbnailUrl(
     }
   }
 
-  final raw = _readString(stream, const <String>['thumbnailUrl', 'thumbnail_url']);
+  final raw = _readString(stream, const <String>[
+    'thumbnailUrl',
+    'thumbnail_url',
+  ]);
   if (raw.isEmpty) return '';
 
   return raw

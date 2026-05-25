@@ -5,19 +5,14 @@ class TwitchStreamPage {
   final List<TwitchStream> streams;
   final String? cursor;
 
-  const TwitchStreamPage({
-    required this.streams,
-    required this.cursor,
-  });
+  const TwitchStreamPage({required this.streams, required this.cursor});
 }
 
 /// Stream feature API。
 class TwitchStreamApiService {
   final TwitchHelixApiService helix;
 
-  const TwitchStreamApiService({
-    required this.helix,
-  });
+  const TwitchStreamApiService({required this.helix});
 
   Future<TwitchStreamPage> getStreams({
     List<String> userLogins = const <String>[],
@@ -81,9 +76,9 @@ class TwitchStreamApiService {
 
     final streams = data is List
         ? data
-            .whereType<Map<String, dynamic>>()
-            .map(TwitchStream.fromHelixJson)
-            .toList(growable: false)
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchStream.fromHelixJson)
+              .toList(growable: false)
         : const <TwitchStream>[];
 
     String? cursor;
@@ -94,9 +89,6 @@ class TwitchStreamApiService {
       }
     }
 
-    return TwitchStreamPage(
-      streams: streams,
-      cursor: cursor,
-    );
+    return TwitchStreamPage(streams: streams, cursor: cursor);
   }
 }

@@ -52,10 +52,7 @@ class TwitchChatInputBar extends StatelessWidget {
       if (message.isEmpty) return;
 
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(
-          content: Text(message),
-          duration: const Duration(seconds: 3),
-        ),
+        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
       );
     }
   }
@@ -145,17 +142,17 @@ class _SelfDrawnInputField extends StatelessWidget {
         height: height,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.060),
+          color: Colors.white.withValues(alpha: 0.060),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: enabled
-                ? const Color(0xFFBF94FF).withOpacity(0.22)
-                : Colors.white.withOpacity(0.065),
+                ? const Color(0xFFBF94FF).withValues(alpha: 0.22)
+                : Colors.white.withValues(alpha: 0.065),
           ),
           boxShadow: enabled
               ? <BoxShadow>[
                   BoxShadow(
-                    color: const Color(0xFF9146FF).withOpacity(0.10),
+                    color: const Color(0xFF9146FF).withValues(alpha: 0.10),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -216,11 +213,11 @@ class _SelfDrawnSendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final foreground = enabled ? Colors.white : Colors.white38;
     final background = enabled
-        ? const Color(0xFF9146FF).withOpacity(0.38)
-        : Colors.white.withOpacity(0.070);
+        ? const Color(0xFF9146FF).withValues(alpha: 0.38)
+        : Colors.white.withValues(alpha: 0.070);
     final borderColor = enabled
-        ? const Color(0xFFBF94FF).withOpacity(0.46)
-        : Colors.white.withOpacity(0.085);
+        ? const Color(0xFFBF94FF).withValues(alpha: 0.46)
+        : Colors.white.withValues(alpha: 0.085);
 
     return Material(
       color: background,
@@ -240,7 +237,7 @@ class _SelfDrawnSendButton extends StatelessWidget {
             boxShadow: enabled
                 ? <BoxShadow>[
                     BoxShadow(
-                      color: const Color(0xFF9146FF).withOpacity(0.22),
+                      color: const Color(0xFF9146FF).withValues(alpha: 0.22),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -257,7 +254,11 @@ class _SelfDrawnSendButton extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.send_rounded, size: compact ? 16 : 18, color: foreground),
+                    Icon(
+                      Icons.send_rounded,
+                      size: compact ? 16 : 18,
+                      color: foreground,
+                    ),
                     if (!compact) ...[
                       const SizedBox(width: 7),
                       Text(

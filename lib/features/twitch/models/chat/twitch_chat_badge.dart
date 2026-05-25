@@ -31,7 +31,8 @@ class TwitchChatBadge {
       image2x: json['image2x']?.toString() ?? '',
       image4x: json['image4x']?.toString() ?? '',
       clickAction: json['clickAction']?.toString() ?? '',
-      clickUrl: json['clickURL']?.toString() ?? json['clickUrl']?.toString() ?? '',
+      clickUrl:
+          json['clickURL']?.toString() ?? json['clickUrl']?.toString() ?? '',
     );
   }
 
@@ -71,10 +72,7 @@ class TwitchBadgeCatalog {
 
   int get totalCount => globalBadges.length + channelBadges.length;
 
-  TwitchChatBadge? findBadge({
-    required String setId,
-    required String version,
-  }) {
+  TwitchChatBadge? findBadge({required String setId, required String version}) {
     final keySetId = setId.trim();
     final keyVersion = version.trim();
 
@@ -98,8 +96,14 @@ class TwitchBadgeCatalog {
       'globalBadgeCount': globalBadges.length,
       'channelBadgeCount': channelBadges.length,
       'totalCount': totalCount,
-      'globalBadgesPreview': globalBadges.take(10).map((badge) => badge.toJson()).toList(),
-      'channelBadgesPreview': channelBadges.take(10).map((badge) => badge.toJson()).toList(),
+      'globalBadgesPreview': globalBadges
+          .take(10)
+          .map((badge) => badge.toJson())
+          .toList(),
+      'channelBadgesPreview': channelBadges
+          .take(10)
+          .map((badge) => badge.toJson())
+          .toList(),
     };
   }
 }

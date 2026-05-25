@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../theme/twitch_ui_tokens.dart';
@@ -255,8 +255,9 @@ class _ShareSection extends StatelessWidget {
 
   String _watchStreakTitle(TwitchWatchStreakStatusStage251? status) {
     final count = status?.streakCount;
-    if (count != null && count > 0)
+    if (count != null && count > 0) {
       return 'Watch Streak $count${status!.unitLabel}';
+    }
     return 'Watch Streak';
   }
 
@@ -569,9 +570,9 @@ class _ErrorBox extends StatelessWidget {
       padding: const EdgeInsets.all(10),
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.redAccent.withOpacity(0.10),
+        color: Colors.redAccent.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.redAccent.withOpacity(0.22)),
+        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.22)),
       ),
       child: Text(
         text,

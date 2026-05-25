@@ -8,9 +8,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../models/engagement/twitch_prediction.dart';
 
-typedef TwitchHermesPredictionHandler = void Function(
-  TwitchPredictionSnapshot prediction,
-);
+typedef TwitchHermesPredictionHandler =
+    void Function(TwitchPredictionSnapshot prediction);
 
 typedef TwitchHermesBalanceHandler = void Function(int balance);
 typedef TwitchHermesStatusHandler = void Function(String status);
@@ -18,7 +17,8 @@ typedef TwitchHermesStatusHandler = void Function(String status);
 class TwitchPredictionHermesRealtimeBus {
   TwitchPredictionHermesRealtimeBus._();
 
-  static final StreamController<TwitchPredictionSnapshot?> _predictionController =
+  static final StreamController<TwitchPredictionSnapshot?>
+  _predictionController =
       StreamController<TwitchPredictionSnapshot?>.broadcast();
 
   static TwitchPredictionSnapshot? _latestPrediction;
@@ -57,12 +57,12 @@ class TwitchPredictionHermesGlobalRuntime {
     if (safeChannelId.isEmpty) return;
 
     final sameChannel = _channelId == safeChannelId;
-    final effectiveViewerUserId = incomingViewerUserId != null &&
-            incomingViewerUserId.isNotEmpty
+    final effectiveViewerUserId =
+        incomingViewerUserId != null && incomingViewerUserId.isNotEmpty
         ? incomingViewerUserId
         : sameChannel
-            ? _viewerUserId
-            : null;
+        ? _viewerUserId
+        : null;
     final sameViewer = (_viewerUserId ?? '') == (effectiveViewerUserId ?? '');
 
     if (sameChannel && sameViewer && _runtime.connected) {
@@ -73,7 +73,8 @@ class TwitchPredictionHermesGlobalRuntime {
     }
 
     _channelId = safeChannelId;
-    _viewerUserId = effectiveViewerUserId == null || effectiveViewerUserId.isEmpty
+    _viewerUserId =
+        effectiveViewerUserId == null || effectiveViewerUserId.isEmpty
         ? null
         : effectiveViewerUserId;
 
@@ -128,7 +129,9 @@ class TwitchPredictionHermesRuntimeService {
     }
 
     final generation = ++_generation;
-    _viewerUserId = safeViewerId == null || safeViewerId.isEmpty ? null : safeViewerId;
+    _viewerUserId = safeViewerId == null || safeViewerId.isEmpty
+        ? null
+        : safeViewerId;
     _lastPrediction = previousPrediction;
     if (_lastPrediction != null && _lastPrediction!.hasPrediction) {
       TwitchPredictionHermesRealtimeBus.publishPrediction(_lastPrediction);
@@ -251,12 +254,18 @@ class TwitchPredictionHermesRuntimeService {
   void _handleSubscribeResponse(Map<dynamic, dynamic> decoded) {
     final response = decoded['subscribeResponse'];
     final subscription = response is Map ? response['subscription'] : null;
-    final subscriptionId = subscription is Map ? subscription['id']?.toString() : null;
-    final topic = subscriptionId == null ? null : _subscriptionTopics[subscriptionId];
+    final subscriptionId = subscription is Map
+        ? subscription['id']?.toString()
+        : null;
+    final topic = subscriptionId == null
+        ? null
+        : _subscriptionTopics[subscriptionId];
     final error = response is Map ? response['error']?.toString() : null;
 
     if (error != null && error.trim().isNotEmpty) {
-      _emitStatus('Hermes topic failed: ${topic ?? subscriptionId ?? '--'} · $error');
+      _emitStatus(
+        'Hermes topic failed: ${topic ?? subscriptionId ?? '--'} · $error',
+      );
       return;
     }
 
@@ -268,8 +277,12 @@ class TwitchPredictionHermesRuntimeService {
     if (notification is! Map) return;
 
     final subscription = notification['subscription'];
-    final subscriptionId = subscription is Map ? subscription['id']?.toString() : null;
-    final topic = subscriptionId == null ? null : _subscriptionTopics[subscriptionId];
+    final subscriptionId = subscription is Map
+        ? subscription['id']?.toString()
+        : null;
+    final topic = subscriptionId == null
+        ? null
+        : _subscriptionTopics[subscriptionId];
 
     final pubsubText = notification['pubsub']?.toString();
     if (pubsubText == null || pubsubText.trim().isEmpty) return;
@@ -295,8 +308,9 @@ class TwitchPredictionHermesRuntimeService {
       }
     }
 
-    final isChannelPredictionTopic =
-        lowerTopic.contains('predictions-channel-v1');
+    final isChannelPredictionTopic = lowerTopic.contains(
+      'predictions-channel-v1',
+    );
     final isUserPredictionTopic = lowerTopic.contains('predictions-user-v1');
     if (isChannelPredictionTopic ||
         isUserPredictionTopic ||
@@ -323,7 +337,8 @@ class TwitchPredictionHermesRuntimeService {
       );
       final base = _lastPrediction;
       if (viewerPrediction != null && base != null && base.hasPrediction) {
-        final sameEvent = viewerPrediction.eventId == null ||
+        final sameEvent =
+            viewerPrediction.eventId == null ||
             viewerPrediction.eventId!.trim().isEmpty ||
             base.id.trim().isEmpty ||
             viewerPrediction.eventId!.trim() == base.id.trim();
@@ -391,7 +406,9 @@ class TwitchPredictionHermesRuntimeService {
         type == 'prediction-result';
   }
 
-  Map<String, dynamic>? _normalizePredictionPayload(Map<dynamic, dynamic> payload) {
+  Map<String, dynamic>? _normalizePredictionPayload(
+    Map<dynamic, dynamic> payload,
+  ) {
     final root = payload.map((key, value) => MapEntry(key.toString(), value));
     final type = root['type']?.toString().trim().toLowerCase() ?? '';
     if (type == 'event-updated') return root;
@@ -506,7 +523,8 @@ class TwitchPredictionHermesRuntimeService {
           _readNested(map['predictionOption'], 'id') ??
           _readNested(map['prediction_option'], 'id'),
     );
-    final points = _readInt(
+    final points =
+        _readInt(
           map['points'] ??
               map['channel_points_used'] ??
               map['channelPointsUsed'] ??
@@ -545,7 +563,9 @@ class TwitchPredictionHermesRuntimeService {
     return null;
   }
 
-  _HermesViewerPrediction? _readViewerFromTopPredictors(Map<dynamic, dynamic> payload) {
+  _HermesViewerPrediction? _readViewerFromTopPredictors(
+    Map<dynamic, dynamic> payload,
+  ) {
     final viewerId = _viewerUserId?.trim();
     if (viewerId == null || viewerId.isEmpty) return null;
 
@@ -574,7 +594,8 @@ class TwitchPredictionHermesRuntimeService {
         );
         if (userId != viewerId) continue;
 
-        final points = _readInt(
+        final points =
+            _readInt(
               predictor['points'] ??
                   predictor['channel_points_used'] ??
                   predictor['channelPointsUsed'] ??
@@ -594,14 +615,16 @@ class TwitchPredictionHermesRuntimeService {
   Map<dynamic, dynamic>? _readEventMap(Map<dynamic, dynamic> payload) {
     final data = payload['data'];
     if (data is Map) {
-      final event = data['event'] ??
+      final event =
+          data['event'] ??
           data['prediction'] ??
           data['predictionEvent'] ??
           data['prediction_event'];
       if (event is Map) return event;
     }
 
-    final event = payload['event'] ??
+    final event =
+        payload['event'] ??
         payload['prediction'] ??
         payload['predictionEvent'] ??
         payload['prediction_event'];
@@ -618,14 +641,20 @@ class TwitchPredictionHermesRuntimeService {
     if (data is Map) {
       final balance = data['balance'];
       if (balance is Map) {
-        return _readInt(balance['balance'] ?? balance['value'] ?? balance['amount']);
+        return _readInt(
+          balance['balance'] ?? balance['value'] ?? balance['amount'],
+        );
       }
 
-      final direct = _readInt(data['balance'] ?? data['points'] ?? data['value']);
+      final direct = _readInt(
+        data['balance'] ?? data['points'] ?? data['value'],
+      );
       if (direct != null) return direct;
     }
 
-    return _readInt(payload['balance'] ?? payload['points'] ?? payload['value']);
+    return _readInt(
+      payload['balance'] ?? payload['points'] ?? payload['value'],
+    );
   }
 
   String? _readString(Object? value) {

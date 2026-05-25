@@ -21,9 +21,11 @@ class TwitchChatSmallChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFF9146FF).withOpacity(0.22),
+        color: const Color(0xFF9146FF).withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.35)),
+        border: Border.all(
+          color: const Color(0xFF9146FF).withValues(alpha: 0.35),
+        ),
       ),
       child: Text(
         label,
@@ -40,10 +42,7 @@ class TwitchChatSmallChip extends StatelessWidget {
 class TwitchChatFirstMessageChip extends StatelessWidget {
   final TwitchChatMessageVisualMetrics metrics;
 
-  const TwitchChatFirstMessageChip({
-    super.key,
-    required this.metrics,
-  });
+  const TwitchChatFirstMessageChip({super.key, required this.metrics});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +51,9 @@ class TwitchChatFirstMessageChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: const Color(0xFFBF94FF).withOpacity(0.45)),
+        border: Border.all(
+          color: const Color(0xFFBF94FF).withValues(alpha: 0.45),
+        ),
       ),
       child: Text(
         '首聊',

@@ -51,11 +51,14 @@ class TwitchPinnedChatMessage {
 
   factory TwitchPinnedChatMessage.fromGqlNode(Map<String, dynamic> node) {
     final pinnedMessage = node['pinnedMessage'];
-    final pinnedMessageMap =
-        pinnedMessage is Map<String, dynamic> ? pinnedMessage : <String, dynamic>{};
+    final pinnedMessageMap = pinnedMessage is Map<String, dynamic>
+        ? pinnedMessage
+        : <String, dynamic>{};
 
     final content = pinnedMessageMap['content'];
-    final contentMap = content is Map<String, dynamic> ? content : <String, dynamic>{};
+    final contentMap = content is Map<String, dynamic>
+        ? content
+        : <String, dynamic>{};
 
     return TwitchPinnedChatMessage(
       pinId: node['id']?.toString() ?? '',
@@ -72,13 +75,17 @@ class TwitchPinnedChatMessage {
   }
 
   static List<TwitchPinnedChatMessage> listFromGqlResponse(Object? response) {
-    if (response is! Map<String, dynamic>) return const <TwitchPinnedChatMessage>[];
+    if (response is! Map<String, dynamic>) {
+      return const <TwitchPinnedChatMessage>[];
+    }
 
     final data = response['data'];
     if (data is! Map<String, dynamic>) return const <TwitchPinnedChatMessage>[];
 
     final channel = data['channel'];
-    if (channel is! Map<String, dynamic>) return const <TwitchPinnedChatMessage>[];
+    if (channel is! Map<String, dynamic>) {
+      return const <TwitchPinnedChatMessage>[];
+    }
 
     final pinnedChatMessages = channel['pinnedChatMessages'];
     if (pinnedChatMessages is! Map<String, dynamic>) {
@@ -93,7 +100,9 @@ class TwitchPinnedChatMessage {
         .map((edge) => edge['node'])
         .whereType<Map<String, dynamic>>()
         .map(TwitchPinnedChatMessage.fromGqlNode)
-        .where((message) => message.pinId.isNotEmpty || message.messageId.isNotEmpty)
+        .where(
+          (message) => message.pinId.isNotEmpty || message.messageId.isNotEmpty,
+        )
         .toList(growable: false);
   }
 
@@ -153,7 +162,8 @@ class TwitchPinnedChatUser {
     return TwitchPinnedChatUser(
       id: value['id']?.toString() ?? '',
       login: _readLogin(value),
-      displayName: value['displayName']?.toString() ??
+      displayName:
+          value['displayName']?.toString() ??
           value['display_name']?.toString() ??
           value['login']?.toString() ??
           '',
@@ -164,7 +174,8 @@ class TwitchPinnedChatUser {
   }
 
   static String _readLogin(Map<String, dynamic> value) {
-    final login = value['login'] ??
+    final login =
+        value['login'] ??
         value['name'] ??
         value['userLogin'] ??
         value['user_login'] ??
@@ -174,7 +185,8 @@ class TwitchPinnedChatUser {
   }
 
   static String _readProfileImageUrl(Map<String, dynamic> value) {
-    final direct = value['profileImageURL'] ??
+    final direct =
+        value['profileImageURL'] ??
         value['profileImageUrl'] ??
         value['profile_image_url'] ??
         value['avatarURL'] ??
@@ -185,7 +197,8 @@ class TwitchPinnedChatUser {
 
     final profileImage = value['profileImage'];
     if (profileImage is Map<String, dynamic>) {
-      final nested = profileImage['url'] ??
+      final nested =
+          profileImage['url'] ??
           profileImage['url1x'] ??
           profileImage['url2x'] ??
           profileImage['url4x'];
@@ -237,10 +250,6 @@ class TwitchPinnedChatBadge {
   }
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'id': id,
-      'setId': setId,
-      'version': version,
-    };
+    return <String, dynamic>{'id': id, 'setId': setId, 'version': version};
   }
 }

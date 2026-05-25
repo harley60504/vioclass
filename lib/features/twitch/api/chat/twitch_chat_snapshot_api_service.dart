@@ -82,17 +82,19 @@ class TwitchChatSnapshotApiService {
     final login = channelLogin.trim().toLowerCase();
 
     if (cid.isEmpty) {
-      throw ArgumentError.value(channelId, 'channelId', 'channelId cannot be empty');
+      throw ArgumentError.value(
+        channelId,
+        'channelId',
+        'channelId cannot be empty',
+      );
     }
 
     final operations = <TwitchPersistedGqlOperation>[
       TwitchPersistedGqlOperation(
         operationName: 'GetPinnedChat',
-        variables: <String, dynamic>{
-          'channelID': cid,
-          'count': 10,
-        },
-        sha256Hash: '2d099d4c9b6af80a07d8440140c4f3dbb04d516b35c401aab7ce8f60765308d5',
+        variables: <String, dynamic>{'channelID': cid, 'count': 10},
+        sha256Hash:
+            '2d099d4c9b6af80a07d8440140c4f3dbb04d516b35c401aab7ce8f60765308d5',
       ),
       TwitchPersistedGqlOperation(
         operationName: 'PaidPinnedChat',
@@ -101,7 +103,8 @@ class TwitchChatSnapshotApiService {
           'count': 25,
           'messageType': 'CHEER',
         },
-        sha256Hash: '888056ddc92e62a7d2fd7a8e0afae5d61fab767ba621ed1006ba8628f6de8e41',
+        sha256Hash:
+            '888056ddc92e62a7d2fd7a8e0afae5d61fab767ba621ed1006ba8628f6de8e41',
       ),
       TwitchPersistedGqlOperation(
         operationName: 'RewardList',
@@ -109,42 +112,39 @@ class TwitchChatSnapshotApiService {
           'shouldIncludeAllSuspendedStreaks': false,
           'channelID': cid,
         },
-        sha256Hash: '0b1471876d7647993731b9e3c6a13bf304c67fb31d07f06a945d42286ee377c4',
+        sha256Hash:
+            '0b1471876d7647993731b9e3c6a13bf304c67fb31d07f06a945d42286ee377c4',
       ),
       TwitchPersistedGqlOperation(
         operationName: 'ChannelLeaderboards',
-        variables: <String, dynamic>{
-          'first': 10,
-          'channelID': cid,
-        },
-        sha256Hash: 'c7cd5116534e0bf47c324dc0ea6f28a3dfb4f429e3d3b274a30f386ea62973e1',
+        variables: <String, dynamic>{'first': 10, 'channelID': cid},
+        sha256Hash:
+            'c7cd5116534e0bf47c324dc0ea6f28a3dfb4f429e3d3b274a30f386ea62973e1',
       ),
       TwitchPersistedGqlOperation(
         operationName: 'ChatInput_Badges',
         variables: const <String, dynamic>{},
-        sha256Hash: '8cb0eae66555ad6dc76aaa111d191ea6174c743f996d506f530e479f28e6b37c',
+        sha256Hash:
+            '8cb0eae66555ad6dc76aaa111d191ea6174c743f996d506f530e479f28e6b37c',
       ),
       TwitchPersistedGqlOperation(
         operationName: 'BitsEmotesData',
-        variables: <String, dynamic>{
-          'channelOwnerID': cid,
-        },
-        sha256Hash: '20807fd5ba85eac178d3f4db4679a346b3c8058057f9255c50a66fb524c60dee',
+        variables: <String, dynamic>{'channelOwnerID': cid},
+        sha256Hash:
+            '20807fd5ba85eac178d3f4db4679a346b3c8058057f9255c50a66fb524c60dee',
       ),
       TwitchPersistedGqlOperation(
         operationName: 'SharedChatSession',
-        variables: <String, dynamic>{
-          'channelID': cid,
-        },
-        sha256Hash: '0ff9562b30cfa2b41ab1738485ced6f8f1e725a93abe732c396be5f4f1d13694',
+        variables: <String, dynamic>{'channelID': cid},
+        sha256Hash:
+            '0ff9562b30cfa2b41ab1738485ced6f8f1e725a93abe732c396be5f4f1d13694',
       ),
       if (login.isNotEmpty)
         TwitchPersistedGqlOperation(
           operationName: 'GetHypeTrainExecution',
-          variables: <String, dynamic>{
-            'userLogin': login,
-          },
-          sha256Hash: '086b4f88754c8270672b32069ff64695e5ee95c678fb7fe57bb027d12f8c83f7',
+          variables: <String, dynamic>{'userLogin': login},
+          sha256Hash:
+              '086b4f88754c8270672b32069ff64695e5ee95c678fb7fe57bb027d12f8c83f7',
         ),
       if (viewerId != null && viewerId.trim().isNotEmpty)
         TwitchPersistedGqlOperation(
@@ -153,7 +153,8 @@ class TwitchChatSnapshotApiService {
             'channelID': cid,
             'userID': viewerId.trim(),
           },
-          sha256Hash: '511b58faf547070bc95b7d32e7b5cdedf8c289a3aeabfc3c5d3ece2de01ae06f',
+          sha256Hash:
+              '511b58faf547070bc95b7d32e7b5cdedf8c289a3aeabfc3c5d3ece2de01ae06f',
         ),
     ];
 

@@ -29,7 +29,8 @@ class TwitchPinnedMessageBanner extends StatefulWidget {
   });
 
   @override
-  State<TwitchPinnedMessageBanner> createState() => _TwitchPinnedMessageBannerState();
+  State<TwitchPinnedMessageBanner> createState() =>
+      _TwitchPinnedMessageBannerState();
 }
 
 class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
@@ -57,12 +58,13 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
   @override
   Widget build(BuildContext context) {
     final senderUser = message.sender ?? message.pinnedBy;
-    final sender = _cleanName(senderUser?.displayName) ??
+    final sender =
+        _cleanName(senderUser?.displayName) ??
         _cleanName(widget.fallbackDisplayName) ??
         'Pinned';
     final pinnedBy = _cleanName(message.pinnedBy?.displayName);
-    final senderColor = _parseUserColor(senderUser?.chatColor) ??
-        TwitchUiColors.primarySoft;
+    final senderColor =
+        _parseUserColor(senderUser?.chatColor) ?? TwitchUiColors.primarySoft;
     final avatarUrl = _resolveAvatarUrl(senderUser);
     final metaText = pinnedBy == null || pinnedBy == sender
         ? 'PINNED MESSAGE'
@@ -86,8 +88,8 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(19),
-        splashColor: TwitchUiColors.primary.withOpacity(0.10),
-        highlightColor: TwitchUiColors.primary.withOpacity(0.06),
+        splashColor: TwitchUiColors.primary.withValues(alpha: 0.10),
+        highlightColor: TwitchUiColors.primary.withValues(alpha: 0.06),
         onTap: () => setState(() => _expanded = !_expanded),
         onLongPress: _copyPinnedMessage,
         child: Ink(
@@ -97,22 +99,21 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                const Color(0xFF241538).withOpacity(0.96),
-                const Color(0xFF15131D).withOpacity(0.98),
+                const Color(0xFF241538).withValues(alpha: 0.96),
+                const Color(0xFF15131D).withValues(alpha: 0.98),
               ],
             ),
             borderRadius: BorderRadius.circular(19),
-            border: Border.all(color: TwitchUiColors.primarySoft.withOpacity(0.28)),
+            border: Border.all(
+              color: TwitchUiColors.primarySoft.withValues(alpha: 0.28),
+            ),
           ),
           child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              10,
-              8 * scale,
-              10,
-              8 * scale,
-            ),
+            padding: EdgeInsets.fromLTRB(10, 8 * scale, 10, 8 * scale),
             child: Row(
-              crossAxisAlignment: _expanded ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+              crossAxisAlignment: _expanded
+                  ? CrossAxisAlignment.start
+                  : CrossAxisAlignment.center,
               children: [
                 TwitchUiAvatar(
                   imageUrl: avatarUrl,
@@ -133,10 +134,14 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                             height: pinBoxSize,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: TwitchUiColors.primary.withOpacity(0.18),
+                              color: TwitchUiColors.primary.withValues(
+                                alpha: 0.18,
+                              ),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: TwitchUiColors.primarySoft.withOpacity(0.28),
+                                color: TwitchUiColors.primarySoft.withValues(
+                                  alpha: 0.28,
+                                ),
                               ),
                             ),
                             child: Icon(
@@ -192,7 +197,9 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                         child: Text(
                           cleanText,
                           maxLines: _expanded ? 12 : 2,
-                          overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                          overflow: _expanded
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
                           style: TextStyle(
                             color: const Color(0xFFF5F0FF),
                             fontSize: bodyFontSize,
@@ -249,7 +256,9 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
 
     final fallbackLoginText = widget.fallbackLogin.trim().toLowerCase();
     final userLogin = user.login.trim().toLowerCase();
-    if (fallbackLoginText.isNotEmpty && userLogin == fallbackLoginText) return true;
+    if (fallbackLoginText.isNotEmpty && userLogin == fallbackLoginText) {
+      return true;
+    }
 
     final fallbackName = widget.fallbackDisplayName.trim().toLowerCase();
     final displayName = user.displayName.trim().toLowerCase();

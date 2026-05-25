@@ -34,8 +34,8 @@ class TwitchChatRuntime extends ChangeNotifier {
     this.maxMessages = 350,
     this.notifyDebounce = const Duration(milliseconds: 200),
   }) : _notifyBatcher = TwitchChatRuntimeNotifyBatcher(
-          interval: notifyDebounce,
-        );
+         interval: notifyDebounce,
+       );
 
   /// 手機上聊天室最怕無限制累積 + 每則訊息都重建。
   ///
@@ -127,8 +127,8 @@ class TwitchChatRuntime extends ChangeNotifier {
 
     _channelLogin = login;
     _viewerLogin = (viewerLogin ?? ircNick ?? '').trim().toLowerCase();
-    _viewerDisplayName =
-        (viewerDisplayName ?? viewerLogin ?? ircNick ?? '').trim();
+    _viewerDisplayName = (viewerDisplayName ?? viewerLogin ?? ircNick ?? '')
+        .trim();
     _viewerUserId = (viewerUserId ?? '').trim();
 
     _connecting = true;
@@ -150,10 +150,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     notifyListeners();
 
     if (preloadRecentMessages && recentMessagesApi != null) {
-      await _loadRecentMessages(
-        channelLogin: login,
-        limit: recentMessageLimit,
-      );
+      await _loadRecentMessages(channelLogin: login, limit: recentMessageLimit);
     }
 
     _messageSubscription = ircApi.messages.listen(
@@ -297,17 +294,15 @@ class TwitchChatRuntime extends ChangeNotifier {
           receivedAt: normalize.readMessageTimeOrNow(message),
         );
 
-        _appendRuntimeMessage(
-          runtimeMessage,
-          notify: false,
-        );
+        _appendRuntimeMessage(runtimeMessage, notify: false);
       }
 
       _recentMessageCount = result.messages.length;
       _recentParseIssueCount = result.issues.length;
 
       if (result.emptyMessageCount > 0 || result.issues.isNotEmpty) {
-        _error ??= 'Recent messages parsed with '
+        _error ??=
+            'Recent messages parsed with '
             '${result.emptyMessageCount} empty messages and '
             '${result.issues.length} parse issues. '
             'Open Recent Messages API debug to inspect raw items.';
@@ -350,10 +345,7 @@ class TwitchChatRuntime extends ChangeNotifier {
 
       case 'USERNOTICE':
         _appendRuntimeMessage(
-          normalizer.normalize(
-            message,
-            receivedAt: DateTime.now(),
-          ),
+          normalizer.normalize(message, receivedAt: DateTime.now()),
         );
         return;
     }
@@ -385,10 +377,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
 
     _appendRuntimeMessage(
-      normalizer.normalize(
-        message,
-        receivedAt: DateTime.now(),
-      ),
+      normalizer.normalize(message, receivedAt: DateTime.now()),
     );
   }
 
@@ -405,7 +394,8 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   void _handleClearMessage(TwitchChatMessage message) {
-    final targetId = message.tags['target-msg-id'] ??
+    final targetId =
+        message.tags['target-msg-id'] ??
         message.tags['target_msg_id'] ??
         message.tags['id'];
 
@@ -417,8 +407,8 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   void _handleClearChat(TwitchChatMessage message) {
-    final targetUserId = message.tags['target-user-id'] ??
-        message.tags['target_user_id'];
+    final targetUserId =
+        message.tags['target-user-id'] ?? message.tags['target_user_id'];
 
     if (targetUserId == null || targetUserId.trim().isEmpty) {
       _messages.clear();
@@ -436,7 +426,8 @@ class TwitchChatRuntime extends ChangeNotifier {
         ? message.message.trim()
         : (message.tags['login'] ?? targetUserId);
 
-    final duration = message.tags['ban-duration'] ?? message.tags['ban_duration'];
+    final duration =
+        message.tags['ban-duration'] ?? message.tags['ban_duration'];
     if (duration != null && duration.isNotEmpty) {
       _appendSystemMessage('$targetUser was timed out for ${duration}s.');
     } else {
@@ -487,13 +478,9 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   void _rejectNewestPending(TwitchChatMessage noticeMessage) {
-    _PendingOutgoingChatMessage? pending;
-
-    for (var index = _pendingOutgoingMessages.length - 1; index >= 0; index -= 1) {
-      final item = _pendingOutgoingMessages[index];
-      pending = item;
-      break;
-    }
+    final pending = _pendingOutgoingMessages.isEmpty
+        ? null
+        : _pendingOutgoingMessages.last;
 
     final reason = noticeMessage.message.trim().isNotEmpty
         ? noticeMessage.message.trim()
@@ -589,17 +576,13 @@ class TwitchChatRuntime extends ChangeNotifier {
       throw StateError('聊天室尚未連線，不能送出訊息。');
     }
 
-    final text = message
-        .replaceAll(RegExp(r'[\r\n]+'), ' ')
-        .trim();
+    final text = message.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
 
     if (text.isEmpty) {
       throw ArgumentError.value(message, 'message', 'message cannot be empty');
     }
 
-    await _sendIrcApi.waitForCurrentUserState(
-      timeout: sendUserStateWait,
-    );
+    await _sendIrcApi.waitForCurrentUserState(timeout: sendUserStateWait);
 
     final pending = _PendingOutgoingChatMessage(
       text: text,
@@ -668,9 +651,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       },
     );
 
-    _appendRuntimeMessage(
-      normalizer.normalize(source, receivedAt: now),
-    );
+    _appendRuntimeMessage(normalizer.normalize(source, receivedAt: now));
   }
 
   Future<void> disconnect() async {

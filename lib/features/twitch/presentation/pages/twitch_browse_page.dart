@@ -59,30 +59,31 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
   int _refreshGeneration = 0;
 
-  static const List<Map<String, String>> languageFilters = <Map<String, String>>[
-    {'label': '全部語言', 'value': ''},
-    {'label': '中文 Chinese', 'value': 'zh'},
-    {'label': 'English', 'value': 'en'},
-    {'label': '日本語 Japanese', 'value': 'ja'},
-    {'label': '한국어 Korean', 'value': 'ko'},
-    {'label': 'Español Spanish', 'value': 'es'},
-    {'label': 'Português Portuguese', 'value': 'pt'},
-    {'label': 'Français French', 'value': 'fr'},
-    {'label': 'Deutsch German', 'value': 'de'},
-    {'label': 'Русский Russian', 'value': 'ru'},
-    {'label': 'Italiano Italian', 'value': 'it'},
-    {'label': 'Türkçe Turkish', 'value': 'tr'},
-    {'label': 'Polski Polish', 'value': 'pl'},
-    {'label': 'Nederlands Dutch', 'value': 'nl'},
-    {'label': 'Svenska Swedish', 'value': 'sv'},
-    {'label': 'Dansk Danish', 'value': 'da'},
-    {'label': 'Suomi Finnish', 'value': 'fi'},
-    {'label': 'ไทย Thai', 'value': 'th'},
-    {'label': 'Tiếng Việt Vietnamese', 'value': 'vi'},
-    {'label': 'Bahasa Indonesia Indonesian', 'value': 'id'},
-    {'label': 'العربية Arabic', 'value': 'ar'},
-    {'label': 'हिन्दी Hindi', 'value': 'hi'},
-  ];
+  static const List<Map<String, String>> languageFilters =
+      <Map<String, String>>[
+        {'label': '全部語言', 'value': ''},
+        {'label': '中文 Chinese', 'value': 'zh'},
+        {'label': 'English', 'value': 'en'},
+        {'label': '日本語 Japanese', 'value': 'ja'},
+        {'label': '한국어 Korean', 'value': 'ko'},
+        {'label': 'Español Spanish', 'value': 'es'},
+        {'label': 'Português Portuguese', 'value': 'pt'},
+        {'label': 'Français French', 'value': 'fr'},
+        {'label': 'Deutsch German', 'value': 'de'},
+        {'label': 'Русский Russian', 'value': 'ru'},
+        {'label': 'Italiano Italian', 'value': 'it'},
+        {'label': 'Türkçe Turkish', 'value': 'tr'},
+        {'label': 'Polski Polish', 'value': 'pl'},
+        {'label': 'Nederlands Dutch', 'value': 'nl'},
+        {'label': 'Svenska Swedish', 'value': 'sv'},
+        {'label': 'Dansk Danish', 'value': 'da'},
+        {'label': 'Suomi Finnish', 'value': 'fi'},
+        {'label': 'ไทย Thai', 'value': 'th'},
+        {'label': 'Tiếng Việt Vietnamese', 'value': 'vi'},
+        {'label': 'Bahasa Indonesia Indonesian', 'value': 'id'},
+        {'label': 'العربية Arabic', 'value': 'ar'},
+        {'label': 'हिन्दी Hindi', 'value': 'hi'},
+      ];
 
   @override
   void initState() {
@@ -144,7 +145,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     try {
       final refreshed = await _fetchRefreshedStreamWindow(
         targetCount: TwitchStreamRefreshReconciler.targetRefreshCount(
-          loadedCount: hadExistingStreams ? loadedStreams.length : _browsePageSize,
+          loadedCount: hadExistingStreams
+              ? loadedStreams.length
+              : _browsePageSize,
           pageSize: _browsePageSize,
         ),
       );
@@ -337,7 +340,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     if (missingLogins.isEmpty) return streams;
 
     try {
-      final profileImages = await widget.discoveryService.fetchProfileImagesForLogins(missingLogins);
+      final profileImages = await widget.discoveryService
+          .fetchProfileImagesForLogins(missingLogins);
       if (profileImages.isEmpty) return streams;
       return streams
           .map(
@@ -372,17 +376,19 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     final keyword = widget.searchText.trim().toLowerCase();
     if (keyword.isEmpty) return loadedStreams;
 
-    return loadedStreams.where((stream) {
-      final haystack = <String>[
-        stream.userName,
-        stream.userLogin,
-        stream.title,
-        stream.gameName,
-        stream.language,
-        ...stream.tags,
-      ].join(' ').toLowerCase();
-      return haystack.contains(keyword);
-    }).toList(growable: false);
+    return loadedStreams
+        .where((stream) {
+          final haystack = <String>[
+            stream.userName,
+            stream.userLogin,
+            stream.title,
+            stream.gameName,
+            stream.language,
+            ...stream.tags,
+          ].join(' ').toLowerCase();
+          return haystack.contains(keyword);
+        })
+        .toList(growable: false);
   }
 
   Future<void> showGameMenu(BuildContext context) async {
@@ -446,8 +452,11 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
             final filteredGames = lowerKeyword.isEmpty
                 ? games
                 : games
-                    .where((game) => game.name.toLowerCase().contains(lowerKeyword))
-                    .toList(growable: false);
+                      .where(
+                        (game) =>
+                            game.name.toLowerCase().contains(lowerKeyword),
+                      )
+                      .toList(growable: false);
             final items = <TwitchGameCategory?>[null, ...filteredGames];
 
             return Column(
@@ -498,7 +507,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                           vertical: 14,
                         ),
                       ),
-                      onChanged: (value) => setSheetState(() => keyword = value),
+                      onChanged: (value) =>
+                          setSheetState(() => keyword = value),
                     ),
                   ),
                 ),
@@ -507,7 +517,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                     builder: (context) {
                       if (loadingGames && games.isEmpty) {
                         return const Center(
-                          child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF9146FF),
+                          ),
                         );
                       }
 
@@ -534,7 +546,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                                 if (hasMoreGames) ...[
                                   const SizedBox(height: 12),
                                   OutlinedButton.icon(
-                                    onPressed: () => unawaited(requestMoreGames()),
+                                    onPressed: () =>
+                                        unawaited(requestMoreGames()),
                                     icon: const Icon(Icons.download_rounded),
                                     label: const Text('繼續載入更多分類再搜尋'),
                                   ),
@@ -551,18 +564,19 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                           final crossAxisCount = maxWidth >= 680
                               ? 4
                               : maxWidth >= 500
-                                  ? 3
-                                  : 2;
+                              ? 3
+                              : 2;
 
                           return GridView.builder(
                             controller: sheetScrollController,
                             padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 12,
-                              childAspectRatio: 0.78,
-                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 0.78,
+                                ),
                             itemCount: items.length + 1,
                             itemBuilder: (context, index) {
                               if (index >= items.length) {
@@ -577,7 +591,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                               return _GameCategoryGridTile(
                                 game: game,
                                 selected: selected,
-                                onTap: () => selectSheetGame(sheetContext, game),
+                                onTap: () =>
+                                    selectSheetGame(sheetContext, game),
                               );
                             },
                           );
@@ -591,7 +606,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF111116),
                     border: Border(
-                      top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
                     ),
                   ),
                   child: Row(
@@ -630,7 +647,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     if (loadingMoreGames) {
       return const Padding(
         padding: EdgeInsets.all(14),
-        child: Center(child: CircularProgressIndicator(color: Color(0xFF9146FF))),
+        child: Center(
+          child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+        ),
       );
     }
 
@@ -681,11 +700,14 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
             final lowerKeyword = keyword.trim().toLowerCase();
             final filteredLanguages = lowerKeyword.isEmpty
                 ? languageFilters
-                : languageFilters.where((item) {
-                    final label = item['label']?.toLowerCase() ?? '';
-                    final value = item['value']?.toLowerCase() ?? '';
-                    return label.contains(lowerKeyword) || value.contains(lowerKeyword);
-                  }).toList(growable: false);
+                : languageFilters
+                      .where((item) {
+                        final label = item['label']?.toLowerCase() ?? '';
+                        final value = item['value']?.toLowerCase() ?? '';
+                        return label.contains(lowerKeyword) ||
+                            value.contains(lowerKeyword);
+                      })
+                      .toList(growable: false);
 
             void selectLanguage(String value) {
               setState(() => currentLanguage = value);
@@ -736,8 +758,12 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         leading: Icon(
-                          selected ? Icons.check_circle_rounded : Icons.language_rounded,
-                          color: selected ? const Color(0xFF9146FF) : Colors.white54,
+                          selected
+                              ? Icons.check_circle_rounded
+                              : Icons.language_rounded,
+                          color: selected
+                              ? const Color(0xFF9146FF)
+                              : Colors.white54,
                         ),
                         title: Text(label),
                         subtitle: value.isEmpty ? null : Text(value),
@@ -751,7 +777,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF111116),
                     border: Border(
-                      top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
                     ),
                   ),
                   child: Row(
@@ -795,7 +823,10 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
     if (errorText != null && loadedStreams.isEmpty) {
       final message = errorText ?? '';
-      final needsLogin = message.contains('OAuth') || message.contains('登入') || message.contains('授權');
+      final needsLogin =
+          message.contains('OAuth') ||
+          message.contains('登入') ||
+          message.contains('授權');
       if (needsLogin) {
         return TwitchLoginRequiredView(
           statusText: message,
@@ -907,10 +938,14 @@ class _GameCategoryGridTile extends StatelessWidget {
                       ? Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF9146FF).withValues(alpha: 0.13),
+                            color: const Color(
+                              0xFF9146FF,
+                            ).withValues(alpha: 0.13),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(0xFF9146FF).withValues(alpha: 0.20),
+                              color: const Color(
+                                0xFF9146FF,
+                              ).withValues(alpha: 0.20),
                             ),
                           ),
                           child: const Icon(
@@ -926,7 +961,7 @@ class _GameCategoryGridTile extends StatelessWidget {
                             fit: BoxFit.cover,
                             cacheWidth: 188,
                             cacheHeight: 250,
-                            errorBuilder: (_, __, ___) {
+                            errorBuilder: (_, _, _) {
                               return Container(
                                 alignment: Alignment.center,
                                 color: Colors.black26,
@@ -960,7 +995,9 @@ class _GameCategoryGridTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: selected ? const Color(0xFFD8BFFF) : Colors.white,
+                          color: selected
+                              ? const Color(0xFFD8BFFF)
+                              : Colors.white,
                           fontSize: 13.2,
                           height: 1.12,
                           fontWeight: FontWeight.w900,

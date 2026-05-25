@@ -8,11 +8,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-typedef TwitchProgressiveGridItemBuilder<T> = Widget Function(
-  BuildContext context,
-  T item,
-  int index,
-);
+typedef TwitchProgressiveGridItemBuilder<T> =
+    Widget Function(BuildContext context, T item, int index);
 
 class TwitchProgressiveGridView<T> extends StatefulWidget {
   final List<T> items;
@@ -138,7 +135,8 @@ class _TwitchProgressiveGridViewState<T>
       itemBuilder: (context, index) {
         if (index >= visibleCount) {
           return TwitchProgressiveGridLoadMoreTile(
-            label: '${widget.loadMoreLabel} $visibleCount/${widget.items.length}',
+            label:
+                '${widget.loadMoreLabel} $visibleCount/${widget.items.length}',
             onTap: _loadMore,
           );
         }
@@ -172,7 +170,9 @@ class TwitchProgressiveGridLoadMoreTile extends StatelessWidget {
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFF9146FF).withOpacity(0.34)),
+            border: Border.all(
+              color: const Color(0xFF9146FF).withValues(alpha: 0.34),
+            ),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

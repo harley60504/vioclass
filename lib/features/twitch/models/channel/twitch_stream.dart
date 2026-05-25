@@ -53,10 +53,7 @@ class TwitchStream {
     );
   }
 
-  String getThumbnailUrl({
-    int width = 440,
-    int height = 248,
-  }) {
+  String getThumbnailUrl({int width = 440, int height = 248}) {
     return thumbnailUrl
         .replaceAll('{width}', width.toString())
         .replaceAll('{height}', height.toString());

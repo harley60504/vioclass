@@ -32,7 +32,9 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 2, bottom: 3),
       child: Text.rich(
-        TextSpan(children: _buildPreviewSpans(name: name, body: body)),
+        TextSpan(
+          children: _buildPreviewSpans(name: name, body: body),
+        ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         textAlign: TextAlign.left,
@@ -48,18 +50,18 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
     final cleanBody = body.trim();
 
     if (cleanName.isEmpty && cleanBody.isEmpty) {
-      return <InlineSpan>[
-        TextSpan(text: 'reply', style: _baseStyle()),
-      ];
+      return <InlineSpan>[TextSpan(text: 'reply', style: _baseStyle())];
     }
 
     final spans = <InlineSpan>[];
 
     if (cleanName.isNotEmpty) {
-      spans.add(TextSpan(
-        text: cleanBody.isEmpty ? cleanName : '$cleanName: ',
-        style: _nameStyle(),
-      ));
+      spans.add(
+        TextSpan(
+          text: cleanBody.isEmpty ? cleanName : '$cleanName: ',
+          style: _nameStyle(),
+        ),
+      );
     }
 
     if (cleanBody.isNotEmpty) {
@@ -74,25 +76,21 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
 
     for (final match in _mentionRegex.allMatches(text)) {
       if (match.start > cursor) {
-        spans.add(TextSpan(
-          text: text.substring(cursor, match.start),
-          style: _baseStyle(),
-        ));
+        spans.add(
+          TextSpan(
+            text: text.substring(cursor, match.start),
+            style: _baseStyle(),
+          ),
+        );
       }
 
-      spans.add(TextSpan(
-        text: match.group(0) ?? '',
-        style: _mentionStyle(),
-      ));
+      spans.add(TextSpan(text: match.group(0) ?? '', style: _mentionStyle()));
 
       cursor = match.end;
     }
 
     if (cursor < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(cursor),
-        style: _baseStyle(),
-      ));
+      spans.add(TextSpan(text: text.substring(cursor), style: _baseStyle()));
     }
   }
 

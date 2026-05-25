@@ -1,14 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-enum TwitchAppNotificationType {
-  info,
-  success,
-  warning,
-  error,
-}
+enum TwitchAppNotificationType { info, success, warning, error }
 
 @immutable
 class TwitchAppNotification {

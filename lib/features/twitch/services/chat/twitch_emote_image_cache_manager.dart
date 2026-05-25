@@ -28,7 +28,9 @@ class TwitchEmoteImageCacheManager {
     required bool staticVariant,
     required String url,
   }) {
-    final provider = providerLabel.trim().isEmpty ? 'emote' : providerLabel.trim();
+    final provider = providerLabel.trim().isEmpty
+        ? 'emote'
+        : providerLabel.trim();
     final cleanId = id.trim();
     final stableId = cleanId.isNotEmpty ? cleanId : name.trim().toLowerCase();
     return '$provider:$stableId:${staticVariant ? 'static' : 'animated'}:${url.trim()}';

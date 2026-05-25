@@ -138,7 +138,9 @@ class TwitchM3u8Parser {
       if (line.isEmpty) continue;
 
       if (line.startsWith('#EXT-X-MEDIA:')) {
-        final attrs = parseAttributeList(line.substring('#EXT-X-MEDIA:'.length));
+        final attrs = parseAttributeList(
+          line.substring('#EXT-X-MEDIA:'.length),
+        );
         final type = attrs['TYPE']?.toUpperCase();
         final groupId = attrs['GROUP-ID'];
         final name = attrs['NAME'];
@@ -153,7 +155,9 @@ class TwitchM3u8Parser {
       }
 
       if (line.startsWith('#EXT-X-STREAM-INF:')) {
-        pendingStreamAttributes = parseAttributeList(line.substring('#EXT-X-STREAM-INF:'.length));
+        pendingStreamAttributes = parseAttributeList(
+          line.substring('#EXT-X-STREAM-INF:'.length),
+        );
         continue;
       }
 
@@ -163,7 +167,9 @@ class TwitchM3u8Parser {
       if (attrs == null) continue;
       pendingStreamAttributes = null;
 
-      final absoluteUrl = masterUri == null ? line : masterUri.resolve(line).toString();
+      final absoluteUrl = masterUri == null
+          ? line
+          : masterUri.resolve(line).toString();
       final videoGroupId = attrs['VIDEO'];
       final audioGroupId = attrs['AUDIO'];
       final resolution = attrs['RESOLUTION'];
@@ -173,13 +179,19 @@ class TwitchM3u8Parser {
 
       final lowerVideoGroup = (videoGroupId ?? '').toLowerCase();
       final lowerUrl = absoluteUrl.toLowerCase();
-      final inferredAudioOnly = lowerVideoGroup.contains('audio') ||
+      final inferredAudioOnly =
+          lowerVideoGroup.contains('audio') ||
           lowerUrl.contains('audio_only') ||
-          (resolution == null && (videoGroupId == null || videoGroupId.isEmpty));
+          (resolution == null &&
+              (videoGroupId == null || videoGroupId.isEmpty));
 
       final name = _buildVariantName(
-        videoGroupName: videoGroupId == null ? null : videoGroupNames[videoGroupId],
-        audioGroupName: audioGroupId == null ? null : audioGroupNames[audioGroupId],
+        videoGroupName: videoGroupId == null
+            ? null
+            : videoGroupNames[videoGroupId],
+        audioGroupName: audioGroupId == null
+            ? null
+            : audioGroupNames[audioGroupId],
         videoGroupId: videoGroupId,
         resolution: resolution,
         frameRate: frameRate,
@@ -212,7 +224,8 @@ class TwitchM3u8Parser {
     var index = 0;
 
     while (index < text.length) {
-      while (index < text.length && (text[index] == ',' || text[index].trim().isEmpty)) {
+      while (index < text.length &&
+          (text[index] == ',' || text[index].trim().isEmpty)) {
         index++;
       }
       if (index >= text.length) break;

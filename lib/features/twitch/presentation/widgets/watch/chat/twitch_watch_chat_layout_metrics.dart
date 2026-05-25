@@ -34,8 +34,10 @@ class TwitchWatchChatLayoutMetrics {
     required MediaQueryData media,
   }) {
     final keyboardVisible = media.viewInsets.bottom > 0;
-    final verticalCompact = constraints.maxHeight < 520 ||
-        (media.orientation == Orientation.landscape && constraints.maxHeight < 620) ||
+    final verticalCompact =
+        constraints.maxHeight < 520 ||
+        (media.orientation == Orientation.landscape &&
+            constraints.maxHeight < 620) ||
         keyboardVisible;
     final ultraVerticalCompact = constraints.maxHeight < 410;
     final compactWidth = constraints.maxWidth < 300;
@@ -43,22 +45,22 @@ class TwitchWatchChatLayoutMetrics {
     final maxEngagementHeight = ultraVerticalCompact
         ? (constraints.maxHeight * 0.34).clamp(110.0, 180.0).toDouble()
         : verticalCompact
-            ? (constraints.maxHeight * 0.38).clamp(130.0, 230.0).toDouble()
-            : (constraints.maxHeight * 0.42).clamp(160.0, 320.0).toDouble();
+        ? (constraints.maxHeight * 0.38).clamp(130.0, 230.0).toDouble()
+        : (constraints.maxHeight * 0.42).clamp(160.0, 320.0).toDouble();
 
     final headerHeight = verticalCompact ? 42.0 : 54.0;
     final utilityBarHeight = (compactWidth || verticalCompact) ? 41.0 : 48.0;
     final inputBarHeight = verticalCompact ? 48.0 : 54.0;
     final fixedChromeHeight = headerHeight + utilityBarHeight + inputBarHeight;
     final minMessageListHeight = keyboardVisible ? 84.0 : 56.0;
-    final maxUsableEngagementHeight = (constraints.maxHeight -
-            fixedChromeHeight -
-            minMessageListHeight)
-        .clamp(0.0, maxEngagementHeight)
-        .toDouble();
+    final maxUsableEngagementHeight =
+        (constraints.maxHeight - fixedChromeHeight - minMessageListHeight)
+            .clamp(0.0, maxEngagementHeight)
+            .toDouble();
     final minScrollableEngagementHeight = verticalCompact ? 72.0 : 88.0;
     final hideOptionalEngagement =
-        keyboardVisible || maxUsableEngagementHeight < minScrollableEngagementHeight;
+        keyboardVisible ||
+        maxUsableEngagementHeight < minScrollableEngagementHeight;
 
     return TwitchWatchChatLayoutMetrics(
       keyboardVisible: keyboardVisible,

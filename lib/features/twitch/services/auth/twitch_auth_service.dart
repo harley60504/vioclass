@@ -21,9 +21,7 @@ class TwitchAuthService extends ChangeNotifier {
   String? _clientId;
   Future<TwitchAuthToken?>? _refreshInFlight;
 
-  TwitchAuthService({
-    required this.apiClient,
-  }) {
+  TwitchAuthService({required this.apiClient}) {
     deviceAuthApi = TwitchDeviceAuthApiService(client: apiClient);
     authApi = TwitchAuthApiService(client: apiClient);
   }
@@ -43,9 +41,7 @@ class TwitchAuthService extends ChangeNotifier {
   /// 讀取本機已保存 OAuth。
   ///
   /// 如果 access token 快過期或已過期，會嘗試用 refresh token 自動刷新。
-  Future<void> loadStoredSession({
-    bool refreshIfNeeded = true,
-  }) async {
+  Future<void> loadStoredSession({bool refreshIfNeeded = true}) async {
     final prefs = await SharedPreferences.getInstance();
 
     final rawToken = prefs.getString(tokenStorageKey);
@@ -101,9 +97,7 @@ class TwitchAuthService extends ChangeNotifier {
   /// - token 還有效：直接回傳
   /// - token 快過期 / 已過期：嘗試 refresh
   /// - refresh 失敗且舊 token 已過期：回傳 null
-  Future<String?> getValidAccessToken({
-    bool forceRefresh = false,
-  }) async {
+  Future<String?> getValidAccessToken({bool forceRefresh = false}) async {
     if (_token == null) {
       await loadStoredSession(refreshIfNeeded: false);
     }
@@ -113,7 +107,8 @@ class TwitchAuthService extends ChangeNotifier {
 
     if (current == null || current.accessToken.isEmpty) return null;
 
-    final shouldRefresh = forceRefresh || current.isExpired || current.expiresSoon;
+    final shouldRefresh =
+        forceRefresh || current.isExpired || current.expiresSoon;
 
     if (!shouldRefresh) {
       return current.accessToken;
@@ -177,10 +172,7 @@ class TwitchAuthService extends ChangeNotifier {
         refreshToken: refreshToken,
       );
 
-      await saveSession(
-        clientId: clientId,
-        token: refreshed,
-      );
+      await saveSession(clientId: clientId, token: refreshed);
 
       return refreshed;
     } catch (_) {

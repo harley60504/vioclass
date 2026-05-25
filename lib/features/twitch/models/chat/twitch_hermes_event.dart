@@ -47,8 +47,12 @@ class TwitchHermesEvent {
       final notification = decoded['notification'];
       if (notification is Map) {
         final subscription = notification['subscription'];
-        final subscriptionId = subscription is Map ? subscription['id']?.toString() : null;
-        topic = subscriptionId == null ? null : subscriptionTopicById[subscriptionId];
+        final subscriptionId = subscription is Map
+            ? subscription['id']?.toString()
+            : null;
+        topic = subscriptionId == null
+            ? null
+            : subscriptionTopicById[subscriptionId];
 
         final pubsub = notification['pubsub'];
         if (pubsub is String && pubsub.trim().isNotEmpty) {

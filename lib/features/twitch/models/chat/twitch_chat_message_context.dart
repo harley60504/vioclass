@@ -11,7 +11,8 @@ class TwitchChatMessageContextEntry {
     required this.replyTargetLogin,
   });
 
-  bool get hasRelation => mentionedLogins.isNotEmpty || replyTargetLogin != null;
+  bool get hasRelation =>
+      mentionedLogins.isNotEmpty || replyTargetLogin != null;
 }
 
 class TwitchChatMessageContextGroup {

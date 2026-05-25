@@ -53,7 +53,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
           Divider(
             height: 1,
             thickness: 1,
-            color: Colors.white.withOpacity(0.055),
+            color: Colors.white.withValues(alpha: 0.055),
           ),
           TwitchWatchChatUtilityBar(
             channelPoints: channelPoints,

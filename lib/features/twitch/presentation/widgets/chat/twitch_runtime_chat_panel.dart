@@ -60,9 +60,7 @@ class _TwitchRuntimeChatPanelState extends State<TwitchRuntimeChatPanel> {
     }
   }
 
-  void _scheduleAutoScroll({
-    required int messageCount,
-  }) {
+  void _scheduleAutoScroll({required int messageCount}) {
     if (messageCount == _lastMessageCount) return;
 
     final previousCount = _lastMessageCount;
@@ -122,12 +120,15 @@ class _TwitchRuntimeChatPanelState extends State<TwitchRuntimeChatPanel> {
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
-                  color: Colors.redAccent.withOpacity(0.14),
+                  color: Colors.redAccent.withValues(alpha: 0.14),
                   child: Text(
                     runtime.error.toString(),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               Expanded(
@@ -157,9 +158,7 @@ class _TwitchRuntimeChatPanelState extends State<TwitchRuntimeChatPanel> {
                                   ? '${message.receivedAt.microsecondsSinceEpoch}-$index'
                                   : message.id,
                             ),
-                            child: TwitchRuntimeMessageTile(
-                              message: message,
-                            ),
+                            child: TwitchRuntimeMessageTile(message: message),
                           );
                         },
                       ),
@@ -207,10 +206,7 @@ class _RuntimeChatHeader extends StatelessWidget {
   final TwitchChatRuntime runtime;
   final VoidCallback? onReconnect;
 
-  const _RuntimeChatHeader({
-    required this.runtime,
-    required this.onReconnect,
-  });
+  const _RuntimeChatHeader({required this.runtime, required this.onReconnect});
 
   @override
   Widget build(BuildContext context) {
@@ -219,9 +215,7 @@ class _RuntimeChatHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: const BoxDecoration(
         color: Color(0xFF18181B),
-        border: Border(
-          bottom: BorderSide(color: Color(0xFF2A2A2D)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFF2A2A2D))),
       ),
       child: Row(
         children: [
@@ -230,9 +224,7 @@ class _RuntimeChatHeader extends StatelessWidget {
           Expanded(
             child: Text(
               runtime.channelLogin.isEmpty ? '聊天室' : '#${runtime.channelLogin}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
           Text(

@@ -6,9 +6,7 @@ import '../../models/bootstrap/twitch_api_bootstrap.dart';
 class TwitchChannelRuntime extends ChangeNotifier {
   final TwitchApiBootstrapService bootstrapApi;
 
-  TwitchChannelRuntime({
-    required this.bootstrapApi,
-  });
+  TwitchChannelRuntime({required this.bootstrapApi});
 
   String _channelLogin = '';
   TwitchApiBootstrapSnapshot? _snapshot;
@@ -27,7 +25,11 @@ class TwitchChannelRuntime extends ChangeNotifier {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin cannot be empty',
+      );
     }
 
     _channelLogin = login;

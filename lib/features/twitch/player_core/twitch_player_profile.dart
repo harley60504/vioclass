@@ -209,7 +209,7 @@ class TwitchPlayerProfile {
       hwdec: hwdec ?? this.hwdec,
       androidAttachSurfaceAfterVideoParameters:
           androidAttachSurfaceAfterVideoParameters ??
-              this.androidAttachSurfaceAfterVideoParameters,
+          this.androidAttachSurfaceAfterVideoParameters,
       mpvOptions: mpvOptions ?? this.mpvOptions,
     );
   }

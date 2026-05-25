@@ -23,26 +23,34 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
   });
 
   @override
-  State<TwitchMediaKitVideoSurface> createState() => _TwitchMediaKitVideoSurfaceState();
+  State<TwitchMediaKitVideoSurface> createState() =>
+      _TwitchMediaKitVideoSurfaceState();
 }
 
-class _TwitchMediaKitVideoSurfaceState extends State<TwitchMediaKitVideoSurface> {
+class _TwitchMediaKitVideoSurfaceState
+    extends State<TwitchMediaKitVideoSurface> {
   final GlobalKey _videoSurfaceKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _reportSourceRectHint(),
+    );
   }
 
   @override
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _reportSourceRectHint(),
+    );
   }
 
   void _reportSourceRectHint() {
-    if (!mounted || !Platform.isAndroid || !widget.reportAndroidPipSourceRect) return;
+    if (!mounted || !Platform.isAndroid || !widget.reportAndroidPipSourceRect) {
+      return;
+    }
     final context = _videoSurfaceKey.currentContext;
     if (context == null) return;
     final renderObject = context.findRenderObject();
@@ -70,7 +78,9 @@ class _TwitchMediaKitVideoSurfaceState extends State<TwitchMediaKitVideoSurface>
           }
           width = width.clamp(1.0, maxWidth).toDouble();
           height = height.clamp(1.0, maxHeight).toDouble();
-          WidgetsBinding.instance.addPostFrameCallback((_) => _reportSourceRectHint());
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _reportSourceRectHint(),
+          );
 
           return Center(
             child: SizedBox(

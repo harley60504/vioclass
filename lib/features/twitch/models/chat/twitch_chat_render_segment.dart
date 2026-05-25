@@ -1,13 +1,7 @@
 import './twitch_chat_fragment.dart';
 import './twitch_chat_message.dart';
 
-enum TwitchChatRenderSegmentType {
-  text,
-  twitchEmote,
-  link,
-  emoji,
-  cheermote,
-}
+enum TwitchChatRenderSegmentType { text, twitchEmote, link, emoji, cheermote }
 
 class TwitchChatRenderSegment {
   final TwitchChatRenderSegmentType type;
@@ -82,7 +76,10 @@ class TwitchChatRenderSegment {
         final imageUrl = fragment.imageUrl;
         final emoteId = fragment.emoteId;
 
-        if (imageUrl != null && imageUrl.isNotEmpty && emoteId != null && emoteId.isNotEmpty) {
+        if (imageUrl != null &&
+            imageUrl.isNotEmpty &&
+            emoteId != null &&
+            emoteId.isNotEmpty) {
           output.add(
             TwitchChatRenderSegment.twitchEmote(
               content: fragment.text,
@@ -97,7 +94,10 @@ class TwitchChatRenderSegment {
         final imageUrl = fragment.imageUrl;
         final emoteId = fragment.emoteId;
 
-        if (imageUrl != null && imageUrl.isNotEmpty && emoteId != null && emoteId.isNotEmpty) {
+        if (imageUrl != null &&
+            imageUrl.isNotEmpty &&
+            emoteId != null &&
+            emoteId.isNotEmpty) {
           output.add(
             TwitchChatRenderSegment.twitchEmote(
               content: fragment.text.isEmpty ? emoteId : fragment.text,
@@ -120,12 +120,17 @@ class TwitchChatRenderSegment {
     if (text.isEmpty) return const <TwitchChatRenderSegment>[];
 
     final output = <TwitchChatRenderSegment>[];
-    final linkRegex = RegExp(r'(https?:\/\/[^\s]+|www\.[^\s]+)', caseSensitive: false);
+    final linkRegex = RegExp(
+      r'(https?:\/\/[^\s]+|www\.[^\s]+)',
+      caseSensitive: false,
+    );
     var cursor = 0;
 
     for (final match in linkRegex.allMatches(text)) {
       if (match.start > cursor) {
-        output.add(TwitchChatRenderSegment.text(text.substring(cursor, match.start)));
+        output.add(
+          TwitchChatRenderSegment.text(text.substring(cursor, match.start)),
+        );
       }
 
       output.add(TwitchChatRenderSegment.link(match.group(0)!));

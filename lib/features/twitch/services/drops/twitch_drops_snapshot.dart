@@ -19,8 +19,9 @@ class TwitchDropsSnapshot {
     final campaignsUser = _currentUser(campaignsResponse);
 
     final inventory = _asMap(inventoryUser?['inventory']);
-    final rawInventoryCampaigns =
-        _asList(inventory?['dropCampaignsInProgress']);
+    final rawInventoryCampaigns = _asList(
+      inventory?['dropCampaignsInProgress'],
+    );
     final rawActiveCampaigns = _asList(campaignsUser?['dropCampaigns']);
 
     final activeCampaigns = rawActiveCampaigns
@@ -42,7 +43,9 @@ class TwitchDropsSnapshot {
           .map((raw) {
             final campaign = TwitchDropCampaign.fromJson(raw);
             final active = activeById[campaign.id];
-            if (active == null || active.imageUrl.isEmpty || campaign.imageUrl.isNotEmpty) {
+            if (active == null ||
+                active.imageUrl.isEmpty ||
+                campaign.imageUrl.isNotEmpty) {
               return campaign;
             }
             return campaign.copyWith(imageUrl: active.imageUrl);
@@ -60,7 +63,9 @@ class TwitchDropsSnapshot {
   }
 
   List<TwitchDrop> get readyDrops {
-    return allDrops.where((drop) => drop.readyToCollect).toList(growable: false);
+    return allDrops
+        .where((drop) => drop.readyToCollect)
+        .toList(growable: false);
   }
 
   List<TwitchDrop> get watchingDrops {
@@ -113,8 +118,9 @@ class TwitchDropsSnapshot {
       'linkedCampaignCount': linkedCampaignCount,
       'unlinkedCampaignCount': unlinkedCampaignCount,
       'readyDrops': readyDrops.map((drop) => drop.toJson()).toList(),
-      'inventoryCampaigns':
-          inventoryCampaigns.map((campaign) => campaign.toJson()).toList(),
+      'inventoryCampaigns': inventoryCampaigns
+          .map((campaign) => campaign.toJson())
+          .toList(),
     };
   }
 
@@ -179,13 +185,15 @@ class TwitchDropCampaign {
     return campaign.copyWith(
       timeBasedDrops: drops
           .whereType<Map>()
-          .map((drop) => TwitchDrop.fromJson(
-                drop,
-                campaignId: campaign.id,
-                campaignName: campaign.name,
-                gameName: campaign.gameName,
-                accountConnected: campaign.isAccountConnected,
-              ))
+          .map(
+            (drop) => TwitchDrop.fromJson(
+              drop,
+              campaignId: campaign.id,
+              campaignName: campaign.name,
+              gameName: campaign.gameName,
+              accountConnected: campaign.isAccountConnected,
+            ),
+          )
           .where((drop) => drop.id.isNotEmpty)
           .toList(growable: false),
     );
@@ -407,10 +415,7 @@ class TwitchDropCampaignSummary {
   }
 }
 
-String _campaignDisplayImageUrl({
-  required Map raw,
-  required Map? game,
-}) {
+String _campaignDisplayImageUrl({required Map raw, required Map? game}) {
   return _firstNonEmptyString(<String>[
     _twitchImageUrl(_string(game?['boxArtURL']), width: 144, height: 192),
     _twitchImageUrl(_string(game?['boxArtUrl']), width: 144, height: 192),
@@ -423,11 +428,7 @@ String _campaignDisplayImageUrl({
   ]);
 }
 
-String _twitchImageUrl(
-  String raw, {
-  required int width,
-  required int height,
-}) {
+String _twitchImageUrl(String raw, {required int width, required int height}) {
   var text = raw.trim();
   if (text.isEmpty) return '';
   text = text.replaceAll('{width}', width.toString());

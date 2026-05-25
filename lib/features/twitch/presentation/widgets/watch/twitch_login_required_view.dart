@@ -27,7 +27,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFF18181B),
           borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
           boxShadow: const [
             BoxShadow(
               color: Color(0xAA000000),
@@ -43,7 +43,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
               width: 62,
               height: 62,
               decoration: BoxDecoration(
-                color: const Color(0xFF9146FF).withOpacity(0.16),
+                color: const Color(0xFF9146FF).withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
@@ -83,7 +83,10 @@ class TwitchLoginRequiredView extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF9146FF),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 14,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),
@@ -98,7 +101,10 @@ class TwitchLoginRequiredView extends StatelessWidget {
                 OutlinedButton.icon(
                   onPressed: loading ? null : onRetryPressed,
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(999),
                     ),

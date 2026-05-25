@@ -62,7 +62,8 @@ class TwitchChatMessageMetadata {
   factory TwitchChatMessageMetadata.fromMessage(TwitchChatMessage message) {
     final tags = message.tags;
     final reply = TwitchChatReplyInfo.fromTags(tags);
-    final sourceRoomId = tags['source-room-id'] ??
+    final sourceRoomId =
+        tags['source-room-id'] ??
         tags['shared-chat-room'] ??
         tags['source-broadcaster-id'];
     final bitsAmount = int.tryParse(tags['bits'] ?? '');

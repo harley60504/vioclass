@@ -79,9 +79,7 @@ class _TwitchSubscribeWebViewDialogBodyState
           padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
           decoration: const BoxDecoration(
             color: Color(0xFF0E0E10),
-            border: Border(
-              bottom: BorderSide(color: Color(0xFF2D2D35)),
-            ),
+            border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
           ),
           child: Row(
             children: [
@@ -96,8 +94,11 @@ class _TwitchSubscribeWebViewDialogBodyState
                 icon: const Icon(Icons.refresh, color: Colors.white70),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.star_rate_rounded,
-                  color: Color(0xFFBF94FF), size: 22),
+              const Icon(
+                Icons.star_rate_rounded,
+                color: Color(0xFFBF94FF),
+                size: 22,
+              ),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -146,7 +147,7 @@ class _TwitchSubscribeWebViewDialogBodyState
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            color: Colors.redAccent.withOpacity(0.14),
+            color: Colors.redAccent.withValues(alpha: 0.14),
             child: Text(
               _errorText!,
               maxLines: 2,
@@ -204,8 +205,7 @@ class _TwitchSubscribeWebViewDialogBodyState
               onReceivedError: (controller, request, error) {
                 if (!mounted) return;
                 setState(() {
-                  _errorText =
-                      '訂閱頁載入訊息：${error.description} (${error.type})';
+                  _errorText = '訂閱頁載入訊息：${error.description} (${error.type})';
                 });
               },
               onCreateWindow: (controller, createWindowAction) async {

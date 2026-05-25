@@ -18,7 +18,9 @@ class TwitchHypeTrainSnapshot {
   bool get hasActiveExecution => execution != null;
   bool get isApproaching => approaching != null;
 
-  factory TwitchHypeTrainSnapshot.fromGqlResponse(Map<String, dynamic> response) {
+  factory TwitchHypeTrainSnapshot.fromGqlResponse(
+    Map<String, dynamic> response,
+  ) {
     final data = _asMap(response['data']);
     final user = _asMap(data['user']);
     final channel = _asMap(user['channel']);
@@ -87,7 +89,8 @@ class TwitchHypeTrainExecution {
   factory TwitchHypeTrainExecution.fromJson(Map<String, dynamic> json) {
     return TwitchHypeTrainExecution(
       id: json['id']?.toString() ?? '',
-      status: json['status']?.toString() ??
+      status:
+          json['status']?.toString() ??
           json['state']?.toString() ??
           json['__typename']?.toString() ??
           '',
@@ -115,7 +118,9 @@ class TwitchHypeTrainExecution {
             json['totalAmount'],
       ),
       startedAt: _readDate(json['startedAt'] ?? json['startTime']),
-      expiresAt: _readDate(json['expiresAt'] ?? json['expirationTime'] ?? json['endsAt']),
+      expiresAt: _readDate(
+        json['expiresAt'] ?? json['expirationTime'] ?? json['endsAt'],
+      ),
       updatedAt: _readDate(json['updatedAt']),
       raw: json,
     );
@@ -163,10 +168,14 @@ class TwitchHypeTrainApproaching {
   factory TwitchHypeTrainApproaching.fromJson(Map<String, dynamic> json) {
     return TwitchHypeTrainApproaching(
       id: json['id']?.toString() ?? '',
-      progress: _readInt(json['progress'] ?? json['currentProgress'] ?? json['amount']),
+      progress: _readInt(
+        json['progress'] ?? json['currentProgress'] ?? json['amount'],
+      ),
       goal: _readInt(json['goal'] ?? json['target'] ?? json['levelGoal']),
       startedAt: _readDate(json['startedAt'] ?? json['startTime']),
-      expiresAt: _readDate(json['expiresAt'] ?? json['expirationTime'] ?? json['endsAt']),
+      expiresAt: _readDate(
+        json['expiresAt'] ?? json['expirationTime'] ?? json['endsAt'],
+      ),
       raw: json,
     );
   }

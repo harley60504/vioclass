@@ -17,7 +17,8 @@ class QualityButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PopupMenuButton<TwitchM3u8Variant>(
-      tooltip: '畫質：${currentVariant?.displayName ?? currentVariant?.name ?? '自動'}',
+      tooltip:
+          '畫質：${currentVariant?.displayName ?? currentVariant?.name ?? '自動'}',
       color: const Color(0xFF18181B),
       icon: const Icon(Icons.settings, color: Colors.white, size: 24),
       onSelected: onChanged,
@@ -32,7 +33,8 @@ class QualityButton extends StatelessWidget {
         }
 
         return variants.map((variant) {
-          final selected = variant.name == currentVariant?.name &&
+          final selected =
+              variant.name == currentVariant?.name &&
               variant.url == currentVariant?.url;
           return PopupMenuItem<TwitchM3u8Variant>(
             value: variant,
@@ -41,13 +43,19 @@ class QualityButton extends StatelessWidget {
                 SizedBox(
                   width: 24,
                   child: selected
-                      ? const Icon(Icons.check, color: Color(0xFF9146FF), size: 18)
+                      ? const Icon(
+                          Icons.check,
+                          color: Color(0xFF9146FF),
+                          size: 18,
+                        )
                       : null,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    variant.displayName.isNotEmpty ? variant.displayName : variant.name,
+                    variant.displayName.isNotEmpty
+                        ? variant.displayName
+                        : variant.name,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,

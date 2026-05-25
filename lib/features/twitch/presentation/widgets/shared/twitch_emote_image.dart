@@ -112,7 +112,8 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     if (imageIndex >= candidates.length) imageIndex = 0;
 
     final currentUrl = candidates.isEmpty ? '' : candidates[imageIndex];
-    final fallback = widget.errorPlaceholder ??
+    final fallback =
+        widget.errorPlaceholder ??
         Icon(
           widget.locked ? Icons.lock_rounded : Icons.broken_image_rounded,
           color: Colors.white38,
@@ -158,7 +159,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         cacheManager: TwitchEmoteImageCacheManager.instance,
         memCacheWidth: widget.memCacheWidth,
         memCacheHeight: widget.memCacheHeight,
-        placeholder: (_, __) => widget.placeholder ?? const SizedBox.shrink(),
+        placeholder: (_, _) => widget.placeholder ?? const SizedBox.shrink(),
         errorWidget: (_, url, error) {
           handleImageError(
             failedUrl: url,
@@ -188,7 +189,9 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     final nextIndex = imageIndex + 1;
     if (nextIndex >= candidates.length) {
       if (widget.debug) {
-        debugLog('network fallback exhausted name=${widget.name} id=${widget.id}');
+        debugLog(
+          'network fallback exhausted name=${widget.name} id=${widget.id}',
+        );
       }
       return;
     }

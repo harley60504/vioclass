@@ -57,7 +57,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   Timer? _bufferFlushTimer;
   List<TwitchChatRuntimeMessage>? _pendingBufferedSourceMessages;
 
-  List<TwitchChatRuntimeMessage> _visibleMessages = <TwitchChatRuntimeMessage>[];
+  List<TwitchChatRuntimeMessage> _visibleMessages =
+      <TwitchChatRuntimeMessage>[];
 
   TwitchChatRuntime get runtime => widget.runtime;
 
@@ -104,7 +105,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
     List<TwitchChatRuntimeMessage> sourceMessages,
   ) {
-    if (!_autoScroll || sourceMessages.length <= _autoFollowRenderMessageLimit) {
+    if (!_autoScroll ||
+        sourceMessages.length <= _autoFollowRenderMessageLimit) {
       return List<TwitchChatRuntimeMessage>.of(sourceMessages);
     }
 
@@ -118,7 +120,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final sourceCount = sourceMessages.length;
     final sourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
 
-    final sourceChanged = sourceCount != _lastSourceMessageCount ||
+    final sourceChanged =
+        sourceCount != _lastSourceMessageCount ||
         sourceNewestFingerprint != _lastSourceNewestFingerprint;
 
     if (!sourceChanged) return;
@@ -182,8 +185,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final fingerprint = id.isNotEmpty
         ? 'id:$id'
         : 'fallback:${message.receivedAt.microsecondsSinceEpoch}|'
-            '${message.userLogin.trim().toLowerCase()}|'
-            '${message.message.trim()}';
+              '${message.userLogin.trim().toLowerCase()}|'
+              '${message.message.trim()}';
 
     _messageFingerprintCache[message] = fingerprint;
     return fingerprint;
@@ -207,7 +210,8 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     var messagesAfterPreviousNewest = 0;
     for (var index = sourceMessages.length - 1; index >= 0; index -= 1) {
-      if (_messageFingerprint(sourceMessages[index]) == previousNewestFingerprint) {
+      if (_messageFingerprint(sourceMessages[index]) ==
+          previousNewestFingerprint) {
         return messagesAfterPreviousNewest;
       }
       messagesAfterPreviousNewest += 1;
@@ -231,7 +235,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
         _autoScroll = true;
         _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
         _lastSourceMessageCount = runtime.messages.length;
-        _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
+        _lastSourceNewestFingerprint = _newestMessageFingerprint(
+          runtime.messages,
+        );
         _hiddenNewMessageCount = 0;
       });
       _scheduleFollowLatest(animated: false);
@@ -294,12 +300,12 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
           curve: Curves.easeOutCubic,
         )
         .whenComplete(() {
-      _programmaticScrollActive = false;
-      if (!mounted) return;
-      if (_isNearLatest && !_autoScroll) {
-        setState(() => _autoScroll = true);
-      }
-    });
+          _programmaticScrollActive = false;
+          if (!mounted) return;
+          if (_isNearLatest && !_autoScroll) {
+            setState(() => _autoScroll = true);
+          }
+        });
   }
 
   void _resumeLatest() {
@@ -310,7 +316,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _autoScroll = true;
       _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
       _lastSourceMessageCount = runtime.messages.length;
-      _lastSourceNewestFingerprint = _newestMessageFingerprint(runtime.messages);
+      _lastSourceNewestFingerprint = _newestMessageFingerprint(
+        runtime.messages,
+      );
       _hiddenNewMessageCount = 0;
     });
 
@@ -342,10 +350,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     if (visibleMessages.isEmpty) {
       return const Center(
-        child: Text(
-          '等待聊天室訊息...',
-          style: TextStyle(color: Colors.white54),
-        ),
+        child: Text('等待聊天室訊息...', style: TextStyle(color: Colors.white54)),
       );
     }
 

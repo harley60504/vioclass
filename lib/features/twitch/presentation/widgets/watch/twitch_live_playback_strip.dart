@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
@@ -19,7 +18,8 @@ class TwitchLivePlaybackStrip extends StatefulWidget {
   });
 
   @override
-  State<TwitchLivePlaybackStrip> createState() => _TwitchLivePlaybackStripState();
+  State<TwitchLivePlaybackStrip> createState() =>
+      _TwitchLivePlaybackStripState();
 }
 
 class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
@@ -55,12 +55,13 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
       await player.seek(target);
       await player.play();
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _dragging = false;
-        _dragValue = null;
-        _livePinned = true;
-      });
+      if (mounted) {
+        setState(() {
+          _dragging = false;
+          _dragValue = null;
+          _livePinned = true;
+        });
+      }
     }
   }
 
@@ -115,15 +116,15 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                     final value = _dragging
                         ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
                         : isAtLiveEdge
-                            ? 1.0
-                            : streamValue;
+                        ? 1.0
+                        : streamValue;
                     final previewPosition = hasSeekableDuration
                         ? isAtLiveEdge && !_dragging
-                            ? duration
-                            : Duration(
-                                milliseconds:
-                                    (duration.inMilliseconds * value).round(),
-                              )
+                              ? duration
+                              : Duration(
+                                  milliseconds:
+                                      (duration.inMilliseconds * value).round(),
+                                )
                         : position;
                     final positionText = _formatDuration(previewPosition);
                     final durationText = hasSeekableDuration
@@ -172,7 +173,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                           ? _liveEdgeSeekTarget(duration)
                                           : Duration(
                                               milliseconds:
-                                                  (duration.inMilliseconds * next)
+                                                  (duration.inMilliseconds *
+                                                          next)
                                                       .round(),
                                             );
 
@@ -255,14 +257,16 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     required bool livePinned,
   }) {
     final pos = _formatDuration(position);
-    final dur = duration.inMilliseconds > 0 ? _formatDuration(duration) : '--:--';
+    final dur = duration.inMilliseconds > 0
+        ? _formatDuration(duration)
+        : '--:--';
     final state = buffering
         ? 'buffering'
         : livePinned
-            ? 'live edge'
-            : playing
-                ? 'playing'
-                : 'paused';
+        ? 'live edge'
+        : playing
+        ? 'playing'
+        : 'paused';
     return 'media_kit $state · $pos / $dur';
   }
 
@@ -299,16 +303,16 @@ class _LiveEdgeButton extends StatelessWidget {
     final foreground = buffering
         ? Colors.orangeAccent
         : active
-            ? Colors.redAccent
-            : Colors.white54;
+        ? Colors.redAccent
+        : Colors.white54;
     final border = buffering
-        ? Colors.orangeAccent.withOpacity(0.42)
+        ? Colors.orangeAccent.withValues(alpha: 0.42)
         : active
-            ? Colors.redAccent.withOpacity(0.52)
-            : Colors.white.withOpacity(0.16);
+        ? Colors.redAccent.withValues(alpha: 0.52)
+        : Colors.white.withValues(alpha: 0.16);
     final background = active
-        ? Colors.redAccent.withOpacity(0.16)
-        : const Color(0xFF18181B).withOpacity(0.86);
+        ? Colors.redAccent.withValues(alpha: 0.16)
+        : const Color(0xFF18181B).withValues(alpha: 0.86);
 
     return Tooltip(
       message: active ? '目前在直播最新位置' : '跳到直播最新位置',

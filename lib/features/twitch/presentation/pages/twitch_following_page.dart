@@ -50,27 +50,28 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
   int _refreshGeneration = 0;
 
-  static const List<Map<String, String>> languageFilters = <Map<String, String>>[
-    {'label': '全部語言', 'value': ''},
-    {'label': '中文 Chinese', 'value': 'zh'},
-    {'label': 'English', 'value': 'en'},
-    {'label': '日本語 Japanese', 'value': 'ja'},
-    {'label': '한국어 Korean', 'value': 'ko'},
-    {'label': 'Español Spanish', 'value': 'es'},
-    {'label': 'Português Portuguese', 'value': 'pt'},
-    {'label': 'Français French', 'value': 'fr'},
-    {'label': 'Deutsch German', 'value': 'de'},
-    {'label': 'Русский Russian', 'value': 'ru'},
-    {'label': 'Italiano Italian', 'value': 'it'},
-    {'label': 'Türkçe Turkish', 'value': 'tr'},
-    {'label': 'Polski Polish', 'value': 'pl'},
-    {'label': 'Nederlands Dutch', 'value': 'nl'},
-    {'label': 'ไทย Thai', 'value': 'th'},
-    {'label': 'Tiếng Việt Vietnamese', 'value': 'vi'},
-    {'label': 'Bahasa Indonesia Indonesian', 'value': 'id'},
-    {'label': 'العربية Arabic', 'value': 'ar'},
-    {'label': 'हिन्दी Hindi', 'value': 'hi'},
-  ];
+  static const List<Map<String, String>> languageFilters =
+      <Map<String, String>>[
+        {'label': '全部語言', 'value': ''},
+        {'label': '中文 Chinese', 'value': 'zh'},
+        {'label': 'English', 'value': 'en'},
+        {'label': '日本語 Japanese', 'value': 'ja'},
+        {'label': '한국어 Korean', 'value': 'ko'},
+        {'label': 'Español Spanish', 'value': 'es'},
+        {'label': 'Português Portuguese', 'value': 'pt'},
+        {'label': 'Français French', 'value': 'fr'},
+        {'label': 'Deutsch German', 'value': 'de'},
+        {'label': 'Русский Russian', 'value': 'ru'},
+        {'label': 'Italiano Italian', 'value': 'it'},
+        {'label': 'Türkçe Turkish', 'value': 'tr'},
+        {'label': 'Polski Polish', 'value': 'pl'},
+        {'label': 'Nederlands Dutch', 'value': 'nl'},
+        {'label': 'ไทย Thai', 'value': 'th'},
+        {'label': 'Tiếng Việt Vietnamese', 'value': 'vi'},
+        {'label': 'Bahasa Indonesia Indonesian', 'value': 'id'},
+        {'label': 'العربية Arabic', 'value': 'ar'},
+        {'label': 'हिन्दी Hindi', 'value': 'hi'},
+      ];
 
   @override
   void initState() {
@@ -130,7 +131,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     try {
       final refreshed = await _fetchRefreshedStreamWindow(
         targetCount: TwitchStreamRefreshReconciler.targetRefreshCount(
-          loadedCount: hadExistingStreams ? loadedStreams.length : _followedPageSize,
+          loadedCount: hadExistingStreams
+              ? loadedStreams.length
+              : _followedPageSize,
           pageSize: _followedPageSize,
         ),
       );
@@ -252,7 +255,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     if (missingLogins.isEmpty) return streams;
 
     try {
-      final profileImages = await widget.discoveryService.fetchProfileImagesForLogins(missingLogins);
+      final profileImages = await widget.discoveryService
+          .fetchProfileImagesForLogins(missingLogins);
       if (profileImages.isEmpty) return streams;
       return streams
           .map(
@@ -287,24 +291,27 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     final keyword = widget.searchText.trim().toLowerCase();
     final language = currentLanguage.trim().toLowerCase();
 
-    return loadedStreams.where((stream) {
-      if (language.isNotEmpty && stream.language.toLowerCase() != language) {
-        return false;
-      }
+    return loadedStreams
+        .where((stream) {
+          if (language.isNotEmpty &&
+              stream.language.toLowerCase() != language) {
+            return false;
+          }
 
-      if (keyword.isEmpty) return true;
+          if (keyword.isEmpty) return true;
 
-      final haystack = <String>[
-        stream.userName,
-        stream.userLogin,
-        stream.title,
-        stream.gameName,
-        stream.language,
-        ...stream.tags,
-      ].join(' ').toLowerCase();
+          final haystack = <String>[
+            stream.userName,
+            stream.userLogin,
+            stream.title,
+            stream.gameName,
+            stream.language,
+            ...stream.tags,
+          ].join(' ').toLowerCase();
 
-      return haystack.contains(keyword);
-    }).toList(growable: false);
+          return haystack.contains(keyword);
+        })
+        .toList(growable: false);
   }
 
   Future<void> showLanguageMenu(BuildContext context) async {
@@ -324,11 +331,14 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
             final lowerKeyword = keyword.trim().toLowerCase();
             final filteredLanguages = lowerKeyword.isEmpty
                 ? languageFilters
-                : languageFilters.where((item) {
-                    final label = item['label']?.toLowerCase() ?? '';
-                    final value = item['value']?.toLowerCase() ?? '';
-                    return label.contains(lowerKeyword) || value.contains(lowerKeyword);
-                  }).toList(growable: false);
+                : languageFilters
+                      .where((item) {
+                        final label = item['label']?.toLowerCase() ?? '';
+                        final value = item['value']?.toLowerCase() ?? '';
+                        return label.contains(lowerKeyword) ||
+                            value.contains(lowerKeyword);
+                      })
+                      .toList(growable: false);
 
             void selectLanguage(String value) {
               setState(() => currentLanguage = value);
@@ -378,8 +388,12 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                         leading: Icon(
-                          selected ? Icons.check_circle_rounded : Icons.language_rounded,
-                          color: selected ? const Color(0xFF9146FF) : Colors.white54,
+                          selected
+                              ? Icons.check_circle_rounded
+                              : Icons.language_rounded,
+                          color: selected
+                              ? const Color(0xFF9146FF)
+                              : Colors.white54,
                         ),
                         title: Text(label),
                         subtitle: value.isEmpty ? null : Text(value),
@@ -393,7 +407,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                   decoration: BoxDecoration(
                     color: const Color(0xFF111116),
                     border: Border(
-                      top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
                     ),
                   ),
                   child: Row(
@@ -437,7 +453,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     if (errorText != null && loadedStreams.isEmpty) {
       final message = errorText ?? '';
-      final needsLogin = message.contains('OAuth') || message.contains('登入') || message.contains('授權');
+      final needsLogin =
+          message.contains('OAuth') ||
+          message.contains('登入') ||
+          message.contains('授權');
       if (needsLogin) {
         return TwitchLoginRequiredView(
           statusText: message,

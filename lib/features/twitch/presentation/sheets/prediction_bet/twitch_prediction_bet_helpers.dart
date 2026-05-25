@@ -25,7 +25,9 @@ TwitchPredictionOutcome? twitchPredictionOutcomeByIdentity(
   if (safeIdentity.isEmpty) return null;
 
   for (final outcome in outcomes) {
-    if (twitchPredictionOutcomeIdentity(outcome) == safeIdentity) return outcome;
+    if (twitchPredictionOutcomeIdentity(outcome) == safeIdentity) {
+      return outcome;
+    }
   }
 
   return null;
@@ -70,11 +72,14 @@ String? twitchPredictionTimeLabel(TwitchPredictionSnapshot prediction) {
   return null;
 }
 
-DateTime? twitchPredictionEffectiveLocksAt(TwitchPredictionSnapshot prediction) {
+DateTime? twitchPredictionEffectiveLocksAt(
+  TwitchPredictionSnapshot prediction,
+) {
   final explicit = prediction.locksAt;
   if (explicit != null) return explicit;
 
-  final createdAt = prediction.createdAt ??
+  final createdAt =
+      prediction.createdAt ??
       _readDateFromRaw(prediction.rawPrediction, const <String>[
         'createdAt',
         'created_at',
@@ -83,16 +88,17 @@ DateTime? twitchPredictionEffectiveLocksAt(TwitchPredictionSnapshot prediction) 
       ]);
   if (createdAt == null) return null;
 
-  final windowSeconds = _readIntFromRaw(prediction.rawPrediction, const <String>[
-    'predictionWindowSeconds',
-    'prediction_window_seconds',
-    'predictionWindowDurationSeconds',
-    'prediction_window_duration_seconds',
-    'durationSeconds',
-    'duration_seconds',
-    'windowSeconds',
-    'window_seconds',
-  ]);
+  final windowSeconds =
+      _readIntFromRaw(prediction.rawPrediction, const <String>[
+        'predictionWindowSeconds',
+        'prediction_window_seconds',
+        'predictionWindowDurationSeconds',
+        'prediction_window_duration_seconds',
+        'durationSeconds',
+        'duration_seconds',
+        'windowSeconds',
+        'window_seconds',
+      ]);
 
   if (windowSeconds == null || windowSeconds <= 0) return null;
   return createdAt.add(Duration(seconds: windowSeconds));
@@ -120,7 +126,9 @@ String twitchPredictionFormatClock(DateTime value) {
 
 String twitchPredictionFormatCompact(int value) {
   if (value >= 1000000000) {
-    final text = (value / 1000000000).toStringAsFixed(value >= 10000000000 ? 1 : 2);
+    final text = (value / 1000000000).toStringAsFixed(
+      value >= 10000000000 ? 1 : 2,
+    );
     return '${_trimTrailingZero(text)}B';
   }
   if (value >= 1000000) {

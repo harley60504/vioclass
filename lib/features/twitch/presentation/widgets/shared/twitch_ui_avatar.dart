@@ -40,12 +40,12 @@ class TwitchUiAvatar extends StatelessWidget {
       child: ClipOval(
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: color.withOpacity(0.22),
+            color: color.withValues(alpha: 0.22),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                color.withOpacity(0.82),
+                color.withValues(alpha: 0.82),
                 TwitchUiColors.surfaceElevated,
               ],
             ),
@@ -97,11 +97,7 @@ class _TwitchUiAvatarFallback extends StatelessWidget {
   Widget build(BuildContext context) {
     if (icon != null) {
       return Center(
-        child: Icon(
-          icon,
-          color: TwitchUiColors.textPrimary,
-          size: size * 0.48,
-        ),
+        child: Icon(icon, color: TwitchUiColors.textPrimary, size: size * 0.48),
       );
     }
 

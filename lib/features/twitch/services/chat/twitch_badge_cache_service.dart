@@ -13,20 +13,14 @@ class TwitchBadgeCacheService {
     final parts = token.split('/');
     if (parts.length != 2) return null;
 
-    return resolveBadge(
-      setId: parts[0],
-      version: parts[1],
-    );
+    return resolveBadge(setId: parts[0], version: parts[1]);
   }
 
   TwitchChatBadge? resolveBadge({
     required String setId,
     required String version,
   }) {
-    return _catalog.findBadge(
-      setId: setId,
-      version: version,
-    );
+    return _catalog.findBadge(setId: setId, version: version);
   }
 
   List<TwitchChatBadge> resolveBadgeTags(String rawBadges) {
@@ -46,8 +40,6 @@ class TwitchBadgeCacheService {
   }
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'catalog': catalog.toJson(),
-    };
+    return <String, dynamic>{'catalog': catalog.toJson()};
   }
 }

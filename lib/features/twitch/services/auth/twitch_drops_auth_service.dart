@@ -27,9 +27,7 @@ class TwitchDropsAuthService extends ChangeNotifier {
   DateTime? _lastValidatedAt;
   String _dropsClientId = TwitchApiConstants.twitchDefaultDropsClientId;
 
-  TwitchDropsAuthService({
-    required this.apiClient,
-  }) {
+  TwitchDropsAuthService({required this.apiClient}) {
     dropsDeviceAuthApi = TwitchDropsDeviceAuthApiService(
       deviceAuthApi: TwitchDeviceAuthApiService(client: apiClient),
       clientIdProvider: () => _dropsClientId,
@@ -85,7 +83,8 @@ class TwitchDropsAuthService extends ChangeNotifier {
               TwitchApiConstants.twitchWebClientId,
             );
             final legacyValidatedAt = prefs.getString(validatedAtStorageKey);
-            if (legacyValidatedAt != null && legacyValidatedAt.trim().isNotEmpty) {
+            if (legacyValidatedAt != null &&
+                legacyValidatedAt.trim().isNotEmpty) {
               await prefs.setString(
                 'new_twitch_app_twitch_web_gql_validated_at',
                 legacyValidatedAt,
@@ -132,8 +131,8 @@ class TwitchDropsAuthService extends ChangeNotifier {
     final next = requested.isEmpty
         ? ''
         : _looksLikeWebClientId(requested)
-            ? _defaultDropsClientId()
-            : requested;
+        ? _defaultDropsClientId()
+        : requested;
     final changed = next != _dropsClientId.trim();
 
     _dropsClientId = next;
@@ -225,9 +224,7 @@ class TwitchDropsAuthService extends ChangeNotifier {
     }
   }
 
-  Future<void> logout({
-    bool clearClientId = false,
-  }) async {
+  Future<void> logout({bool clearClientId = false}) async {
     _token = null;
     _lastValidatedAt = null;
 

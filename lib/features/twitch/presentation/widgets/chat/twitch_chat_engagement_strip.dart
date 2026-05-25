@@ -45,15 +45,18 @@ class TwitchChatEngagementStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final activePinned = showPinned
         ? pinnedMessages
-            .where((item) => item.isActive && item.text.isNotEmpty)
-            .toList(growable: false)
+              .where((item) => item.isActive && item.text.isNotEmpty)
+              .toList(growable: false)
         : const <TwitchPinnedChatMessage>[];
     final firstPinned = activePinned.isEmpty ? null : activePinned.first;
 
     final currentPrediction = showPrediction ? prediction : null;
-    final hasPrediction = currentPrediction != null && currentPrediction.hasPrediction;
+    final hasPrediction =
+        currentPrediction != null && currentPrediction.hasPrediction;
 
-    if (firstPinned == null && !hasPrediction && (error == null || error!.isEmpty)) {
+    if (firstPinned == null &&
+        !hasPrediction &&
+        (error == null || error!.isEmpty)) {
       return const SizedBox.shrink();
     }
 
@@ -84,9 +87,11 @@ class TwitchChatEngagementStrip extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.orangeAccent.withOpacity(0.10),
+                color: Colors.orangeAccent.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.orangeAccent.withOpacity(0.26)),
+                border: Border.all(
+                  color: Colors.orangeAccent.withValues(alpha: 0.26),
+                ),
               ),
               child: Text(
                 error!,

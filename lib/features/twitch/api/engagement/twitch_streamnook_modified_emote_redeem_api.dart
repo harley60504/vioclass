@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import '../../models/engagement/twitch_channel_points_models.dart';
 import '../core/twitch_api_client.dart';
 import '../core/twitch_api_constants.dart';
 import '../core/twitch_api_exception.dart';
@@ -36,10 +35,14 @@ class TwitchStreamNookModifiedEmoteRedeemApi {
       throw ArgumentError.value(channelId, 'channelId', 'cannot be empty');
     }
     if (finalModifiedEmoteId.isEmpty) {
-      throw TwitchApiException('Modify Emote requires a final modified emoteID.');
+      throw TwitchApiException(
+        'Modify Emote requires a final modified emoteID.',
+      );
     }
     if (cost <= 0) {
-      throw TwitchApiException('Modify Emote requires a positive StreamNook-style cost.');
+      throw TwitchApiException(
+        'Modify Emote requires a positive StreamNook-style cost.',
+      );
     }
 
     final token = await _requireAccessToken();
@@ -95,7 +98,9 @@ class TwitchStreamNookModifiedEmoteRedeemApi {
   Future<String> _requireAccessToken() async {
     final token = (await tokenProvider())?.trim();
     if (token == null || token.isEmpty) {
-      throw TwitchApiException('Drops OAuth token is missing for modified emote redeem.');
+      throw TwitchApiException(
+        'Drops OAuth token is missing for modified emote redeem.',
+      );
     }
     return token;
   }

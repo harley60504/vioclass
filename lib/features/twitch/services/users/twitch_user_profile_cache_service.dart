@@ -45,7 +45,11 @@ class TwitchUserProfileCacheService {
     final byId = <String, TwitchUserProfile>{};
     final byLogin = <String, TwitchUserProfile>{};
 
-    for (final id in ids.map((value) => value.trim()).where((value) => value.isNotEmpty).toSet()) {
+    for (final id
+        in ids
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toSet()) {
       final cached = _byId[id];
       if (cached != null && !cached.isExpired(now, ttl)) {
         byId[id] = cached.profile;
@@ -54,10 +58,11 @@ class TwitchUserProfileCacheService {
       }
     }
 
-    for (final login in logins
-        .map((value) => value.trim().toLowerCase())
-        .where((value) => value.isNotEmpty)
-        .toSet()) {
+    for (final login
+        in logins
+            .map((value) => value.trim().toLowerCase())
+            .where((value) => value.isNotEmpty)
+            .toSet()) {
       final cached = _byLogin[login];
       if (cached != null && !cached.isExpired(now, ttl)) {
         byLogin[login] = cached.profile;
@@ -67,7 +72,10 @@ class TwitchUserProfileCacheService {
     }
 
     if (missingIds.isNotEmpty || missingLogins.isNotEmpty) {
-      final fetched = await api.fetchUsers(ids: missingIds, logins: missingLogins);
+      final fetched = await api.fetchUsers(
+        ids: missingIds,
+        logins: missingLogins,
+      );
       _storeLookup(fetched);
       byId.addAll(fetched.byId);
       byLogin.addAll(fetched.byLogin);
@@ -105,10 +113,7 @@ class _CachedProfile {
   final TwitchUserProfile profile;
   final DateTime fetchedAt;
 
-  const _CachedProfile({
-    required this.profile,
-    required this.fetchedAt,
-  });
+  const _CachedProfile({required this.profile, required this.fetchedAt});
 
   bool isExpired(DateTime now, Duration ttl) {
     return now.difference(fetchedAt) > ttl;

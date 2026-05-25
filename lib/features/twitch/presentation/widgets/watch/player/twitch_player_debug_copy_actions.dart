@@ -3,10 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 
-enum PlaybackDebugCopyAction {
-  proxyUrl,
-  mpvProxyCommand,
-}
+enum PlaybackDebugCopyAction { proxyUrl, mpvProxyCommand }
 
 class PlaybackDebugCopyButton extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -18,13 +15,18 @@ class PlaybackDebugCopyButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final proxyUrl = playerRuntime.proxyMpvUrl?.trim() ?? playerRuntime.proxyUrl?.trim();
+    final proxyUrl =
+        playerRuntime.proxyMpvUrl?.trim() ?? playerRuntime.proxyUrl?.trim();
     final hasProxyUrl = proxyUrl != null && proxyUrl.isNotEmpty;
 
     return PopupMenuButton<PlaybackDebugCopyAction>(
       tooltip: 'Debug：複製 Dart Proxy URL',
       color: const Color(0xFF18181B),
-      icon: const Icon(Icons.bug_report_outlined, color: Colors.white, size: 23),
+      icon: const Icon(
+        Icons.bug_report_outlined,
+        color: Colors.white,
+        size: 23,
+      ),
       enabled: hasProxyUrl,
       onSelected: (action) => _handleCopy(context, action),
       itemBuilder: (context) => <PopupMenuEntry<PlaybackDebugCopyAction>>[
@@ -114,9 +116,9 @@ class PlaybackDebugCopyButton extends StatelessWidget {
   }
 
   static void _showCopySnack(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -124,21 +126,14 @@ class PlaybackDebugCopyPayload {
   final String label;
   final String text;
 
-  const PlaybackDebugCopyPayload({
-    required this.label,
-    required this.text,
-  });
+  const PlaybackDebugCopyPayload({required this.label, required this.text});
 }
 
 class DebugMenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const DebugMenuRow({
-    super.key,
-    required this.icon,
-    required this.label,
-  });
+  const DebugMenuRow({super.key, required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {

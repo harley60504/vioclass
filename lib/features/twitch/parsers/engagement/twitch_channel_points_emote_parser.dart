@@ -56,9 +56,11 @@ class TwitchChannelPointEmoteOption {
       'token': token,
       'emoteType': emoteType,
       'imageUrl': imageUrl,
-      'modifications': modifications.map((modification) {
-        return modification.toJson();
-      }).toList(growable: false),
+      'modifications': modifications
+          .map((modification) {
+            return modification.toJson();
+          })
+          .toList(growable: false),
     };
   }
 }
@@ -93,10 +95,7 @@ class TwitchChannelPointsEmoteParser {
       filterTier1000BaseSet: false,
     );
     final approved = dedupeChannelPointEmotes(
-      extractSubscriptionProductEmotes(
-        raw,
-        filterTier1000BaseSet: true,
-      ),
+      extractSubscriptionProductEmotes(raw, filterTier1000BaseSet: true),
     );
 
     _debugMenuAudit(
@@ -120,6 +119,8 @@ class TwitchChannelPointsEmoteParser {
   /// - variant.emote is the base emote.
   /// - variant.modifications[].emote.id is the final modified emote id, such
   ///   as `1022569_BW`. That final id is what Twitch expects as emoteID.
+  /// - StreamNook keeps the base emote when `modifications` is empty; the UI
+  ///   can surface that state instead of hiding the emote entirely.
   static List<TwitchChannelPointEmoteOption> parseModifiableEmoteVariants(
     Object? raw, {
     required String channelLogin,
@@ -134,35 +135,32 @@ class TwitchChannelPointsEmoteParser {
       }
     }
 
-    addVariantsAt(
-      raw,
-      const <String>[
-        'data',
-        'community',
-        'channel',
-        'communityPointsSettings',
-        'emoteVariants',
-      ],
-    );
-    addVariantsAt(
-      raw,
-      const <String>['data', 'channel', 'communityPointsSettings', 'emoteVariants'],
-    );
-    addVariantsAt(
-      raw,
-      const <String>[
-        'data',
-        'user',
-        'channel',
-        'communityPointsSettings',
-        'emoteVariants',
-      ],
-    );
+    addVariantsAt(raw, const <String>[
+      'data',
+      'community',
+      'channel',
+      'communityPointsSettings',
+      'emoteVariants',
+    ]);
+    addVariantsAt(raw, const <String>[
+      'data',
+      'channel',
+      'communityPointsSettings',
+      'emoteVariants',
+    ]);
+    addVariantsAt(raw, const <String>[
+      'data',
+      'user',
+      'channel',
+      'communityPointsSettings',
+      'emoteVariants',
+    ]);
 
     final output = <TwitchChannelPointEmoteOption>[];
 
     for (final variant in variants) {
-      final unlockable = _readBool(variant, const <String>['isUnlockable']) ?? false;
+      final unlockable =
+          _readBool(variant, const <String>['isUnlockable']) ?? false;
       if (!unlockable) continue;
 
       final baseEmote = _asStringMap(variant['emote']);
@@ -186,8 +184,9 @@ class TwitchChannelPointsEmoteParser {
         }
       }
 
-      if (modifications.isEmpty) continue;
-      modifications.sort((a, b) => a.token.toLowerCase().compareTo(b.token.toLowerCase()));
+      modifications.sort(
+        (a, b) => a.token.toLowerCase().compareTo(b.token.toLowerCase()),
+      );
 
       output.add(
         TwitchChannelPointEmoteOption(
@@ -225,22 +224,28 @@ class TwitchChannelPointsEmoteParser {
     }
 
     addProductsAt(raw, const <String>['data', 'user', 'subscriptionProducts']);
-    addProductsAt(
-      raw,
-      const <String>['data', 'currentUser', 'subscriptionProducts'],
-    );
-    addProductsAt(
-      raw,
-      const <String>['data', 'channel', 'subscriptionProducts'],
-    );
-    addProductsAt(
-      raw,
-      const <String>['data', 'community', 'channel', 'subscriptionProducts'],
-    );
-    addProductsAt(
-      raw,
-      const <String>['data', 'user', 'channel', 'subscriptionProducts'],
-    );
+    addProductsAt(raw, const <String>[
+      'data',
+      'currentUser',
+      'subscriptionProducts',
+    ]);
+    addProductsAt(raw, const <String>[
+      'data',
+      'channel',
+      'subscriptionProducts',
+    ]);
+    addProductsAt(raw, const <String>[
+      'data',
+      'community',
+      'channel',
+      'subscriptionProducts',
+    ]);
+    addProductsAt(raw, const <String>[
+      'data',
+      'user',
+      'channel',
+      'subscriptionProducts',
+    ]);
 
     final output = <TwitchChannelPointEmoteOption>[];
 
@@ -249,7 +254,7 @@ class TwitchChannelPointsEmoteParser {
       final productEmoteSetId = _readProductEmoteSetId(product);
 
       if (filterTier1000BaseSet) {
-        if (productTier != '1000') continue;
+        if (!_isTier1000(productTier)) continue;
         if (productEmoteSetId.isEmpty) continue;
       }
 
@@ -257,17 +262,27 @@ class TwitchChannelPointsEmoteParser {
         for (final item in list) {
           final itemMap = _asStringMap(item);
           if (itemMap == null) continue;
-          final option = _readEmoteOption(
-            itemMap,
-            productTier: productTier,
-            requiredSetId: requiredSetId,
-          );
-          if (option != null) output.add(option);
+          for (final emoteMap in _candidateEmoteMaps(itemMap)) {
+            final option = _readEmoteOption(
+              emoteMap,
+              productTier: productTier,
+              requiredSetId: requiredSetId,
+            );
+            if (option != null) output.add(option);
+          }
         }
       }
 
       readEmotesFromList(
         _readList(product, const <String>['emotes']),
+        requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
+      );
+      readEmotesFromList(
+        _readList(product, const <String>['emotes', 'edges']),
+        requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
+      );
+      readEmotesFromList(
+        _readList(product, const <String>['emotes', 'nodes']),
         requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
       );
 
@@ -279,18 +294,35 @@ class TwitchChannelPointsEmoteParser {
             _readList(directEmoteSet, const <String>['emotes']),
             requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
           );
+          readEmotesFromList(
+            _readList(directEmoteSet, const <String>['emotes', 'edges']),
+            requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
+          );
+          readEmotesFromList(
+            _readList(directEmoteSet, const <String>['emotes', 'nodes']),
+            requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
+          );
         }
       }
 
       for (final setItem in _readList(product, const <String>['emoteSets'])) {
         final setMap = _asStringMap(setItem);
         if (setMap == null) continue;
-        if (filterTier1000BaseSet && _readEmoteSetId(setMap) != productEmoteSetId) {
+        if (filterTier1000BaseSet &&
+            _readEmoteSetId(setMap) != productEmoteSetId) {
           continue;
         }
 
         readEmotesFromList(
           _readList(setMap, const <String>['emotes']),
+          requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
+        );
+        readEmotesFromList(
+          _readList(setMap, const <String>['emotes', 'edges']),
+          requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
+        );
+        readEmotesFromList(
+          _readList(setMap, const <String>['emotes', 'nodes']),
           requiredSetId: filterTier1000BaseSet ? productEmoteSetId : '',
         );
       }
@@ -345,10 +377,36 @@ String _readProductEmoteSetId(Map<String, dynamic> product) {
     <String>['emoteSetID'],
     <String>['emoteSetId'],
     <String>['emote_set_id'],
+    <String>['emoteSet', 'setID'],
+    <String>['emoteSet', 'setId'],
+    <String>['emoteSet', 'emoteSetID'],
+    <String>['emoteSet', 'emoteSetId'],
     <String>['emoteSet', 'id'],
   ]);
 
   return value?.trim() ?? '';
+}
+
+bool _isTier1000(String value) {
+  final text = value.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+  return text == '1000' || text == 'tier1' || text == 'subtier1';
+}
+
+List<Map<String, dynamic>> _candidateEmoteMaps(Map<String, dynamic> map) {
+  final node = _asStringMap(map['node']);
+  if (node != null) return <Map<String, dynamic>>[_mergedEmoteMap(map, node)];
+
+  final emote = _asStringMap(map['emote']);
+  if (emote != null) return <Map<String, dynamic>>[_mergedEmoteMap(map, emote)];
+
+  return <Map<String, dynamic>>[map];
+}
+
+Map<String, dynamic> _mergedEmoteMap(
+  Map<String, dynamic> outer,
+  Map<String, dynamic> inner,
+) {
+  return <String, dynamic>{...outer, ...inner};
 }
 
 String _readEmoteSetId(Map<String, dynamic> map) {
@@ -397,7 +455,8 @@ TwitchChannelPointEmoteOption? _readEmoteOption(
     return null;
   }
 
-  final emoteType = _firstNonEmptyString(map, const <List<String>>[
+  final emoteType =
+      _firstNonEmptyString(map, const <List<String>>[
         <String>['type'],
         <String>['emote_type'],
         <String>['emoteType'],
@@ -457,7 +516,8 @@ TwitchChannelPointEmoteModification? _readModification(
 
   if (id == null || id.isEmpty || !_looksLikeTwitchEmoteId(id)) return null;
 
-  final modifierId = _firstNonEmptyString(map, const <List<String>>[
+  final modifierId =
+      _firstNonEmptyString(map, const <List<String>>[
         <String>['modifier_id'],
         <String>['modifierID'],
         <String>['modifierId'],
@@ -469,7 +529,8 @@ TwitchChannelPointEmoteModification? _readModification(
       ]) ??
       '';
 
-  final token = _firstNonEmptyString(map, const <List<String>>[
+  final token =
+      _firstNonEmptyString(map, const <List<String>>[
         <String>['token'],
         <String>['name'],
         <String>['displayName'],
@@ -498,14 +559,16 @@ TwitchChannelPointEmoteModification? _readVariantModification(
   ]);
   if (id == null || id.isEmpty || !_looksLikeTwitchEmoteId(id)) return null;
 
-  final token = _firstNonEmptyString(emote, const <List<String>>[
+  final token =
+      _firstNonEmptyString(emote, const <List<String>>[
         <String>['token'],
         <String>['name'],
         <String>['displayName'],
       ]) ??
       id;
 
-  final modifierId = _firstNonEmptyString(modifier, const <List<String>>[
+  final modifierId =
+      _firstNonEmptyString(modifier, const <List<String>>[
         <String>['id'],
         <String>['modifierID'],
         <String>['modifierId'],
@@ -551,10 +614,7 @@ bool _looksLikeTwitchEmoteId(String value) {
   return false;
 }
 
-String? _firstNonEmptyString(
-  Object? root,
-  List<List<String>> paths,
-) {
+String? _firstNonEmptyString(Object? root, List<List<String>> paths) {
   for (final path in paths) {
     final text = _readString(root, path);
     if (text != null && text.isNotEmpty) return text;

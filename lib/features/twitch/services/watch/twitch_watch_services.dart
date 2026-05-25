@@ -52,7 +52,8 @@ class TwitchWatchServices {
   final TwitchDropsPredictionApiService dropsPredictionApi;
   final TwitchViewerSpecialMessageApiServiceStage251 specialMessageApiStage251;
   final TwitchViewerSpecialMessageRuntimeStage251 specialMessageRuntimeStage251;
-  final TwitchViewerSpecialMessageDebugProbeStage251 specialMessageDebugProbeStage251;
+  final TwitchViewerSpecialMessageDebugProbeStage251
+  specialMessageDebugProbeStage251;
   final TwitchMediaKitPlayerSession playerSession;
 
   final TwitchWatchCoreServices core;
@@ -163,22 +164,22 @@ class TwitchWatchServices {
     );
     final streamNookModifiedEmoteRedeemApi =
         TwitchStreamNookModifiedEmoteRedeemApi(
-      client: apiClient,
-      tokenProvider: () async {
-        final dropsToken = await dropsAuthService.getToken();
-        if (dropsToken != null && dropsToken.trim().isNotEmpty) {
-          return dropsToken.trim();
-        }
-        return webGqlAuthService.getToken();
-      },
-      actionClientIdProvider: () {
-        final dropsClientId = dropsAuthService.dropsClientId.trim();
-        if (dropsClientId.isNotEmpty) return dropsClientId;
-        return TwitchApiConstants.twitchDefaultDropsClientId;
-      },
-      deviceId: channelPointsApi.deviceId,
-      sessionId: channelPointsApi.sessionId,
-    );
+          client: apiClient,
+          tokenProvider: () async {
+            final dropsToken = await dropsAuthService.getToken();
+            if (dropsToken != null && dropsToken.trim().isNotEmpty) {
+              return dropsToken.trim();
+            }
+            return webGqlAuthService.getToken();
+          },
+          actionClientIdProvider: () {
+            final dropsClientId = dropsAuthService.dropsClientId.trim();
+            if (dropsClientId.isNotEmpty) return dropsClientId;
+            return TwitchApiConstants.twitchDefaultDropsClientId;
+          },
+          deviceId: channelPointsApi.deviceId,
+          sessionId: channelPointsApi.sessionId,
+        );
     final relationshipApi = TwitchPrivateGqlRelationshipApiServiceV1(
       client: apiClient,
       oauthTokenProvider: authService.getValidAccessToken,
@@ -207,20 +208,23 @@ class TwitchWatchServices {
       client: apiClient,
       tokenProvider: dropsAuthService.getToken,
     );
-    final specialMessageApiStage251 = TwitchViewerSpecialMessageApiServiceStage251(
-      webGql: publicWebGqlApi,
-      androidGql: specialAndroidGqlApi,
-    );
-    final specialMessageRuntimeStage251 = TwitchViewerSpecialMessageRuntimeStage251(
-      api: specialMessageApiStage251,
-    );
-    final specialMessageDebugProbeStage251 = TwitchViewerSpecialMessageDebugProbeStage251(
-      api: specialMessageApiStage251,
-      runtime: specialMessageRuntimeStage251,
-      webTokenProvider: webGqlAuthService.getToken,
-      dropsTokenProvider: dropsAuthService.getToken,
-      dropsClientIdProvider: () => dropsAuthService.dropsClientId,
-    );
+    final specialMessageApiStage251 =
+        TwitchViewerSpecialMessageApiServiceStage251(
+          webGql: publicWebGqlApi,
+          androidGql: specialAndroidGqlApi,
+        );
+    final specialMessageRuntimeStage251 =
+        TwitchViewerSpecialMessageRuntimeStage251(
+          api: specialMessageApiStage251,
+        );
+    final specialMessageDebugProbeStage251 =
+        TwitchViewerSpecialMessageDebugProbeStage251(
+          api: specialMessageApiStage251,
+          runtime: specialMessageRuntimeStage251,
+          webTokenProvider: webGqlAuthService.getToken,
+          dropsTokenProvider: dropsAuthService.getToken,
+          dropsClientIdProvider: () => dropsAuthService.dropsClientId,
+        );
     final playerSession = TwitchMediaKitPlayerHost.acquire(title: playerTitle);
 
     final core = TwitchWatchCoreServices(

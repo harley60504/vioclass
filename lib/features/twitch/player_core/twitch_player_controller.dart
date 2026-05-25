@@ -38,13 +38,14 @@ class TwitchPlayerController extends ChangeNotifier {
   TwitchPlayerController({
     TwitchPlayerProfile? profile,
     TwitchMediaKitPlayerEngine? engine,
-  })  : engine = engine ??
-            TwitchMediaKitPlayerEngine(
-              profile: profile ?? TwitchPlayerProfile.forCurrentPlatform(),
-            ),
-        _state = TwitchPlayerState.initial(
-          profile ?? TwitchPlayerProfile.forCurrentPlatform(),
-        );
+  }) : engine =
+           engine ??
+           TwitchMediaKitPlayerEngine(
+             profile: profile ?? TwitchPlayerProfile.forCurrentPlatform(),
+           ),
+       _state = TwitchPlayerState.initial(
+         profile ?? TwitchPlayerProfile.forCurrentPlatform(),
+       );
 
   TwitchPlayerState get state => _state;
   bool get initialized => engine.initialized;
@@ -80,21 +81,21 @@ class TwitchPlayerController extends ChangeNotifier {
       throw ArgumentError.value(uri, 'uri', 'uri cannot be empty');
     }
 
-    _emit(_state.copyWith(
-      opening: true,
-      clearError: true,
-      mediaUri: safeUri,
-      clearVideoSize: force || _state.mediaUri != safeUri,
-    ));
+    _emit(
+      _state.copyWith(
+        opening: true,
+        clearError: true,
+        mediaUri: safeUri,
+        clearVideoSize: force || _state.mediaUri != safeUri,
+      ),
+    );
 
     try {
       await initialize();
       await engine.open(uri: safeUri, play: play, force: force);
-      _emit(_state.copyWith(
-        opening: false,
-        mediaUri: safeUri,
-        clearError: true,
-      ));
+      _emit(
+        _state.copyWith(opening: false, mediaUri: safeUri, clearError: true),
+      );
     } catch (error) {
       _emit(_state.copyWith(opening: false, error: error));
       rethrow;
@@ -124,14 +125,16 @@ class TwitchPlayerController extends ChangeNotifier {
     await engine.stop();
     _lastPublishedPositionSecond = -1;
     _lastPublishedBufferedSecond = -1;
-    _emit(_state.copyWith(
-      playing: false,
-      buffering: false,
-      position: Duration.zero,
-      buffered: Duration.zero,
-      clearMediaUri: true,
-      clearVideoSize: true,
-    ));
+    _emit(
+      _state.copyWith(
+        playing: false,
+        buffering: false,
+        position: Duration.zero,
+        buffered: Duration.zero,
+        clearMediaUri: true,
+        clearVideoSize: true,
+      ),
+    );
   }
 
   Future<void> setVolume(double value) async {
@@ -167,49 +170,65 @@ class TwitchPlayerController extends ChangeNotifier {
     final player = engine.player;
     final stream = player.stream;
 
-    _subscriptions.add(stream.playing.listen((playing) {
-      _emit(_state.copyWith(playing: playing));
-    }));
+    _subscriptions.add(
+      stream.playing.listen((playing) {
+        _emit(_state.copyWith(playing: playing));
+      }),
+    );
 
-    _subscriptions.add(stream.completed.listen((completed) {
-      if (!completed) return;
-      _emit(_state.copyWith(playing: false, buffering: false));
-    }));
+    _subscriptions.add(
+      stream.completed.listen((completed) {
+        if (!completed) return;
+        _emit(_state.copyWith(playing: false, buffering: false));
+      }),
+    );
 
-    _subscriptions.add(stream.position.listen((position) {
-      final second = position.inSeconds;
-      if (second == _lastPublishedPositionSecond) return;
-      _lastPublishedPositionSecond = second;
-      _emit(_state.copyWith(position: position));
-    }));
+    _subscriptions.add(
+      stream.position.listen((position) {
+        final second = position.inSeconds;
+        if (second == _lastPublishedPositionSecond) return;
+        _lastPublishedPositionSecond = second;
+        _emit(_state.copyWith(position: position));
+      }),
+    );
 
-    _subscriptions.add(stream.duration.listen((duration) {
-      _emit(_state.copyWith(duration: duration));
-    }));
+    _subscriptions.add(
+      stream.duration.listen((duration) {
+        _emit(_state.copyWith(duration: duration));
+      }),
+    );
 
-    _subscriptions.add(stream.buffer.listen((buffered) {
-      final second = buffered.inSeconds;
-      if (second == _lastPublishedBufferedSecond) return;
-      _lastPublishedBufferedSecond = second;
-      _emit(_state.copyWith(buffered: buffered));
-    }));
+    _subscriptions.add(
+      stream.buffer.listen((buffered) {
+        final second = buffered.inSeconds;
+        if (second == _lastPublishedBufferedSecond) return;
+        _lastPublishedBufferedSecond = second;
+        _emit(_state.copyWith(buffered: buffered));
+      }),
+    );
 
-    _subscriptions.add(stream.buffering.listen((buffering) {
-      _emit(_state.copyWith(buffering: buffering));
-    }));
+    _subscriptions.add(
+      stream.buffering.listen((buffering) {
+        _emit(_state.copyWith(buffering: buffering));
+      }),
+    );
 
     if (kDebugMode) {
-      _subscriptions.add(stream.log.listen((log) {
-        final text = log.toString();
-        if (text.contains('error') || text.contains('fatal')) {
-          debugPrint('[TwitchPlayerCore][mpv] $text');
-        }
-      }));
+      _subscriptions.add(
+        stream.log.listen((log) {
+          final text = log.toString();
+          if (text.contains('error') || text.contains('fatal')) {
+            debugPrint('[TwitchPlayerCore][mpv] $text');
+          }
+        }),
+      );
     }
 
-    _subscriptions.add(stream.error.listen((error) {
-      _emit(_state.copyWith(error: error));
-    }));
+    _subscriptions.add(
+      stream.error.listen((error) {
+        _emit(_state.copyWith(error: error));
+      }),
+    );
   }
 
   void _emit(TwitchPlayerState next) {
@@ -222,8 +241,9 @@ class TwitchPlayerController extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
 
-    for (final subscription
-        in List<StreamSubscription<dynamic>>.from(_subscriptions)) {
+    for (final subscription in List<StreamSubscription<dynamic>>.from(
+      _subscriptions,
+    )) {
       try {
         await subscription.cancel();
       } catch (_) {}
@@ -239,8 +259,9 @@ class TwitchPlayerController extends ChangeNotifier {
     if (_disposed) return;
     _disposed = true;
 
-    for (final subscription
-        in List<StreamSubscription<dynamic>>.from(_subscriptions)) {
+    for (final subscription in List<StreamSubscription<dynamic>>.from(
+      _subscriptions,
+    )) {
       unawaited(subscription.cancel().catchError((_) {}));
     }
     _subscriptions.clear();

@@ -17,6 +17,7 @@ class ChannelPointsHeader extends StatelessWidget {
   final Future<void> Function() onRefresh;
 
   const ChannelPointsHeader({
+    super.key,
     required this.title,
     required this.iconUrl,
     required this.balance,
@@ -89,7 +90,11 @@ class ChannelPointsErrorBanner extends StatelessWidget {
   final String label;
   final String message;
 
-  const ChannelPointsErrorBanner({required this.label, required this.message});
+  const ChannelPointsErrorBanner({
+    super.key,
+    required this.label,
+    required this.message,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -98,9 +103,9 @@ class ChannelPointsErrorBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(14, 8, 14, 0),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.orangeAccent.withOpacity(0.12),
+        color: Colors.orangeAccent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.orangeAccent.withOpacity(0.35)),
+        border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
       ),
       child: Text(
         '$label：$message',
@@ -122,6 +127,7 @@ class ChannelPointsEmptyRewards extends StatelessWidget {
   final Future<void> Function() onRefresh;
 
   const ChannelPointsEmptyRewards({
+    super.key,
     required this.hasSnapshot,
     required this.loading,
     required this.onRefresh,
@@ -183,6 +189,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
   final Future<void> Function() onTap;
 
   const ChannelPointsRewardTile({
+    super.key,
     required this.reward,
     required this.balance,
     required this.pointsIconUrl,
@@ -224,7 +231,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
                 BoxShadow(
                   color: available
                       ? TwitchUiColors.sheet.shadow
-                      : Colors.black.withOpacity(0.080),
+                      : Colors.black.withValues(alpha: 0.080),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -273,14 +280,14 @@ class ChannelPointsRewardTile extends StatelessWidget {
                           height: 80,
                           padding: const EdgeInsets.all(2),
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.82),
+                            color: color.withValues(alpha: 0.82),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.12),
+                              color: Colors.white.withValues(alpha: 0.12),
                             ),
                             boxShadow: <BoxShadow>[
                               BoxShadow(
-                                color: color.withOpacity(0.18),
+                                color: color.withValues(alpha: 0.18),
                                 blurRadius: 12,
                                 offset: const Offset(0, 5),
                               ),
@@ -303,7 +310,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
                                   cacheHeight: 156,
                                   fit: BoxFit.cover,
                                   filterQuality: FilterQuality.low,
-                                  errorBuilder: (_, __, ___) => const Icon(
+                                  errorBuilder: (_, _, _) => const Icon(
                                     Icons.diamond_outlined,
                                     color: Colors.white,
                                   ),
@@ -377,11 +384,11 @@ class _CostChip extends StatelessWidget {
         vertical: compact ? 4 : 5,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.13),
+        color: color.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withOpacity(0.28)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
         boxShadow: <BoxShadow>[
-          BoxShadow(color: color.withOpacity(0.08), blurRadius: 7),
+          BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 7),
         ],
       ),
       child: Row(
@@ -403,31 +410,6 @@ class _CostChip extends StatelessWidget {
   }
 }
 
-class _MiniBadge extends StatelessWidget {
-  final String label;
-
-  const _MiniBadge({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: TwitchUiColors.sheet.cardFill,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white54,
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
 class _StatusBadge extends StatelessWidget {
   final String label;
   final bool warning;
@@ -440,9 +422,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.11),
+        color: color.withValues(alpha: 0.11),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withOpacity(0.22)),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
       child: Text(
         label,
@@ -475,9 +457,11 @@ class _StatusChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(highlight ? 0.13 : 0.06),
+        color: color.withValues(alpha: highlight ? 0.13 : 0.06),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withOpacity(highlight ? 0.30 : 0.10)),
+        border: Border.all(
+          color: color.withValues(alpha: highlight ? 0.30 : 0.10),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -516,7 +500,7 @@ class _PointsIcon extends StatelessWidget {
         cacheWidth: (size * 2).round(),
         cacheHeight: (size * 2).round(),
         filterQuality: FilterQuality.low,
-        errorBuilder: (_, __, ___) => _FallbackPointsIcon(size: size),
+        errorBuilder: (_, _, _) => _FallbackPointsIcon(size: size),
       );
     }
 

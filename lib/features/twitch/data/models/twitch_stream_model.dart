@@ -25,27 +25,34 @@ class TwitchStreamModel {
     return TwitchStreamModel(
       id: json['id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? json['userId']?.toString() ?? '',
-      userLogin: json['user_login']?.toString() ??
+      userLogin:
+          json['user_login']?.toString() ??
           json['userLogin']?.toString() ??
           json['login']?.toString() ??
           json['channelLogin']?.toString() ??
           '',
-      userName: json['user_name']?.toString() ??
+      userName:
+          json['user_name']?.toString() ??
           json['userName']?.toString() ??
           json['displayName']?.toString() ??
           json['channelName']?.toString() ??
           '',
       title: json['title']?.toString() ?? '',
-      gameName: json['game_name']?.toString() ?? json['gameName']?.toString() ?? '',
-      viewerCount: int.tryParse(
+      gameName:
+          json['game_name']?.toString() ?? json['gameName']?.toString() ?? '',
+      viewerCount:
+          int.tryParse(
             json['viewer_count']?.toString() ??
                 json['viewerCount']?.toString() ??
                 '',
           ) ??
           0,
       thumbnailUrl:
-          json['thumbnail_url']?.toString() ?? json['thumbnailUrl']?.toString() ?? '',
-      profileImageUrl: json['profile_image_url']?.toString() ??
+          json['thumbnail_url']?.toString() ??
+          json['thumbnailUrl']?.toString() ??
+          '',
+      profileImageUrl:
+          json['profile_image_url']?.toString() ??
           json['profileImageUrl']?.toString() ??
           '',
     );

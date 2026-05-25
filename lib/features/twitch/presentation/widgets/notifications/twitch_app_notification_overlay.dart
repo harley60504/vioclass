@@ -5,10 +5,7 @@ import '../../../services/notifications/twitch_app_notification_service.dart';
 class TwitchAppNotificationOverlay extends StatelessWidget {
   final Widget child;
 
-  const TwitchAppNotificationOverlay({
-    super.key,
-    required this.child,
-  });
+  const TwitchAppNotificationOverlay({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -93,15 +90,15 @@ class _TwitchAppNotificationCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xF216111F),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: accent.withOpacity(0.34)),
+            border: Border.all(color: accent.withValues(alpha: 0.34)),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: Colors.black.withOpacity(0.38),
+                color: Colors.black.withValues(alpha: 0.38),
                 blurRadius: 24,
                 offset: const Offset(0, 10),
               ),
               BoxShadow(
-                color: accent.withOpacity(0.16),
+                color: accent.withValues(alpha: 0.16),
                 blurRadius: 18,
                 offset: const Offset(0, 0),
               ),
@@ -115,10 +112,7 @@ class _TwitchAppNotificationCard extends StatelessWidget {
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  child: Container(
-                    width: 5,
-                    color: accent,
-                  ),
+                  child: Container(width: 5, color: accent),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(17, 14, 10, 14),
@@ -129,9 +123,11 @@ class _TwitchAppNotificationCard extends StatelessWidget {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: accent.withOpacity(0.14),
+                          color: accent.withValues(alpha: 0.14),
                           shape: BoxShape.circle,
-                          border: Border.all(color: accent.withOpacity(0.32)),
+                          border: Border.all(
+                            color: accent.withValues(alpha: 0.32),
+                          ),
                         ),
                         child: Icon(item.icon, color: accent, size: 23),
                       ),
@@ -159,7 +155,7 @@ class _TwitchAppNotificationCard extends StatelessWidget {
                                 maxLines: 3,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.70),
+                                  color: Colors.white.withValues(alpha: 0.70),
                                   fontSize: 12.5,
                                   height: 1.28,
                                   fontWeight: FontWeight.w700,
@@ -177,7 +173,7 @@ class _TwitchAppNotificationCard extends StatelessWidget {
                         onPressed: onDismiss,
                         icon: Icon(
                           Icons.close_rounded,
-                          color: Colors.white.withOpacity(0.58),
+                          color: Colors.white.withValues(alpha: 0.58),
                           size: 19,
                         ),
                       ),

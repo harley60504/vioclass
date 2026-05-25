@@ -6,9 +6,7 @@ import '../core/twitch_api_client.dart';
 class TwitchThirdPartyEmoteApiService {
   final TwitchApiClient client;
 
-  const TwitchThirdPartyEmoteApiService({
-    required this.client,
-  });
+  const TwitchThirdPartyEmoteApiService({required this.client});
 
   static const int _sevenTvPreferredChatWidth = 64;
 
@@ -19,11 +17,18 @@ class TwitchThirdPartyEmoteApiService {
     final results = await Future.wait<List<TwitchThirdPartyEmote>>(
       <Future<List<TwitchThirdPartyEmote>>>[
         fetchBttvGlobal().catchError((_) => <TwitchThirdPartyEmote>[]),
-        fetchBttvChannel(channelId: channelId).catchError((_) => <TwitchThirdPartyEmote>[]),
+        fetchBttvChannel(
+          channelId: channelId,
+        ).catchError((_) => <TwitchThirdPartyEmote>[]),
         fetchFfzGlobal().catchError((_) => <TwitchThirdPartyEmote>[]),
-        fetchFfzChannel(channelId: channelId, channelLogin: channelLogin).catchError((_) => <TwitchThirdPartyEmote>[]),
+        fetchFfzChannel(
+          channelId: channelId,
+          channelLogin: channelLogin,
+        ).catchError((_) => <TwitchThirdPartyEmote>[]),
         fetchSevenTvGlobal().catchError((_) => <TwitchThirdPartyEmote>[]),
-        fetchSevenTvChannel(channelId: channelId).catchError((_) => <TwitchThirdPartyEmote>[]),
+        fetchSevenTvChannel(
+          channelId: channelId,
+        ).catchError((_) => <TwitchThirdPartyEmote>[]),
       ],
     );
 
@@ -34,7 +39,9 @@ class TwitchThirdPartyEmoteApiService {
     // emotes for the same token.
     for (final group in results) {
       for (final emote in group) {
-        if (emote.name.trim().isEmpty || emote.imageUrl.trim().isEmpty) continue;
+        if (emote.name.trim().isEmpty || emote.imageUrl.trim().isEmpty) {
+          continue;
+        }
         // Twitch-style priority when names collide: 7TV > FFZ > BTTV.
         byName[emote.name] = emote;
       }
@@ -55,10 +62,10 @@ class TwitchThirdPartyEmoteApiService {
 
     return raw
         .whereType<Map<String, dynamic>>()
-        .map((json) => _bttvFromJson(
-              json,
-              scope: TwitchThirdPartyEmoteScope.global,
-            ))
+        .map(
+          (json) =>
+              _bttvFromJson(json, scope: TwitchThirdPartyEmoteScope.global),
+        )
         .where((emote) => emote.name.isNotEmpty && emote.imageUrl.isNotEmpty)
         .toList(growable: false);
   }
@@ -79,22 +86,18 @@ class TwitchThirdPartyEmoteApiService {
     if (channelEmotes is List) {
       output.addAll(
         channelEmotes.whereType<Map<String, dynamic>>().map(
-              (json) => _bttvFromJson(
-                json,
-                scope: TwitchThirdPartyEmoteScope.channel,
-              ),
-            ),
+          (json) =>
+              _bttvFromJson(json, scope: TwitchThirdPartyEmoteScope.channel),
+        ),
       );
     }
 
     if (sharedEmotes is List) {
       output.addAll(
         sharedEmotes.whereType<Map<String, dynamic>>().map(
-              (json) => _bttvFromJson(
-                json,
-                scope: TwitchThirdPartyEmoteScope.shared,
-              ),
-            ),
+          (json) =>
+              _bttvFromJson(json, scope: TwitchThirdPartyEmoteScope.shared),
+        ),
       );
     }
 
@@ -109,13 +112,16 @@ class TwitchThirdPartyEmoteApiService {
   }) {
     final id = json['id']?.toString() ?? '';
     final code = json['code']?.toString() ?? '';
-    final animated = _readBool(json['animated']) ||
+    final animated =
+        _readBool(json['animated']) ||
         (json['imageType']?.toString().toLowerCase() == 'gif');
     return TwitchThirdPartyEmote(
       id: id,
       name: code,
       imageUrl: id.isEmpty ? '' : 'https://cdn.betterttv.net/emote/$id/2x',
-      staticImageUrl: id.isEmpty ? '' : 'https://cdn.betterttv.net/emote/$id/1x',
+      staticImageUrl: id.isEmpty
+          ? ''
+          : 'https://cdn.betterttv.net/emote/$id/1x',
       provider: TwitchThirdPartyEmoteProvider.bttv,
       scope: scope,
       isZeroWidth: json['modifier'] == true,
@@ -190,9 +196,12 @@ class TwitchThirdPartyEmoteApiService {
         String staticImageUrl = '';
         if (urls is Map) {
           imageUrl = (urls['2'] ?? urls['1'] ?? urls['4'])?.toString() ?? '';
-          staticImageUrl = (urls['1'] ?? urls['2'] ?? urls['4'])?.toString() ?? '';
+          staticImageUrl =
+              (urls['1'] ?? urls['2'] ?? urls['4'])?.toString() ?? '';
           if (imageUrl.startsWith('//')) imageUrl = 'https:$imageUrl';
-          if (staticImageUrl.startsWith('//')) staticImageUrl = 'https:$staticImageUrl';
+          if (staticImageUrl.startsWith('//')) {
+            staticImageUrl = 'https:$staticImageUrl';
+          }
         }
 
         output.add(
@@ -220,10 +229,7 @@ class TwitchThirdPartyEmoteApiService {
       'https://7tv.io/v3/emote-sets/global',
     );
 
-    return _sevenTvFromEmoteSet(
-      raw,
-      scope: TwitchThirdPartyEmoteScope.global,
-    );
+    return _sevenTvFromEmoteSet(raw, scope: TwitchThirdPartyEmoteScope.global);
   }
 
   Future<List<TwitchThirdPartyEmote>> fetchSevenTvChannel({
@@ -324,12 +330,17 @@ class TwitchThirdPartyEmoteApiService {
   }) {
     if (candidates.isEmpty) return const <String, dynamic>{};
 
-    final formatPool = candidates.where((file) {
-      final format = file['format']?.toString().toLowerCase() ?? '';
-      final name = file['name']?.toString().toLowerCase() ?? '';
-      if (animated) return format == 'webp' || name.endsWith('.webp');
-      return format == 'webp' || format == 'png' || name.endsWith('.webp') || name.endsWith('.png');
-    }).toList(growable: false);
+    final formatPool = candidates
+        .where((file) {
+          final format = file['format']?.toString().toLowerCase() ?? '';
+          final name = file['name']?.toString().toLowerCase() ?? '';
+          if (animated) return format == 'webp' || name.endsWith('.webp');
+          return format == 'webp' ||
+              format == 'png' ||
+              name.endsWith('.webp') ||
+              name.endsWith('.png');
+        })
+        .toList(growable: false);
 
     final preferredPool = formatPool.isNotEmpty ? formatPool : candidates;
     return _selectByPreferredWidth(preferredPool);
@@ -340,21 +351,27 @@ class TwitchThirdPartyEmoteApiService {
   ) {
     if (candidates.isEmpty) return const <String, dynamic>{};
 
-    final staticPool = candidates.where((file) {
-      final name = file['name']?.toString().toLowerCase() ?? '';
-      final format = file['format']?.toString().toLowerCase() ?? '';
-      return name.endsWith('.png') || format == 'png';
-    }).toList(growable: false);
+    final staticPool = candidates
+        .where((file) {
+          final name = file['name']?.toString().toLowerCase() ?? '';
+          final format = file['format']?.toString().toLowerCase() ?? '';
+          return name.endsWith('.png') || format == 'png';
+        })
+        .toList(growable: false);
 
     if (staticPool.isNotEmpty) return _selectByPreferredWidth(staticPool);
 
-    final fallbackPool = candidates.where((file) {
-      final name = file['name']?.toString().toLowerCase() ?? '';
-      final format = file['format']?.toString().toLowerCase() ?? '';
-      return name.endsWith('.webp') || format == 'webp';
-    }).toList(growable: false);
+    final fallbackPool = candidates
+        .where((file) {
+          final name = file['name']?.toString().toLowerCase() ?? '';
+          final format = file['format']?.toString().toLowerCase() ?? '';
+          return name.endsWith('.webp') || format == 'webp';
+        })
+        .toList(growable: false);
 
-    return _selectByPreferredWidth(fallbackPool.isNotEmpty ? fallbackPool : candidates);
+    return _selectByPreferredWidth(
+      fallbackPool.isNotEmpty ? fallbackPool : candidates,
+    );
   }
 
   Map<String, dynamic> _selectByPreferredWidth(

@@ -75,10 +75,10 @@ class TwitchCachedImageLayer extends StatelessWidget {
     this.gaplessPlayback = true,
     this.fadeInDuration = const Duration(milliseconds: 80),
     this.fadeOutDuration = const Duration(milliseconds: 80),
-  })  : width = size,
-        height = size,
-        circular = true,
-        borderRadius = null;
+  }) : width = size,
+       height = size,
+       circular = true,
+       borderRadius = null;
 
   @override
   Widget build(BuildContext context) {

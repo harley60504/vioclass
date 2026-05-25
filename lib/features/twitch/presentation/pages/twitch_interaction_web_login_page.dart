@@ -92,7 +92,8 @@ class _TwitchInteractionWebLoginPageState
   }
 
   static String sharedDesktopWebViewUserDataFolder() {
-    final path = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    final path =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
         'new_twitch_app_shared_twitch_desktop_webview_v30';
     try {
       Directory(path).createSync(recursive: true);
@@ -105,9 +106,9 @@ class _TwitchInteractionWebLoginPageState
     if (url == null || url.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已複製目前 URL')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製目前 URL')));
   }
 
   void _startProbeTimer() {
@@ -293,7 +294,9 @@ class _TwitchInteractionWebLoginPageState
     try {
       final token = _isDesktopAuthWindowPlatform
           ? await _readTwitchWebAuthTokenFromWindow(window)
-          : await _readTwitchWebAuthTokenFromEmbeddedWebView(embeddedController!);
+          : await _readTwitchWebAuthTokenFromEmbeddedWebView(
+              embeddedController!,
+            );
       if (token == null || token.trim().isEmpty) {
         if (!mounted) return;
         setState(() {
@@ -349,7 +352,6 @@ class _TwitchInteractionWebLoginPageState
     return _tryExtractTokenFromText(raw?.toString() ?? '');
   }
 
-
   Future<String?> _readTwitchWebAuthTokenFromEmbeddedWebView(
     InAppWebViewController controller,
   ) async {
@@ -395,10 +397,22 @@ class _TwitchInteractionWebLoginPageState
     }
 
     final patterns = <RegExp>[
-      RegExp(r'''["']auth-token["']\s*[:=]\s*["']([^"']+)["']''', caseSensitive: false),
-      RegExp(r'''["']authToken["']\s*[:=]\s*["']([^"']+)["']''', caseSensitive: false),
-      RegExp(r'''["']accessToken["']\s*[:=]\s*["']([^"']+)["']''', caseSensitive: false),
-      RegExp(r'''["']token["']\s*[:=]\s*["']([^"']{20,})["']''', caseSensitive: false),
+      RegExp(
+        r'''["']auth-token["']\s*[:=]\s*["']([^"']+)["']''',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'''["']authToken["']\s*[:=]\s*["']([^"']+)["']''',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'''["']accessToken["']\s*[:=]\s*["']([^"']+)["']''',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'''["']token["']\s*[:=]\s*["']([^"']{20,})["']''',
+        caseSensitive: false,
+      ),
     ];
 
     for (final pattern in patterns) {
@@ -421,7 +435,10 @@ class _TwitchInteractionWebLoginPageState
       for (final entry in value.entries) {
         final key = entry.key.toString().toLowerCase();
         final item = entry.value;
-        if ((key == 'auth-token' || key == 'authtoken' || key == 'accesstoken' || key == 'token') &&
+        if ((key == 'auth-token' ||
+                key == 'authtoken' ||
+                key == 'accesstoken' ||
+                key == 'token') &&
             item is String &&
             item.trim().length >= 20) {
           return item.trim();
@@ -528,9 +545,13 @@ query ChannelPointsContext($channelLogin: String!) {
 
     if (raw is! Map) throw StateError('GQL 回傳格式不是 Map：${raw.runtimeType}');
     final errors = raw['errors'];
-    if (errors is List && errors.isNotEmpty) throw StateError('GQL errors: $errors');
+    if (errors is List && errors.isNotEmpty) {
+      throw StateError('GQL errors: $errors');
+    }
     final data = raw['data'];
-    if (data is! Map || data['user'] == null) throw StateError('GQL 沒有回傳 data.user。');
+    if (data is! Map || data['user'] == null) {
+      throw StateError('GQL 沒有回傳 data.user。');
+    }
   }
 
   String _previewToken(String token) {
@@ -562,7 +583,11 @@ query ChannelPointsContext($channelLogin: String!) {
           _buildStatusBar(),
           if (_errorText != null) _buildErrorBanner(),
           _buildActionBar(busy),
-          Expanded(child: _useEmbeddedMobileWebView ? _buildEmbeddedWebGqlWebView() : _buildMainPanel(busy)),
+          Expanded(
+            child: _useEmbeddedMobileWebView
+                ? _buildEmbeddedWebGqlWebView()
+                : _buildMainPanel(busy),
+          ),
         ],
       ),
     );
@@ -575,22 +600,33 @@ query ChannelPointsContext($channelLogin: String!) {
       color: const Color(0xFF111116),
       child: Row(
         children: [
-          Icon(_windowOpen ? Icons.open_in_new_rounded : Icons.web_asset_off_rounded,
-              color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white54),
+          Icon(
+            _windowOpen
+                ? Icons.open_in_new_rounded
+                : Icons.web_asset_off_rounded,
+            color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white54,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               _statusText,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           if (_checking || _saving || _openingWindow)
             const SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFBF94FF)),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFBF94FF),
+              ),
             ),
         ],
       ),
@@ -601,8 +637,15 @@ query ChannelPointsContext($channelLogin: String!) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: Colors.redAccent.withOpacity(0.18),
-      child: Text(_errorText!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.w800)),
+      color: Colors.redAccent.withValues(alpha: 0.18),
+      child: Text(
+        _errorText!,
+        style: const TextStyle(
+          color: Colors.orangeAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 
@@ -641,9 +684,14 @@ query ChannelPointsContext($channelLogin: String!) {
           const Spacer(),
           Flexible(
             child: Text(
-              _lastProbeText ?? (_useEmbeddedMobileWebView
-                  ? (_embeddedWebViewReady ? 'App 內 Web/GQL 頁已載入' : '等待 App 內 Web/GQL 頁...')
-                  : (_windowOpen ? 'desktop_webview_window 已開啟' : '等待視窗開啟')), 
+              _lastProbeText ??
+                  (_useEmbeddedMobileWebView
+                      ? (_embeddedWebViewReady
+                            ? 'App 內 Web/GQL 頁已載入'
+                            : '等待 App 內 Web/GQL 頁...')
+                      : (_windowOpen
+                            ? 'desktop_webview_window 已開啟'
+                            : '等待視窗開啟')),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.white54, fontSize: 12),
@@ -654,9 +702,10 @@ query ChannelPointsContext($channelLogin: String!) {
     );
   }
 
-
   Widget _buildEmbeddedWebGqlWebView() {
-    final url = _lastUrl?.trim().isNotEmpty == true ? _lastUrl!.trim() : _loginUrl;
+    final url = _lastUrl?.trim().isNotEmpty == true
+        ? _lastUrl!.trim()
+        : _loginUrl;
 
     return Column(
       children: [
@@ -779,24 +828,34 @@ query ChannelPointsContext($channelLogin: String!) {
         decoration: BoxDecoration(
           color: const Color(0xFF111116),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_windowOpen ? Icons.language_rounded : Icons.language_outlined,
-                color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white38,
-                size: 58),
+            Icon(
+              _windowOpen ? Icons.language_rounded : Icons.language_outlined,
+              color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white38,
+              size: 58,
+            ),
             const SizedBox(height: 14),
             const Text(
               '官方 Twitch Web / GQL',
-              style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             const SizedBox(height: 8),
             const Text(
               '這是單獨補 Web/GQL 的頁面。一般一鍵登入會在主 OAuth 視窗裡順手擷取 GQL token，不會再另外開這個視窗。',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white60, height: 1.4, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                color: Colors.white60,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 18),
             Wrap(
@@ -808,7 +867,10 @@ query ChannelPointsContext($channelLogin: String!) {
                   onPressed: busy ? null : () => _openDesktopWindow(_loginUrl),
                   icon: const Icon(Icons.open_in_new_rounded),
                   label: Text(_windowOpen ? '重開登入視窗' : '開啟登入視窗'),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9146FF), foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF9146FF),
+                    foregroundColor: Colors.white,
+                  ),
                 ),
                 OutlinedButton.icon(
                   onPressed: busy ? null : () => _probeAndMaybeSave(),
@@ -819,11 +881,23 @@ query ChannelPointsContext($channelLogin: String!) {
             ),
             if (_lastTokenPreview != null) ...[
               const SizedBox(height: 14),
-              Text('token=$_lastTokenPreview', style: const TextStyle(color: Colors.white38, fontSize: 12, fontFamily: 'monospace')),
+              Text(
+                'token=$_lastTokenPreview',
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                ),
+              ),
             ],
             if (_lastUrl != null) ...[
               const SizedBox(height: 10),
-              SelectableText(_lastUrl!, maxLines: 2, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white30, fontSize: 11)),
+              SelectableText(
+                _lastUrl!,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white30, fontSize: 11),
+              ),
             ],
           ],
         ),

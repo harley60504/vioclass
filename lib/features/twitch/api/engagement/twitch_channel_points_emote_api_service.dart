@@ -7,9 +7,8 @@ export '../../parsers/engagement/twitch_channel_points_emote_parser.dart';
 
 typedef TwitchChannelPointsEmoteTokenProvider = Future<String?> Function();
 typedef TwitchChannelPointsEmoteActionClientIdProvider = String Function();
-typedef TwitchChannelPointsChannelIdResolver = Future<String> Function({
-  required String channelLogin,
-});
+typedef TwitchChannelPointsChannelIdResolver =
+    Future<String> Function({required String channelLogin});
 
 /// Backend-only API for Channel Points emote menus.
 ///
@@ -135,7 +134,9 @@ class TwitchChannelPointsEmoteApiService {
       );
     }
 
-    if (ownerId.isEmpty && channelLogin.isNotEmpty && resolveChannelId != null) {
+    if (ownerId.isEmpty &&
+        channelLogin.isNotEmpty &&
+        resolveChannelId != null) {
       ownerId = (await resolveChannelId(channelLogin: channelLogin)).trim();
     }
 
@@ -153,9 +154,7 @@ class TwitchChannelPointsEmoteApiService {
     return _postPersistedQuery(
       operationName: 'ChannelPointsContext',
       sha256Hash: channelPointsContextHash,
-      variables: <String, dynamic>{
-        'channelLogin': channelLogin,
-      },
+      variables: <String, dynamic>{'channelLogin': channelLogin},
     );
   }
 
@@ -169,9 +168,7 @@ class TwitchChannelPointsEmoteApiService {
     return _postPersistedQuery(
       operationName: null,
       sha256Hash: emotePickerUserSubscriptionProductsHash,
-      variables: <String, dynamic>{
-        'channelOwnerID': channelOwnerId,
-      },
+      variables: <String, dynamic>{'channelOwnerID': channelOwnerId},
     );
   }
 
@@ -235,16 +232,10 @@ class TwitchChannelPointsEmoteApiService {
     if (errors is List && errors.isNotEmpty) {
       final first = errors.first;
       if (first is Map && first['message'] != null) {
-        throw TwitchApiException(
-          first['message'].toString(),
-          details: raw,
-        );
+        throw TwitchApiException(first['message'].toString(), details: raw);
       }
 
-      throw TwitchApiException(
-        errors.toString(),
-        details: raw,
-      );
+      throw TwitchApiException(errors.toString(), details: raw);
     }
   }
 }

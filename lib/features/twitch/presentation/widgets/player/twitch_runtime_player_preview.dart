@@ -46,10 +46,11 @@ class TwitchRuntimePlayerPreview extends StatelessWidget {
                   gameName: gameName,
                   viewerCount: viewerCount,
                   loading: playerRuntime.loading,
-                  playlistPreview: playerRuntime.playlistUri?.toString().replaceFirst(
-                            RegExp(r'token=[^&]+'),
-                            'token=<hidden>',
-                          ) ??
+                  playlistPreview:
+                      playerRuntime.playlistUri?.toString().replaceFirst(
+                        RegExp(r'token=[^&]+'),
+                        'token=<hidden>',
+                      ) ??
                       '',
                 ),
               ),
@@ -61,13 +62,18 @@ class TwitchRuntimePlayerPreview extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.16),
+                      color: Colors.redAccent.withValues(alpha: 0.16),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.redAccent.withOpacity(0.35)),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.35),
+                      ),
                     ),
                     child: SelectableText(
                       playerRuntime.error.toString(),
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -103,7 +109,7 @@ class _InfoCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xCC18181B),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

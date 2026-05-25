@@ -112,7 +112,7 @@ class _TwitchPlayerCoreErrorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xCC1F1329),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Text(
         error.toString(),
@@ -147,7 +147,7 @@ class _TwitchPlayerCoreDebugBadge extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xAA000000),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),

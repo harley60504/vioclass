@@ -23,9 +23,9 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.fromLTRB(10, compact ? 8 : 10, 7, compact ? 8 : 10),
         decoration: BoxDecoration(
-          color: accent.withOpacity(0.12),
+          color: accent.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: accent.withOpacity(0.34)),
+          border: Border.all(color: accent.withValues(alpha: 0.34)),
         ),
         child: Row(
           children: <Widget>[
@@ -34,9 +34,9 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
               height: compact ? 30 : 34,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.20),
+                color: Colors.black.withValues(alpha: 0.20),
                 shape: BoxShape.circle,
-                border: Border.all(color: accent.withOpacity(0.42)),
+                border: Border.all(color: accent.withValues(alpha: 0.42)),
               ),
               child: Icon(
                 _iconForKind(pending.kind),
@@ -77,7 +77,7 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
                     maxLines: compact ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.66),
+                      color: Colors.white.withValues(alpha: 0.66),
                       fontSize: compact ? 10.8 : 11.6,
                       height: 1.25,
                       fontWeight: FontWeight.w700,
@@ -142,19 +142,16 @@ class _TinyPill extends StatelessWidget {
   final String text;
   final Color color;
 
-  const _TinyPill({
-    required this.text,
-    required this.color,
-  });
+  const _TinyPill({required this.text, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.30)),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
       child: Text(
         text,

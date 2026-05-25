@@ -22,9 +22,19 @@ class FollowButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visualHeight = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
+    final visualHeight =
+        height ??
+        (tiny
+            ? 36.0
+            : compact
+            ? 42.0
+            : 64.0);
     final size = visualHeight;
-    final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
+    final radius = tiny
+        ? 14.0
+        : compact
+        ? 16.0
+        : 20.0;
 
     return Tooltip(
       message: followed ? '取消追隨' : '追隨',
@@ -37,11 +47,11 @@ class FollowButton extends StatelessWidget {
           child: TwitchGlassSurface(
             borderRadius: BorderRadius.circular(radius),
             backgroundColor: followed
-                ? Colors.pinkAccent.withOpacity(0.24)
-                : Colors.black.withOpacity(0.42),
+                ? Colors.pinkAccent.withValues(alpha: 0.24)
+                : Colors.black.withValues(alpha: 0.42),
             borderColor: followed
-                ? Colors.pinkAccent.withOpacity(0.34)
-                : Colors.white.withOpacity(0.10),
+                ? Colors.pinkAccent.withValues(alpha: 0.34)
+                : Colors.white.withValues(alpha: 0.10),
             blurSigma: 0,
             boxShadow: const <BoxShadow>[],
             child: SizedBox(
@@ -57,7 +67,11 @@ class FollowButton extends StatelessWidget {
                     : Icon(
                         followed ? Icons.favorite : Icons.favorite_border,
                         color: followed ? Colors.pinkAccent : Colors.white,
-                        size: tiny ? 20 : compact ? 23 : 32,
+                        size: tiny
+                            ? 20
+                            : compact
+                            ? 23
+                            : 32,
                       ),
               ),
             ),
@@ -84,8 +98,18 @@ class SubscribeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visualHeight = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
-    final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
+    final visualHeight =
+        height ??
+        (tiny
+            ? 36.0
+            : compact
+            ? 42.0
+            : 64.0);
+    final radius = tiny
+        ? 14.0
+        : compact
+        ? 16.0
+        : 20.0;
 
     return Material(
       color: Colors.transparent,
@@ -95,18 +119,24 @@ class SubscribeButton extends StatelessWidget {
         onTap: onPressed,
         child: TwitchGlassSurface(
           borderRadius: BorderRadius.circular(radius),
-          backgroundColor: const Color(0xFF9146FF).withOpacity(0.28),
-          borderColor: const Color(0xFFBF94FF).withOpacity(0.30),
+          backgroundColor: const Color(0xFF9146FF).withValues(alpha: 0.28),
+          borderColor: const Color(0xFFBF94FF).withValues(alpha: 0.30),
           blurSigma: 0,
           boxShadow: const <BoxShadow>[],
           child: SizedBox(
             height: visualHeight,
             width: compact ? visualHeight : null,
             child: Padding(
-              padding: compact ? EdgeInsets.zero : const EdgeInsets.symmetric(horizontal: 22),
+              padding: compact
+                  ? EdgeInsets.zero
+                  : const EdgeInsets.symmetric(horizontal: 22),
               child: Center(
                 child: compact
-                    ? Icon(Icons.auto_awesome, color: Colors.white, size: tiny ? 19 : 22)
+                    ? Icon(
+                        Icons.auto_awesome,
+                        color: Colors.white,
+                        size: tiny ? 19 : 22,
+                      )
                     : const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -119,7 +149,11 @@ class SubscribeButton extends StatelessWidget {
                             ),
                           ),
                           SizedBox(width: 8),
-                          Icon(Icons.auto_awesome, color: Colors.white, size: 19),
+                          Icon(
+                            Icons.auto_awesome,
+                            color: Colors.white,
+                            size: 19,
+                          ),
                         ],
                       ),
               ),

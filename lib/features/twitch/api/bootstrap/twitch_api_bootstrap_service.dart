@@ -34,7 +34,11 @@ class TwitchApiBootstrapService {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin cannot be empty',
+      );
     }
 
     final startedAt = DateTime.now();
@@ -42,8 +46,13 @@ class TwitchApiBootstrapService {
     final userFuture = userApi.getUserByLogin(login);
     final streamFuture = streamApi.getLiveStreamByLogin(login);
     final playbackFuture = _safeMap(() async {
-      final token = await playbackApi.getLivePlaybackAccessToken(channelLogin: login);
-      final uri = playbackApi.buildLivePlaylistUri(channelLogin: login, accessToken: token);
+      final token = await playbackApi.getLivePlaybackAccessToken(
+        channelLogin: login,
+      );
+      final uri = playbackApi.buildLivePlaylistUri(
+        channelLogin: login,
+        accessToken: token,
+      );
 
       return <String, dynamic>{
         'hasValue': token.value.isNotEmpty,
@@ -51,25 +60,33 @@ class TwitchApiBootstrapService {
         'hasSignature': token.signature.isNotEmpty,
         'signature': token.signature,
         'playlistUriPreview': uri.toString().replaceFirst(
-              RegExp(r'token=[^&]+'),
-              'token=<hidden>',
-            ),
+          RegExp(r'token=[^&]+'),
+          'token=<hidden>',
+        ),
       };
     });
     final hypeTrainFuture = _safeMap(() async {
-      final snapshot = await hypeTrainApi.getHypeTrainSnapshot(channelLogin: login);
+      final snapshot = await hypeTrainApi.getHypeTrainSnapshot(
+        channelLogin: login,
+      );
       return snapshot.toJson();
     });
     final channelPointsFuture = _safeMap(() async {
-      final bundle = await channelPointsApi.fetchChannelPointsBundle(channelLogin: login);
+      final bundle = await channelPointsApi.fetchChannelPointsBundle(
+        channelLogin: login,
+      );
       return bundle.toJson();
     });
     final predictionFuture = _safeMap(() async {
-      final prediction = await predictionApi.fetchPredictionContext(channelLogin: login);
+      final prediction = await predictionApi.fetchPredictionContext(
+        channelLogin: login,
+      );
       return prediction.toJson();
     });
     final chatStartupFuture = _safeMap(() async {
-      final startup = await chatStartupApi.fetchParsedStartupSnapshot(channelLogin: login);
+      final startup = await chatStartupApi.fetchParsedStartupSnapshot(
+        channelLogin: login,
+      );
       return startup.toJson();
     });
 
@@ -78,9 +95,7 @@ class TwitchApiBootstrapService {
 
     final pinnedChatFuture = _safeMap(() async {
       if (channelId.isEmpty) {
-        return <String, dynamic>{
-          'error': 'channelId is empty',
-        };
+        return <String, dynamic>{'error': 'channelId is empty'};
       }
 
       final messages = await pinnedChatApi.getPinnedChatMessages(

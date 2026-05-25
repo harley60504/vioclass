@@ -6,7 +6,8 @@ import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api.dart';
 class TwitchChannelPointsRuntimeService {
   final TwitchChannelPointsApiService channelPointsApi;
   final TwitchChannelPointsEmoteApiService? channelPointsEmoteApi;
-  final TwitchStreamNookModifiedEmoteRedeemApi? streamNookModifiedEmoteRedeemApi;
+  final TwitchStreamNookModifiedEmoteRedeemApi?
+  streamNookModifiedEmoteRedeemApi;
 
   const TwitchChannelPointsRuntimeService({
     required this.channelPointsApi,
@@ -60,7 +61,8 @@ class TwitchChannelPointsRuntimeService {
     String textInput = '',
   }) {
     final parsedReward = _parseRedeemableReward(reward);
-    if (parsedReward.normalizedRewardType == 'CHOSEN_MODIFIED_SUB_EMOTE_UNLOCK') {
+    if (parsedReward.normalizedRewardType ==
+        'CHOSEN_MODIFIED_SUB_EMOTE_UNLOCK') {
       final selection = _parseModifiedEmoteSelection(textInput);
       return unlockModifiedSubscriberEmote(
         channelId: channelId,
@@ -140,7 +142,9 @@ class TwitchChannelPointsRuntimeService {
   _TwitchModifiedEmoteSelection _parseModifiedEmoteSelection(String textInput) {
     final clean = textInput.trim();
     if (clean.isEmpty) {
-      throw StateError('Modify Emote requires a selected modified emote payload.');
+      throw StateError(
+        'Modify Emote requires a selected modified emote payload.',
+      );
     }
     try {
       final decoded = jsonDecode(clean);
@@ -160,7 +164,8 @@ class TwitchChannelPointsRuntimeService {
 
   TwitchChannelReward _parseRedeemableReward(Map<String, dynamic> reward) {
     final source = reward['source']?.toString() ?? '';
-    final isPublicFallback = source == 'publicFallback' ||
+    final isPublicFallback =
+        source == 'publicFallback' ||
         reward['publicFallback'] == true ||
         reward['isRedeemable'] == false;
     if (isPublicFallback) {
@@ -183,7 +188,9 @@ class TwitchChannelPointsRuntimeService {
       channelLogin: channelLogin,
       channelId: channelId,
       resolveChannelId: ({required String channelLogin}) async {
-        final context = await channelPointsApi.getContext(channelLogin: channelLogin);
+        final context = await channelPointsApi.getContext(
+          channelLogin: channelLogin,
+        );
         return context.channelId;
       },
     );
@@ -271,19 +278,23 @@ class TwitchChannelPointsRuntimeSnapshot {
   bool get rewardsOk => rewardsError == null;
   bool get usable => publicOk || contextOk || rewardsOk;
 
-  int get elapsedMilliseconds => completedAt.difference(startedAt).inMilliseconds;
+  int get elapsedMilliseconds =>
+      completedAt.difference(startedAt).inMilliseconds;
   int? get balance => context?.balance;
   String? get availableClaimId => context?.availableClaimId;
   int get availableClaimPoints => context?.availableClaimPoints ?? 0;
   bool get hasAvailableClaim => context?.hasAvailableClaim ?? false;
   String? get pointsName => context?.pointsName ?? rewardsResult?.pointsName;
-  String? get pointsIconUrl => context?.pointsIconUrl ?? rewardsResult?.pointsIconUrl;
+  String? get pointsIconUrl =>
+      context?.pointsIconUrl ?? rewardsResult?.pointsIconUrl;
   String? get channelId => context?.channelId ?? rewardsResult?.channelId;
 
   List<Map<String, dynamic>> get rewards {
     final channelRewards = rewardsResult;
     if (channelRewards != null && channelRewards.rewards.isNotEmpty) {
-      return channelRewards.rewards.map((reward) => reward.toJson()).toList(growable: false);
+      return channelRewards.rewards
+          .map((reward) => reward.toJson())
+          .toList(growable: false);
     }
     return _publicRewardsFallback();
   }
@@ -300,7 +311,9 @@ class TwitchChannelPointsRuntimeSnapshot {
       if (rawRewards is! List) continue;
       for (final reward in rawRewards) {
         if (reward is! Map) continue;
-        final mapped = reward.map((key, value) => MapEntry(key.toString(), value));
+        final mapped = reward.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
         final resolvedImageUrl = _resolveRewardImageUrl(mapped);
         if (resolvedImageUrl.isNotEmpty) {
           mapped['imageUrl'] = resolvedImageUrl;
@@ -327,14 +340,15 @@ class TwitchChannelPointsRuntimeSnapshot {
       final bCost = int.tryParse(b['cost']?.toString() ?? '') ?? 0;
       if (aCost != bCost) return aCost.compareTo(bCost);
       return (a['title']?.toString() ?? '').toLowerCase().compareTo(
-            (b['title']?.toString() ?? '').toLowerCase(),
-          );
+        (b['title']?.toString() ?? '').toLowerCase(),
+      );
     });
     return output;
   }
 
   String _resolveRewardImageUrl(Map<String, dynamic> reward) {
-    final custom = _readNestedString(reward, const <String>['image', 'url4x']) ??
+    final custom =
+        _readNestedString(reward, const <String>['image', 'url4x']) ??
         _readNestedString(reward, const <String>['image', 'url_4x']) ??
         _readNestedString(reward, const <String>['image', 'url2x']) ??
         _readNestedString(reward, const <String>['image', 'url_2x']) ??
@@ -346,17 +360,17 @@ class TwitchChannelPointsRuntimeSnapshot {
 
     final fallback =
         _readNestedString(reward, const <String>['defaultImage', 'url4x']) ??
-            _readNestedString(reward, const <String>['defaultImage', 'url_4x']) ??
-            _readNestedString(reward, const <String>['defaultImage', 'url2x']) ??
-            _readNestedString(reward, const <String>['defaultImage', 'url_2x']) ??
-            _readNestedString(reward, const <String>['defaultImage', 'url']) ??
-            _readNestedString(reward, const <String>['default_image', 'url4x']) ??
-            _readNestedString(reward, const <String>['default_image', 'url_4x']) ??
-            _readNestedString(reward, const <String>['default_image', 'url2x']) ??
-            _readNestedString(reward, const <String>['default_image', 'url_2x']) ??
-            _readNestedString(reward, const <String>['default_image', 'url']) ??
-            _readFlatString(reward, 'defaultImageUrl') ??
-            _readFlatString(reward, 'default_image_url');
+        _readNestedString(reward, const <String>['defaultImage', 'url_4x']) ??
+        _readNestedString(reward, const <String>['defaultImage', 'url2x']) ??
+        _readNestedString(reward, const <String>['defaultImage', 'url_2x']) ??
+        _readNestedString(reward, const <String>['defaultImage', 'url']) ??
+        _readNestedString(reward, const <String>['default_image', 'url4x']) ??
+        _readNestedString(reward, const <String>['default_image', 'url_4x']) ??
+        _readNestedString(reward, const <String>['default_image', 'url2x']) ??
+        _readNestedString(reward, const <String>['default_image', 'url_2x']) ??
+        _readNestedString(reward, const <String>['default_image', 'url']) ??
+        _readFlatString(reward, 'defaultImageUrl') ??
+        _readFlatString(reward, 'default_image_url');
     if (_looksLikeImageUrl(fallback)) return fallback!.trim();
     return '';
   }

@@ -17,9 +17,7 @@ import '../../services/chat/twitch_badge_cache_service.dart';
 class TwitchChatMessageNormalizer {
   final TwitchBadgeCacheService badgeCache;
 
-  const TwitchChatMessageNormalizer({
-    required this.badgeCache,
-  });
+  const TwitchChatMessageNormalizer({required this.badgeCache});
 
   TwitchChatRuntimeMessage normalize(
     TwitchChatMessage message, {
@@ -27,13 +25,14 @@ class TwitchChatMessageNormalizer {
   }) {
     final fragments = TwitchChatFragment.buildFromMessage(message);
     final metadata = TwitchChatMessageMetadata.fromMessage(message);
-    final segments = TwitchChatRenderSegment.buildFromMessage(message, fragments);
+    final segments = TwitchChatRenderSegment.buildFromMessage(
+      message,
+      fragments,
+    );
 
     return TwitchChatRuntimeMessage(
       source: message,
-      resolvedBadges: badgeCache.resolveBadgeTags(
-        message.tags['badges'] ?? '',
-      ),
+      resolvedBadges: badgeCache.resolveBadgeTags(message.tags['badges'] ?? ''),
       receivedAt: receivedAt,
       fragments: fragments,
       segments: segments,

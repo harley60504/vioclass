@@ -39,10 +39,7 @@ class TwitchRecentMessageParseIssue {
   final String reason;
   final Object? itemPreview;
 
-  const TwitchRecentMessageParseIssue({
-    required this.reason,
-    this.itemPreview,
-  });
+  const TwitchRecentMessageParseIssue({required this.reason, this.itemPreview});
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
@@ -95,10 +92,7 @@ class TwitchRecentMessageParser {
     final issues = <TwitchRecentMessageParseIssue>[];
 
     for (final item in messagesField) {
-      final parsed = parseSingleItem(
-        item,
-        channelLogin: channelLogin,
-      );
+      final parsed = _parseSingleItem(item, channelLogin: channelLogin);
 
       if (parsed.rawLine != null) {
         rawMessages.add(parsed.rawLine!);
@@ -126,7 +120,7 @@ class TwitchRecentMessageParser {
     );
   }
 
-  _RecentSingleParseResult parseSingleItem(
+  _RecentSingleParseResult _parseSingleItem(
     Object? item, {
     required String channelLogin,
   }) {
@@ -162,7 +156,9 @@ class TwitchRecentMessageParser {
 
         if (parsed.message.trim().isNotEmpty) {
           return _RecentSingleParseResult(
-            message: parsed.copyWith(source: TwitchChatMessageSource.recentRawIrc),
+            message: parsed.copyWith(
+              source: TwitchChatMessageSource.recentRawIrc,
+            ),
             rawLine: rawLine,
             rawObject: rawObject,
           );
@@ -293,17 +289,23 @@ class TwitchRecentMessageParser {
     };
 
     final nestedMessage = item['message'];
-    final text = readTextValue(item['text']) ??
+    final text =
+        readTextValue(item['text']) ??
         readTextValue(item['body']) ??
         readTextValue(item['content']) ??
         readTextValue(item['messageText']) ??
         readTextValue(nestedMessage) ??
-        readTextValue(readNestedValue(item, const <String>['message', 'text'])) ??
-        readTextValue(readNestedValue(item, const <String>['message', 'body'])) ??
+        readTextValue(
+          readNestedValue(item, const <String>['message', 'text']),
+        ) ??
+        readTextValue(
+          readNestedValue(item, const <String>['message', 'body']),
+        ) ??
         parsed?.message ??
         '';
 
-    final userLogin = readTextValue(item['userLogin']) ??
+    final userLogin =
+        readTextValue(item['userLogin']) ??
         readTextValue(item['login']) ??
         readTextValue(item['username']) ??
         readTextValue(item['user']) ??
@@ -311,9 +313,12 @@ class TwitchRecentMessageParser {
         parsed?.userLogin ??
         '';
 
-    final displayName = readTextValue(item['displayName']) ??
+    final displayName =
+        readTextValue(item['displayName']) ??
         readTextValue(item['display-name']) ??
-        readTextValue(readNestedValue(item, const <String>['user', 'displayName'])) ??
+        readTextValue(
+          readNestedValue(item, const <String>['user', 'displayName']),
+        ) ??
         parsed?.displayName ??
         userLogin;
 
@@ -324,14 +329,17 @@ class TwitchRecentMessageParser {
       if (!tags.containsKey('id'))
         'id': readTextValue(item['id']) ?? parsed?.tags['id'] ?? '',
       if (!tags.containsKey('tmi-sent-ts'))
-        'tmi-sent-ts': readTextValue(item['timestamp']) ??
+        'tmi-sent-ts':
+            readTextValue(item['timestamp']) ??
             readTextValue(item['sentAt']) ??
             parsed?.tags['tmi-sent-ts'] ??
             '',
     }..removeWhere((key, value) => value.trim().isEmpty);
 
     return TwitchChatMessage.synthetic(
-      channelLogin: parsed?.channel.isNotEmpty == true ? parsed!.channel : channelLogin,
+      channelLogin: parsed?.channel.isNotEmpty == true
+          ? parsed!.channel
+          : channelLogin,
       userLogin: userLogin,
       displayName: displayName,
       message: text,
@@ -382,10 +390,7 @@ class TwitchRecentMessageParser {
     if (value is! Map) return const <String, String>{};
 
     return value.map(
-      (key, item) => MapEntry(
-        key.toString(),
-        item?.toString() ?? '',
-      ),
+      (key, item) => MapEntry(key.toString(), item?.toString() ?? ''),
     );
   }
 }

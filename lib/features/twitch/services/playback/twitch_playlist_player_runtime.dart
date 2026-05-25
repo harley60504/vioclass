@@ -19,7 +19,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
     'Origin': 'https://www.twitch.tv',
     'Referer': 'https://www.twitch.tv/',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
   };
@@ -41,16 +42,15 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   static TwitchStableHlsProxyRouter? _sharedProxy;
   static int _sharedProxyRevision = 0;
 
-  TwitchPlaylistPlayerRuntime({
-    required this.playbackApi,
-    Dio? dio,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 12),
-              ),
-            );
+  TwitchPlaylistPlayerRuntime({required this.playbackApi, Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 12),
+            ),
+          );
 
   String _channelLogin = '';
   Uri? _masterPlaylistUri;
@@ -191,12 +191,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
       final selected = preferredVariant == null
           ? _findVariantBySavedPreference(merged, wantedQuality) ??
-              selectDefaultVariant(
-                merged,
-                allowMobileStartupSafeQuality: wantedQuality == null,
-              )
+                selectDefaultVariant(
+                  merged,
+                  allowMobileStartupSafeQuality: wantedQuality == null,
+                )
           : _findMatchingMergedVariant(merged, preferredVariant) ??
-              preferredVariant;
+                preferredVariant;
 
       if (selected == null) {
         _playlistUri = base.masterUri;
@@ -283,7 +283,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
   }
 
-  Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({bool notify = true}) async {
+  Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({
+    bool notify = true,
+  }) async {
     final router = _proxy ?? _sharedProxy;
     if (router == null || !router.isRunning) {
       if (_proxyLiveStatus != null) {
@@ -320,7 +322,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Future<String?> _loadPreferredQualityName(String login) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final value = prefs.getString('$_qualityChannelPrefix$login') ??
+      final value =
+          prefs.getString('$_qualityChannelPrefix$login') ??
           prefs.getString(_qualityKey) ??
           prefs.getString('$_legacyQualityChannelPrefix$login') ??
           prefs.getString(_legacyQualityKey);
@@ -433,7 +436,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       } else {
         used.add(clean.url);
         merged.add(
-          base.copyWith(url: clean.url, hasAds: false, sourceTag: clean.sourceTag),
+          base.copyWith(
+            url: clean.url,
+            hasAds: false,
+            sourceTag: clean.sourceTag,
+          ),
         );
       }
     }
@@ -523,7 +530,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
 
     final keyMatches = variants.where((v) {
-      return _normalizeQualityPreference(v.adAwareQualityKey) == normalizedTarget ||
+      return _normalizeQualityPreference(v.adAwareQualityKey) ==
+              normalizedTarget ||
           _normalizeQualityPreference(v.name) == normalizedTarget ||
           _normalizeQualityPreference(v.displayName) == normalizedTarget ||
           _normalizeQualityPreference(v.videoGroupId ?? '') == normalizedTarget;

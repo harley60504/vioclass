@@ -79,9 +79,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         height: 124,
         padding: const EdgeInsets.fromLTRB(12, 9, 12, 10),
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.30),
+          color: Colors.black.withValues(alpha: 0.30),
           border: Border(
-            bottom: BorderSide(color: _kTwitchPurple.withOpacity(0.22)),
+            bottom: BorderSide(color: _kTwitchPurple.withValues(alpha: 0.22)),
           ),
         ),
         child: Column(
@@ -104,9 +104,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
       height: 74,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.30),
+        color: Colors.black.withValues(alpha: 0.30),
         border: Border(
-          bottom: BorderSide(color: _kTwitchPurple.withOpacity(0.22)),
+          bottom: BorderSide(color: _kTwitchPurple.withValues(alpha: 0.22)),
         ),
       ),
       child: Row(
@@ -123,9 +123,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.055),
+        color: Colors.white.withValues(alpha: 0.055),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: TextField(
         controller: searchController,
@@ -201,7 +201,7 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withOpacity(0.12)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
             ),
             child: Icon(
               icon,

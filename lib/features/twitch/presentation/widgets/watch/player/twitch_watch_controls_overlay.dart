@@ -147,9 +147,7 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
       onWakeControls: _showAndRestartAutoHide,
       child: Stack(
         children: [
-          Positioned.fill(
-            child: _PlayerDimOverlay(visible: widget.loading),
-          ),
+          Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
           if (_shouldKeepControlsMounted)
             _FadingWatchChrome(
               visible: _visible,
@@ -273,10 +271,7 @@ class _WatchErrorOverlay extends StatelessWidget {
   final String? error;
   final Object? runtimeError;
 
-  const _WatchErrorOverlay({
-    required this.error,
-    required this.runtimeError,
-  });
+  const _WatchErrorOverlay({required this.error, required this.runtimeError});
 
   @override
   Widget build(BuildContext context) {
@@ -313,9 +308,7 @@ class _PlayerDimOverlay extends StatelessWidget {
 
     return const ColoredBox(
       color: Color(0x66000000),
-      child: Center(
-        child: CircularProgressIndicator(color: Color(0xFF9146FF)),
-      ),
+      child: Center(child: CircularProgressIndicator(color: Color(0xFF9146FF))),
     );
   }
 }

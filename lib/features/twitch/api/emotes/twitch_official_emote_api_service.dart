@@ -5,9 +5,7 @@ import '../core/twitch_api_constants.dart';
 class TwitchOfficialEmoteApiService {
   final TwitchApiClient client;
 
-  const TwitchOfficialEmoteApiService({
-    required this.client,
-  });
+  const TwitchOfficialEmoteApiService({required this.client});
 
   Future<List<TwitchOfficialEmote>> fetchGlobalEmotes({
     required String accessToken,
@@ -15,10 +13,7 @@ class TwitchOfficialEmoteApiService {
   }) async {
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/chat/emotes/global',
-      headers: _headers(
-        accessToken: accessToken,
-        clientId: clientId,
-      ),
+      headers: _headers(accessToken: accessToken, clientId: clientId),
     );
 
     return _parseEmotes(
@@ -38,13 +33,8 @@ class TwitchOfficialEmoteApiService {
 
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/chat/emotes',
-      queryParameters: <String, dynamic>{
-        'broadcaster_id': cleanBroadcasterId,
-      },
-      headers: _headers(
-        accessToken: accessToken,
-        clientId: clientId,
-      ),
+      queryParameters: <String, dynamic>{'broadcaster_id': cleanBroadcasterId},
+      headers: _headers(accessToken: accessToken, clientId: clientId),
     );
 
     return _parseEmotes(
@@ -76,12 +66,9 @@ class TwitchOfficialEmoteApiService {
           'user_id': cleanUserId,
           if (includeBroadcasterFilter && cleanBroadcasterId.isNotEmpty)
             'broadcaster_id': cleanBroadcasterId,
-          if (after != null && after!.isNotEmpty) 'after': after,
+          if (after != null && after.isNotEmpty) 'after': after,
         },
-        headers: _headers(
-          accessToken: accessToken,
-          clientId: clientId,
-        ),
+        headers: _headers(accessToken: accessToken, clientId: clientId),
       );
 
       output.addAll(
@@ -94,7 +81,7 @@ class TwitchOfficialEmoteApiService {
 
       final pagination = raw['pagination'];
       after = pagination is Map ? pagination['cursor']?.toString() : null;
-    } while (after != null && after!.trim().isNotEmpty);
+    } while (after != null && after.trim().isNotEmpty);
 
     return output;
   }
@@ -118,13 +105,8 @@ class TwitchOfficialEmoteApiService {
       final chunk = ids.skip(index).take(100).toList(growable: false);
       final raw = await client.getJson<Map<String, dynamic>>(
         '${TwitchApiConstants.helixBaseUrl}/users',
-        queryParameters: <String, dynamic>{
-          'id': chunk,
-        },
-        headers: _headers(
-          accessToken: accessToken,
-          clientId: clientId,
-        ),
+        queryParameters: <String, dynamic>{'id': chunk},
+        headers: _headers(accessToken: accessToken, clientId: clientId),
       );
 
       final data = raw['data'];

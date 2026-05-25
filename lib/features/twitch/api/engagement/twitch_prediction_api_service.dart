@@ -9,9 +9,7 @@ class TwitchPredictionApiService {
   static Future<TwitchPredictionSnapshot?> Function()? _lastFallbackLoader;
   static String? _lastViewerUserId;
 
-  const TwitchPredictionApiService({
-    required this.gql,
-  });
+  const TwitchPredictionApiService({required this.gql});
 
   static void rememberViewerUserId(String? viewerUserId) {
     final safeViewerUserId = viewerUserId?.trim();
@@ -19,7 +17,8 @@ class TwitchPredictionApiService {
     _lastViewerUserId = safeViewerUserId;
   }
 
-  static Future<TwitchPredictionSnapshot?> refreshLastPredictionContext() async {
+  static Future<TwitchPredictionSnapshot?>
+  refreshLastPredictionContext() async {
     final loader = _lastFallbackLoader;
     if (loader == null) return null;
     return loader();
@@ -32,17 +31,18 @@ class TwitchPredictionApiService {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     final explicitViewerUserId = viewerUserId?.trim();
-    final safeViewerUserId = explicitViewerUserId != null && explicitViewerUserId.isNotEmpty
+    final safeViewerUserId =
+        explicitViewerUserId != null && explicitViewerUserId.isNotEmpty
         ? explicitViewerUserId
         : _lastViewerUserId;
     rememberViewerUserId(safeViewerUserId);
 
     if (login.isNotEmpty) {
       _lastFallbackLoader = () => fetchPredictionContext(
-            channelLogin: login,
-            count: count,
-            viewerUserId: safeViewerUserId,
-          );
+        channelLogin: login,
+        count: count,
+        viewerUserId: safeViewerUserId,
+      );
     }
 
     final raw = await fetchPredictionContextRaw(
@@ -53,18 +53,21 @@ class TwitchPredictionApiService {
     final snapshot = TwitchPredictionSnapshot.fromRawResponse(raw.response);
     if (snapshot.hasPrediction) {
       TwitchPredictionHermesRealtimeBus.publishPrediction(snapshot);
-      final channelId = _readChannelIdFromPrediction(snapshot.rawPrediction) ??
+      final channelId =
+          _readChannelIdFromPrediction(snapshot.rawPrediction) ??
           _readChannelIdFromObject(raw.response);
       if (channelId != null && channelId.trim().isNotEmpty) {
         // Twitch-style path: GQL is the initial active snapshot, Hermes is
         // the realtime prediction event stream. Pass viewerUserId when known so
         // Hermes can distinguish the current viewer's prediction-made / top
         // predictor entries from everyone else's bets.
-        unawaited(TwitchPredictionHermesGlobalRuntime.ensureConnected(
-          channelId: channelId,
-          viewerUserId: safeViewerUserId,
-          previousPrediction: snapshot,
-        ));
+        unawaited(
+          TwitchPredictionHermesGlobalRuntime.ensureConnected(
+            channelId: channelId,
+            viewerUserId: safeViewerUserId,
+            previousPrediction: snapshot,
+          ),
+        );
       }
     }
     return snapshot;
@@ -76,7 +79,11 @@ class TwitchPredictionApiService {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin cannot be empty',
+      );
     }
 
     return gql.single(
@@ -86,7 +93,8 @@ class TwitchPredictionApiService {
           'count': count.clamp(1, 10),
           'channelLogin': login,
         },
-        sha256Hash: 'beb846598256b75bd7c1fe54a80431335996153e358ca9c7837ce7bb83d7d383',
+        sha256Hash:
+            'beb846598256b75bd7c1fe54a80431335996153e358ca9c7837ce7bb83d7d383',
       ),
     );
   }

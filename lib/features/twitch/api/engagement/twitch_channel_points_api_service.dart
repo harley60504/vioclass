@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -59,10 +61,10 @@ class TwitchChannelPointsApiService {
     this.actionClientIdProvider,
     String? deviceId,
     String? sessionId,
-  })  : androidClientId =
-            androidClientId ?? TwitchApiConstants.twitchAndroidClientId,
-        deviceId = deviceId ?? _randomCompactId(),
-        sessionId = sessionId ?? _randomCompactId();
+  }) : androidClientId =
+           androidClientId ?? TwitchApiConstants.twitchAndroidClientId,
+       deviceId = deviceId ?? _randomCompactId(),
+       sessionId = sessionId ?? _randomCompactId();
 
   String get effectiveActionClientId {
     final provided = actionClientIdProvider?.call().trim();
@@ -79,8 +81,6 @@ class TwitchChannelPointsApiService {
     ).join();
     return '$now$suffix';
   }
-
-
 
   TwitchApiClient get _client {
     final effective = client ?? gql?.client;
@@ -168,10 +168,7 @@ mutation ClaimCommunityPoints($input: ClaimCommunityPointsInput!) {
 }
 ''',
       variables: <String, dynamic>{
-        'input': <String, dynamic>{
-          'channelID': channelId,
-          'claimID': claimId,
-        },
+        'input': <String, dynamic>{'channelID': channelId, 'claimID': claimId},
       },
     );
   }
@@ -257,7 +254,11 @@ mutation RedeemCommunityPointsCustomReward($input: RedeemCommunityPointsCustomRe
     final safeToken = accessToken.trim();
 
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'cannot be empty',
+      );
     }
 
     if (safeClientId.isEmpty) {
@@ -300,9 +301,7 @@ query ChannelPointsContext($channelLogin: String!) {
       data: <String, dynamic>{
         'operationName': 'ChannelPointsContext',
         'query': query,
-        'variables': <String, dynamic>{
-          'channelLogin': login,
-        },
+        'variables': <String, dynamic>{'channelLogin': login},
       },
       headers: _headers(
         clientId: safeClientId,
@@ -329,12 +328,14 @@ query ChannelPointsContext($channelLogin: String!) {
     }
 
     final channel = _readMap(user, const <String>['channel']);
-    final channelId = _readString(channel, const <String>['id']) ??
+    final channelId =
+        _readString(channel, const <String>['id']) ??
         _readString(user, const <String>['id']) ??
         '';
 
-    final settings =
-        _readMap(channel, const <String>['communityPointsSettings']);
+    final settings = _readMap(channel, const <String>[
+      'communityPointsSettings',
+    ]);
     final self = _readMap(channel, const <String>['self']);
     final points = _readMap(self, const <String>['communityPoints']);
     final availableClaim = _readMap(points, const <String>['availableClaim']);
@@ -362,7 +363,11 @@ query ChannelPointsContext($channelLogin: String!) {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'cannot be empty',
+      );
     }
 
     final token = await _requireAccessToken();
@@ -411,7 +416,6 @@ query ChannelPointsContext($channelLogin: String!) {
       );
     }
   }
-
 
   /// Twitch-style Channel Points emote menu source.
   ///
@@ -464,10 +468,7 @@ query ChannelPointsContext($channelLogin: String!) {
       data: <String, dynamic>{
         'operationName': 'ClaimCommunityPoints',
         'variables': <String, dynamic>{
-          'input': <String, dynamic>{
-            'claimID': claim,
-            'channelID': cid,
-          },
+          'input': <String, dynamic>{'claimID': claim, 'channelID': cid},
         },
         'extensions': <String, dynamic>{
           'persistedQuery': <String, dynamic>{
@@ -502,7 +503,8 @@ query ChannelPointsContext($channelLogin: String!) {
 
     return TwitchChannelPointsClaimResult(
       ok: true,
-      pointsEarned: _readInt(claimData, const <String>['currentPoints']) ??
+      pointsEarned:
+          _readInt(claimData, const <String>['currentPoints']) ??
           _readInt(claimData, const <String>['pointsEarned']) ??
           _readInt(claimData, const <String>['pointGain']) ??
           50,
@@ -650,7 +652,6 @@ mutation RedeemCommunityPointsCustomReward($input: RedeemCommunityPointsCustomRe
     );
   }
 
-
   Future<TwitchChannelRewardRedeemResult> _redeemAutomaticReward({
     required String channelId,
     required TwitchChannelReward reward,
@@ -795,7 +796,6 @@ mutation UnlockChosenSubscriberEmote($input: UnlockChosenSubscriberEmoteInput!) 
     required String? emoteModifierId,
   }) async {
     final cleanEmoteId = emoteId?.trim();
-    final cleanModifierId = emoteModifierId?.trim();
 
     if (cleanEmoteId == null || cleanEmoteId.isEmpty) {
       throw TwitchApiException('Modify Emote requires an emoteId.');
@@ -840,8 +840,11 @@ mutation UnlockChosenSubscriberEmote($input: UnlockChosenSubscriberEmoteInput!) 
     final cleanEmoteId = emoteId?.trim();
     final cleanMessage = message.trim();
 
-    if ((cleanEmoteId == null || cleanEmoteId.isEmpty) && cleanMessage.isEmpty) {
-      throw TwitchApiException('Gigantify Emote requires an emoteId or message.');
+    if ((cleanEmoteId == null || cleanEmoteId.isEmpty) &&
+        cleanMessage.isEmpty) {
+      throw TwitchApiException(
+        'Gigantify Emote requires an emoteId or message.',
+      );
     }
 
     final transactionId = _transactionId();
@@ -885,9 +888,7 @@ mutation UnlockChosenSubscriberEmote($input: UnlockChosenSubscriberEmoteInput!) 
       '${TwitchApiConstants.gqlEndpoint}#origin=twilight',
       data: <String, dynamic>{
         'operationName': operationName,
-        'variables': <String, dynamic>{
-          'input': input,
-        },
+        'variables': <String, dynamic>{'input': input},
         'extensions': <String, dynamic>{
           'persistedQuery': <String, dynamic>{
             'version': 1,
@@ -906,7 +907,6 @@ mutation UnlockChosenSubscriberEmote($input: UnlockChosenSubscriberEmoteInput!) 
     return raw;
   }
 
-
   Future<dynamic> _postInlineChannelPointMutation({
     required String operationName,
     required String operationField,
@@ -919,7 +919,8 @@ mutation UnlockChosenSubscriberEmote($input: UnlockChosenSubscriberEmoteInput!) 
       '${TwitchApiConstants.gqlEndpoint}#origin=twilight',
       data: <String, dynamic>{
         'operationName': operationName,
-        'query': '''
+        'query':
+            '''
 mutation $operationName(\$input: ${operationName}Input!) {
   $operationField(input: \$input) {
     __typename
@@ -929,9 +930,7 @@ mutation $operationName(\$input: ${operationName}Input!) {
   }
 }
 ''',
-        'variables': <String, dynamic>{
-          'input': input,
-        },
+        'variables': <String, dynamic>{'input': input},
       },
       headers: _headers(
         clientId: effectiveActionClientId,
@@ -945,8 +944,8 @@ mutation $operationName(\$input: ${operationName}Input!) {
   }
 
   Future<String> _requireAccessToken() async {
-    final token = await tokenProvider?.call() ??
-        await gql?.accessTokenProvider?.call();
+    final token =
+        await tokenProvider?.call() ?? await gql?.accessTokenProvider?.call();
     final safeToken = token?.trim();
 
     if (safeToken == null || safeToken.isEmpty) {
@@ -960,9 +959,7 @@ mutation $operationName(\$input: ${operationName}Input!) {
 
   void _ensureActionClientId() {
     if (effectiveActionClientId.trim().isEmpty) {
-      throw TwitchApiException(
-        'Channel-points action Client-ID is empty.',
-      );
+      throw TwitchApiException('Channel-points action Client-ID is empty.');
     }
   }
 
@@ -994,16 +991,10 @@ mutation $operationName(\$input: ${operationName}Input!) {
     if (errors is List && errors.isNotEmpty) {
       final first = errors.first;
       if (first is Map && first['message'] != null) {
-        throw TwitchApiException(
-          first['message'].toString(),
-          details: raw,
-        );
+        throw TwitchApiException(first['message'].toString(), details: raw);
       }
 
-      throw TwitchApiException(
-        errors.toString(),
-        details: raw,
-      );
+      throw TwitchApiException(errors.toString(), details: raw);
     }
   }
 
@@ -1018,13 +1009,9 @@ mutation $operationName(\$input: ${operationName}Input!) {
     if (error == null) return;
 
     final code = _readString(error, const <String>['code']) ?? 'UNKNOWN';
-    throw TwitchApiException(
-      '$operationName failed: $code',
-      details: raw,
-    );
+    throw TwitchApiException('$operationName failed: $code', details: raw);
   }
 }
-
 
 class _AutomaticRewardInput {
   final String? emoteId;
@@ -1038,10 +1025,7 @@ class _AutomaticRewardInput {
   static _AutomaticRewardInput parse(String raw) {
     final text = raw.trim();
     if (text.isEmpty) {
-      return const _AutomaticRewardInput(
-        emoteId: null,
-        emoteModifierId: null,
-      );
+      return const _AutomaticRewardInput(emoteId: null, emoteModifierId: null);
     }
 
     if (text.startsWith('{')) {
@@ -1053,8 +1037,9 @@ class _AutomaticRewardInput {
           final modifierId = map['modifierId']?.toString().trim();
           return _AutomaticRewardInput(
             emoteId: emoteId == null || emoteId.isEmpty ? null : emoteId,
-            emoteModifierId:
-                modifierId == null || modifierId.isEmpty ? null : modifierId,
+            emoteModifierId: modifierId == null || modifierId.isEmpty
+                ? null
+                : modifierId,
           );
         }
       } catch (_) {
@@ -1063,12 +1048,15 @@ class _AutomaticRewardInput {
     }
 
     final named = <String, String>{};
-    for (final match in RegExp(r'([a-zA-Z_]+)\s*[:=]\s*([^,\s]+)').allMatches(text)) {
+    for (final match in RegExp(
+      r'([a-zA-Z_]+)\s*[:=]\s*([^,\s]+)',
+    ).allMatches(text)) {
       named[match.group(1)!.toLowerCase()] = match.group(2)!.trim();
     }
 
     final emoteId = named['emoteid'] ?? named['emote_id'] ?? named['emote'];
-    final modifierId = named['modifierid'] ??
+    final modifierId =
+        named['modifierid'] ??
         named['modifier_id'] ??
         named['emotemodifierid'] ??
         named['emote_modifier_id'] ??
@@ -1096,19 +1084,17 @@ class _AutomaticRewardInput {
   }
 }
 
-
-int _resolveRewardCost(
-  Map<String, dynamic> json, {
-  required String source,
-}) {
+int _resolveRewardCost(Map<String, dynamic> json, {required String source}) {
   final lowerSource = source.trim().toLowerCase();
 
   final cost = _readInt(json, const <String>['cost']);
-  final minimumCost = _readInt(json, const <String>['minimumCost']) ??
+  final minimumCost =
+      _readInt(json, const <String>['minimumCost']) ??
       _readInt(json, const <String>['minimum_cost']) ??
       _readInt(json, const <String>['minCost']) ??
       _readInt(json, const <String>['min_cost']);
-  final defaultCost = _readInt(json, const <String>['defaultCost']) ??
+  final defaultCost =
+      _readInt(json, const <String>['defaultCost']) ??
       _readInt(json, const <String>['default_cost']) ??
       _readInt(json, const <String>['defaultPrice']) ??
       _readInt(json, const <String>['default_price']);
@@ -1137,11 +1123,13 @@ int _resolveRewardRedeemCost(
   final lowerSource = source.trim().toLowerCase();
 
   final cost = _readInt(json, const <String>['cost']);
-  final minimumCost = _readInt(json, const <String>['minimumCost']) ??
+  final minimumCost =
+      _readInt(json, const <String>['minimumCost']) ??
       _readInt(json, const <String>['minimum_cost']) ??
       _readInt(json, const <String>['minCost']) ??
       _readInt(json, const <String>['min_cost']);
-  final defaultCost = _readInt(json, const <String>['defaultCost']) ??
+  final defaultCost =
+      _readInt(json, const <String>['defaultCost']) ??
       _readInt(json, const <String>['default_cost']) ??
       _readInt(json, const <String>['defaultPrice']) ??
       _readInt(json, const <String>['default_price']);
@@ -1163,10 +1151,7 @@ int _resolveRewardRedeemCost(
   return 0;
 }
 
-int? _firstPositiveInt(
-  Map<String, dynamic> json,
-  List<List<String>> paths,
-) {
+int? _firstPositiveInt(Map<String, dynamic> json, List<List<String>> paths) {
   for (final path in paths) {
     final value = _readInt(json, path);
     if (value != null && value > 0) return value;
@@ -1188,8 +1173,6 @@ bool _shouldDisplayReward({
 
   return true;
 }
-
-
 
 Map<String, dynamic>? _readMap(Object? root, List<String> path) {
   Object? current = root;
@@ -1262,9 +1245,7 @@ bool? _readBool(Object? root, List<String> path) {
 Map<String, dynamic>? _asStringMap(Object? value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) {
-    return value.map(
-      (key, value) => MapEntry(key.toString(), value),
-    );
+    return value.map((key, value) => MapEntry(key.toString(), value));
   }
   return null;
 }

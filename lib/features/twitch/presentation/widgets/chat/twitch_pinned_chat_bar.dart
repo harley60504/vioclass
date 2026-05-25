@@ -5,22 +5,24 @@ import '../../../models/engagement/twitch_pinned_chat.dart';
 class TwitchPinnedChatBar extends StatelessWidget {
   final TwitchPinnedChatMessage message;
 
-  const TwitchPinnedChatBar({
-    super.key,
-    required this.message,
-  });
+  const TwitchPinnedChatBar({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
-    final name = message.sender?.displayName ?? message.pinnedBy?.displayName ?? 'Pinned';
+    final name =
+        message.sender?.displayName ??
+        message.pinnedBy?.displayName ??
+        'Pinned';
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFD166).withOpacity(0.12),
+        color: const Color(0xFFFFD166).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFFD166).withOpacity(0.32)),
+        border: Border.all(
+          color: const Color(0xFFFFD166).withValues(alpha: 0.32),
+        ),
       ),
       child: Row(
         children: [

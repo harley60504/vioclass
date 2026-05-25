@@ -1,4 +1,6 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member
 
 extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
   Future<void> _loadAuth() async {
@@ -19,7 +21,6 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       setState(() {
         _viewerLogin = validation.login;
         _viewerId = validation.userId;
-        _viewerScopes = validation.scopes;
         _loadingAuth = false;
       });
     } catch (error) {

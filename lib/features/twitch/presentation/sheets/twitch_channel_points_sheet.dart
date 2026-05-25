@@ -19,7 +19,8 @@ Future<void> showTwitchChannelPointsSheet({
   required Future<void> Function(String claimId) onClaim,
   Future<void> Function(Map<String, dynamic> reward)? onRewardTap,
   Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward,
-  Future<void> Function(Map<String, dynamic> reward, String textInput)? onRedeemReward,
+  Future<void> Function(Map<String, dynamic> reward, String textInput)?
+  onRedeemReward,
   TwitchChannelPointEmoteLoader? onLoadChannelPointEmotes,
 }) {
   return showTwitchResponsiveSheet<void>(
@@ -65,7 +66,7 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   /// - Modify: JSON string with {emoteId, modifierId}; emoteId is the final
   ///   modified emote id, Twitch-style.
   final Future<void> Function(Map<String, dynamic> reward, String textInput)?
-      onRedeemReward;
+  onRedeemReward;
 
   /// Twitch-style source for Choose / Modify emote menus.
   /// This must return Channel Points-selectable emotes, not the general chat
@@ -85,7 +86,8 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   });
 
   @override
-  State<TwitchChannelPointsSheet> createState() => _TwitchChannelPointsSheetState();
+  State<TwitchChannelPointsSheet> createState() =>
+      _TwitchChannelPointsSheetState();
 }
 
 class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
@@ -103,7 +105,9 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     );
 
     final availableCount = rewards
-        .where((reward) => isChannelPointRewardAvailable(reward, balance: balance))
+        .where(
+          (reward) => isChannelPointRewardAvailable(reward, balance: balance),
+        )
         .length;
 
     return SafeArea(
@@ -204,10 +208,7 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
   }) async {
     final loader = widget.onLoadChannelPointEmotes;
     if (loader == null) {
-      showChannelPointsSnack(
-        context,
-        'Channel Points emote menu 目前先暫時關閉。',
-      );
+      showChannelPointsSnack(context, 'Channel Points emote menu 目前先暫時關閉。');
       return null;
     }
 

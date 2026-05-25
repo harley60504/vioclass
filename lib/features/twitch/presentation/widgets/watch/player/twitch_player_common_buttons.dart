@@ -30,10 +30,22 @@ class RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = height ?? (tiny ? 36.0 : compact ? 42.0 : 64.0);
-    final radius = tiny ? 14.0 : compact ? 16.0 : 20.0;
-    final effectiveBackgroundColor = backgroundColor ?? Colors.black.withOpacity(0.42);
-    final effectiveBorderColor = borderColor ?? Colors.white.withOpacity(0.10);
+    final size =
+        height ??
+        (tiny
+            ? 36.0
+            : compact
+            ? 42.0
+            : 64.0);
+    final radius = tiny
+        ? 14.0
+        : compact
+        ? 16.0
+        : 20.0;
+    final effectiveBackgroundColor =
+        backgroundColor ?? Colors.black.withValues(alpha: 0.42);
+    final effectiveBorderColor =
+        borderColor ?? Colors.white.withValues(alpha: 0.10);
 
     return Tooltip(
       message: tooltip,
@@ -55,7 +67,11 @@ class RoundIconButton extends StatelessWidget {
               child: Icon(
                 icon,
                 color: iconColor,
-                size: tiny ? 20 : compact ? 23 : 30,
+                size: tiny
+                    ? 20
+                    : compact
+                    ? 23
+                    : 30,
               ),
             ),
           ),

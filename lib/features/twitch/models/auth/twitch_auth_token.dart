@@ -22,7 +22,9 @@ class TwitchAuthToken {
   }
 
   bool get expiresSoon {
-    return DateTime.now().isAfter(expiresAt.subtract(const Duration(minutes: 5)));
+    return DateTime.now().isAfter(
+      expiresAt.subtract(const Duration(minutes: 5)),
+    );
   }
 
   factory TwitchAuthToken.fromOAuthJson(Map<String, dynamic> json) {
@@ -51,7 +53,8 @@ class TwitchAuthToken {
           ? scopes.map((item) => item.toString()).toList(growable: false)
           : const <String>[],
       expiresIn: int.tryParse(json['expiresIn']?.toString() ?? '') ?? 0,
-      obtainedAt: DateTime.tryParse(json['obtainedAt']?.toString() ?? '') ??
+      obtainedAt:
+          DateTime.tryParse(json['obtainedAt']?.toString() ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
     );
   }

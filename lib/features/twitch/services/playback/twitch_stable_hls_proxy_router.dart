@@ -101,7 +101,9 @@ class TwitchStableHlsProxyRouter {
       );
     }
 
-    if (_inner != null && _inner!.isRunning && _upstreamPlaylistUrl == safeUrl) {
+    if (_inner != null &&
+        _inner!.isRunning &&
+        _upstreamPlaylistUrl == safeUrl) {
       return;
     }
 
@@ -120,7 +122,8 @@ class TwitchStableHlsProxyRouter {
         futureOutputSegmentCount: futureOutputSegmentCount,
         dropBehindLiveEdge: dropBehindLiveEdge,
         startupEdgeSegmentCount: startupEdgeSegmentCount,
-        startupRequirePrefetchedFirstSegment: startupRequirePrefetchedFirstSegment,
+        startupRequirePrefetchedFirstSegment:
+            startupRequirePrefetchedFirstSegment,
         startupSkipCurrentLatestSegment: startupSkipCurrentLatestSegment,
         startupMode: startupMode,
         verboseLogging: verboseLogging,
@@ -195,7 +198,9 @@ class TwitchStableHlsProxyRouter {
             ? HttpStatus.serviceUnavailable
             : HttpStatus.badGateway;
         request.response.headers.contentType = ContentType.text;
-        request.response.write(_switching ? 'Switching upstream' : 'Inner proxy not ready');
+        request.response.write(
+          _switching ? 'Switching upstream' : 'Inner proxy not ready',
+        );
         await request.response.close();
         return;
       }
@@ -259,9 +264,7 @@ class TwitchStableHlsProxyRouter {
 
     try {
       while (_server != null) {
-        final inner = await _waitForReadyInner(
-          lastGeneration: lastGeneration,
-        );
+        final inner = await _waitForReadyInner(lastGeneration: lastGeneration);
         if (inner == null) break;
 
         final target = Uri.parse(inner.streamTsUrl);
@@ -313,7 +316,9 @@ class TwitchStableHlsProxyRouter {
 
     while (_server != null && DateTime.now().isBefore(deadline)) {
       final inner = _inner;
-      if (inner != null && inner.isRunning && _switchGeneration != lastGeneration) {
+      if (inner != null &&
+          inner.isRunning &&
+          _switchGeneration != lastGeneration) {
         return inner;
       }
       if (inner != null && inner.isRunning && !_switching) {

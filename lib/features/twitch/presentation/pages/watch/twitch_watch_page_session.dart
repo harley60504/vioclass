@@ -1,4 +1,6 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member
 
 class _TwitchWatchSessionHandles {
   final TwitchWatchServices services;
@@ -24,9 +26,7 @@ class _TwitchWatchSessionHandles {
     required this.playerSession,
   });
 
-  factory _TwitchWatchSessionHandles.create({
-    required String playerTitle,
-  }) {
+  factory _TwitchWatchSessionHandles.create({required String playerTitle}) {
     final services = TwitchWatchServices.create(playerTitle: playerTitle);
     final ports = TwitchWatchFeaturePorts.fromServices(services);
 

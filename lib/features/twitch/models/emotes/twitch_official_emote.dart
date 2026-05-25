@@ -1,8 +1,4 @@
-enum TwitchOfficialEmoteSource {
-  global,
-  channel,
-  user,
-}
+enum TwitchOfficialEmoteSource { global, channel, user }
 
 class TwitchOfficialEmote {
   final String id;
@@ -40,15 +36,15 @@ class TwitchOfficialEmote {
 
     var imageUrl = '';
     if (images is Map) {
-      imageUrl = (images['url_2x'] ??
-              images['url_4x'] ??
-              images['url_1x'])
-          ?.toString() ??
+      imageUrl =
+          (images['url_2x'] ?? images['url_4x'] ?? images['url_1x'])
+              ?.toString() ??
           '';
     }
 
     if (imageUrl.isEmpty && id.isNotEmpty) {
-      imageUrl = 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
+      imageUrl =
+          'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0';
     }
 
     return TwitchOfficialEmote(
@@ -59,7 +55,8 @@ class TwitchOfficialEmote {
       tier: json['tier']?.toString() ?? '',
       emoteSetId: json['emote_set_id']?.toString() ?? '',
       ownerId: json['owner_id']?.toString() ?? '',
-      ownerDisplayName: json['owner_name']?.toString() ??
+      ownerDisplayName:
+          json['owner_name']?.toString() ??
           json['owner_display_name']?.toString() ??
           json['owner_login']?.toString() ??
           '',

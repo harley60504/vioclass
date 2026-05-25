@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
@@ -19,14 +18,17 @@ class TwitchLivePlaybackStrip extends StatefulWidget {
   });
 
   @override
-  State<TwitchLivePlaybackStrip> createState() => _TwitchLivePlaybackStripState();
+  State<TwitchLivePlaybackStrip> createState() =>
+      _TwitchLivePlaybackStripState();
 }
 
 class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   static const Duration _liveEdgeUiTolerance = Duration(seconds: 5);
   static const Duration _liveEdgeSeekBackoff = Duration(milliseconds: 350);
   static const Duration _liveSeekVerifyDelay = Duration(milliseconds: 420);
-  static const Duration _liveSeekSuccessTolerance = Duration(milliseconds: 2200);
+  static const Duration _liveSeekSuccessTolerance = Duration(
+    milliseconds: 2200,
+  );
   static const bool _liveSeekProbeEnabled = bool.fromEnvironment(
     'TWITCH_LIVE_SEEK_PROBE',
     defaultValue: false,
@@ -130,17 +132,6 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     } catch (_) {
       return null;
     }
-  }
-
-  Duration _liveEdgeSeekTargetForStatus({
-    required Duration mediaDuration,
-    required dynamic proxyLiveStatus,
-  }) {
-    return _proxySafeTargetInMediaTimeline(
-          proxyLiveStatus: proxyLiveStatus,
-          mediaDuration: mediaDuration,
-        ) ??
-        _liveEdgeSeekTarget(mediaDuration);
   }
 
   List<Duration> _liveSeekTargets({
@@ -307,25 +298,28 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
       reachedLive = false;
       _appendLiveSeekProbeLine(probeLines, 'ERROR $error');
     } finally {
-      if (!mounted) return;
+      if (mounted) {
+        final finalPosition = player.state.position;
+        final finalDuration = player.state.duration;
+        final targetSliderValue = _sliderValueForTarget(
+          lastTarget,
+          finalDuration,
+        );
+        _appendLiveSeekProbeLine(
+          probeLines,
+          'END reached=$reachedLive final=${_formatDuration(finalPosition)}/'
+          '${_formatDuration(finalDuration)} sliderTarget='
+          '${targetSliderValue.toStringAsFixed(3)}',
+        );
 
-      final finalPosition = player.state.position;
-      final finalDuration = player.state.duration;
-      final targetSliderValue = _sliderValueForTarget(lastTarget, finalDuration);
-      _appendLiveSeekProbeLine(
-        probeLines,
-        'END reached=$reachedLive final=${_formatDuration(finalPosition)}/'
-        '${_formatDuration(finalDuration)} sliderTarget='
-        '${targetSliderValue.toStringAsFixed(3)}',
-      );
-
-      setState(() {
-        _dragging = false;
-        _dragValue = null;
-        _seekingLiveEdge = false;
-        _livePinned = reachedLive || targetSliderValue >= 0.97;
-        _lastLiveSeekProbeSummary = probeLines.join('\n');
-      });
+        setState(() {
+          _dragging = false;
+          _dragValue = null;
+          _seekingLiveEdge = false;
+          _livePinned = reachedLive || targetSliderValue >= 0.97;
+          _lastLiveSeekProbeSummary = probeLines.join('\n');
+        });
+      }
     }
   }
 
@@ -342,8 +336,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     final streamValue = duration.inMilliseconds <= 0
         ? 1.0
         : (position.inMilliseconds / duration.inMilliseconds)
-            .clamp(0.0, 1.0)
-            .toDouble();
+              .clamp(0.0, 1.0)
+              .toDouble();
 
     final closeEnough = _isCloseEnoughForLive(
       position: position,
@@ -354,7 +348,9 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     );
     if (closeEnough) return true;
 
-    final distanceFromTarget = position > target ? position - target : target - position;
+    final distanceFromTarget = position > target
+        ? position - target
+        : target - position;
     if (distanceFromTarget <= _liveSeekSuccessTolerance) return true;
 
     final movedForward = position - originalPosition;
@@ -471,15 +467,15 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                     final value = _dragging
                         ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
                         : isAtLiveEdge
-                            ? 1.0
-                            : streamValue;
+                        ? 1.0
+                        : streamValue;
                     final previewPosition = hasSeekableDuration
                         ? isAtLiveEdge && !_dragging
-                            ? duration
-                            : Duration(
-                                milliseconds:
-                                    (duration.inMilliseconds * value).round(),
-                              )
+                              ? duration
+                              : Duration(
+                                  milliseconds:
+                                      (duration.inMilliseconds * value).round(),
+                                )
                         : position;
                     final positionText = _formatDuration(previewPosition);
                     final durationText = hasSeekableDuration
@@ -574,12 +570,12 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                           compact: compact,
                           onPressed: hasSeekableDuration
                               ? () => unawaited(
-                                    _goLive(
-                                      position: position,
-                                      duration: duration,
-                                      proxyLiveStatus: proxyLiveStatus,
-                                    ),
-                                  )
+                                  _goLive(
+                                    position: position,
+                                    duration: duration,
+                                    proxyLiveStatus: proxyLiveStatus,
+                                  ),
+                                )
                               : null,
                         ),
                         SizedBox(width: compact ? 6 : 8),
@@ -647,16 +643,18 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     required String? liveSeekProbe,
   }) {
     final pos = _formatDuration(position);
-    final dur = duration.inMilliseconds > 0 ? _formatDuration(duration) : '--:--';
+    final dur = duration.inMilliseconds > 0
+        ? _formatDuration(duration)
+        : '--:--';
     final state = buffering
         ? 'buffering'
         : seeking
-            ? 'seeking live edge'
-            : livePinned
-                ? 'live edge'
-                : playing
-                    ? 'playing'
-                    : 'paused';
+        ? 'seeking live edge'
+        : livePinned
+        ? 'live edge'
+        : playing
+        ? 'playing'
+        : 'paused';
 
     final proxy = _proxyStatusTooltip(
       proxyLiveStatus,
@@ -739,25 +737,25 @@ class _LiveEdgeButton extends StatelessWidget {
     final foreground = buffering || seeking
         ? Colors.orangeAccent
         : active
-            ? Colors.redAccent
-            : Colors.white54;
+        ? Colors.redAccent
+        : Colors.white54;
     final border = buffering || seeking
-        ? Colors.orangeAccent.withOpacity(0.42)
+        ? Colors.orangeAccent.withValues(alpha: 0.42)
         : active
-            ? Colors.redAccent.withOpacity(0.52)
-            : Colors.white.withOpacity(0.16);
+        ? Colors.redAccent.withValues(alpha: 0.52)
+        : Colors.white.withValues(alpha: 0.16);
     final background = active
-        ? Colors.redAccent.withOpacity(0.16)
+        ? Colors.redAccent.withValues(alpha: 0.16)
         : seeking
-            ? Colors.orangeAccent.withOpacity(0.12)
-            : const Color(0xFF18181B).withOpacity(0.86);
+        ? Colors.orangeAccent.withValues(alpha: 0.12)
+        : const Color(0xFF18181B).withValues(alpha: 0.86);
 
     return Tooltip(
       message: seeking
           ? '正在嘗試跳到直播最新位置'
           : active
-              ? '目前在直播最新位置'
-              : '跳到直播最新位置',
+          ? '目前在直播最新位置'
+          : '跳到直播最新位置',
       child: Material(
         color: background,
         borderRadius: BorderRadius.circular(999),

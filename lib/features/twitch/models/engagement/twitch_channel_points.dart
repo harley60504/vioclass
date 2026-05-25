@@ -23,7 +23,8 @@ class TwitchChannelPointsBundle {
   bool get hasUsefulViewerData {
     return snapshots.any((snapshot) {
       return snapshot.balance != null ||
-          (snapshot.availableClaimId != null && snapshot.availableClaimId!.isNotEmpty) ||
+          (snapshot.availableClaimId != null &&
+              snapshot.availableClaimId!.isNotEmpty) ||
           snapshot.availableClaimValue != null ||
           (snapshot.pointsName != null && snapshot.pointsName!.isNotEmpty);
     });
@@ -35,7 +36,9 @@ class TwitchChannelPointsBundle {
     final merged = <TwitchChannelPointsContextSnapshot>[];
 
     for (final snapshot in snapshots) {
-      final fallbackSnapshot = fallback._snapshotByOperation(snapshot.operationName);
+      final fallbackSnapshot = fallback._snapshotByOperation(
+        snapshot.operationName,
+      );
       merged.add(snapshot.mergedWithFallback(fallbackSnapshot));
     }
 
@@ -49,12 +52,16 @@ class TwitchChannelPointsBundle {
     }
 
     return TwitchChannelPointsBundle(
-      channelLogin: channelLogin.isNotEmpty ? channelLogin : fallback.channelLogin,
+      channelLogin: channelLogin.isNotEmpty
+          ? channelLogin
+          : fallback.channelLogin,
       snapshots: merged,
     );
   }
 
-  TwitchChannelPointsContextSnapshot? _snapshotByOperation(String operationName) {
+  TwitchChannelPointsContextSnapshot? _snapshotByOperation(
+    String operationName,
+  ) {
     for (final snapshot in snapshots) {
       if (snapshot.operationName == operationName) return snapshot;
     }
@@ -95,7 +102,9 @@ class TwitchChannelPointsContextSnapshot {
     required String operationName,
     required Object? response,
   }) {
-    final root = response is Map<String, dynamic> ? response : <String, dynamic>{};
+    final root = response is Map<String, dynamic>
+        ? response
+        : <String, dynamic>{};
     final maps = _collectMaps(root);
 
     final balanceMap = maps.firstWhere(
@@ -124,7 +133,9 @@ class TwitchChannelPointsContextSnapshot {
         .where((map) {
           final hasCost = map.containsKey('cost') || map.containsKey('price');
           final hasTitle = map.containsKey('title') || map.containsKey('name');
-          final hasRewardType = map['__typename']?.toString().toLowerCase().contains('reward') == true;
+          final hasRewardType =
+              map['__typename']?.toString().toLowerCase().contains('reward') ==
+              true;
           return hasTitle && (hasCost || hasRewardType);
         })
         .map(TwitchChannelPointReward.fromFlexibleJson)
@@ -164,7 +175,8 @@ class TwitchChannelPointsContextSnapshot {
     return TwitchChannelPointsContextSnapshot(
       operationName: operationName,
       balance: balance ?? fallback.balance,
-      availableClaimId: (availableClaimId != null && availableClaimId!.isNotEmpty)
+      availableClaimId:
+          (availableClaimId != null && availableClaimId!.isNotEmpty)
           ? availableClaimId
           : fallback.availableClaimId,
       availableClaimValue: availableClaimValue ?? fallback.availableClaimValue,
@@ -227,8 +239,10 @@ class TwitchChannelPointReward {
       isPaused: _readBool(json['isPaused'] ?? json['paused']) ?? false,
       isInStock: _readBool(json['isInStock'] ?? json['inStock']) ?? true,
       isUserInputRequired:
-          _readBool(json['isUserInputRequired'] ?? json['userInputRequired']) ?? false,
-      backgroundColor: _readString(json['backgroundColor'] ?? json['color']) ?? '',
+          _readBool(json['isUserInputRequired'] ?? json['userInputRequired']) ??
+          false,
+      backgroundColor:
+          _readString(json['backgroundColor'] ?? json['color']) ?? '',
       imageUrl: image ?? '',
     );
   }
@@ -292,7 +306,9 @@ bool? _readBool(Object? value) {
 }
 
 String? _findImageUrl(Map<String, dynamic> json) {
-  final direct = _readString(json['imageURL'] ?? json['imageUrl'] ?? json['url']);
+  final direct = _readString(
+    json['imageURL'] ?? json['imageUrl'] ?? json['url'],
+  );
   if (direct != null && direct.startsWith('http')) return direct;
 
   for (final value in json.values) {

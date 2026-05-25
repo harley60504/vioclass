@@ -7,12 +7,13 @@ class TwitchBackendTokenAuditService {
     TwitchChannelPointsApiService? channelPointsApi,
     TwitchChannelPointsApiService? publicChannelPointsApi,
     TwitchChannelPointsApiService? dropsChannelPointsApi,
-  }) : channelPointsApi = channelPointsApi ??
-            dropsChannelPointsApi ??
-            publicChannelPointsApi ??
-            (throw ArgumentError(
-              'TwitchBackendTokenAuditService requires channelPointsApi.',
-            ));
+  }) : channelPointsApi =
+           channelPointsApi ??
+           dropsChannelPointsApi ??
+           publicChannelPointsApi ??
+           (throw ArgumentError(
+             'TwitchBackendTokenAuditService requires channelPointsApi.',
+           ));
 
   /// Deprecated alias kept for old diagnostics wiring.
   @Deprecated('Use channelPointsApi instead.')
@@ -46,9 +47,7 @@ class TwitchBackendTokenAuditService {
     }
 
     try {
-      final context = await channelPointsApi.getContext(
-        channelLogin: login,
-      );
+      final context = await channelPointsApi.getContext(channelLogin: login);
 
       contextRead = context.toJson();
     } catch (e) {
@@ -56,9 +55,7 @@ class TwitchBackendTokenAuditService {
     }
 
     try {
-      final rewards = await channelPointsApi.getRewards(
-        channelLogin: login,
-      );
+      final rewards = await channelPointsApi.getRewards(channelLogin: login);
 
       rewardsRead = rewards.toJson();
     } catch (e) {

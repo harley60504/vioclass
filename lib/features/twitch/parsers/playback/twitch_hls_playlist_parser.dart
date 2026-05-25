@@ -28,7 +28,8 @@ class TwitchHlsPlaylistParser {
       if (line.isEmpty) continue;
 
       if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) {
-        mediaSequence = int.tryParse(
+        mediaSequence =
+            int.tryParse(
               line.substring('#EXT-X-MEDIA-SEQUENCE:'.length).trim(),
             ) ??
             mediaSequence;
@@ -79,8 +80,11 @@ class TwitchHlsPlaylistParser {
       }
 
       if (line.startsWith('#EXTINF:')) {
-        final durationText =
-            line.substring('#EXTINF:'.length).split(',').first.trim();
+        final durationText = line
+            .substring('#EXTINF:'.length)
+            .split(',')
+            .first
+            .trim();
         final durationSeconds = double.tryParse(durationText);
         if (durationSeconds != null && durationSeconds > 0) {
           final nextPendingMilliseconds = (durationSeconds * 1000).round();
@@ -189,7 +193,8 @@ class TwitchHlsPlaylistParser {
           TwitchHlsSegmentItem(
             url: absoluteUrl,
             mapUrl: currentMapUrl,
-            label: pendingLabel ??
+            label:
+                pendingLabel ??
                 _lastPathSegment(absoluteUrl, fallback: 'segment'),
             sequence: mediaSequence + segmentIndex,
             isPrefetch: false,
@@ -208,8 +213,8 @@ class TwitchHlsPlaylistParser {
     final reloadDelay = hasEndList
         ? Duration.zero
         : hasFutureSegment
-            ? const Duration(milliseconds: 160)
-            : _halfDuration(targetDuration);
+        ? const Duration(milliseconds: 160)
+        : _halfDuration(targetDuration);
 
     return TwitchParsedMediaPlaylist(
       items: items,

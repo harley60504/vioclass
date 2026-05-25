@@ -32,10 +32,7 @@ Future<void> showTwitchChatAppearanceSheet({
 class TwitchChatAppearanceSheet extends StatelessWidget {
   final TwitchChatAppearanceController controller;
 
-  const TwitchChatAppearanceSheet({
-    super.key,
-    required this.controller,
-  });
+  const TwitchChatAppearanceSheet({super.key, required this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +43,10 @@ class TwitchChatAppearanceSheet extends StatelessWidget {
       builder: (context, _) {
         final scale = controller.fontScale;
         final fontSize = TwitchTypography.chatFontSize(scale, compact: compact);
-        final emoteSize = TwitchTypography.chatEmoteSize(scale, compact: compact);
+        final emoteSize = TwitchTypography.chatEmoteSize(
+          scale,
+          compact: compact,
+        );
 
         return Padding(
           padding: EdgeInsets.fromLTRB(14, compact ? 10 : 14, 14, 14),

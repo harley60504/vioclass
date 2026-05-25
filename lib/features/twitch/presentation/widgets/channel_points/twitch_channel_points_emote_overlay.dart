@@ -24,6 +24,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
   final ValueChanged<TwitchChannelPointEmoteModification> onChooseModifier;
 
   const ChannelPointEmoteMenuOverlay({
+    super.key,
     required this.mode,
     required this.rewardTitle,
     required this.emotes,
@@ -213,10 +214,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                   : choosingModifier
                   ? _ModifierGrid(emote: base, onSelected: onChooseModifier)
                   : emotes.isEmpty
-                  ? _EmoteEmptyMessage(
-                      mode: mode,
-                      query: query,
-                    )
+                  ? _EmoteEmptyMessage(mode: mode, query: query)
                   : _EmoteGrid(emotes: emotes, onSelected: onChooseEmote),
             ),
           ],
@@ -302,7 +300,6 @@ class _EmoteGrid extends StatelessWidget {
     );
   }
 }
-
 
 class _EmoteEmptyMessage extends StatelessWidget {
   final ChannelPointEmoteOverlayMode? mode;
@@ -445,15 +442,11 @@ class _OverlayMessage extends StatelessWidget {
 
 class _OptimizedChannelPointEmoteImage extends StatelessWidget {
   final String imageUrl;
-  final double? width;
-  final double? height;
   final int cacheSize;
   final IconData fallbackIcon;
 
   const _OptimizedChannelPointEmoteImage({
     required this.imageUrl,
-    this.width,
-    this.height,
     required this.cacheSize,
     this.fallbackIcon = Icons.emoji_emotions,
   });
@@ -468,13 +461,11 @@ class _OptimizedChannelPointEmoteImage extends StatelessWidget {
     return RepaintBoundary(
       child: Image.network(
         url,
-        width: width,
-        height: height,
         fit: BoxFit.contain,
         cacheWidth: cacheSize,
         cacheHeight: cacheSize,
         filterQuality: FilterQuality.low,
-        errorBuilder: (_, __, ___) => Icon(fallbackIcon, color: Colors.white54),
+        errorBuilder: (_, _, _) => Icon(fallbackIcon, color: Colors.white54),
       ),
     );
   }

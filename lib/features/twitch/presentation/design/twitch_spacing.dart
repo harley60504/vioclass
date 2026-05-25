@@ -8,7 +8,11 @@ class TwitchSpacing {
   static const double lg = 14;
   static const double xl = 18;
 
-  static double compactAware(bool compact, double regular, double compactValue) {
+  static double compactAware(
+    bool compact,
+    double regular,
+    double compactValue,
+  ) {
     return compact ? compactValue : regular;
   }
 }

@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum TwitchDeviceLayout {
-  phonePortrait,
-  phoneLandscape,
-  tablet,
-  desktop,
-}
+enum TwitchDeviceLayout { phonePortrait, phoneLandscape, tablet, desktop }
 
 class TwitchBreakpoints {
   const TwitchBreakpoints._();

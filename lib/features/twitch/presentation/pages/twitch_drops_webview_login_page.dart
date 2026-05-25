@@ -41,7 +41,8 @@ class TwitchDropsWebViewLoginPage extends StatefulWidget {
       _TwitchDropsWebViewLoginPageState();
 }
 
-class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPage> {
+class _TwitchDropsWebViewLoginPageState
+    extends State<TwitchDropsWebViewLoginPage> {
   InAppWebViewController? _controller;
 
   late final TextEditingController _clientIdController;
@@ -68,7 +69,9 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
 
   String get _redirectUri {
     final text = _redirectUriController.text.trim();
-    return text.isNotEmpty ? text : TwitchDropsWebViewLoginPage.defaultRedirectUri;
+    return text.isNotEmpty
+        ? text
+        : TwitchDropsWebViewLoginPage.defaultRedirectUri;
   }
 
   @override
@@ -111,21 +114,23 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
       'force_verify': 'false',
     };
 
-    return Uri.parse('https://id.twitch.tv/oauth2/authorize').replace(
-      queryParameters: params,
-    );
+    return Uri.parse(
+      'https://id.twitch.tv/oauth2/authorize',
+    ).replace(queryParameters: params);
   }
 
   bool _isRedirectUri(Uri uri) {
     final configured = Uri.tryParse(_redirectUri);
     if (configured != null) {
-      final schemeMatches = uri.scheme.toLowerCase() == configured.scheme.toLowerCase();
-      final hostMatches = uri.host.toLowerCase() == configured.host.toLowerCase();
+      final schemeMatches =
+          uri.scheme.toLowerCase() == configured.scheme.toLowerCase();
+      final hostMatches =
+          uri.host.toLowerCase() == configured.host.toLowerCase();
       final portMatches = uri.hasPort
           ? uri.port == configured.port
           : configured.hasPort
-              ? false
-              : true;
+          ? false
+          : true;
       if (schemeMatches && hostMatches && portMatches) return true;
     }
 
@@ -169,7 +174,9 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
     }
 
     final returnedState = params['state'];
-    if (returnedState == null || returnedState.isEmpty || returnedState != _state) {
+    if (returnedState == null ||
+        returnedState.isEmpty ||
+        returnedState != _state) {
       if (!mounted) return;
       setState(() {
         _errorText = 'OAuth state 不一致，已阻擋這次回傳。';
@@ -265,7 +272,9 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
   Map<String, String> _parseOAuthResponse(Uri uri) {
     final output = <String, String>{};
     if (uri.query.isNotEmpty) output.addAll(Uri.splitQueryString(uri.query));
-    if (uri.fragment.isNotEmpty) output.addAll(Uri.splitQueryString(uri.fragment));
+    if (uri.fragment.isNotEmpty) {
+      output.addAll(Uri.splitQueryString(uri.fragment));
+    }
     return output;
   }
 
@@ -291,16 +300,18 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
         _currentUrlText = uri.toString();
       });
     }
-    await _controller?.loadUrl(urlRequest: URLRequest(url: WebUri(uri.toString())));
+    await _controller?.loadUrl(
+      urlRequest: URLRequest(url: WebUri(uri.toString())),
+    );
   }
 
   Future<void> _copyAuthorizationUrl() async {
     final uri = _buildAuthorizationUri();
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已複製 Drops OAuth URL')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製 Drops OAuth URL')));
   }
 
   Future<void> _tryManualInput() async {
@@ -372,7 +383,9 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
             Expanded(
               child: ClipRect(
                 child: InAppWebView(
-                  initialUrlRequest: URLRequest(url: WebUri(initialUri.toString())),
+                  initialUrlRequest: URLRequest(
+                    url: WebUri(initialUri.toString()),
+                  ),
                   initialSettings: InAppWebViewSettings(
                     javaScriptEnabled: true,
                     domStorageEnabled: true,
@@ -574,7 +587,11 @@ class _TwitchDropsWebViewLoginPageState extends State<TwitchDropsWebViewLoginPag
                 ),
                 const SizedBox(width: 8),
               ] else ...[
-                const Icon(Icons.info_outline, color: Color(0xFFBF94FF), size: 16),
+                const Icon(
+                  Icons.info_outline,
+                  color: Color(0xFFBF94FF),
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
               ],
               Expanded(

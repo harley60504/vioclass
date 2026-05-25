@@ -176,7 +176,8 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       thirdPartyEmoteCache: emotes.thirdParty,
       officialEmoteCache: emotes.official,
       emoteCount: emotes.thirdParty.count,
-      loadingEmotes: loadingEmotes || emotes.thirdParty.loading || emotes.official.loading,
+      loadingEmotes:
+          loadingEmotes || emotes.thirdParty.loading || emotes.official.loading,
       channelPoints: channelPoints,
       pendingSpecialMessage: pendingSpecialMessage,
       pinnedMessages: pinnedMessages,

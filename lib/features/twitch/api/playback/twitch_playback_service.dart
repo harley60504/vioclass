@@ -60,16 +60,15 @@ class TwitchPlaybackService {
   final TwitchGqlClient gqlClient;
   final Dio _dio;
 
-  TwitchPlaybackService({
-    required this.gqlClient,
-    Dio? dio,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 12),
-              ),
-            );
+  TwitchPlaybackService({required this.gqlClient, Dio? dio})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: const Duration(seconds: 10),
+              receiveTimeout: const Duration(seconds: 12),
+            ),
+          );
 
   Future<TwitchPlaybackResult> getLivePlaylist({
     required String channelLogin,
@@ -82,40 +81,39 @@ class TwitchPlaybackService {
       throw const TwitchPlaybackServiceException('channelLogin is empty.');
     }
 
-    final candidates = await Future.wait<_PlaybackCandidate?>(
-      <Future<_PlaybackCandidate?>>[
-        _loadCandidate(
-          login,
-          platform: 'web',
-          playerType: 'site',
-          sourceTag: 'web-site',
-          defaultHasAds: true,
-          supportedCodecs: supportedCodecs,
-          allowSource: allowSource,
-          allowAudioOnly: allowAudioOnly,
-        ),
-        _loadCandidate(
-          login,
-          platform: 'android',
-          playerType: 'autoplay',
-          sourceTag: 'android-autoplay',
-          defaultHasAds: false,
-          supportedCodecs: supportedCodecs,
-          allowSource: allowSource,
-          allowAudioOnly: allowAudioOnly,
-        ),
-        _loadCandidate(
-          login,
-          platform: 'ios',
-          playerType: 'site',
-          sourceTag: 'ios-site',
-          defaultHasAds: false,
-          supportedCodecs: supportedCodecs,
-          allowSource: allowSource,
-          allowAudioOnly: allowAudioOnly,
-        ),
-      ],
-    );
+    final candidates =
+        await Future.wait<_PlaybackCandidate?>(<Future<_PlaybackCandidate?>>[
+          _loadCandidate(
+            login,
+            platform: 'web',
+            playerType: 'site',
+            sourceTag: 'web-site',
+            defaultHasAds: true,
+            supportedCodecs: supportedCodecs,
+            allowSource: allowSource,
+            allowAudioOnly: allowAudioOnly,
+          ),
+          _loadCandidate(
+            login,
+            platform: 'android',
+            playerType: 'autoplay',
+            sourceTag: 'android-autoplay',
+            defaultHasAds: false,
+            supportedCodecs: supportedCodecs,
+            allowSource: allowSource,
+            allowAudioOnly: allowAudioOnly,
+          ),
+          _loadCandidate(
+            login,
+            platform: 'ios',
+            playerType: 'site',
+            sourceTag: 'ios-site',
+            defaultHasAds: false,
+            supportedCodecs: supportedCodecs,
+            allowSource: allowSource,
+            allowAudioOnly: allowAudioOnly,
+          ),
+        ]);
 
     final webCandidate = candidates.firstWhere(
       (candidate) => candidate?.sourceTag == 'web-site',
@@ -139,10 +137,7 @@ class TwitchPlaybackService {
 
     final variants = _mergeAdAwareVariants(
       baseVariants: baseCandidate.variants,
-      cleanCandidates: <_PlaybackCandidate>[
-        if (androidCandidate != null) androidCandidate,
-        if (iosCandidate != null) iosCandidate,
-      ],
+      cleanCandidates: <_PlaybackCandidate>[?androidCandidate, ?iosCandidate],
     );
 
     if (variants.isEmpty) {
@@ -201,7 +196,8 @@ class TwitchPlaybackService {
         options: Options(
           responseType: ResponseType.plain,
           headers: const <String, String>{
-            'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
+            'Accept':
+                'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
             'Origin': 'https://www.twitch.tv',
             'Referer': 'https://www.twitch.tv/',
             'User-Agent':
@@ -265,17 +261,26 @@ class TwitchPlaybackService {
 
     final root = data is List && data.isNotEmpty ? data.first : data;
     if (root is! Map) {
-      throw TwitchPlaybackServiceException('Unexpected playback token response.', cause: data);
+      throw TwitchPlaybackServiceException(
+        'Unexpected playback token response.',
+        cause: data,
+      );
     }
 
     final dataNode = root['data'];
     if (dataNode is! Map) {
-      throw TwitchPlaybackServiceException('Missing data in playback token response.', cause: data);
+      throw TwitchPlaybackServiceException(
+        'Missing data in playback token response.',
+        cause: data,
+      );
     }
 
     final tokenNode = dataNode['streamPlaybackAccessToken'];
     if (tokenNode is! Map) {
-      throw TwitchPlaybackServiceException('Missing streamPlaybackAccessToken.', cause: data);
+      throw TwitchPlaybackServiceException(
+        'Missing streamPlaybackAccessToken.',
+        cause: data,
+      );
     }
 
     return _PlaybackAccessTokenData(
@@ -309,7 +314,9 @@ class TwitchPlaybackService {
         'playlist_include_framerate': 'true',
         'reassignments_supported': 'true',
         'sig': signature,
-        'supported_codecs': supportedCodecs.trim().isEmpty ? 'h264' : supportedCodecs.trim(),
+        'supported_codecs': supportedCodecs.trim().isEmpty
+            ? 'h264'
+            : supportedCodecs.trim(),
         'token': token,
       },
     );
@@ -332,9 +339,20 @@ class TwitchPlaybackService {
       final clean = cleanByQuality[base.adAwareQualityKey];
       if (clean != null) {
         usedCleanUrls.add(clean.url);
-        merged.add(base.copyWith(url: clean.url, hasAds: false, sourceTag: clean.sourceTag));
+        merged.add(
+          base.copyWith(
+            url: clean.url,
+            hasAds: false,
+            sourceTag: clean.sourceTag,
+          ),
+        );
       } else {
-        merged.add(base.copyWith(hasAds: true, sourceTag: base.sourceTag.isEmpty ? 'web-site' : base.sourceTag));
+        merged.add(
+          base.copyWith(
+            hasAds: true,
+            sourceTag: base.sourceTag.isEmpty ? 'web-site' : base.sourceTag,
+          ),
+        );
       }
     }
 

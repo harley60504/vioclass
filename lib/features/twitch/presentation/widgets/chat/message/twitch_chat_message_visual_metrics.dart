@@ -7,14 +7,12 @@ class TwitchChatMessageVisualMetrics {
   final double scale;
   final bool compact;
 
-  const TwitchChatMessageVisualMetrics(
-    double rawScale, {
-    this.compact = false,
-  }) : scale = rawScale < 0.82
-            ? 0.82
-            : rawScale > 1.45
-                ? 1.45
-                : rawScale;
+  const TwitchChatMessageVisualMetrics(double rawScale, {this.compact = false})
+    : scale = rawScale < 0.82
+          ? 0.82
+          : rawScale > 1.45
+          ? 1.45
+          : rawScale;
 
   double get compactFactor => compact ? 0.92 : 1.0;
 

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum TwitchHomeSection {
-  following,
-  browse,
-}
+enum TwitchHomeSection { following, browse }
 
 extension TwitchHomeSectionUi on TwitchHomeSection {
   String get label {

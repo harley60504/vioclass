@@ -44,7 +44,9 @@ class TwitchChatMentionHistoryBuilder {
     void rememberDisplay(String login, String displayName) {
       final clean = normalize(login);
       if (clean.isEmpty) return;
-      final label = displayName.trim().isNotEmpty ? displayName.trim() : login.trim();
+      final label = displayName.trim().isNotEmpty
+          ? displayName.trim()
+          : login.trim();
       displayNames.putIfAbsent(clean, () => label);
       parent.putIfAbsent(clean, () => clean);
     }
@@ -83,10 +85,7 @@ class TwitchChatMentionHistoryBuilder {
       if (replyTarget.isNotEmpty &&
           replyTarget != fromLogin &&
           !seenTargets.contains(replyTarget)) {
-        rememberDisplay(
-          replyTarget,
-          reply?.parentDisplayName ?? replyTarget,
-        );
+        rememberDisplay(replyTarget, reply?.parentDisplayName ?? replyTarget);
         union(fromLogin, replyTarget);
         items.add(
           TwitchChatMentionHistoryItem(
@@ -105,7 +104,9 @@ class TwitchChatMentionHistoryBuilder {
     for (final item in items) {
       final root = find(item.fromLogin);
       if (root.isEmpty) continue;
-      grouped.putIfAbsent(root, () => <TwitchChatMentionHistoryItem>[]).add(item);
+      grouped
+          .putIfAbsent(root, () => <TwitchChatMentionHistoryItem>[])
+          .add(item);
     }
 
     final groups = <TwitchChatMentionHistoryGroup>[];
@@ -119,10 +120,11 @@ class TwitchChatMentionHistoryBuilder {
         participants.add(item.targetLogin);
       }
 
-      final labels = participants
-          .map((login) => displayNames[login] ?? login)
-          .toList(growable: false)
-        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      final labels =
+          participants
+              .map((login) => displayNames[login] ?? login)
+              .toList(growable: false)
+            ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
 
       groups.add(
         TwitchChatMentionHistoryGroup(

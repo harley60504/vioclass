@@ -20,17 +20,15 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 class TwitchDropsDeviceLoginPage extends StatefulWidget {
   final TwitchDropsAuthService dropsAuthService;
 
-  const TwitchDropsDeviceLoginPage({
-    super.key,
-    required this.dropsAuthService,
-  });
+  const TwitchDropsDeviceLoginPage({super.key, required this.dropsAuthService});
 
   @override
   State<TwitchDropsDeviceLoginPage> createState() =>
       _TwitchDropsDeviceLoginPageState();
 }
 
-class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage> {
+class _TwitchDropsDeviceLoginPageState
+    extends State<TwitchDropsDeviceLoginPage> {
   dynamic _authWindow;
   InAppWebViewController? _embeddedController;
   Timer? _pollTimer;
@@ -73,7 +71,8 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
   }
 
   static String sharedDesktopWebViewUserDataFolder() {
-    final path = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    final path =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
         'new_twitch_app_shared_twitch_desktop_webview_v30';
     try {
       Directory(path).createSync(recursive: true);
@@ -202,7 +201,7 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
           if (!mounted) return;
           setState(() {
             _authWindowOpen = false;
-        _embeddedWebViewReady = false;
+            _embeddedWebViewReady = false;
             if (!_done) _statusText = '授權視窗已關閉，仍會繼續輪詢一段時間。';
           });
         });
@@ -293,7 +292,8 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
           if (!valid) {
             setState(() {
               _polling = false;
-              _errorText = '已取得 token，但 validate client_id 不是 Drops / Android client。請重新授權。';
+              _errorText =
+                  '已取得 token，但 validate client_id 不是 Drops / Android client。請重新授權。';
               _lastPollText = 'Drops token validate 失敗。';
             });
             _schedulePoll();
@@ -321,7 +321,8 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
           return;
 
         case TwitchDeviceTokenPollStatus.slowDown:
-          _intervalSeconds = result.nextIntervalSeconds ?? (_intervalSeconds + 5);
+          _intervalSeconds =
+              result.nextIntervalSeconds ?? (_intervalSeconds + 5);
           setState(() {
             _polling = false;
             _lastPollText = result.message ?? 'Twitch 要求降低輪詢頻率。';
@@ -356,7 +357,9 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
     if (code == null || code.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: code));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已複製 Drops 授權代碼')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製 Drops 授權代碼')));
   }
 
   Future<void> _copyUrl() async {
@@ -364,7 +367,9 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
     if (url == null || url.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已複製 Drops 授權網址')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製 Drops 授權網址')));
   }
 
   @override
@@ -379,8 +384,16 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
         foregroundColor: Colors.white,
         title: const Text('Drops / Android Token 登入'),
         actions: [
-          IconButton(tooltip: '重新產生', onPressed: busy ? null : _start, icon: const Icon(Icons.restart_alt_rounded)),
-          IconButton(tooltip: '關閉', onPressed: busy ? null : () => Navigator.of(context).pop(false), icon: const Icon(Icons.close_rounded)),
+          IconButton(
+            tooltip: '重新產生',
+            onPressed: busy ? null : _start,
+            icon: const Icon(Icons.restart_alt_rounded),
+          ),
+          IconButton(
+            tooltip: '關閉',
+            onPressed: busy ? null : () => Navigator.of(context).pop(false),
+            icon: const Icon(Icons.close_rounded),
+          ),
         ],
       ),
       body: Column(
@@ -398,7 +411,10 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      decoration: const BoxDecoration(color: Color(0xFF18181B), border: Border(bottom: BorderSide(color: Color(0xFF2D2D35)))),
+      decoration: const BoxDecoration(
+        color: Color(0xFF18181B),
+        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
+      ),
       child: Row(
         children: [
           const Icon(Icons.devices_rounded, color: Color(0xFFBF94FF)),
@@ -408,17 +424,37 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('Drops / Android token 授權', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900)),
+                const Text(
+                  'Drops / Android token 授權',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(_statusText,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w700)),
+                Text(
+                  _statusText,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ],
             ),
           ),
           if (_polling)
-            const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.2, color: Color(0xFFBF94FF))),
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: Color(0xFFBF94FF),
+              ),
+            ),
         ],
       ),
     );
@@ -428,33 +464,85 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: Colors.redAccent.withOpacity(0.20),
-      child: Text(_errorText!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.w800)),
+      color: Colors.redAccent.withValues(alpha: 0.20),
+      child: Text(
+        _errorText!,
+        style: const TextStyle(
+          color: Colors.orangeAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 
   Widget _buildActionBar(TwitchDeviceAuthorization? auth) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: const BoxDecoration(color: Color(0xFF111116), border: Border(bottom: BorderSide(color: Color(0xFF2D2D35)))),
+      decoration: const BoxDecoration(
+        color: Color(0xFF111116),
+        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
+      ),
       child: Row(
         children: [
-          const Text('代碼', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w800)),
+          const Text(
+            '代碼',
+            style: TextStyle(
+              color: Colors.white70,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(width: 8),
-          SelectableText(auth?.userCode ?? '--------', style: const TextStyle(color: Color(0xFF5CFFB1), fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1.8)),
+          SelectableText(
+            auth?.userCode ?? '--------',
+            style: const TextStyle(
+              color: Color(0xFF5CFFB1),
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.8,
+            ),
+          ),
           const SizedBox(width: 12),
-          OutlinedButton.icon(onPressed: auth == null ? null : _copyCode, icon: const Icon(Icons.copy_rounded, size: 18), label: const Text('複製代碼'), style: _buttonStyle()),
+          OutlinedButton.icon(
+            onPressed: auth == null ? null : _copyCode,
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('複製代碼'),
+            style: _buttonStyle(),
+          ),
           const SizedBox(width: 8),
-          OutlinedButton.icon(onPressed: auth == null ? null : _copyUrl, icon: const Icon(Icons.link_rounded, size: 18), label: const Text('複製網址'), style: _buttonStyle()),
+          OutlinedButton.icon(
+            onPressed: auth == null ? null : _copyUrl,
+            icon: const Icon(Icons.link_rounded, size: 18),
+            label: const Text('複製網址'),
+            style: _buttonStyle(),
+          ),
           const SizedBox(width: 8),
-          OutlinedButton.icon(onPressed: auth == null || _openingWindow ? null : _reopenAuthWindow, icon: const Icon(Icons.open_in_new_rounded, size: 18), label: Text(_authWindowOpen ? '重開授權窗' : '開授權窗'), style: _buttonStyle()),
+          OutlinedButton.icon(
+            onPressed: auth == null || _openingWindow
+                ? null
+                : _reopenAuthWindow,
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            label: Text(_authWindowOpen ? '重開授權窗' : '開授權窗'),
+            style: _buttonStyle(),
+          ),
           const SizedBox(width: 8),
-          OutlinedButton.icon(onPressed: _polling ? null : _poll, icon: const Icon(Icons.check_circle_outline_rounded, size: 18), label: const Text('立即檢查'), style: _buttonStyle()),
+          OutlinedButton.icon(
+            onPressed: _polling ? null : _poll,
+            icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+            label: const Text('立即檢查'),
+            style: _buttonStyle(),
+          ),
           const Spacer(),
-          Text(_lastPollText ?? (_authWindowOpen ? '授權視窗已開啟' : '等待授權視窗...'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w700)),
+          Text(
+            _lastPollText ?? (_authWindowOpen ? '授權視窗已開啟' : '等待授權視窗...'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -510,7 +598,10 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
                 ),
                 TextButton.icon(
                   onPressed: _polling ? null : _poll,
-                  icon: const Icon(Icons.check_circle_outline_rounded, size: 16),
+                  icon: const Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 16,
+                  ),
                   label: const Text('檢查'),
                 ),
               ],
@@ -587,22 +678,44 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
         child: Container(
           width: 620,
           padding: const EdgeInsets.all(26),
-          decoration: BoxDecoration(color: const Color(0xFF18181B), borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white.withOpacity(0.08))),
+          decoration: BoxDecoration(
+            color: const Color(0xFF18181B),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(_authWindowOpen ? Icons.open_in_new_rounded : Icons.web_asset_off_rounded,
-                  color: _authWindowOpen ? const Color(0xFF5CFFB1) : Colors.white38,
-                  size: 64),
+              Icon(
+                _authWindowOpen
+                    ? Icons.open_in_new_rounded
+                    : Icons.web_asset_off_rounded,
+                color: _authWindowOpen
+                    ? const Color(0xFF5CFFB1)
+                    : Colors.white38,
+                size: 64,
+              ),
               const SizedBox(height: 14),
-              Text(_authWindowOpen ? '獨立授權視窗已開啟' : '尚未開啟授權視窗',
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900)),
+              Text(
+                _authWindowOpen ? '獨立授權視窗已開啟' : '尚未開啟授權視窗',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 10),
-              Text(auth == null
-                  ? '正在產生 Drops device code...'
-                  : '請在彈出的 Twitch 視窗完成 Android App 授權。這個視窗與官方 Web/GQL、主 OAuth 共用同一個 desktop WebView cookie storage。',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white60, height: 1.45, fontWeight: FontWeight.w700)),
+              Text(
+                auth == null
+                    ? '正在產生 Drops device code...'
+                    : '請在彈出的 Twitch 視窗完成 Android App 授權。這個視窗與官方 Web/GQL、主 OAuth 共用同一個 desktop WebView cookie storage。',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white60,
+                  height: 1.45,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 20),
               Wrap(
                 spacing: 10,
@@ -610,17 +723,36 @@ class _TwitchDropsDeviceLoginPageState extends State<TwitchDropsDeviceLoginPage>
                 alignment: WrapAlignment.center,
                 children: [
                   ElevatedButton.icon(
-                    onPressed: auth == null || _openingWindow ? null : _reopenAuthWindow,
+                    onPressed: auth == null || _openingWindow
+                        ? null
+                        : _reopenAuthWindow,
                     icon: const Icon(Icons.open_in_new_rounded),
                     label: Text(_authWindowOpen ? '重開授權視窗' : '開啟授權視窗'),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9146FF), foregroundColor: Colors.white),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF9146FF),
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                  OutlinedButton.icon(onPressed: _polling ? null : _poll, icon: const Icon(Icons.check_circle_outline_rounded), label: const Text('立即檢查'), style: _buttonStyle()),
+                  OutlinedButton.icon(
+                    onPressed: _polling ? null : _poll,
+                    icon: const Icon(Icons.check_circle_outline_rounded),
+                    label: const Text('立即檢查'),
+                    style: _buttonStyle(),
+                  ),
                 ],
               ),
               if (_currentUrl != null) ...[
                 const SizedBox(height: 18),
-                SelectableText(_currentUrl!, maxLines: 2, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white38, fontSize: 11, fontFamily: 'monospace')),
+                SelectableText(
+                  _currentUrl!,
+                  maxLines: 2,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                  ),
+                ),
               ],
             ],
           ),

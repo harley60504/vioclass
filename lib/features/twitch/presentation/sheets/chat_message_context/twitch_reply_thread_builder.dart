@@ -11,11 +11,7 @@
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 
-enum TwitchReplyThreadEntryKind {
-  ancestor,
-  selected,
-  directReply,
-}
+enum TwitchReplyThreadEntryKind { ancestor, selected, directReply }
 
 class TwitchReplyThreadEntry {
   final TwitchChatRuntimeMessage message;
@@ -71,7 +67,9 @@ class TwitchReplyThreadBuilder {
       parentOf: parentOf,
     );
 
-    final rootMessage = parentChain.isEmpty ? selectedMessage : parentChain.first;
+    final rootMessage = parentChain.isEmpty
+        ? selectedMessage
+        : parentChain.first;
     final rootKey = _messageIdentityKey(rootMessage);
     final selectedKey = _messageIdentityKey(selectedMessage);
     final ancestorKeys = parentChain.map(_messageIdentityKey).toSet();
@@ -83,11 +81,8 @@ class TwitchReplyThreadBuilder {
       final key = _messageIdentityKey(message);
       if (!seenEntryKeys.add(key)) continue;
 
-      final belongsToRoot = _conversationRootKey(
-            message: message,
-            parentOf: parentOf,
-          ) ==
-          rootKey;
+      final belongsToRoot =
+          _conversationRootKey(message: message, parentOf: parentOf) == rootKey;
       if (!belongsToRoot) continue;
 
       final depth = _conversationDepthFromRoot(
@@ -99,15 +94,11 @@ class TwitchReplyThreadBuilder {
       final kind = key == selectedKey
           ? TwitchReplyThreadEntryKind.selected
           : ancestorKeys.contains(key)
-              ? TwitchReplyThreadEntryKind.ancestor
-              : TwitchReplyThreadEntryKind.directReply;
+          ? TwitchReplyThreadEntryKind.ancestor
+          : TwitchReplyThreadEntryKind.directReply;
 
       entries.add(
-        TwitchReplyThreadEntry(
-          message: message,
-          kind: kind,
-          depth: depth,
-        ),
+        TwitchReplyThreadEntry(message: message, kind: kind, depth: depth),
       );
     }
 
@@ -126,7 +117,9 @@ class TwitchReplyThreadBuilder {
       if (timeCompare != 0) return timeCompare;
       final depthCompare = a.depth.compareTo(b.depth);
       if (depthCompare != 0) return depthCompare;
-      return _messageIdentityKey(a.message).compareTo(_messageIdentityKey(b.message));
+      return _messageIdentityKey(
+        a.message,
+      ).compareTo(_messageIdentityKey(b.message));
     });
 
     if (entries.length <= _maxTotalRows) {
@@ -134,10 +127,7 @@ class TwitchReplyThreadBuilder {
     }
 
     return List<TwitchReplyThreadEntry>.unmodifiable(
-      _trimEntriesAroundSelected(
-        entries: entries,
-        selectedKey: selectedKey,
-      ),
+      _trimEntriesAroundSelected(entries: entries, selectedKey: selectedKey),
     );
   }
 
@@ -150,7 +140,8 @@ class TwitchReplyThreadBuilder {
 
     for (final entry in entries) {
       final key = _messageIdentityKey(entry.message);
-      if (entry.kind == TwitchReplyThreadEntryKind.ancestor || key == selectedKey) {
+      if (entry.kind == TwitchReplyThreadEntryKind.ancestor ||
+          key == selectedKey) {
         required.add(entry);
       } else {
         optional.add(entry);
@@ -180,7 +171,9 @@ class TwitchReplyThreadBuilder {
       if (timeCompare != 0) return timeCompare;
       final depthCompare = a.depth.compareTo(b.depth);
       if (depthCompare != 0) return depthCompare;
-      return _messageIdentityKey(a.message).compareTo(_messageIdentityKey(b.message));
+      return _messageIdentityKey(
+        a.message,
+      ).compareTo(_messageIdentityKey(b.message));
     });
 
     return output.take(_maxTotalRows).toList(growable: false);
@@ -188,8 +181,10 @@ class TwitchReplyThreadBuilder {
 
   static List<TwitchChatRuntimeMessage> _buildParentChain({
     required TwitchChatRuntimeMessage selectedMessage,
-    required TwitchChatRuntimeMessage? Function(TwitchChatRuntimeMessage message)
-        parentOf,
+    required TwitchChatRuntimeMessage? Function(
+      TwitchChatRuntimeMessage message,
+    )
+    parentOf,
   }) {
     final chain = <TwitchChatRuntimeMessage>[];
     final seen = <String>{_messageIdentityKey(selectedMessage)};
@@ -211,8 +206,10 @@ class TwitchReplyThreadBuilder {
 
   static String _conversationRootKey({
     required TwitchChatRuntimeMessage message,
-    required TwitchChatRuntimeMessage? Function(TwitchChatRuntimeMessage message)
-        parentOf,
+    required TwitchChatRuntimeMessage? Function(
+      TwitchChatRuntimeMessage message,
+    )
+    parentOf,
   }) {
     var cursor = message;
     final seen = <String>{_messageIdentityKey(cursor)};
@@ -233,8 +230,10 @@ class TwitchReplyThreadBuilder {
   static int _conversationDepthFromRoot({
     required TwitchChatRuntimeMessage message,
     required String rootKey,
-    required TwitchChatRuntimeMessage? Function(TwitchChatRuntimeMessage message)
-        parentOf,
+    required TwitchChatRuntimeMessage? Function(
+      TwitchChatRuntimeMessage message,
+    )
+    parentOf,
   }) {
     final messageKey = _messageIdentityKey(message);
     if (messageKey == rootKey) return 0;
@@ -306,7 +305,8 @@ class TwitchReplyThreadBuilder {
       final candidateDisplayName = _normalizeLogin(candidate.displayName);
       final candidateBody = _normalizeBody(_messagePlainText(candidate));
 
-      final loginMatches = parentLogin.isEmpty ||
+      final loginMatches =
+          parentLogin.isEmpty ||
           parentLogin == candidateLogin ||
           parentLogin == candidateDisplayName;
       final bodyMatches = parentBody.isEmpty || parentBody == candidateBody;

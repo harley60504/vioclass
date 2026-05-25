@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
@@ -204,7 +205,8 @@ class TwitchDartHlsLowLatencyProxy {
       'maxPlaylistReloadDelayMs': maxPlaylistReloadDelay.inMilliseconds,
       'dropBehindLiveEdge': dropBehindLiveEdge,
       'startupEdgeSegmentCount': startupEdgeSegmentCount,
-      'startupRequirePrefetchedFirstSegment': startupRequirePrefetchedFirstSegment,
+      'startupRequirePrefetchedFirstSegment':
+          startupRequirePrefetchedFirstSegment,
       'startupSkipCurrentLatestSegment': startupSkipCurrentLatestSegment,
       'startupPrefetchWaitTimeoutMs': startupPrefetchWaitTimeout.inMilliseconds,
       'startupFutureReadyWaitTimeoutMs':
@@ -338,7 +340,8 @@ Future<void> _twitchHlsProxyIsolateEntry(Map<String, Object?> args) async {
   final controlPort = ReceivePort();
 
   try {
-    final startupModeName = args['startupMode']?.toString() ??
+    final startupModeName =
+        args['startupMode']?.toString() ??
         TwitchHlsStartupMode.streamlinkLiveEdge.name;
 
     final startupMode = TwitchHlsStartupMode.values.firstWhere(
@@ -392,10 +395,7 @@ Future<void> _twitchHlsProxyIsolateEntry(Map<String, Object?> args) async {
       startupMode: startupMode,
       timelineOrigin: origin,
       onLog: (message) {
-        replyPort.send(<String, Object?>{
-          'type': 'log',
-          'message': message,
-        });
+        replyPort.send(<String, Object?>{'type': 'log', 'message': message});
       },
     );
 
@@ -414,8 +414,9 @@ Future<void> _twitchHlsProxyIsolateEntry(Map<String, Object?> args) async {
       if (raw is! Map) continue;
 
       final type = raw['type']?.toString();
-      final commandReply =
-          raw['replyPort'] is SendPort ? raw['replyPort'] as SendPort : null;
+      final commandReply = raw['replyPort'] is SendPort
+          ? raw['replyPort'] as SendPort
+          : null;
 
       if (type == 'close') {
         await proxy.close();
@@ -473,8 +474,6 @@ class _TwitchDartHlsLowLatencyProxyCore {
   final TwitchHlsStartupMode startupMode;
   final DateTime? timelineOrigin;
 
-  late final DateTime _timelineOrigin = timelineOrigin ?? DateTime.now();
-
   _TwitchDartHlsLowLatencyProxyCore({
     required this.upstreamPlaylistUrl,
     required this.upstreamHeaders,
@@ -505,8 +504,8 @@ class _TwitchDartHlsLowLatencyProxyCore {
 
   final Expando<_TwitchHlsPrefetchRuntimeState> _prefetchRuntimeStates =
       Expando<_TwitchHlsPrefetchRuntimeState>(
-    'twitch_hls_prefetch_runtime_state',
-  );
+        'twitch_hls_prefetch_runtime_state',
+      );
 
   final LinkedHashMap<String, List<int>> _initMapBytesCache =
       LinkedHashMap<String, List<int>>();
@@ -550,9 +549,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
     engine.startPrewarm();
 
     unawaited(
-      engine.waitUntilReady(
-        timeout: const Duration(milliseconds: 900),
-      ),
+      engine.waitUntilReady(timeout: const Duration(milliseconds: 900)),
     );
   }
 
@@ -719,10 +716,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
 
     engine?.stop();
 
-    final fresh = _TwitchHlsLowLatencyEngine(
-      owner: this,
-      playlistUrl: url,
-    );
+    final fresh = _TwitchHlsLowLatencyEngine(owner: this, playlistUrl: url);
 
     _prewarmEngine = fresh;
     fresh.startPrewarm();
@@ -749,7 +743,8 @@ class _TwitchDartHlsLowLatencyProxyCore {
       bytesSinceFlush += chunk.length;
 
       final now = DateTime.now();
-      final shouldFlush = !flushedFirstChunk ||
+      final shouldFlush =
+          !flushedFirstChunk ||
           bytesSinceFlush >= 16 * 1024 ||
           now.difference(lastFlushAt) >= const Duration(milliseconds: 15);
 
@@ -977,7 +972,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
         lastError = HttpException('Upstream HTTP $status for $label');
 
         if (!retryLiveSegment || attempt >= maxAttempts) {
-          throw lastError ?? StateError('Unknown upstream error for $label');
+          throw lastError;
         }
       } catch (e, stackTrace) {
         lastError = e;
@@ -990,10 +985,12 @@ class _TwitchDartHlsLowLatencyProxyCore {
 
       await Future<void>.delayed(delay);
 
-      final nextMs = math.min(
-        (delay.inMilliseconds * 1.45).round() + 20,
-        retryLiveSegment ? 260 : 520,
-      ).toInt();
+      final nextMs = math
+          .min(
+            (delay.inMilliseconds * 1.45).round() + 20,
+            retryLiveSegment ? 260 : 520,
+          )
+          .toInt();
 
       delay = Duration(milliseconds: nextMs);
     }
@@ -1070,7 +1067,10 @@ class _TwitchDartHlsLowLatencyProxyCore {
       'no-store, no-cache, must-revalidate',
     );
     request.response.headers.set(HttpHeaders.pragmaHeader, 'no-cache');
-    request.response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
+    request.response.headers.set(
+      HttpHeaders.accessControlAllowOriginHeader,
+      '*',
+    );
     request.response.headers.contentLength = rewrittenBytes.length;
 
     if (request.method != 'HEAD') {
@@ -1096,7 +1096,10 @@ class _TwitchDartHlsLowLatencyProxyCore {
       fallbackUrl: url,
     );
 
-    request.response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
+    request.response.headers.set(
+      HttpHeaders.accessControlAllowOriginHeader,
+      '*',
+    );
 
     if (request.method != 'HEAD') {
       await upstreamResponse.pipe(request.response);
@@ -1126,8 +1129,9 @@ class _TwitchDartHlsLowLatencyProxyCore {
       upstreamRequest.headers.set(key, value);
     }
 
-    final incomingUserAgent =
-        incomingRequest.headers.value(HttpHeaders.userAgentHeader);
+    final incomingUserAgent = incomingRequest.headers.value(
+      HttpHeaders.userAgentHeader,
+    );
     if (incomingUserAgent != null && incomingUserAgent.trim().isNotEmpty) {
       upstreamRequest.headers.set(
         HttpHeaders.userAgentHeader,
@@ -1212,10 +1216,16 @@ class _TwitchDartHlsLowLatencyProxyCore {
       fallbackUrl,
     );
 
-    localResponse.headers.set(HttpHeaders.cacheControlHeader, 'public, max-age=10');
+    localResponse.headers.set(
+      HttpHeaders.cacheControlHeader,
+      'public, max-age=10',
+    );
   }
 
-  ContentType _guessSegmentContentType(String? upstreamContentType, String url) {
+  ContentType _guessSegmentContentType(
+    String? upstreamContentType,
+    String url,
+  ) {
     final lowerType = (upstreamContentType ?? '').toLowerCase();
 
     if (lowerType.contains('mp2t')) return ContentType('video', 'mp2t');
@@ -1256,7 +1266,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
       if (_isLowLatencyOnlyTag(line)) {
         skipNextUriLineForLowLatencyTag =
             line.startsWith('#EXT-X-TWITCH-PREFETCH') ||
-                line.startsWith('#EXT-X-PREFETCH');
+            line.startsWith('#EXT-X-PREFETCH');
         continue;
       }
 
@@ -1326,8 +1336,8 @@ class _TwitchDartHlsLowLatencyProxyCore {
     final ext = path.endsWith('.ts')
         ? 'ts'
         : path.endsWith('.aac')
-            ? 'aac'
-            : 'm4s';
+        ? 'aac'
+        : 'm4s';
 
     return 'http://127.0.0.1:$port/segment.$ext?u=${_encodeUrl(absoluteUrl)}';
   }
@@ -1345,10 +1355,7 @@ class _TwitchHlsLowLatencyEngine {
   final _TwitchDartHlsLowLatencyProxyCore owner;
   final String playlistUrl;
 
-  _TwitchHlsLowLatencyEngine({
-    required this.owner,
-    required this.playlistUrl,
-  });
+  _TwitchHlsLowLatencyEngine({required this.owner, required this.playlistUrl});
 
   final Set<int> _writtenSequences = <int>{};
   final Set<String> _writtenUrls = <String>{};
@@ -1411,10 +1418,7 @@ class _TwitchHlsLowLatencyEngine {
     final existing = _writer;
     if (existing != null && !existing.isStopped) return;
 
-    final writer = _TwitchHlsPersistentWriter(
-      engine: this,
-      output: _liveBus,
-    );
+    final writer = _TwitchHlsPersistentWriter(engine: this, output: _liveBus);
 
     _writer = writer;
     unawaited(writer.start());
@@ -1531,7 +1535,9 @@ class _TwitchHlsLowLatencyEngine {
         }
 
         final outputFutureItems = owner.outputFutureSegments
-            ? futureItems.take(math.max(owner.futureOutputSegmentCount, 0)).toList()
+            ? futureItems
+                  .take(math.max(owner.futureOutputSegmentCount, 0))
+                  .toList()
             : const <TwitchHlsSegmentItem>[];
 
         final outputCandidates = _buildOutputCandidates(
@@ -1609,7 +1615,9 @@ class _TwitchHlsLowLatencyEngine {
 
     final tail = items.length > 8 ? items.sublist(items.length - 8) : items;
     return tail
-        .map((item) => '${item.sequence}:${item.isPrefetch ? 1 : 0}:${item.url}')
+        .map(
+          (item) => '${item.sequence}:${item.isPrefetch ? 1 : 0}:${item.url}',
+        )
         .join('|');
   }
 
@@ -1810,10 +1818,7 @@ class _TwitchHlsPersistentWriter {
   final Set<int> _sessionWrittenSequences = <int>{};
   final Set<String> _sessionWrittenUrls = <String>{};
 
-  _TwitchHlsPersistentWriter({
-    required this.engine,
-    required this.output,
-  });
+  _TwitchHlsPersistentWriter({required this.engine, required this.output});
 
   bool get isStopped => _stopped;
 
@@ -1882,10 +1887,7 @@ class _TwitchHlsPersistentWriter {
     final segmentMs = lastSegmentDuration.inMilliseconds;
     if (segmentMs <= 0) return const Duration(milliseconds: 900);
 
-    final backoffMs = (segmentMs * 0.45)
-        .round()
-        .clamp(700, 1800)
-        .toInt();
+    final backoffMs = (segmentMs * 0.45).round().clamp(700, 1800).toInt();
 
     return Duration(milliseconds: backoffMs);
   }
@@ -2059,7 +2061,9 @@ class _TwitchHlsPersistentWriter {
 
     TwitchHlsSegmentItem? bestOpenedFuture;
 
-    while (!_stopped && !engine.isStopped && DateTime.now().isBefore(deadline)) {
+    while (!_stopped &&
+        !engine.isStopped &&
+        DateTime.now().isBefore(deadline)) {
       final normalItems = engine.snapshotNormalItems();
       final outputCandidates = engine.snapshotOutputCandidates();
 
@@ -2149,7 +2153,9 @@ class _TwitchHlsPersistentWriter {
 
     TwitchHlsSegmentItem? bestFallback;
 
-    while (!_stopped && !engine.isStopped && DateTime.now().isBefore(deadline)) {
+    while (!_stopped &&
+        !engine.isStopped &&
+        DateTime.now().isBefore(deadline)) {
       final outputCandidates = engine.snapshotOutputCandidates();
 
       final selected = _streamlinkLiveEdgeCandidate(outputCandidates);
@@ -2166,7 +2172,8 @@ class _TwitchHlsPersistentWriter {
 
         // 如果 live_edge > 1，選到 normal 是合理行為。
         // 如果 live_edge == 1 但目前還沒有 future，就多等一點看 future 會不會出現。
-        if (!engine.owner.outputFutureSegments || engine.owner.edgeSegmentCount > 1) {
+        if (!engine.owner.outputFutureSegments ||
+            engine.owner.edgeSegmentCount > 1) {
           return selected;
         }
       }
@@ -2182,15 +2189,16 @@ class _TwitchHlsPersistentWriter {
   TwitchHlsSegmentItem? _streamlinkLiveEdgeCandidate(
     List<TwitchHlsSegmentItem> outputCandidates,
   ) {
-    final pool = outputCandidates
-        .where(
-          (item) =>
-              !_sessionWrittenUrls.contains(item.url) &&
-              !_sessionWrittenSequences.contains(item.sequence) &&
-              item.sequence > _lastWrittenSequence,
-        )
-        .toList()
-      ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    final pool =
+        outputCandidates
+            .where(
+              (item) =>
+                  !_sessionWrittenUrls.contains(item.url) &&
+                  !_sessionWrittenSequences.contains(item.sequence) &&
+                  item.sequence > _lastWrittenSequence,
+            )
+            .toList()
+          ..sort((a, b) => a.sequence.compareTo(b.sequence));
 
     if (pool.isEmpty) return null;
 
@@ -2256,7 +2264,8 @@ class _TwitchHlsPersistentWriter {
       if (_sessionWrittenSequences.contains(item.sequence)) return false;
       if (item.sequence <= _lastWrittenSequence) return false;
 
-      if (engine.owner.dropBehindLiveEdge && item.sequence < minSequenceToKeep) {
+      if (engine.owner.dropBehindLiveEdge &&
+          item.sequence < minSequenceToKeep) {
         engine.markSkipped(item);
         return false;
       }
@@ -2296,7 +2305,10 @@ class _TwitchHlsPersistentWriter {
 
   int _edgeStartSequence(List<TwitchHlsSegmentItem> pool) {
     final safeStartupEdgeSegmentCount = math
-        .max(engine.owner.startupEdgeSegmentCount, engine.owner.edgeSegmentCount)
+        .max(
+          engine.owner.startupEdgeSegmentCount,
+          engine.owner.edgeSegmentCount,
+        )
         .clamp(1, pool.length)
         .toInt();
 

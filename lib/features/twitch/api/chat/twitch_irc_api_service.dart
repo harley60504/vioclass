@@ -10,9 +10,7 @@ import '../core/twitch_api_constants.dart';
 class TwitchIrcApiService {
   final TwitchIrcMessageParser messageParser;
 
-  TwitchIrcApiService({
-    this.messageParser = const TwitchIrcMessageParser(),
-  });
+  TwitchIrcApiService({this.messageParser = const TwitchIrcMessageParser()});
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
@@ -61,7 +59,9 @@ class TwitchIrcApiService {
 
     _channel = ws;
     _currentChannelLogin = login;
-    _currentNick = nick.trim().isEmpty ? 'justinfan12345' : nick.trim().toLowerCase();
+    _currentNick = nick.trim().isEmpty
+        ? 'justinfan12345'
+        : nick.trim().toLowerCase();
     _currentUserStateTags.clear();
     _userStateCompleter = Completer<Map<String, String>>();
 
@@ -82,7 +82,8 @@ class TwitchIrcApiService {
       _send('PASS oauth:$safeToken');
       _send('NICK $_currentNick');
     } else {
-      final guestNick = 'justinfan${DateTime.now().millisecondsSinceEpoch.remainder(999999)}';
+      final guestNick =
+          'justinfan${DateTime.now().millisecondsSinceEpoch.remainder(999999)}';
       _currentNick = guestNick;
       _send('PASS SCHMOOPIIE');
       _send('NICK $guestNick');
@@ -113,12 +114,15 @@ class TwitchIrcApiService {
       }
 
       final parsed = messageParser.parseLine(line);
-      if (parsed.command == 'USERSTATE' || parsed.command == 'GLOBALUSERSTATE') {
+      if (parsed.command == 'USERSTATE' ||
+          parsed.command == 'GLOBALUSERSTATE') {
         _currentUserStateTags.addAll(parsed.tags);
 
         final completer = _userStateCompleter;
         if (completer != null && !completer.isCompleted) {
-          completer.complete(Map<String, String>.unmodifiable(_currentUserStateTags));
+          completer.complete(
+            Map<String, String>.unmodifiable(_currentUserStateTags),
+          );
         }
       }
 
@@ -165,9 +169,7 @@ class TwitchIrcApiService {
       throw StateError('缺少 channel login，不能送出聊天室訊息。');
     }
 
-    final text = message
-        .replaceAll(RegExp(r'[\r\n]+'), ' ')
-        .trim();
+    final text = message.replaceAll(RegExp(r'[\r\n]+'), ' ').trim();
 
     if (text.isEmpty) {
       throw ArgumentError.value(message, 'message', 'message cannot be empty');

@@ -10,10 +10,7 @@ class TwitchUserApiService {
   final TwitchHelixApiService helix;
   final TwitchGqlApiService gql;
 
-  const TwitchUserApiService({
-    required this.helix,
-    required this.gql,
-  });
+  const TwitchUserApiService({required this.helix, required this.gql});
 
   Future<List<TwitchUser>> getUsersByLogin(List<String> logins) async {
     final clean = logins

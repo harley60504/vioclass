@@ -31,14 +31,15 @@ class TwitchGqlClient {
     this.accessToken,
     this.authorizationPrefix = 'Bearer',
     Dio? dio,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: const Duration(seconds: 10),
-                receiveTimeout: const Duration(seconds: 12),
-                sendTimeout: const Duration(seconds: 10),
-              ),
-            );
+  }) : _dio =
+           dio ??
+           Dio(
+             BaseOptions(
+               connectTimeout: const Duration(seconds: 10),
+               receiveTimeout: const Duration(seconds: 12),
+               sendTimeout: const Duration(seconds: 10),
+             ),
+           );
 
   Map<String, String> buildHeaders() {
     final headers = <String, String>{

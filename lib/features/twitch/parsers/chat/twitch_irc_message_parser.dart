@@ -28,8 +28,9 @@ class TwitchIrcMessageParser {
           if (equalsIndex <= 0) {
             tags[pair] = '';
           } else {
-            tags[pair.substring(0, equalsIndex)] =
-                decodeTagValue(pair.substring(equalsIndex + 1));
+            tags[pair.substring(0, equalsIndex)] = decodeTagValue(
+              pair.substring(equalsIndex + 1),
+            );
           }
         }
       }
@@ -53,14 +54,12 @@ class TwitchIrcMessageParser {
     }
 
     final parts = middle.split(' ').where((item) => item.isNotEmpty).toList();
-    final command = parts.isEmpty ? extractCommandFromRaw(original) : parts.first;
+    final command = parts.isEmpty
+        ? extractCommandFromRaw(original)
+        : parts.first;
     final channel = extractChannel(parts, original);
 
-    final userLogin = extractLogin(
-      prefix: prefix,
-      tags: tags,
-      raw: original,
-    );
+    final userLogin = extractLogin(prefix: prefix, tags: tags, raw: original);
 
     final displayName = tags['display-name']?.trim().isNotEmpty == true
         ? tags['display-name']!.trim()

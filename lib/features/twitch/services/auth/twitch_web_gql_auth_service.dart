@@ -40,9 +40,7 @@ class TwitchWebGqlAuthService extends ChangeNotifier {
   DateTime? _lastValidatedAt;
   String _clientId = TwitchApiConstants.twitchWebClientId;
 
-  TwitchWebGqlAuthService({
-    required this.apiClient,
-  }) {
+  TwitchWebGqlAuthService({required this.apiClient}) {
     authApi = TwitchAuthApiService(
       client: apiClient,
       clientId: TwitchApiConstants.twitchWebClientId,
@@ -60,7 +58,9 @@ class TwitchWebGqlAuthService extends ChangeNotifier {
     return current.accessToken;
   }
 
-  Future<void> loadStoredSession({bool migrateLegacyDropsWebToken = true}) async {
+  Future<void> loadStoredSession({
+    bool migrateLegacyDropsWebToken = true,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
 
     if (migrateLegacyDropsWebToken) {
@@ -158,7 +158,9 @@ class TwitchWebGqlAuthService extends ChangeNotifier {
   Future<void> _migrateLegacyDropsWebTokenIfNeeded(
     SharedPreferences prefs,
   ) async {
-    final legacyClientId = prefs.getString(legacyDropsClientIdStorageKey)?.trim();
+    final legacyClientId = prefs
+        .getString(legacyDropsClientIdStorageKey)
+        ?.trim();
     if (legacyClientId != TwitchApiConstants.twitchWebClientId) return;
 
     final legacyRaw = prefs.getString(legacyDropsTokenStorageKey);
@@ -166,8 +168,13 @@ class TwitchWebGqlAuthService extends ChangeNotifier {
       final existingWebRaw = prefs.getString(tokenStorageKey);
       if (existingWebRaw == null || existingWebRaw.trim().isEmpty) {
         await prefs.setString(tokenStorageKey, legacyRaw);
-        await prefs.setString(clientIdStorageKey, TwitchApiConstants.twitchWebClientId);
-        final legacyValidatedAt = prefs.getString(legacyDropsValidatedAtStorageKey);
+        await prefs.setString(
+          clientIdStorageKey,
+          TwitchApiConstants.twitchWebClientId,
+        );
+        final legacyValidatedAt = prefs.getString(
+          legacyDropsValidatedAtStorageKey,
+        );
         if (legacyValidatedAt != null && legacyValidatedAt.trim().isNotEmpty) {
           await prefs.setString(validatedAtStorageKey, legacyValidatedAt);
         }

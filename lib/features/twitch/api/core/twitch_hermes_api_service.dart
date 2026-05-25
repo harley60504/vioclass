@@ -20,9 +20,7 @@ class TwitchHermesApiService {
   final StreamController<String> _rawController =
       StreamController<String>.broadcast();
 
-  TwitchHermesApiService({
-    required this.clientId,
-  });
+  TwitchHermesApiService({required this.clientId});
 
   Stream<TwitchHermesEvent> get events => _eventsController.stream;
   Stream<String> get rawEvents => _rawController.stream;
@@ -68,9 +66,7 @@ class TwitchHermesApiService {
       'subscribe': <String, dynamic>{
         'id': subscriptionId,
         'type': 'pubsub',
-        'pubsub': <String, dynamic>{
-          'topic': topic,
-        },
+        'pubsub': <String, dynamic>{'topic': topic},
       },
       'timestamp': DateTime.now().toUtc().toIso8601String(),
     };
@@ -169,7 +165,8 @@ class TwitchHermesApiService {
   }
 
   String _randomId() {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
+    const chars =
+        'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-';
     final random = Random.secure();
     return List<String>.generate(
       21,

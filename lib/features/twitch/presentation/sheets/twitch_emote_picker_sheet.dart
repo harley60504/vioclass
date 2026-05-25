@@ -88,10 +88,7 @@ class _TwitchUnifiedEmotePickerSheetState
     final official = _official;
 
     return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[
-        widget.cache,
-        if (official != null) official,
-      ]),
+      animation: Listenable.merge(<Listenable>[widget.cache, ?official]),
       builder: (context, _) {
         final loading =
             widget.loading ||
@@ -694,9 +691,9 @@ class _EmoteTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: entry.favorite
-                    ? const Color(0xFFEAB308).withOpacity(0.78)
+                    ? const Color(0xFFEAB308).withValues(alpha: 0.78)
                     : locked
-                    ? const Color(0xFFFFD166).withOpacity(0.38)
+                    ? const Color(0xFFFFD166).withValues(alpha: 0.38)
                     : TwitchUiColors.sheet.backplate.border,
               ),
               boxShadow: const <BoxShadow>[

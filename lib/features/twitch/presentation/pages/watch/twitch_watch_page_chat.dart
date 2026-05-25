@@ -1,4 +1,6 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member, unused_element
 
 extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
   Future<void> _runDeferredChatStartup(String channel, int generation) async {
@@ -42,7 +44,6 @@ extension _TwitchWatchPageChatMethods on _TwitchWatchPageState {
         _chatRuntime = runtime;
         _viewerLogin = validation.login;
         _viewerId = validation.userId;
-        _viewerScopes = validation.scopes;
         _channelId = startup.channelId;
       });
 

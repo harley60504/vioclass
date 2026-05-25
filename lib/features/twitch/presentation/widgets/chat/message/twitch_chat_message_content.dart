@@ -44,10 +44,7 @@ class TwitchChatMessageContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (metadata.hasReply)
-          TwitchChatMessageReplyPreview(
-            message: message,
-            metrics: metrics,
-          ),
+          TwitchChatMessageReplyPreview(message: message, metrics: metrics),
         if (showSystemMessage && metadata.isSystemLike)
           Padding(
             padding: const EdgeInsets.only(bottom: 3),
@@ -76,74 +73,90 @@ class TwitchChatMessageContent extends StatelessWidget {
     final spans = <InlineSpan>[];
 
     if (showTimestamp) {
-      spans.add(TextSpan(
-        text: '${formatTwitchChatMessageTime(message.receivedAt)} ',
-        style: TextStyle(
-          color: Colors.white38,
-          fontSize: metrics.metaFontSize,
-          fontWeight: FontWeight.w700,
-          height: metrics.lineHeight,
+      spans.add(
+        TextSpan(
+          text: '${formatTwitchChatMessageTime(message.receivedAt)} ',
+          style: TextStyle(
+            color: Colors.white38,
+            fontSize: metrics.metaFontSize,
+            fontWeight: FontWeight.w700,
+            height: metrics.lineHeight,
+          ),
         ),
-      ));
+      );
     }
 
     for (final badge in message.resolvedBadges) {
       if (badge.image1x.trim().isEmpty) continue;
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: const EdgeInsets.only(right: 3),
-          child: TwitchChatMessageBadge(
-            badge: badge,
-            metrics: metrics,
-            compact: compact,
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.only(right: 3),
+            child: TwitchChatMessageBadge(
+              badge: badge,
+              metrics: metrics,
+              compact: compact,
+            ),
           ),
         ),
-      ));
+      );
     }
 
-    spans.add(TextSpan(
-      text: displayNameText,
-      style: TextStyle(
-        color: displayColor,
-        fontWeight: FontWeight.w900,
-        fontSize: compact ? metrics.compactNameFontSize : metrics.nameFontSize,
-        fontStyle: message.metadata.isAction ? FontStyle.italic : FontStyle.normal,
-        height: metrics.lineHeight,
+    spans.add(
+      TextSpan(
+        text: displayNameText,
+        style: TextStyle(
+          color: displayColor,
+          fontWeight: FontWeight.w900,
+          fontSize: compact
+              ? metrics.compactNameFontSize
+              : metrics.nameFontSize,
+          fontStyle: message.metadata.isAction
+              ? FontStyle.italic
+              : FontStyle.normal,
+          height: metrics.lineHeight,
+        ),
       ),
-    ));
+    );
 
     if (message.metadata.isFirstMessage) {
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 4, right: 3),
-          child: TwitchChatFirstMessageChip(metrics: metrics),
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, right: 3),
+            child: TwitchChatFirstMessageChip(metrics: metrics),
+          ),
         ),
-      ));
+      );
     }
 
-    spans.add(TextSpan(
-      text: ': ',
-      style: TextStyle(
-        color: Colors.white54,
-        fontWeight: FontWeight.w700,
-        fontSize: metrics.messageFontSize,
-        height: metrics.lineHeight,
+    spans.add(
+      TextSpan(
+        text: ': ',
+        style: TextStyle(
+          color: Colors.white54,
+          fontWeight: FontWeight.w700,
+          fontSize: metrics.messageFontSize,
+          height: metrics.lineHeight,
+        ),
       ),
-    ));
+    );
 
     final segments = message.segments;
     if (segments.isEmpty) {
-      spans.add(TextSpan(
-        text: '〔空訊息〕',
-        style: TextStyle(
-          color: Colors.white38,
-          fontSize: metrics.compactMessageFontSize,
-          fontStyle: FontStyle.italic,
-          height: metrics.lineHeight,
+      spans.add(
+        TextSpan(
+          text: '〔空訊息〕',
+          style: TextStyle(
+            color: Colors.white38,
+            fontSize: metrics.compactMessageFontSize,
+            fontStyle: FontStyle.italic,
+            height: metrics.lineHeight,
+          ),
         ),
-      ));
+      );
     } else {
       spans.addAll(
         buildTwitchChatMessageSegmentSpans(
@@ -158,26 +171,30 @@ class TwitchChatMessageContent extends StatelessWidget {
     }
 
     if (message.metadata.hasBits) {
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: TwitchChatBitsChip(
-            bits: message.metadata.bitsAmount!,
-            metrics: metrics,
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: TwitchChatBitsChip(
+              bits: message.metadata.bitsAmount!,
+              metrics: metrics,
+            ),
           ),
         ),
-      ));
+      );
     }
 
     if (message.metadata.isRewardRedemption) {
-      spans.add(WidgetSpan(
-        alignment: PlaceholderAlignment.middle,
-        child: Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: TwitchChatSmallChip(label: 'reward', metrics: metrics),
+      spans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: TwitchChatSmallChip(label: 'reward', metrics: metrics),
+          ),
         ),
-      ));
+      );
     }
 
     return spans;

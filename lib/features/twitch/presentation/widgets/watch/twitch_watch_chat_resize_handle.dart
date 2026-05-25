@@ -19,7 +19,8 @@ class TwitchWatchChatResizeHandle extends StatefulWidget {
       _TwitchWatchChatResizeHandleState();
 }
 
-class _TwitchWatchChatResizeHandleState extends State<TwitchWatchChatResizeHandle> {
+class _TwitchWatchChatResizeHandleState
+    extends State<TwitchWatchChatResizeHandle> {
   bool _hovering = false;
   bool _dragging = false;
 
@@ -56,11 +57,11 @@ class _TwitchWatchChatResizeHandleState extends State<TwitchWatchChatResizeHandl
             decoration: BoxDecoration(
               color: active
                   ? const Color(0xFF8F7CC0)
-                  : Colors.white.withOpacity(0.10),
+                  : Colors.white.withValues(alpha: 0.10),
               boxShadow: active
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF8F7CC0).withOpacity(0.38),
+                        color: const Color(0xFF8F7CC0).withValues(alpha: 0.38),
                         blurRadius: 8,
                       ),
                     ]

@@ -49,10 +49,12 @@ class _TwitchWatchEmbeddedEmotePanelState
           _EmbeddedEmotePage(
             label: 'Recent',
             entries: <_EmbeddedEmoteEntry>[
-              ...widget.thirdPartyCache.recentEmotes
-                  .map(_EmbeddedEmoteEntry.thirdParty),
-              ...widget.officialCache.recentEmotes
-                  .map(_EmbeddedEmoteEntry.official),
+              ...widget.thirdPartyCache.recentEmotes.map(
+                _EmbeddedEmoteEntry.thirdParty,
+              ),
+              ...widget.officialCache.recentEmotes.map(
+                _EmbeddedEmoteEntry.official,
+              ),
             ],
           ),
         ],
@@ -63,10 +65,12 @@ class _TwitchWatchEmbeddedEmotePanelState
           _EmbeddedEmotePage(
             label: 'Favorite',
             entries: <_EmbeddedEmoteEntry>[
-              ...widget.thirdPartyCache.favoriteEmotes
-                  .map(_EmbeddedEmoteEntry.thirdParty),
-              ...widget.officialCache.favoriteEmotes
-                  .map(_EmbeddedEmoteEntry.official),
+              ...widget.thirdPartyCache.favoriteEmotes.map(
+                _EmbeddedEmoteEntry.thirdParty,
+              ),
+              ...widget.officialCache.favoriteEmotes.map(
+                _EmbeddedEmoteEntry.official,
+              ),
             ],
           ),
         ],
@@ -79,9 +83,9 @@ class _TwitchWatchEmbeddedEmotePanelState
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF0E0E10).withOpacity(0.94),
+        color: const Color(0xFF0E0E10).withValues(alpha: 0.94),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.07)),
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
         ),
       ),
       child: DefaultTabController(
@@ -123,7 +127,9 @@ class _TwitchWatchEmbeddedEmotePanelState
                 children: [
                   for (final tab in tabs)
                     _EmbeddedProviderPage(
-                      key: PageStorageKey<String>('embedded-emote-${tab.label}'),
+                      key: PageStorageKey<String>(
+                        'embedded-emote-${tab.label}',
+                      ),
                       tab: tab,
                       loading: widget.loading,
                       onSelect: _insertEntry,
@@ -147,15 +153,18 @@ class _TwitchWatchEmbeddedEmotePanelState
     final globalKeys = global.map(_officialKey).toSet();
     final currentChannelId = widget.officialCache.channelId.trim();
 
-    final userOnly = user.where((emote) {
-      final key = _officialKey(emote);
-      if (channelKeys.contains(key)) return false;
-      if (globalKeys.contains(key)) return false;
-      if (currentChannelId.isNotEmpty && emote.ownerId.trim() == currentChannelId) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
+    final userOnly = user
+        .where((emote) {
+          final key = _officialKey(emote);
+          if (channelKeys.contains(key)) return false;
+          if (globalKeys.contains(key)) return false;
+          if (currentChannelId.isNotEmpty &&
+              emote.ownerId.trim() == currentChannelId) {
+            return false;
+          }
+          return true;
+        })
+        .toList(growable: false);
 
     final unlocked = _uniqueOfficial(
       userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
@@ -168,20 +177,28 @@ class _TwitchWatchEmbeddedEmotePanelState
     final pages = <_EmbeddedEmotePage>[
       _EmbeddedEmotePage(
         label: 'Channel',
-        entries: channel.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+        entries: channel
+            .map(_EmbeddedEmoteEntry.official)
+            .toList(growable: false),
       ),
       _EmbeddedEmotePage(
         label: 'Global',
-        entries: global.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+        entries: global
+            .map(_EmbeddedEmoteEntry.official)
+            .toList(growable: false),
       ),
       for (final group in subscriptionGroups.entries)
         _EmbeddedEmotePage(
           label: group.key,
-          entries: group.value.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+          entries: group.value
+              .map(_EmbeddedEmoteEntry.official)
+              .toList(growable: false),
         ),
       _EmbeddedEmotePage(
         label: 'Unlocked',
-        entries: unlocked.map(_EmbeddedEmoteEntry.official).toList(growable: false),
+        entries: unlocked
+            .map(_EmbeddedEmoteEntry.official)
+            .toList(growable: false),
       ),
     ];
 
@@ -255,11 +272,7 @@ class _TwitchWatchEmbeddedEmotePanelState
         .map(_EmbeddedEmoteEntry.thirdParty)
         .toList(growable: false);
 
-    final channelLike = <_EmbeddedEmoteEntry>[
-      ...channel,
-      ...shared,
-      ...other,
-    ];
+    final channelLike = <_EmbeddedEmoteEntry>[...channel, ...shared, ...other];
 
     return _EmbeddedEmoteProviderTab(
       label: label,
@@ -270,7 +283,9 @@ class _TwitchWatchEmbeddedEmotePanelState
     );
   }
 
-  List<TwitchOfficialEmote> _uniqueOfficial(Iterable<TwitchOfficialEmote> source) {
+  List<TwitchOfficialEmote> _uniqueOfficial(
+    Iterable<TwitchOfficialEmote> source,
+  ) {
     final byKey = <String, TwitchOfficialEmote>{};
     for (final emote in source) {
       byKey[_officialKey(emote)] = emote;
@@ -340,7 +355,10 @@ class _ProviderTabBar extends StatelessWidget {
       indicatorSize: TabBarIndicatorSize.label,
       labelPadding: const EdgeInsets.symmetric(horizontal: 10),
       labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-      unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+      unselectedLabelStyle: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+      ),
       tabs: [
         for (final tab in tabs) Tab(text: '${tab.label} ${tab.totalCount}'),
       ],
@@ -386,7 +404,10 @@ class _EmbeddedProviderPageState extends State<_EmbeddedProviderPage>
               indicatorColor: const Color(0xFF9146FF),
               indicatorSize: TabBarIndicatorSize.label,
               labelPadding: const EdgeInsets.symmetric(horizontal: 10),
-              labelStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800),
+              labelStyle: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
               tabs: [
                 for (final page in tab.pages)
                   Tab(text: '${page.label} ${page.entries.length}'),
@@ -398,9 +419,13 @@ class _EmbeddedProviderPageState extends State<_EmbeddedProviderPage>
               children: [
                 for (final page in tab.pages)
                   _EmbeddedEmoteGrid(
-                    key: PageStorageKey<String>('grid-${tab.label}-${page.label}'),
+                    key: PageStorageKey<String>(
+                      'grid-${tab.label}-${page.label}',
+                    ),
                     entries: page.entries,
-                    emptyText: widget.loading ? 'Loading emotes...' : 'No emotes',
+                    emptyText: widget.loading
+                        ? 'Loading emotes...'
+                        : 'No emotes',
                     onSelect: widget.onSelect,
                     onLongPress: widget.onLongPress,
                   ),
@@ -545,10 +570,10 @@ class _EmbeddedEmoteTile extends StatelessWidget {
                   fadeOutCurve: Curves.easeIn,
                   useOldImageOnUrlChange: false,
                   cacheManager: _embeddedEmoteCacheManager,
-                  color: locked ? Colors.white.withOpacity(0.42) : null,
+                  color: locked ? Colors.white.withValues(alpha: 0.42) : null,
                   colorBlendMode: locked ? BlendMode.modulate : null,
-                  placeholder: (_, __) => const SizedBox.shrink(),
-                  errorWidget: (_, __, ___) => const Icon(
+                  placeholder: (_, _) => const SizedBox.shrink(),
+                  errorWidget: (_, _, _) => const Icon(
                     Icons.broken_image_rounded,
                     color: Colors.white38,
                     size: 20,
@@ -564,22 +589,17 @@ class _EmbeddedEmoteProviderTab {
   final String label;
   final List<_EmbeddedEmotePage> pages;
 
-  const _EmbeddedEmoteProviderTab({
-    required this.label,
-    required this.pages,
-  });
+  const _EmbeddedEmoteProviderTab({required this.label, required this.pages});
 
-  int get totalCount => pages.fold<int>(0, (sum, page) => sum + page.entries.length);
+  int get totalCount =>
+      pages.fold<int>(0, (sum, page) => sum + page.entries.length);
 }
 
 class _EmbeddedEmotePage {
   final String label;
   final List<_EmbeddedEmoteEntry> entries;
 
-  const _EmbeddedEmotePage({
-    required this.label,
-    required this.entries,
-  });
+  const _EmbeddedEmotePage({required this.label, required this.entries});
 }
 
 class _EmbeddedEmoteEntry {

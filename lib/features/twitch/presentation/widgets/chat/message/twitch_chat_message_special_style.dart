@@ -83,10 +83,10 @@ class TwitchChatSpecialMessageStyle {
     return TwitchChatSpecialMessageStyle(
       accentColor: accent,
       backgroundColor: Color.alphaBlend(
-        accent.withOpacity(0.14),
+        accent.withValues(alpha: 0.14),
         const Color(0xFF191922),
       ),
-      borderColor: accent.withOpacity(0.46),
+      borderColor: accent.withValues(alpha: 0.46),
       icon: icon,
     );
   }

@@ -1,4 +1,6 @@
 // PATCH VERSION: relationship_token_split_v15
+// ignore_for_file: unused_element
+
 // Twitch-aligned Twitch relationship API service.
 //
 // Notes:
@@ -26,7 +28,8 @@ typedef TwitchRelationshipStringProvider = Future<String?> Function();
 
 class _DropsPrefsKeys {
   static const String tokenStorageKey = 'new_twitch_app_twitch_drops_token';
-  static const String clientIdStorageKey = 'new_twitch_app_twitch_drops_client_id';
+  static const String clientIdStorageKey =
+      'new_twitch_app_twitch_drops_client_id';
 }
 
 class TwitchPrivateGqlRelationshipSnapshot {
@@ -185,15 +188,18 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
   /// Build-time defines can override these if Twitch rotates the hashes.
   static const String _followApqHash = String.fromEnvironment(
     'TWITCH_FOLLOW_APQ_HASH',
-    defaultValue: '800e7346bdf7e5278a3c1d3f21b2b56e2639928f86815677a7126b093b2fdd08',
+    defaultValue:
+        '800e7346bdf7e5278a3c1d3f21b2b56e2639928f86815677a7126b093b2fdd08',
   );
   static const String _unfollowApqHash = String.fromEnvironment(
     'TWITCH_UNFOLLOW_APQ_HASH',
-    defaultValue: 'f7dae976ebf41c755ae2d758546bfd176b4eeb856656098bb40e0a672ca0d880',
+    defaultValue:
+        'f7dae976ebf41c755ae2d758546bfd176b4eeb856656098bb40e0a672ca0d880',
   );
 
   static final Map<String, String> _runtimeApqHashCache = <String, String>{};
-  static final Map<String, String> _runtimeApqDiscoveryDebug = <String, String>{};
+  static final Map<String, String> _runtimeApqDiscoveryDebug =
+      <String, String>{};
   static bool _apqDiscoveryFailedRecently = false;
 
   /// Last APQ discovery summary. Useful when the UI only shows a compact error.
@@ -266,9 +272,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       targetUserId: targetUserId,
     );
     if (!target.hasId) {
-      throw TwitchApiException(
-        '無法取得 $channelLogin 的 user id，不能送出 follow。',
-      );
+      throw TwitchApiException('無法取得 $channelLogin 的 user id，不能送出 follow。');
     }
 
     await _sendFollowMutation(target.id, channelLogin: channelLogin);
@@ -290,9 +294,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       targetUserId: targetUserId,
     );
     if (!target.hasId) {
-      throw TwitchApiException(
-        '無法取得 $channelLogin 的 user id，不能送出 unfollow。',
-      );
+      throw TwitchApiException('無法取得 $channelLogin 的 user id，不能送出 unfollow。');
     }
 
     await _sendUnfollowMutation(target.id, channelLogin: channelLogin);
@@ -341,7 +343,8 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
             return _TwitchRelationshipUserLite(
               id: first['id']?.toString() ?? '',
               login: first['login']?.toString() ?? login,
-              displayName: first['display_name']?.toString() ??
+              displayName:
+                  first['display_name']?.toString() ??
                   first['displayName']?.toString() ??
                   login,
             );
@@ -433,9 +436,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     }
   }
 
-  Future<bool?> _checkFollowingByGql({
-    required String channelLogin,
-  }) async {
+  Future<bool?> _checkFollowingByGql({required String channelLogin}) async {
     final candidates = await _authCandidates();
     for (final auth in candidates) {
       if (auth.blocked) continue;
@@ -520,9 +521,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     String? channelLogin,
   }) async {
     final variables = <String, dynamic>{
-      'input': <String, dynamic>{
-        'targetID': targetUserId,
-      },
+      'input': <String, dynamic>{'targetID': targetUserId},
     };
 
     final runtimeHash = _unfollowApqHash.trim();
@@ -651,7 +650,8 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       final expectedClientId = safeClientId.trim();
       final actualClientId = validation.clientId.trim();
       final isWebClientToken = _looksLikeTwitchWebClientId(actualClientId);
-      final isMismatch = validation.hasClientId &&
+      final isMismatch =
+          validation.hasClientId &&
           expectedClientId.isNotEmpty &&
           actualClientId != expectedClientId;
 
@@ -668,8 +668,8 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
           blockReason: isWebClientToken
               ? 'this token validates as Twitch Web client_id=$actualClientId, not Android/Drops; clear drops session and login drops again'
               : isMismatch
-                  ? 'token client_id=$actualClientId does not match selected drops clientId=$expectedClientId; clear drops session and login drops again'
-                  : null,
+              ? 'token client_id=$actualClientId does not match selected drops clientId=$expectedClientId; clear drops session and login drops again'
+              : null,
         ),
       );
     }
@@ -765,7 +765,9 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
   List<String> _extractTwitchAssetUrls(String html) {
     final result = <String>{};
     final patterns = <RegExp>[
-      RegExp(r'''https://static\.twitchcdn\.net/assets/[^"'<>\s]+?\.js[^"'<>\s]*'''),
+      RegExp(
+        r'''https://static\.twitchcdn\.net/assets/[^"'<>\s]+?\.js[^"'<>\s]*''',
+      ),
       RegExp(r'''//static\.twitchcdn\.net/assets/[^"'<>\s]+?\.js[^"'<>\s]*'''),
       RegExp(r'''/assets/[^"'<>\s]+?\.js[^"'<>\s]*'''),
     ];
@@ -826,10 +828,13 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       'requestMode': requestMode,
       'followApqHashConfigured': _followApqHash.trim().isNotEmpty,
       'unfollowApqHashConfigured': _unfollowApqHash.trim().isNotEmpty,
-      'runtimeApqDiscovery': _runtimeApqDiscoveryDebug[operationName] ??
+      'runtimeApqDiscovery':
+          _runtimeApqDiscoveryDebug[operationName] ??
           'not started or cache hit unavailable',
-      'tokenRule': 'follow/unfollow uses Twitch-style drops/android token; status check still uses main OAuth Helix',
-      'nextStep': 'if Twitch returns failed integrity check even with v11 APQ hashes, compare live Twitch request headers/client context',
+      'tokenRule':
+          'follow/unfollow uses Twitch-style drops/android token; status check still uses main OAuth Helix',
+      'nextStep':
+          'if Twitch returns failed integrity check even with v11 APQ hashes, compare live Twitch request headers/client context',
     };
   }
 
@@ -841,17 +846,24 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     return '$label => $text';
   }
 
-  Future<_RelationshipValueSource<String?>> _dropsCompatibleTokenWithSource() async {
+  Future<_RelationshipValueSource<String?>>
+  _dropsCompatibleTokenWithSource() async {
     final direct = await dropsTokenProvider?.call();
     final safeDirect = direct?.trim();
     if (safeDirect != null && safeDirect.isNotEmpty) {
-      return _RelationshipValueSource<String?>(safeDirect, 'dropsTokenProvider');
+      return _RelationshipValueSource<String?>(
+        safeDirect,
+        'dropsTokenProvider',
+      );
     }
 
     final stored = await _loadDropsTokenFromSharedPreferences();
     final safeStored = stored?.trim();
     if (safeStored != null && safeStored.isNotEmpty) {
-      return _RelationshipValueSource<String?>(safeStored, 'sharedPreferences:${_DropsPrefsKeys.tokenStorageKey}');
+      return _RelationshipValueSource<String?>(
+        safeStored,
+        'sharedPreferences:${_DropsPrefsKeys.tokenStorageKey}',
+      );
     }
 
     return const _RelationshipValueSource<String?>(null, 'missing');
@@ -861,7 +873,8 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     return (await _dropsCompatibleTokenWithSource()).value;
   }
 
-  Future<_RelationshipValueSource<String>> _dropsCompatibleClientIdWithSource() async {
+  Future<_RelationshipValueSource<String>>
+  _dropsCompatibleClientIdWithSource() async {
     final value = await dropsClientIdProvider?.call();
     final safe = value?.trim();
     if (safe != null && safe.isNotEmpty && !_looksLikeTwitchWebClientId(safe)) {
@@ -873,12 +886,19 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     if (safeStored != null &&
         safeStored.isNotEmpty &&
         !_looksLikeTwitchWebClientId(safeStored)) {
-      return _RelationshipValueSource<String>(safeStored, 'sharedPreferences:${_DropsPrefsKeys.clientIdStorageKey}');
+      return _RelationshipValueSource<String>(
+        safeStored,
+        'sharedPreferences:${_DropsPrefsKeys.clientIdStorageKey}',
+      );
     }
 
     final fromConstants = TwitchApiConstants.twitchDefaultDropsClientId.trim();
-    if (fromConstants.isNotEmpty && !_looksLikeTwitchWebClientId(fromConstants)) {
-      return _RelationshipValueSource<String>(fromConstants, 'TwitchApiConstants.twitchDefaultDropsClientId');
+    if (fromConstants.isNotEmpty &&
+        !_looksLikeTwitchWebClientId(fromConstants)) {
+      return _RelationshipValueSource<String>(
+        fromConstants,
+        'TwitchApiConstants.twitchDefaultDropsClientId',
+      );
     }
 
     return _RelationshipValueSource<String>(
@@ -896,7 +916,8 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     if (safe.isNotEmpty && !_looksLikeTwitchWebClientId(safe)) return safe;
 
     final fromConstants = TwitchApiConstants.twitchDefaultDropsClientId.trim();
-    if (fromConstants.isNotEmpty && !_looksLikeTwitchWebClientId(fromConstants)) {
+    if (fromConstants.isNotEmpty &&
+        !_looksLikeTwitchWebClientId(fromConstants)) {
       return fromConstants;
     }
 
@@ -951,7 +972,9 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       );
 
       final scopes = raw['scopes'];
-      final scopesText = scopes is List ? scopes.join(',') : scopes?.toString() ?? '';
+      final scopesText = scopes is List
+          ? scopes.join(',')
+          : scopes?.toString() ?? '';
       return _TokenValidationDetails(
         clientId: raw['client_id']?.toString() ?? '',
         login: raw['login']?.toString() ?? '',

@@ -17,11 +17,13 @@ class TwitchChatMentionHistoryItem {
     required this.fromReply,
   });
 
-  String get fromLabel => fromDisplayName.trim().isNotEmpty ? fromDisplayName : fromLogin;
+  String get fromLabel =>
+      fromDisplayName.trim().isNotEmpty ? fromDisplayName : fromLogin;
   String get targetLabel =>
       targetDisplayName.trim().isNotEmpty ? targetDisplayName : targetLogin;
 
-  String get relationLabel => '$targetLabel 被 $fromLabel ${fromReply ? '回覆' : 'tag'}';
+  String get relationLabel =>
+      '$targetLabel 被 $fromLabel ${fromReply ? '回覆' : 'tag'}';
 
   String get plainText {
     final body = message.message.trim();

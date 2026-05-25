@@ -38,10 +38,10 @@ class TwitchResponsiveLayout {
     final mode = width >= 1024
         ? TwitchResponsiveLayoutMode.desktop
         : shortestSide >= 600
-            ? TwitchResponsiveLayoutMode.tablet
-            : aspectRatio >= 1.25
-                ? TwitchResponsiveLayoutMode.phoneLandscape
-                : TwitchResponsiveLayoutMode.phonePortrait;
+        ? TwitchResponsiveLayoutMode.tablet
+        : aspectRatio >= 1.25
+        ? TwitchResponsiveLayoutMode.phoneLandscape
+        : TwitchResponsiveLayoutMode.phonePortrait;
 
     return TwitchResponsiveLayout._(
       width: width,
@@ -54,9 +54,7 @@ class TwitchResponsiveLayout {
 
   static TwitchResponsiveLayout fromContext(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    return TwitchResponsiveLayout.fromConstraints(
-      BoxConstraints.tight(size),
-    );
+    return TwitchResponsiveLayout.fromConstraints(BoxConstraints.tight(size));
   }
 
   bool get isPhone =>
@@ -64,7 +62,8 @@ class TwitchResponsiveLayout {
       mode == TwitchResponsiveLayoutMode.phoneLandscape;
 
   bool get isPhonePortrait => mode == TwitchResponsiveLayoutMode.phonePortrait;
-  bool get isPhoneLandscape => mode == TwitchResponsiveLayoutMode.phoneLandscape;
+  bool get isPhoneLandscape =>
+      mode == TwitchResponsiveLayoutMode.phoneLandscape;
   bool get isTablet => mode == TwitchResponsiveLayoutMode.tablet;
   bool get isDesktop => mode == TwitchResponsiveLayoutMode.desktop;
 

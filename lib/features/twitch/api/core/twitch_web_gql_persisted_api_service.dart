@@ -85,7 +85,9 @@ class TwitchWebGqlPersistedApiService {
 
     final raw = await client.postJson<dynamic>(
       '${TwitchApiConstants.gqlEndpoint}#origin=twilight',
-      data: operations.map((operation) => operation.toJson()).toList(growable: false),
+      data: operations
+          .map((operation) => operation.toJson())
+          .toList(growable: false),
       headers: await _headers(),
     );
 

@@ -22,7 +22,8 @@ class TwitchChatRuntimeMessage {
   });
 
   String get id {
-    return source.tags['id'] ?? '${source.source.name}-${source.userLogin}-${receivedAt.microsecondsSinceEpoch}';
+    return source.tags['id'] ??
+        '${source.source.name}-${source.userLogin}-${receivedAt.microsecondsSinceEpoch}';
   }
 
   String get userLogin => source.userLogin;
@@ -32,7 +33,8 @@ class TwitchChatRuntimeMessage {
   String get channel => source.channel;
 
   bool get isActionMessage => metadata.isAction;
-  bool get hasVisibleContent => message.trim().isNotEmpty || segments.isNotEmpty || metadata.isSystemLike;
+  bool get hasVisibleContent =>
+      message.trim().isNotEmpty || segments.isNotEmpty || metadata.isSystemLike;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{

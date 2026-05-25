@@ -42,7 +42,9 @@ class TwitchDiscoveryService {
     bool forceValidate = false,
   }) async {
     final cached = _cachedAuth;
-    if (!forceValidate && cached != null && cached.accessToken.trim().isNotEmpty) {
+    if (!forceValidate &&
+        cached != null &&
+        cached.accessToken.trim().isNotEmpty) {
       return cached;
     }
 
@@ -61,8 +63,8 @@ class TwitchDiscoveryService {
       clientId: validation.clientId.trim().isNotEmpty
           ? validation.clientId.trim()
           : (storedClientId != null && storedClientId.isNotEmpty
-              ? storedClientId
-              : TwitchApiConstants.twitchWebClientId),
+                ? storedClientId
+                : TwitchApiConstants.twitchWebClientId),
       viewerId: validation.userId,
       viewerLogin: validation.login,
       scopes: validation.scopes,
@@ -110,8 +112,10 @@ class TwitchDiscoveryService {
       queryParameters: <String, dynamic>{
         'first': first.clamp(1, 100),
         if (after != null && after.trim().isNotEmpty) 'after': after.trim(),
-        if (gameId != null && gameId.trim().isNotEmpty) 'game_id': gameId.trim(),
-        if (language != null && language.trim().isNotEmpty) 'language': language.trim(),
+        if (gameId != null && gameId.trim().isNotEmpty)
+          'game_id': gameId.trim(),
+        if (language != null && language.trim().isNotEmpty)
+          'language': language.trim(),
       },
       headers: _helixHeaders(auth),
     );
@@ -152,7 +156,9 @@ class TwitchDiscoveryService {
     final output = <String, String>{};
 
     for (var start = 0; start < cleanLogins.length; start += 100) {
-      final end = (start + 100) > cleanLogins.length ? cleanLogins.length : start + 100;
+      final end = (start + 100) > cleanLogins.length
+          ? cleanLogins.length
+          : start + 100;
       final chunk = cleanLogins.sublist(start, end);
 
       final raw = await client.getJson<Map<String, dynamic>>(
@@ -177,7 +183,6 @@ class TwitchDiscoveryService {
     return output;
   }
 
-
   TwitchGamePageResult _parseGamePage(Map<String, dynamic> raw) {
     final data = raw['data'];
     final pagination = raw['pagination'];
@@ -185,10 +190,10 @@ class TwitchDiscoveryService {
     final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
     final games = data is List
         ? data
-            .whereType<Map<String, dynamic>>()
-            .map(TwitchGameCategory.fromHelixJson)
-            .where((game) => game.id.isNotEmpty)
-            .toList(growable: false)
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchGameCategory.fromHelixJson)
+              .where((game) => game.id.isNotEmpty)
+              .toList(growable: false)
         : const <TwitchGameCategory>[];
 
     return TwitchGamePageResult(
@@ -204,10 +209,10 @@ class TwitchDiscoveryService {
     final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
     final streams = data is List
         ? data
-            .whereType<Map<String, dynamic>>()
-            .map(TwitchLiveStream.fromHelixJson)
-            .where((stream) => stream.channelLogin.isNotEmpty)
-            .toList(growable: false)
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchLiveStream.fromHelixJson)
+              .where((stream) => stream.channelLogin.isNotEmpty)
+              .toList(growable: false)
         : const <TwitchLiveStream>[];
 
     return TwitchStreamPageResult(

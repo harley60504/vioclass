@@ -16,18 +16,17 @@ class TwitchApiClient {
   final Dio _dio;
   final bool closeDioOnDispose;
 
-  TwitchApiClient({
-    Dio? dio,
-    this.closeDioOnDispose = true,
-  }) : _dio = dio ??
-            Dio(
-              BaseOptions(
-                connectTimeout: TwitchApiConstants.connectTimeout,
-                receiveTimeout: TwitchApiConstants.receiveTimeout,
-                sendTimeout: TwitchApiConstants.sendTimeout,
-                validateStatus: (status) => status != null && status < 500,
-              ),
-            );
+  TwitchApiClient({Dio? dio, this.closeDioOnDispose = true})
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              connectTimeout: TwitchApiConstants.connectTimeout,
+              receiveTimeout: TwitchApiConstants.receiveTimeout,
+              sendTimeout: TwitchApiConstants.sendTimeout,
+              validateStatus: (status) => status != null && status < 500,
+            ),
+          );
 
   Dio get dio => _dio;
 

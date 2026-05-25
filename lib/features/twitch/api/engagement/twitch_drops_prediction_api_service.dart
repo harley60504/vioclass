@@ -27,23 +27,17 @@ class TwitchDropsPredictionApiService {
     }
 
     final token = await _requireToken();
-    final eventId = _extractId(
-      prediction,
-      const <String>[
-        'predictionId',
-        'eventId',
-        'eventID',
-        'id',
-      ],
-    );
-    final outcomeId = _extractId(
-      outcome,
-      const <String>[
-        'outcomeId',
-        'outcomeID',
-        'id',
-      ],
-    );
+    final eventId = _extractId(prediction, const <String>[
+      'predictionId',
+      'eventId',
+      'eventID',
+      'id',
+    ]);
+    final outcomeId = _extractId(outcome, const <String>[
+      'outcomeId',
+      'outcomeID',
+      'id',
+    ]);
 
     if (eventId.isEmpty) {
       throw TwitchApiException(
@@ -107,10 +101,7 @@ mutation MakePrediction($input: MakePredictionInput!) {
 
     final errors = raw['errors'];
     if (errors is List && errors.isNotEmpty) {
-      throw TwitchApiException(
-        errors.toString(),
-        details: raw,
-      );
+      throw TwitchApiException(errors.toString(), details: raw);
     }
 
     final makePrediction = _readMap(raw, const <String>[
@@ -121,10 +112,7 @@ mutation MakePrediction($input: MakePredictionInput!) {
     final error = _readMap(makePrediction, const <String>['error']);
     if (error != null) {
       final code = error['code']?.toString() ?? 'UNKNOWN';
-      throw TwitchApiException(
-        'Prediction failed: $code',
-        details: raw,
-      );
+      throw TwitchApiException('Prediction failed: $code', details: raw);
     }
 
     return raw;
@@ -181,7 +169,11 @@ mutation MakePrediction($input: MakePredictionInput!) {
   }
 
   Object? _toJson(Object value) {
-    if (value is Map || value is List || value is String || value is num || value is bool) {
+    if (value is Map ||
+        value is List ||
+        value is String ||
+        value is num ||
+        value is bool) {
       return value;
     }
 

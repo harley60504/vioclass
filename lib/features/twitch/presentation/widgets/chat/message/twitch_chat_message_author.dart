@@ -40,7 +40,9 @@ class TwitchChatMessageAuthor extends StatelessWidget {
           style: TextStyle(
             color: displayColor,
             fontWeight: FontWeight.w900,
-            fontSize: compact ? metrics.compactNameFontSize : metrics.nameFontSize,
+            fontSize: compact
+                ? metrics.compactNameFontSize
+                : metrics.nameFontSize,
             fontStyle: isAction ? FontStyle.italic : FontStyle.normal,
           ),
         ),

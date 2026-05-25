@@ -6,9 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 import 'twitch_player_debug_copy_actions.dart';
 
-enum _PlayerMoreAction {
-  debug,
-}
+enum _PlayerMoreAction { debug }
 
 class PlayerMoreActionsButton extends StatefulWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -16,7 +14,8 @@ class PlayerMoreActionsButton extends StatefulWidget {
   const PlayerMoreActionsButton({super.key, required this.playerRuntime});
 
   @override
-  State<PlayerMoreActionsButton> createState() => _PlayerMoreActionsButtonState();
+  State<PlayerMoreActionsButton> createState() =>
+      _PlayerMoreActionsButtonState();
 }
 
 class _PlayerMoreActionsButtonState extends State<PlayerMoreActionsButton> {
@@ -70,17 +69,11 @@ class _PlayerMoreActionsButtonState extends State<PlayerMoreActionsButton> {
       items: const <PopupMenuEntry<PlaybackDebugCopyAction>>[
         PopupMenuItem<PlaybackDebugCopyAction>(
           value: PlaybackDebugCopyAction.proxyUrl,
-          child: DebugMenuRow(
-            icon: Icons.link,
-            label: '複製 Dart Proxy URL',
-          ),
+          child: DebugMenuRow(icon: Icons.link, label: '複製 Dart Proxy URL'),
         ),
         PopupMenuItem<PlaybackDebugCopyAction>(
           value: PlaybackDebugCopyAction.mpvProxyCommand,
-          child: DebugMenuRow(
-            icon: Icons.terminal,
-            label: '複製 mpv Proxy 指令',
-          ),
+          child: DebugMenuRow(icon: Icons.terminal, label: '複製 mpv Proxy 指令'),
         ),
       ],
     );
@@ -99,7 +92,8 @@ class _PlayerMoreActionsButtonState extends State<PlayerMoreActionsButton> {
     required double height,
     required List<PopupMenuEntry<T>> items,
   }) {
-    final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
     final buttonContext = _buttonKey.currentContext;
     final buttonBox = buttonContext?.findRenderObject() as RenderBox?;
 
@@ -107,7 +101,10 @@ class _PlayerMoreActionsButtonState extends State<PlayerMoreActionsButton> {
       return Future<T?>.value(null);
     }
 
-    final buttonTopLeft = buttonBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final buttonTopLeft = buttonBox.localToGlobal(
+      Offset.zero,
+      ancestor: overlay,
+    );
     final buttonBottomRight = buttonBox.localToGlobal(
       buttonBox.size.bottomRight(Offset.zero),
       ancestor: overlay,
@@ -120,11 +117,11 @@ class _PlayerMoreActionsButtonState extends State<PlayerMoreActionsButton> {
     final preferAbove = buttonTopLeft.dy > height + 16;
     final top = preferAbove
         ? (buttonTopLeft.dy - height - 10.0)
-            .clamp(8.0, math.max(8.0, overlay.size.height - height - 8.0))
-            .toDouble()
+              .clamp(8.0, math.max(8.0, overlay.size.height - height - 8.0))
+              .toDouble()
         : (buttonBottomRight.dy + 8.0)
-            .clamp(8.0, math.max(8.0, overlay.size.height - height - 8.0))
-            .toDouble();
+              .clamp(8.0, math.max(8.0, overlay.size.height - height - 8.0))
+              .toDouble();
 
     return showMenu<T>(
       context: context,

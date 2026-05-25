@@ -140,7 +140,8 @@ String _formatSubMysteryGift({
   required bool anonymous,
 }) {
   final giver = anonymous ? '匿名觀眾' : actor;
-  final count = _readInt(tags, 'msg-param-mass-gift-count') ??
+  final count =
+      _readInt(tags, 'msg-param-mass-gift-count') ??
       _readInt(tags, 'msg-param-gift-count');
   final senderCount = _readInt(tags, 'msg-param-sender-count');
   final plan = _formatSubPlan(_read(tags, 'msg-param-sub-plan'));
@@ -173,16 +174,14 @@ String _formatGiftPaidUpgrade({
   return '$actor 將 $sender 贈送的訂閱升級為付費訂閱';
 }
 
-String _formatRaid({
-  required String actor,
-  required Map<String, String> tags,
-}) {
+String _formatRaid({required String actor, required Map<String, String> tags}) {
   final raider = _firstNonEmpty(<String>[
     _read(tags, 'msg-param-displayName'),
     _read(tags, 'msg-param-login'),
     actor,
   ]);
-  final viewerCount = _readInt(tags, 'msg-param-viewerCount') ??
+  final viewerCount =
+      _readInt(tags, 'msg-param-viewerCount') ??
       _readInt(tags, 'msg-param-viewer-count');
   if (viewerCount != null && viewerCount > 0) {
     return '$raider 帶著 $viewerCount 位觀眾襲來';
@@ -239,7 +238,10 @@ String? _formatKnownFallbackSystemMessage(
     caseSensitive: false,
   ).firstMatch(text);
   if (watchStreakGeneric != null) {
-    final actor = _cleanFallbackActor(watchStreakGeneric.group(1), fallbackActor);
+    final actor = _cleanFallbackActor(
+      watchStreakGeneric.group(1),
+      fallbackActor,
+    );
     final count = watchStreakGeneric.group(2)?.replaceAll(',', '') ?? '';
     if (count.isNotEmpty) {
       return '$actor 已連續觀看 $count 場直播，達成觀看連勝';

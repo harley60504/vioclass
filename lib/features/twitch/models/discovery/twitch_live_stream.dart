@@ -48,17 +48,15 @@ class TwitchLiveStream {
       thumbnailUrl: json['thumbnail_url']?.toString() ?? '',
       tags: rawTags is List
           ? rawTags
-              .map((tag) => tag.toString())
-              .where((tag) => tag.isNotEmpty)
-              .toList(growable: false)
+                .map((tag) => tag.toString())
+                .where((tag) => tag.isNotEmpty)
+                .toList(growable: false)
           : const <String>[],
       isMature: json['is_mature'] == true,
     );
   }
 
-  TwitchLiveStream copyWith({
-    String? profileImageUrl,
-  }) {
+  TwitchLiveStream copyWith({String? profileImageUrl}) {
     return TwitchLiveStream(
       id: id,
       userId: userId,
@@ -85,10 +83,7 @@ class TwitchLiveStream {
 
   String get channelLogin => userLogin.trim().toLowerCase();
 
-  String thumbnail({
-    int width = 440,
-    int height = 248,
-  }) {
+  String thumbnail({int width = 440, int height = 248}) {
     return thumbnailUrl
         .replaceAll('{width}', width.toString())
         .replaceAll('{height}', height.toString());
@@ -139,10 +134,7 @@ class TwitchGameCategory {
     );
   }
 
-  String boxArt({
-    int width = 188,
-    int height = 250,
-  }) {
+  String boxArt({int width = 188, int height = 250}) {
     return boxArtUrl
         .replaceAll('{width}', width.toString())
         .replaceAll('{height}', height.toString());
@@ -153,23 +145,16 @@ class TwitchStreamPageResult {
   final List<TwitchLiveStream> streams;
   final String? cursor;
 
-  const TwitchStreamPageResult({
-    required this.streams,
-    required this.cursor,
-  });
+  const TwitchStreamPageResult({required this.streams, required this.cursor});
 
   bool get hasMore => cursor != null && cursor!.trim().isNotEmpty;
 }
-
 
 class TwitchGamePageResult {
   final List<TwitchGameCategory> games;
   final String? cursor;
 
-  const TwitchGamePageResult({
-    required this.games,
-    required this.cursor,
-  });
+  const TwitchGamePageResult({required this.games, required this.cursor});
 
   bool get hasMore => cursor != null && cursor!.trim().isNotEmpty;
 }

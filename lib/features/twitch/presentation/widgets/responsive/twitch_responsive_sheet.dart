@@ -435,7 +435,7 @@ class _SheetHeaderIconButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: TwitchUiColors.sheet.cardFill,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
           ),
           child: loading
               ? const SizedBox(
@@ -484,7 +484,7 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
             cacheHeight: 48,
             filterQuality: FilterQuality.low,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _fallbackIcon(),
+            errorBuilder: (_, _, _) => _fallbackIcon(),
           ),
         ),
       );

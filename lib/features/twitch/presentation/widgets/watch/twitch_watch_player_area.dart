@@ -1,12 +1,4 @@
-library twitch_watch_player_area;
-
-import 'dart:async';
-import 'dart:io';
-import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
@@ -15,19 +7,9 @@ import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../shared/twitch_glass.dart';
-import 'player/twitch_live_playback_strip.dart';
 import 'player/twitch_media_kit_video_surface.dart';
 import 'player/twitch_player_common_buttons.dart';
-import 'player/twitch_player_error_card.dart';
-import 'player/twitch_player_more_actions_button.dart';
-import 'player/twitch_player_pip_button.dart';
-import 'player/twitch_player_quality_button.dart';
-import 'player/twitch_player_volume_control.dart';
-import 'player/twitch_watch_bottom_control_bar.dart';
 import 'player/twitch_watch_controls_overlay.dart';
-import 'player/twitch_watch_stream_header.dart';
-import 'player/twitch_watch_top_action_bar.dart';
-import 'player/twitch_watch_top_buttons.dart';
 
 /// Repaint isolation switches for profiling the 2nd-entry FPS drop.
 ///
@@ -132,10 +114,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
       animation: Listenable.merge(<Listenable>[playerRuntime, pip]),
       child: stableVideoStage,
       builder: (context, child) {
-        final state = _WatchPlayerAreaState.fromWidget(
-          widget: this,
-          pip: pip,
-        );
+        final state = _WatchPlayerAreaState.fromWidget(widget: this, pip: pip);
 
         return _WatchPlayerShell(
           inPipMode: state.inPipMode,
@@ -171,7 +150,8 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                   ),
                 )
               : null,
-          waitingOverlay: state.shouldShowWaitingOverlay && !_debugHidePlayerOverlay
+          waitingOverlay:
+              state.shouldShowWaitingOverlay && !_debugHidePlayerOverlay
               ? RepaintBoundary(
                   child: _WatchControlsNotReadyOverlay(
                     metadata: metadata,
@@ -237,10 +217,12 @@ class _WatchPlayerAreaState {
       playerReady: playerReady,
       inPipMode: pip.isInPictureInPictureMode,
       effectiveFullscreen: widget.fullscreen || widget.fullscreenMode,
-      effectiveChatVisible:
-          pip.isInPictureInPictureMode ? false : widget.chatVisible,
+      effectiveChatVisible: pip.isInPictureInPictureMode
+          ? false
+          : widget.chatVisible,
       effectiveFollowBusy: widget.followBusy || widget.relationshipBusy,
-      overlayLoading: widget.loading ||
+      overlayLoading:
+          widget.loading ||
           widget.playerRuntime.loading ||
           widget.playerRuntime.switchingQuality,
       effectiveQualityVariants:
@@ -278,9 +260,7 @@ class _WatchPlayerShell extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned.fill(
-            child: RepaintBoundary(child: video),
-          ),
+          Positioned.fill(child: RepaintBoundary(child: video)),
           if (overlay != null) Positioned.fill(child: overlay!),
           if (waitingOverlay != null) Positioned.fill(child: waitingOverlay!),
           if (debugLabel != null &&
@@ -351,9 +331,9 @@ class _WatchPlayerIsolationLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.72),
+        color: Colors.black.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -393,8 +373,8 @@ class _WatchControlsNotReadyOverlay extends StatelessWidget {
           top: 12,
           child: TwitchGlassSurface(
             borderRadius: BorderRadius.circular(18),
-            backgroundColor: Colors.black.withOpacity(0.34),
-            borderColor: Colors.white.withOpacity(0.10),
+            backgroundColor: Colors.black.withValues(alpha: 0.34),
+            borderColor: Colors.white.withValues(alpha: 0.10),
             blurSigma: 18,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

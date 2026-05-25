@@ -152,7 +152,11 @@ class _WatchBottomControlBarLayout {
       veryNarrow: veryNarrow,
       useCompactLayout: useCompactLayout,
       barHeight: barHeight,
-      horizontalPadding: veryNarrow ? 4.0 : useCompactLayout ? 7.0 : 20.0,
+      horizontalPadding: veryNarrow
+          ? 4.0
+          : useCompactLayout
+          ? 7.0
+          : 20.0,
       contentWidth: useCompactLayout ? (veryNarrow ? 390.0 : 620.0) : width,
       contentHeight: useCompactLayout ? 58.0 : barHeight,
     );
@@ -163,23 +167,17 @@ class _WatchBottomControlSurface extends StatelessWidget {
   final double height;
   final Widget child;
 
-  const _WatchBottomControlSurface({
-    required this.height,
-    required this.child,
-  });
+  const _WatchBottomControlSurface({required this.height, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return TwitchGlassSurface(
       borderRadius: BorderRadius.circular(24),
-      backgroundColor: Colors.black.withOpacity(0.56),
-      borderColor: Colors.white.withOpacity(0.12),
+      backgroundColor: Colors.black.withValues(alpha: 0.56),
+      borderColor: Colors.white.withValues(alpha: 0.12),
       blurSigma: 0,
       boxShadow: const <BoxShadow>[],
-      child: SizedBox(
-        height: height,
-        child: child,
-      ),
+      child: SizedBox(height: height, child: child),
     );
   }
 }
@@ -274,10 +272,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
             dense: true,
             onPressed: onToggleFullscreen,
           ),
-        const AndroidPipButton(
-          dense: true,
-          size: 22,
-        ),
+        const AndroidPipButton(dense: true, size: 22),
         PlayerMoreActionsButton(playerRuntime: playerRuntime),
       ],
     );
@@ -323,11 +318,7 @@ class _WideWatchBottomControls extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _PlayPauseButton(
-          player: player,
-          playing: playing,
-          size: 32,
-        ),
+        _PlayPauseButton(player: player, playing: playing, size: 32),
         const SizedBox(width: 16),
         Expanded(
           child: TwitchLivePlaybackStrip(
@@ -510,8 +501,8 @@ class _LivePlaybackSheetButton extends StatelessWidget {
             alignment: Alignment.bottomCenter,
             child: TwitchGlassSurface(
               borderRadius: BorderRadius.circular(22),
-              backgroundColor: Colors.black.withOpacity(0.56),
-              borderColor: Colors.white.withOpacity(0.13),
+              backgroundColor: Colors.black.withValues(alpha: 0.56),
+              borderColor: Colors.white.withValues(alpha: 0.13),
               blurSigma: 0,
               boxShadow: const <BoxShadow>[],
               child: SizedBox(

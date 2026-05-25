@@ -28,11 +28,12 @@ class TwitchSubscribeApiServiceV1 {
     final text = uri.toString();
 
     if (Platform.isWindows) {
-      await Process.start(
-        'cmd',
-        <String>['/c', 'start', '', text],
-        runInShell: true,
-      );
+      await Process.start('cmd', <String>[
+        '/c',
+        'start',
+        '',
+        text,
+      ], runInShell: true);
       return;
     }
 

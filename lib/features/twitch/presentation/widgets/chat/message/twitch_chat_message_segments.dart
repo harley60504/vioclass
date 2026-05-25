@@ -38,7 +38,9 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
         );
         break;
       case TwitchChatRenderSegmentType.link:
-        spans.add(TextSpan(text: segment.content, style: _linkTextStyle(metrics)));
+        spans.add(
+          TextSpan(text: segment.content, style: _linkTextStyle(metrics)),
+        );
         break;
       case TwitchChatRenderSegmentType.twitchEmote:
         _appendTwitchEmoteSegment(
@@ -50,7 +52,9 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
         );
         break;
       case TwitchChatRenderSegmentType.cheermote:
-        spans.add(TextSpan(text: segment.content, style: _cheermoteTextStyle(metrics)));
+        spans.add(
+          TextSpan(text: segment.content, style: _cheermoteTextStyle(metrics)),
+        );
         break;
     }
   }
@@ -88,11 +92,13 @@ void _appendTwitchEmoteSegment({
     }
   }
 
-  spans.add(_twitchEmoteSpan(
-    segment: segment,
-    metrics: metrics,
-    animateEmotes: animateEmotes,
-  ));
+  spans.add(
+    _twitchEmoteSpan(
+      segment: segment,
+      metrics: metrics,
+      animateEmotes: animateEmotes,
+    ),
+  );
 }
 
 void _appendTextWithInlineEmotes({
@@ -105,11 +111,7 @@ void _appendTextWithInlineEmotes({
   if (text.isEmpty) return;
 
   if (!resolver.hasAnyEmotes) {
-    _appendMentionAwarePlainText(
-      spans: spans,
-      text: text,
-      metrics: metrics,
-    );
+    _appendMentionAwarePlainText(spans: spans, text: text, metrics: metrics);
     return;
   }
 
@@ -183,25 +185,25 @@ void _appendMentionAwarePlainText({
   var cursor = 0;
   for (final match in _mentionRegex.allMatches(text)) {
     if (match.start > cursor) {
-      spans.add(TextSpan(
-        text: text.substring(cursor, match.start),
-        style: _normalTextStyle(metrics),
-      ));
+      spans.add(
+        TextSpan(
+          text: text.substring(cursor, match.start),
+          style: _normalTextStyle(metrics),
+        ),
+      );
     }
 
-    spans.add(TextSpan(
-      text: match.group(0) ?? '',
-      style: _mentionTextStyle(metrics),
-    ));
+    spans.add(
+      TextSpan(text: match.group(0) ?? '', style: _mentionTextStyle(metrics)),
+    );
 
     cursor = match.end;
   }
 
   if (cursor < text.length) {
-    spans.add(TextSpan(
-      text: text.substring(cursor),
-      style: _normalTextStyle(metrics),
-    ));
+    spans.add(
+      TextSpan(text: text.substring(cursor), style: _normalTextStyle(metrics)),
+    );
   }
 }
 
@@ -259,10 +261,7 @@ class _ResolvedInlineEmote {
   }
 }
 
-enum _ResolvedInlineEmoteKind {
-  official,
-  thirdParty,
-}
+enum _ResolvedInlineEmoteKind { official, thirdParty }
 
 class _ChatTextToken {
   final String text;
@@ -285,7 +284,8 @@ class _ChatTextToken {
 const int _tokenCacheLimit = 4096;
 final RegExp _chatTokenRegex = RegExp(r'(\s+|\S+)');
 final RegExp _mentionRegex = RegExp(r'@[A-Za-z0-9_]{3,25}');
-final Map<String, List<_ChatTextToken>> _tokenCache = <String, List<_ChatTextToken>>{};
+final Map<String, List<_ChatTextToken>> _tokenCache =
+    <String, List<_ChatTextToken>>{};
 
 List<_ChatTextToken> _tokenizeChatText(String text) {
   final cached = _tokenCache.remove(text);
@@ -306,14 +306,16 @@ List<_ChatTextToken> _tokenizeChatText(String text) {
     }
 
     final normalized = _normalizeLookupToken(raw);
-    output.add(_ChatTextToken(
-      text: raw,
-      isWhitespace: false,
-      leading: normalized.leading,
-      lookupText: normalized.core,
-      trailing: normalized.trailing,
-      canLookup: _canMaybeBeEmoteCode(normalized.core),
-    ));
+    output.add(
+      _ChatTextToken(
+        text: raw,
+        isWhitespace: false,
+        leading: normalized.leading,
+        lookupText: normalized.core,
+        trailing: normalized.trailing,
+        canLookup: _canMaybeBeEmoteCode(normalized.core),
+      ),
+    );
   }
 
   if (_tokenCache.length >= _tokenCacheLimit) {
@@ -485,9 +487,7 @@ void _appendThirdPartyEmoteSpan({
           alignment: Alignment.center,
           children: [
             previous.child,
-            Positioned.fill(
-              child: IgnorePointer(child: image),
-            ),
+            Positioned.fill(child: IgnorePointer(child: image)),
           ],
         ),
       );
@@ -515,10 +515,7 @@ WidgetSpan _twitchEmoteSpan({
   if (imageUrl == null || imageUrl.isEmpty) {
     return WidgetSpan(
       alignment: PlaceholderAlignment.middle,
-      child: Text(
-        segment.content,
-        style: _normalTextStyle(metrics),
-      ),
+      child: Text(segment.content, style: _normalTextStyle(metrics)),
     );
   }
 
@@ -531,7 +528,9 @@ WidgetSpan _twitchEmoteSpan({
         id: segment.emoteId ?? '',
         name: segment.content,
         imageUrl: imageUrl,
-        staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(segment.emoteId ?? ''),
+        staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(
+          segment.emoteId ?? '',
+        ),
         providerLabel: 'Twitch',
         isOfficial: true,
         animate: animateEmotes,
@@ -634,10 +633,7 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
         memCacheWidth: 96,
         memCacheHeight: 96,
         placeholder: const SizedBox.shrink(),
-        errorPlaceholder: Text(
-          fallbackText,
-          style: _normalTextStyle(metrics),
-        ),
+        errorPlaceholder: Text(fallbackText, style: _normalTextStyle(metrics)),
       ),
     );
   }
@@ -714,13 +710,17 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
       case TwitchChatRenderSegmentType.link:
         return _LinkSegment(segment: segment, metrics: metrics);
       case TwitchChatRenderSegmentType.twitchEmote:
-        return Text.rich(TextSpan(children: [
-          _twitchEmoteSpan(
-            segment: segment,
-            metrics: metrics,
-            animateEmotes: animateEmotes,
+        return Text.rich(
+          TextSpan(
+            children: [
+              _twitchEmoteSpan(
+                segment: segment,
+                metrics: metrics,
+                animateEmotes: animateEmotes,
+              ),
+            ],
           ),
-        ]));
+        );
       case TwitchChatRenderSegmentType.cheermote:
         return _CheermoteSegment(segment: segment, metrics: metrics);
     }

@@ -1,10 +1,6 @@
 import './twitch_chat_message.dart';
 
-enum TwitchChatFragmentType {
-  text,
-  twitchEmote,
-  unknownEmote,
-}
+enum TwitchChatFragmentType { text, twitchEmote, unknownEmote }
 
 class TwitchChatFragment {
   final TwitchChatFragmentType type;
@@ -27,10 +23,7 @@ class TwitchChatFragment {
   bool get isEmote => type == TwitchChatFragmentType.twitchEmote;
 
   factory TwitchChatFragment.text(String text) {
-    return TwitchChatFragment(
-      type: TwitchChatFragmentType.text,
-      text: text,
-    );
+    return TwitchChatFragment(type: TwitchChatFragmentType.text, text: text);
   }
 
   factory TwitchChatFragment.twitchEmote({
@@ -49,9 +42,7 @@ class TwitchChatFragment {
     );
   }
 
-  factory TwitchChatFragment.unknownEmote({
-    required String emoteId,
-  }) {
+  factory TwitchChatFragment.unknownEmote({required String emoteId}) {
     return TwitchChatFragment(
       type: TwitchChatFragmentType.unknownEmote,
       text: '',
@@ -95,7 +86,9 @@ class TwitchChatFragment {
     // 但 trailing text 是空的。此時至少把 emote id render 出來，避免 UI 空白。
     if (text.isEmpty) {
       return ranges
-          .map((range) => TwitchChatFragment.unknownEmote(emoteId: range.emoteId))
+          .map(
+            (range) => TwitchChatFragment.unknownEmote(emoteId: range.emoteId),
+          )
           .toList(growable: false);
     }
 
@@ -115,7 +108,9 @@ class TwitchChatFragment {
       if (range.end >= text.length) continue;
 
       if (range.start > cursor) {
-        fragments.add(TwitchChatFragment.text(text.substring(cursor, range.start)));
+        fragments.add(
+          TwitchChatFragment.text(text.substring(cursor, range.start)),
+        );
       }
 
       fragments.add(

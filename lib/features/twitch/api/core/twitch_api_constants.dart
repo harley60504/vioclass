@@ -23,7 +23,7 @@ class TwitchApiConstants {
   /// Defaults to the Twitch-compatible public Android Client-ID, but can be
   /// overridden at build time:
   ///
-  /// flutter run -d windows --dart-define=TWITCH_DROPS_CLIENT_ID=<client_id>
+  /// flutter run -d windows --dart-define=TWITCH_DROPS_CLIENT_ID=`<client_id>`
   ///
   /// TWITCH_ANDROID_CLIENT_ID is still accepted as a compatibility fallback.
   static const String twitchDefaultDropsClientId = String.fromEnvironment(

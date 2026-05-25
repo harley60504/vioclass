@@ -35,8 +35,10 @@ class TwitchWatchPlayerPort {
       services.playerSession.videoControllerOrNull;
   Player get player => services.playerSession.player;
   VideoController get videoController => services.playerSession.videoController;
-  List<TwitchM3u8Variant> get qualityVariants => services.playerRuntime.variants;
-  TwitchM3u8Variant? get currentVariant => services.playerRuntime.currentVariant;
+  List<TwitchM3u8Variant> get qualityVariants =>
+      services.playerRuntime.variants;
+  TwitchM3u8Variant? get currentVariant =>
+      services.playerRuntime.currentVariant;
   bool get busy => services.playerRuntime.busy;
   Object? get error => services.playerRuntime.error;
 
@@ -226,19 +228,16 @@ class TwitchWatchEngagementPort {
     await Future.wait<void>([
       (() async {
         try {
-          nextChannelPointsSnapshot =
-              await services.channelPointsRuntimeService.load(
-            channelLogin: channelLogin,
-          );
+          nextChannelPointsSnapshot = await services.channelPointsRuntimeService
+              .load(channelLogin: channelLogin);
         } catch (error) {
           errors.add(error);
         }
       })(),
       (() async {
         try {
-          nextPrediction = await services.publicPredictionApi.fetchPredictionContext(
-            channelLogin: channelLogin,
-          );
+          nextPrediction = await services.publicPredictionApi
+              .fetchPredictionContext(channelLogin: channelLogin);
         } catch (error) {
           errors.add(error);
         }
@@ -249,9 +248,8 @@ class TwitchWatchEngagementPort {
           return;
         }
         try {
-          nextPinnedMessages = await services.pinnedChatApi.getPinnedChatMessages(
-            channelId: channelId,
-          );
+          nextPinnedMessages = await services.pinnedChatApi
+              .getPinnedChatMessages(channelId: channelId);
         } catch (error) {
           errors.add(error);
         }
@@ -311,7 +309,9 @@ class TwitchWatchEngagementPort {
     return TwitchWatchRewardRedeemResult(title: title);
   }
 
-  _TwitchWatchModifiedEmoteSelection? _tryReadModifiedEmoteSelection(String raw) {
+  _TwitchWatchModifiedEmoteSelection? _tryReadModifiedEmoteSelection(
+    String raw,
+  ) {
     final text = raw.trim();
     if (text.isEmpty || !text.startsWith('{')) return null;
     try {
@@ -491,7 +491,9 @@ class TwitchWatchFeaturePorts {
       chat: TwitchWatchChatPort(services: services.chat),
       emotes: TwitchWatchEmotePort(services: services.emotes),
       engagement: TwitchWatchEngagementPort(services: services.engagement),
-      relationship: TwitchWatchRelationshipPort(services: services.relationship),
+      relationship: TwitchWatchRelationshipPort(
+        services: services.relationship,
+      ),
     );
   }
 }

@@ -37,7 +37,8 @@ class TwitchEmoteOnlyTestPage extends StatefulWidget {
   });
 
   @override
-  State<TwitchEmoteOnlyTestPage> createState() => _TwitchEmoteOnlyTestPageState();
+  State<TwitchEmoteOnlyTestPage> createState() =>
+      _TwitchEmoteOnlyTestPageState();
 }
 
 class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
@@ -51,7 +52,8 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
   late final TextEditingController channelIdController;
   final TextEditingController messageController = TextEditingController();
 
-  String status = '輸入 channel login / id 後按 Load。這頁不建立 watch page、player、chat list。';
+  String status =
+      '輸入 channel login / id 後按 Load。這頁不建立 watch page、player、chat list。';
   String viewerId = '';
   String activeChannelId = '';
   String activeChannelLogin = '';
@@ -122,7 +124,8 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
           : '已載入登入狀態 viewerId=$viewerId。';
     });
 
-    final hasInitialChannel = channelLoginController.text.trim().isNotEmpty ||
+    final hasInitialChannel =
+        channelLoginController.text.trim().isNotEmpty ||
         channelIdController.text.trim().isNotEmpty;
     if (widget.autoLoad && hasInitialChannel) {
       await _loadEmotes();
@@ -184,8 +187,11 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
 
       if (!mounted) return;
       setState(() {
-        final label = activeChannelLogin.isEmpty ? activeChannelId : activeChannelLogin;
-        status = '載入完成：$label｜third-party=${thirdPartyCache.count}，official=${officialCache.visibleCount}。';
+        final label = activeChannelLogin.isEmpty
+            ? activeChannelId
+            : activeChannelLogin;
+        status =
+            '載入完成：$label｜third-party=${thirdPartyCache.count}，official=${officialCache.visibleCount}。';
       });
     } catch (error) {
       if (!mounted) return;
@@ -193,10 +199,11 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
         status = '載入失敗：$error';
       });
     } finally {
-      if (!mounted) return;
-      setState(() {
-        loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          loading = false;
+        });
+      }
     }
   }
 
@@ -207,9 +214,7 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
   }) async {
     final raw = await apiClient.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/users',
-      queryParameters: <String, dynamic>{
-        'login': login,
-      },
+      queryParameters: <String, dynamic>{'login': login},
       headers: <String, String>{
         'Client-ID': clientId,
         'Authorization': 'Bearer ${accessToken.trim()}',
@@ -244,7 +249,10 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
                   return TwitchWatchEmbeddedEmotePanel(
                     thirdPartyCache: thirdPartyCache,
                     officialCache: officialCache,
-                    loading: loading || thirdPartyCache.loading || officialCache.loading,
+                    loading:
+                        loading ||
+                        thirdPartyCache.loading ||
+                        officialCache.loading,
                     messageController: messageController,
                     onRefresh: () => unawaited(_loadEmotes()),
                   );
@@ -267,9 +275,9 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.34),
+        color: Colors.black.withValues(alpha: 0.34),
         border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.08)),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
       ),
       child: Column(
@@ -277,7 +285,10 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
         children: [
           Row(
             children: [
-              const Icon(Icons.emoji_emotions_rounded, color: Color(0xFFBF94FF)),
+              const Icon(
+                Icons.emoji_emotions_rounded,
+                color: Color(0xFFBF94FF),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
@@ -370,9 +381,9 @@ class _TwitchEmoteOnlyTestPageState extends State<TwitchEmoteOnlyTestPage> {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.30),
+        color: Colors.black.withValues(alpha: 0.30),
         border: Border(
-          top: BorderSide(color: Colors.white.withOpacity(0.08)),
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
         ),
       ),
       child: TextField(

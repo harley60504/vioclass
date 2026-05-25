@@ -1,4 +1,4 @@
-library twitch_watch_page;
+library;
 
 import 'dart:async';
 
@@ -147,7 +147,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
 
   TwitchWatchServices get _watchServices => _session.services;
   TwitchWatchFeaturePorts get _watchPorts => _session.ports;
-  TwitchApiClient get _apiClient => _session.apiClient;
   TwitchAuthService get _authService => _session.authService;
   TwitchDropsAuthService get _dropsAuthService => _session.dropsAuthService;
   TwitchWebGqlAuthService get _webGqlAuthService => _session.webGqlAuthService;
@@ -155,7 +154,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   TwitchRecentMessagesApiService get _recentMessagesApi =>
       _session.recentMessagesApi;
   TwitchMediaKitPlayerSession get _playerSession => _session.playerSession;
-  Player get _player => _session.player;
 
   StreamSubscription<double>? _playerVolumeSubscription;
   Timer? _volumePreferenceSaveDebounce;
@@ -193,7 +191,6 @@ class _TwitchWatchPageState extends State<TwitchWatchPage> {
   String? _viewerLogin;
   String? _viewerId;
   String? _channelId;
-  List<String> _viewerScopes = const <String>[];
   String? _playerError;
   String? _engagementError;
   String? _relationshipError;

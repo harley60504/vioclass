@@ -19,10 +19,7 @@ class TwitchStreamHomeAccountMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       tooltip: '設定',
       color: const Color(0xFF191421),
-      icon: const Icon(
-        Icons.settings_rounded,
-        color: Color(0xFFBF94FF),
-      ),
+      icon: const Icon(Icons.settings_rounded, color: Color(0xFFBF94FF)),
       onSelected: (value) async {
         switch (value) {
           case 'login':
@@ -40,24 +37,15 @@ class TwitchStreamHomeAccountMenu extends StatelessWidget {
         }
       },
       itemBuilder: (context) => const <PopupMenuEntry<String>>[
-        PopupMenuItem<String>(
-          value: 'login',
-          child: Text('完整登入 / 修復登入'),
-        ),
-        PopupMenuItem<String>(
-          value: 'refresh',
-          child: Text('重新檢查登入狀態'),
-        ),
+        PopupMenuItem<String>(value: 'login', child: Text('完整登入 / 修復登入')),
+        PopupMenuItem<String>(value: 'refresh', child: Text('重新檢查登入狀態')),
         PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'test_app_notification',
           child: Text('測試程式內部通知'),
         ),
         PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'logout',
-          child: Text('登出'),
-        ),
+        PopupMenuItem<String>(value: 'logout', child: Text('登出')),
       ],
     );
   }

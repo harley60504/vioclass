@@ -103,8 +103,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       if (token != null && token.trim().isNotEmpty) {
         try {
           final validation = await authApi.validateToken(token);
-          nextViewerLabel =
-              validation.login.isEmpty ? '已登入' : '@${validation.login}';
+          nextViewerLabel = validation.login.isEmpty
+              ? '已登入'
+              : '@${validation.login}';
           final hasFollows = validation.scopes.contains('user:read:follows');
           final hasChatRead = validation.scopes.contains('chat:read');
           final hasChatEdit = validation.scopes.contains('chat:edit');
@@ -181,7 +182,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   }
 
   void showInternalNotificationTest() {
-    final hasDropsToken = dropsAuthService.accessToken?.trim().isNotEmpty ?? false;
+    final hasDropsToken =
+        dropsAuthService.accessToken?.trim().isNotEmpty ?? false;
     final tokenLabel = hasDropsToken ? 'Drops token 已存在' : '尚未登入 Drops token';
 
     twitchAppNotificationCenter.showSuccess(
@@ -229,7 +231,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+              final layout = TwitchResponsiveLayout.fromConstraints(
+                constraints,
+              );
               return layout.shouldUseBottomHomeNavigation
                   ? _buildMobileShell(layout)
                   : _buildDesktopShell(layout);

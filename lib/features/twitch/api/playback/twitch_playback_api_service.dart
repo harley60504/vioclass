@@ -6,9 +6,7 @@ import '../core/twitch_gql_api_service.dart';
 class TwitchPlaybackApiService {
   final TwitchGqlApiService gql;
 
-  const TwitchPlaybackApiService({
-    required this.gql,
-  });
+  const TwitchPlaybackApiService({required this.gql});
 
   Future<TwitchPlaybackAccessToken> getLivePlaybackAccessToken({
     required String channelLogin,
@@ -17,10 +15,16 @@ class TwitchPlaybackApiService {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     final cleanPlatform = platform.trim().isEmpty ? 'web' : platform.trim();
-    final cleanPlayerType = playerType.trim().isEmpty ? 'site' : playerType.trim();
+    final cleanPlayerType = playerType.trim().isEmpty
+        ? 'site'
+        : playerType.trim();
 
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channel login cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channel login cannot be empty',
+      );
     }
 
     final data = await gql.request(
@@ -70,7 +74,9 @@ class TwitchPlaybackApiService {
 
     final raw = data['streamPlaybackAccessToken'];
     if (raw is! Map<String, dynamic>) {
-      throw StateError('GQL response does not contain streamPlaybackAccessToken.');
+      throw StateError(
+        'GQL response does not contain streamPlaybackAccessToken.',
+      );
     }
 
     final token = TwitchPlaybackAccessToken.fromJson(raw);
@@ -96,7 +102,9 @@ class TwitchPlaybackApiService {
       clientId: gql.clientId,
       allowSource: allowSource,
       allowAudioOnly: allowAudioOnly,
-      supportedCodecs: supportedCodecs.trim().isEmpty ? 'avc1' : supportedCodecs.trim(),
+      supportedCodecs: supportedCodecs.trim().isEmpty
+          ? 'avc1'
+          : supportedCodecs.trim(),
     ).buildUsherUri();
   }
 }

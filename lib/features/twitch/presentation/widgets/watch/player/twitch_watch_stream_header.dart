@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 
-import 'package:characters/characters.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -28,8 +27,8 @@ class WatchCompactAvatarTile extends StatelessWidget {
       message: data.channelLabel,
       child: TwitchGlassSurface(
         borderRadius: BorderRadius.circular(tiny ? 14 : 16),
-        backgroundColor: Colors.black.withOpacity(0.42),
-        borderColor: Colors.white.withOpacity(0.10),
+        backgroundColor: Colors.black.withValues(alpha: 0.42),
+        borderColor: Colors.white.withValues(alpha: 0.10),
         blurSigma: 0,
         boxShadow: const <BoxShadow>[],
         child: SizedBox(
@@ -67,8 +66,8 @@ class WatchStreamHeaderCard extends StatelessWidget {
 
     return TwitchGlassSurface(
       borderRadius: BorderRadius.circular(compact ? 16 : 20),
-      backgroundColor: Colors.black.withOpacity(0.46),
-      borderColor: Colors.white.withOpacity(0.11),
+      backgroundColor: Colors.black.withValues(alpha: 0.46),
+      borderColor: Colors.white.withValues(alpha: 0.11),
       blurSigma: 0,
       boxShadow: const <BoxShadow>[],
       child: SizedBox(
@@ -155,16 +154,10 @@ class _WatchStreamHeaderTextBlock extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _WatchStreamHeaderMainRow(
-          data: data,
-          compact: compact,
-        ),
+        _WatchStreamHeaderMainRow(data: data, compact: compact),
         if (data.streamTitle.isNotEmpty) ...[
           SizedBox(height: compact ? 3 : 4),
-          _WatchStreamTitleText(
-            title: data.streamTitle,
-            compact: compact,
-          ),
+          _WatchStreamTitleText(title: data.streamTitle, compact: compact),
         ],
       ],
     );
@@ -175,10 +168,7 @@ class _WatchStreamHeaderMainRow extends StatelessWidget {
   final _WatchStreamHeaderData data;
   final bool compact;
 
-  const _WatchStreamHeaderMainRow({
-    required this.data,
-    required this.compact,
-  });
+  const _WatchStreamHeaderMainRow({required this.data, required this.compact});
 
   @override
   Widget build(BuildContext context) {
@@ -226,10 +216,7 @@ class _WatchChannelNameText extends StatelessWidget {
   final String label;
   final bool compact;
 
-  const _WatchChannelNameText({
-    required this.label,
-    required this.compact,
-  });
+  const _WatchChannelNameText({required this.label, required this.compact});
 
   @override
   Widget build(BuildContext context) {
@@ -254,10 +241,7 @@ class _WatchStreamTitleText extends StatelessWidget {
   final String title;
   final bool compact;
 
-  const _WatchStreamTitleText({
-    required this.title,
-    required this.compact,
-  });
+  const _WatchStreamTitleText({required this.title, required this.compact});
 
   @override
   Widget build(BuildContext context) {
@@ -329,20 +313,17 @@ class _WatchAvatarImage extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFF2A2236),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
       ),
       clipBehavior: Clip.antiAlias,
       child: imageUrl.isEmpty
-          ? _WatchAvatarFallbackLetter(
-              letter: fallbackLetter,
-              size: size,
-            )
+          ? _WatchAvatarFallbackLetter(letter: fallbackLetter, size: size)
           : Image.network(
               imageUrl,
               fit: BoxFit.cover,
               cacheWidth: (size * 2).round(),
               cacheHeight: (size * 2).round(),
-              errorBuilder: (_, __, ___) => _WatchAvatarFallbackLetter(
+              errorBuilder: (_, _, _) => _WatchAvatarFallbackLetter(
                 letter: fallbackLetter,
                 size: size,
               ),
@@ -355,10 +336,7 @@ class _WatchAvatarFallbackLetter extends StatelessWidget {
   final String letter;
   final double size;
 
-  const _WatchAvatarFallbackLetter({
-    required this.letter,
-    required this.size,
-  });
+  const _WatchAvatarFallbackLetter({required this.letter, required this.size});
 
   @override
   Widget build(BuildContext context) {
@@ -432,31 +410,39 @@ class _WatchInfoPill extends StatelessWidget {
     return Tooltip(
       message: canCopy ? '點擊複製：$label' : label,
       child: Material(
-        color: Colors.white.withOpacity(0.075),
+        color: Colors.white.withValues(alpha: 0.075),
         borderRadius: BorderRadius.circular(999),
         child: InkWell(
           borderRadius: BorderRadius.circular(999),
           onTap: canCopy
               ? () async {
-                  await Clipboard.setData(ClipboardData(text: copyText!.trim()));
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('已複製：$label')),
+                  await Clipboard.setData(
+                    ClipboardData(text: copyText!.trim()),
                   );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('已複製：$label')));
                 }
               : null,
           child: Container(
             height: compact ? 24 : 28,
-            constraints: BoxConstraints(maxWidth: maxWidth ?? (compact ? 120 : 190)),
+            constraints: BoxConstraints(
+              maxWidth: maxWidth ?? (compact ? 120 : 190),
+            ),
             padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 9),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withOpacity(0.11)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.11)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: compact ? 13 : 15, color: const Color(0xFFBF94FF)),
+                Icon(
+                  icon,
+                  size: compact ? 13 : 15,
+                  color: const Color(0xFFBF94FF),
+                ),
                 SizedBox(width: compact ? 4 : 5),
                 Flexible(
                   child: Text(

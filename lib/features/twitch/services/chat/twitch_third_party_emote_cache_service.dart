@@ -13,24 +13,28 @@ import 'twitch_emote_image_cache_manager.dart';
 class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   final TwitchThirdPartyEmoteApiService api;
 
-  TwitchThirdPartyEmoteCacheService({
-    required this.api,
-  }) {
+  TwitchThirdPartyEmoteCacheService({required this.api}) {
     loadFavoriteEmotes();
     loadRecentEmotes();
   }
 
   static const Duration memoryCacheDuration = Duration(minutes: 5);
-  static const String favoriteStorageKey = 'twitch_third_party_favorite_emotes_v1';
+  static const String favoriteStorageKey =
+      'twitch_third_party_favorite_emotes_v1';
   static const String recentStorageKey = 'twitch_third_party_recent_emotes_v1';
   static const int maxRecentEmotes = 80;
   static const int maxStaticPrecacheEmotes = 180;
 
-  final Map<String, TwitchThirdPartyEmote> _byName = <String, TwitchThirdPartyEmote>{};
-  final Map<String, TwitchThirdPartyEmote> _byLowerName = <String, TwitchThirdPartyEmote>{};
-  final Map<String, TwitchThirdPartyEmote> _favorites = <String, TwitchThirdPartyEmote>{};
-  final Map<String, TwitchThirdPartyEmote> _recent = <String, TwitchThirdPartyEmote>{};
-  final Map<String, _CachedThirdPartyEmoteSet> _memoryCache = <String, _CachedThirdPartyEmoteSet>{};
+  final Map<String, TwitchThirdPartyEmote> _byName =
+      <String, TwitchThirdPartyEmote>{};
+  final Map<String, TwitchThirdPartyEmote> _byLowerName =
+      <String, TwitchThirdPartyEmote>{};
+  final Map<String, TwitchThirdPartyEmote> _favorites =
+      <String, TwitchThirdPartyEmote>{};
+  final Map<String, TwitchThirdPartyEmote> _recent =
+      <String, TwitchThirdPartyEmote>{};
+  final Map<String, _CachedThirdPartyEmoteSet> _memoryCache =
+      <String, _CachedThirdPartyEmoteSet>{};
   final Set<String> _staticPrecacheKeys = <String>{};
 
   bool _favoritesLoaded = false;
@@ -46,7 +50,8 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   String get channelLogin => _channelLogin;
   bool get favoritesLoaded => _favoritesLoaded;
   bool get recentLoaded => _recentLoaded;
-  bool get hasAnyEmotes => _byName.isNotEmpty || _favorites.isNotEmpty || _recent.isNotEmpty;
+  bool get hasAnyEmotes =>
+      _byName.isNotEmpty || _favorites.isNotEmpty || _recent.isNotEmpty;
 
   List<TwitchThirdPartyEmote> get emotes {
     final output = _byName.values.toList(growable: false)
@@ -73,10 +78,13 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   List<TwitchThirdPartyEmote> emotesForProvider(
     TwitchThirdPartyEmoteProvider provider,
   ) {
-    final output = _byName.values
-        .where((emote) => emote.provider == provider)
-        .toList(growable: false)
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final output =
+        _byName.values
+            .where((emote) => emote.provider == provider)
+            .toList(growable: false)
+          ..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
 
     return output;
   }
@@ -158,7 +166,9 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   Future<void> _saveFavoriteEmotes() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = favoriteEmotes.map((emote) => emote.toJson()).toList(growable: false);
+      final jsonList = favoriteEmotes
+          .map((emote) => emote.toJson())
+          .toList(growable: false);
       await prefs.setString(favoriteStorageKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Save third party favorite emotes failed: $e');
@@ -204,7 +214,9 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
   Future<void> _saveRecentEmotes() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = recentEmotes.map((emote) => emote.toJson()).toList(growable: false);
+      final jsonList = recentEmotes
+          .map((emote) => emote.toJson())
+          .toList(growable: false);
       await prefs.setString(recentStorageKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Save third party recent emotes failed: $e');
@@ -385,10 +397,7 @@ class TwitchThirdPartyEmoteCacheService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final emotes = await api.fetchAll(
-        channelId: cid,
-        channelLogin: login,
-      );
+      final emotes = await api.fetchAll(channelId: cid, channelLogin: login);
 
       final next = <String, TwitchThirdPartyEmote>{
         for (final emote in emotes)

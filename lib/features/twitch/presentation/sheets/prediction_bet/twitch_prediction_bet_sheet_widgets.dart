@@ -108,11 +108,11 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
         ? Colors.white38
         : TwitchUiColors.sheet.backplate.foreground;
     final borderColor = outcome.isWinner
-        ? Colors.greenAccent.withOpacity(0.58)
+        ? Colors.greenAccent.withValues(alpha: 0.58)
         : selectedByViewer
-        ? Colors.greenAccent.withOpacity(0.58)
+        ? Colors.greenAccent.withValues(alpha: 0.58)
         : lockedByViewerChoice
-        ? Colors.white.withOpacity(0.10)
+        ? Colors.white.withValues(alpha: 0.10)
         : TwitchUiColors.sheet.backplate.borderActive;
     final opacity = lockedByViewerChoice ? 0.62 : 1.0;
 
@@ -132,7 +132,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: <Color>[
                   selectedByViewer
-                      ? const Color(0xFF162C22).withOpacity(0.98)
+                      ? const Color(0xFF162C22).withValues(alpha: 0.98)
                       : TwitchUiColors.sheet.cardFillActive,
                   TwitchUiColors.sheet.shellGradientEnd,
                 ],
@@ -141,14 +141,14 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
               border: Border.all(color: borderColor),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: accent.withOpacity(
-                    enabled || selectedByViewer ? 0.18 : 0.04,
+                  color: accent.withValues(
+                    alpha: enabled || selectedByViewer ? 0.18 : 0.04,
                   ),
                   blurRadius: 18,
                   offset: const Offset(0, 8),
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.26),
+                  color: Colors.black.withValues(alpha: 0.26),
                   blurRadius: 14,
                   offset: const Offset(0, 8),
                 ),
@@ -270,11 +270,11 @@ class TwitchPredictionBetChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
+        color: color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.38)),
+        border: Border.all(color: color.withValues(alpha: 0.38)),
         boxShadow: <BoxShadow>[
-          BoxShadow(color: color.withOpacity(0.08), blurRadius: 8),
+          BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 8),
         ],
       ),
       child: Text(

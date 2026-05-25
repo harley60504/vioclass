@@ -51,20 +51,22 @@ class TwitchPredictionBanner extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                const Color(0xFF251640).withOpacity(0.97),
-                const Color(0xFF171420).withOpacity(0.98),
+                const Color(0xFF251640).withValues(alpha: 0.97),
+                const Color(0xFF171420).withValues(alpha: 0.98),
               ],
             ),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: TwitchUiColors.primary.withOpacity(0.44)),
+            border: Border.all(
+              color: TwitchUiColors.primary.withValues(alpha: 0.44),
+            ),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: TwitchUiColors.primary.withOpacity(0.20),
+                color: TwitchUiColors.primary.withValues(alpha: 0.20),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.32),
+                color: Colors.black.withValues(alpha: 0.32),
                 blurRadius: 16,
                 offset: const Offset(0, 8),
               ),
@@ -79,19 +81,23 @@ class TwitchPredictionBanner extends StatelessWidget {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: TwitchUiColors.primary.withOpacity(0.22),
+                      color: TwitchUiColors.primary.withValues(alpha: 0.22),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: TwitchUiColors.primarySoft.withOpacity(0.38),
+                        color: TwitchUiColors.primarySoft.withValues(
+                          alpha: 0.38,
+                        ),
                       ),
                     ),
                     child: Icon(
                       canceled
                           ? Icons.remove_circle_outline_rounded
                           : resolved
-                              ? Icons.emoji_events_rounded
-                              : Icons.how_to_vote_rounded,
-                      color: canceled ? Colors.orangeAccent : TwitchUiColors.primarySoft,
+                          ? Icons.emoji_events_rounded
+                          : Icons.how_to_vote_rounded,
+                      color: canceled
+                          ? Colors.orangeAccent
+                          : TwitchUiColors.primarySoft,
                       size: 15,
                     ),
                   ),
@@ -118,7 +124,10 @@ class TwitchPredictionBanner extends StatelessWidget {
                     canceled: canceled,
                   ),
                   const SizedBox(width: 2),
-                  const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: Colors.white38,
+                  ),
                 ],
               ),
               if (left != null && right != null) ...[
@@ -198,7 +207,10 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
 
   bool get _shouldTick {
     final locksAt = widget.locksAt;
-    if (!widget.active || widget.resolved || widget.canceled || locksAt == null) {
+    if (!widget.active ||
+        widget.resolved ||
+        widget.canceled ||
+        locksAt == null) {
       return false;
     }
     return locksAt.isAfter(DateTime.now());
@@ -207,16 +219,18 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
   @override
   Widget build(BuildContext context) {
     final locksAt = widget.locksAt;
-    final remaining = locksAt == null ? null : locksAt.difference(DateTime.now());
-    final displayLabel = widget.active &&
+    final remaining = locksAt?.difference(DateTime.now());
+    final displayLabel =
+        widget.active &&
             !widget.resolved &&
             !widget.canceled &&
             remaining != null
         ? remaining.inSeconds > 0
-            ? '關盤 ${_formatLockCountdown(remaining)}'
-            : '即將關盤'
+              ? '關盤 ${_formatLockCountdown(remaining)}'
+              : '即將關盤'
         : widget.label;
-    final urgent = widget.active &&
+    final urgent =
+        widget.active &&
         !widget.resolved &&
         !widget.canceled &&
         remaining != null &&
@@ -224,22 +238,19 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
     final color = widget.canceled
         ? Colors.orangeAccent
         : widget.resolved
-            ? Colors.greenAccent
-            : urgent
-                ? Colors.orangeAccent
-                : TwitchUiColors.primarySoft;
+        ? Colors.greenAccent
+        : urgent
+        ? Colors.orangeAccent
+        : TwitchUiColors.primarySoft;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.16),
+        color: color.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        border: Border.all(color: color.withOpacity(0.40)),
+        border: Border.all(color: color.withValues(alpha: 0.40)),
         boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: color.withOpacity(0.14),
-            blurRadius: 10,
-          ),
+          BoxShadow(color: color.withValues(alpha: 0.14), blurRadius: 10),
         ],
       ),
       child: Text(
@@ -280,9 +291,9 @@ class _PredictionSplitBar extends StatelessWidget {
       child: Container(
         height: 31,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-          border: Border.all(color: Colors.white.withOpacity(0.10)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
         ),
         child: Row(
           children: [
@@ -290,7 +301,9 @@ class _PredictionSplitBar extends StatelessWidget {
               flex: (leftPercent * 1000).round().clamp(1, 999).toInt(),
               child: Container(
                 height: 31,
-                color: TwitchUiColors.blue.withOpacity(left.isWinner ? 0.96 : 0.82),
+                color: TwitchUiColors.blue.withValues(
+                  alpha: left.isWinner ? 0.96 : 0.82,
+                ),
                 alignment: Alignment.centerLeft,
                 padding: const EdgeInsets.only(left: 10),
                 child: Text(
@@ -303,12 +316,14 @@ class _PredictionSplitBar extends StatelessWidget {
                 ),
               ),
             ),
-            Container(width: 1, color: Colors.black.withOpacity(0.30)),
+            Container(width: 1, color: Colors.black.withValues(alpha: 0.30)),
             Expanded(
               flex: (rightPercent * 1000).round().clamp(1, 999).toInt(),
               child: Container(
                 height: 31,
-                color: TwitchUiColors.red.withOpacity(right.isWinner ? 0.96 : 0.82),
+                color: TwitchUiColors.red.withValues(
+                  alpha: right.isWinner ? 0.96 : 0.82,
+                ),
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.only(right: 10),
                 child: Text(
@@ -332,17 +347,18 @@ DateTime? _effectiveLocksAt(TwitchPredictionSnapshot prediction) {
   final explicit = prediction.locksAt;
   if (explicit != null) return explicit;
 
-  final createdAt = prediction.createdAt ??
+  final createdAt =
+      prediction.createdAt ??
       _readDateFromRaw(prediction.rawPrediction, const <String>[
         'created_at',
         'createdAt',
       ]);
   if (createdAt == null) return null;
 
-  final windowSeconds = _readIntFromRaw(prediction.rawPrediction, const <String>[
-    'prediction_window_seconds',
-    'predictionWindowSeconds',
-  ]);
+  final windowSeconds = _readIntFromRaw(
+    prediction.rawPrediction,
+    const <String>['prediction_window_seconds', 'predictionWindowSeconds'],
+  );
   if (windowSeconds == null || windowSeconds <= 0) return null;
 
   return createdAt.add(Duration(seconds: windowSeconds));

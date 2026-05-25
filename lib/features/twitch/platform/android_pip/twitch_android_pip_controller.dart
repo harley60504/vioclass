@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -18,7 +17,8 @@ class TwitchAndroidPipController extends ChangeNotifier {
     _channel.setMethodCallHandler(_handleNativeCall);
   }
 
-  static final TwitchAndroidPipController instance = TwitchAndroidPipController._();
+  static final TwitchAndroidPipController instance =
+      TwitchAndroidPipController._();
 
   static const MethodChannel _channel = MethodChannel('vio_class/android_pip');
   static const Duration _manualPrepareFrameDelay = Duration(milliseconds: 60);
@@ -57,15 +57,12 @@ class TwitchAndroidPipController extends ChangeNotifier {
     if (rect.isEmpty || !rect.isFinite) return;
 
     try {
-      await _channel.invokeMethod<void>(
-        'setSourceRectHint',
-        <String, Object>{
-          'left': rect.left.round(),
-          'top': rect.top.round(),
-          'right': rect.right.round(),
-          'bottom': rect.bottom.round(),
-        },
-      );
+      await _channel.invokeMethod<void>('setSourceRectHint', <String, Object>{
+        'left': rect.left.round(),
+        'top': rect.top.round(),
+        'right': rect.right.round(),
+        'bottom': rect.bottom.round(),
+      });
     } catch (_) {}
   }
 
@@ -77,13 +74,11 @@ class TwitchAndroidPipController extends ChangeNotifier {
 
     try {
       await _prepareManualPictureInPictureFrame();
-      final entered = await _channel.invokeMethod<bool>(
-        'enterPip',
-        <String, Object>{
-          'aspectRatioWidth': aspectRatioWidth,
-          'aspectRatioHeight': aspectRatioHeight,
-        },
-      );
+      final entered = await _channel
+          .invokeMethod<bool>('enterPip', <String, Object>{
+            'aspectRatioWidth': aspectRatioWidth,
+            'aspectRatioHeight': aspectRatioHeight,
+          });
       if (entered != true) {
         _setPreparingPictureInPicture(false);
       }

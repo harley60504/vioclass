@@ -12,11 +12,12 @@ import '../../widgets/channel_points/twitch_channel_points_emote_overlay.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import 'twitch_channel_points_sheet_models.dart';
 
-typedef TwitchChannelPointEmoteOverlayOpener = Future<Object?> Function({
-  required BuildContext context,
-  required Map<String, dynamic> reward,
-  required ChannelPointEmoteOverlayMode mode,
-});
+typedef TwitchChannelPointEmoteOverlayOpener =
+    Future<Object?> Function({
+      required BuildContext context,
+      required Map<String, dynamic> reward,
+      required ChannelPointEmoteOverlayMode mode,
+    });
 
 Future<String?> buildTwitchChannelPointRedeemPayload({
   required BuildContext context,

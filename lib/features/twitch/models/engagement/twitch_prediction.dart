@@ -27,7 +27,8 @@ class TwitchPredictionSnapshot {
     this.rawPrediction,
   });
 
-  bool get hasPrediction => id.isNotEmpty || title.isNotEmpty || outcomes.isNotEmpty;
+  bool get hasPrediction =>
+      id.isNotEmpty || title.isNotEmpty || outcomes.isNotEmpty;
 
   String get normalizedStatus => status.trim().toUpperCase();
 
@@ -120,22 +121,21 @@ class TwitchPredictionSnapshot {
     final safeOutcomeId = outcomeId.trim();
     if (safeOutcomeId.isEmpty) return this;
 
-    final updatedOutcomes = outcomes.map((outcome) {
-      final isTarget = _matchesOutcomeIdentity(outcome, safeOutcomeId);
-      final nextViewerPoints = isTarget
-          ? (addToExisting ? outcome.viewerPoints + points : points)
-          : 0;
+    final updatedOutcomes = outcomes
+        .map((outcome) {
+          final isTarget = _matchesOutcomeIdentity(outcome, safeOutcomeId);
+          final nextViewerPoints = isTarget
+              ? (addToExisting ? outcome.viewerPoints + points : points)
+              : 0;
 
-      return outcome.copyWith(
-        isViewerChoice: isTarget,
-        viewerPoints: nextViewerPoints,
-      );
-    }).toList(growable: false);
+          return outcome.copyWith(
+            isViewerChoice: isTarget,
+            viewerPoints: nextViewerPoints,
+          );
+        })
+        .toList(growable: false);
 
-    return copyWith(
-      viewerOutcomeId: safeOutcomeId,
-      outcomes: updatedOutcomes,
-    );
+    return copyWith(viewerOutcomeId: safeOutcomeId, outcomes: updatedOutcomes);
   }
 
   factory TwitchPredictionSnapshot.empty() {
@@ -163,8 +163,9 @@ class TwitchPredictionSnapshot {
     if (type == 'event-updated' && data is Map) {
       final event = data['event'];
       if (event is Map) {
-        final parsed = TwitchPredictionSnapshot.fromRawResponse(event)
-            ._withViewerFromHermesEvent(event, viewerUserId: viewerUserId);
+        final parsed = TwitchPredictionSnapshot.fromRawResponse(
+          event,
+        )._withViewerFromHermesEvent(event, viewerUserId: viewerUserId);
         return parsed._preserveViewerPredictionFrom(previous);
       }
     }
@@ -172,25 +173,35 @@ class TwitchPredictionSnapshot {
     if (type == 'prediction-made' && data is Map) {
       final prediction = data['prediction'];
       if (prediction is Map) {
-        final eventId = _readString(
-              prediction['event_id'] ?? prediction['eventID'] ?? prediction['eventId'],
+        final eventId =
+            _readString(
+              prediction['event_id'] ??
+                  prediction['eventID'] ??
+                  prediction['eventId'],
             ) ??
             previous?.id ??
             '';
-        final outcomeId = _readString(
-              prediction['outcome_id'] ?? prediction['outcomeID'] ?? prediction['outcomeId'],
+        final outcomeId =
+            _readString(
+              prediction['outcome_id'] ??
+                  prediction['outcomeID'] ??
+                  prediction['outcomeId'],
             ) ??
             '';
         final points = _readInt(prediction['points']) ?? 0;
-        final userId = _readString(prediction['user_id'] ?? prediction['userId']);
+        final userId = _readString(
+          prediction['user_id'] ?? prediction['userId'],
+        );
         final viewerId = viewerUserId?.trim();
-        final isViewer = viewerId == null ||
+        final isViewer =
+            viewerId == null ||
             viewerId.isEmpty ||
             userId == null ||
             userId.isEmpty ||
             userId == viewerId;
 
-        final base = previous ??
+        final base =
+            previous ??
             TwitchPredictionSnapshot(
               id: eventId,
               title: '',
@@ -198,7 +209,9 @@ class TwitchPredictionSnapshot {
               totalPoints: 0,
               totalUsers: 0,
               outcomes: const <TwitchPredictionOutcome>[],
-              rawPrediction: prediction.map((key, value) => MapEntry(key.toString(), value)),
+              rawPrediction: prediction.map(
+                (key, value) => MapEntry(key.toString(), value),
+              ),
             );
 
         if (!isViewer || outcomeId.isEmpty) return base;
@@ -206,16 +219,17 @@ class TwitchPredictionSnapshot {
       }
     }
 
-    return TwitchPredictionSnapshot.fromRawResponse(root)
-        ._preserveViewerPredictionFrom(previous);
+    return TwitchPredictionSnapshot.fromRawResponse(
+      root,
+    )._preserveViewerPredictionFrom(previous);
   }
 
   factory TwitchPredictionSnapshot.fromRawResponse(Object? response) {
     final root = response is Map<String, dynamic>
         ? response
         : response is Map
-            ? response.map((key, value) => MapEntry(key.toString(), value))
-            : <String, dynamic>{};
+        ? response.map((key, value) => MapEntry(key.toString(), value))
+        : <String, dynamic>{};
     final maps = _collectMaps(root);
 
     final predictionMap = _findPredictionMap(maps);
@@ -225,7 +239,8 @@ class TwitchPredictionSnapshot {
     }
 
     final predictionId = _readPredictionId(predictionMap);
-    final rawOutcomes = predictionMap['outcomes'] ??
+    final rawOutcomes =
+        predictionMap['outcomes'] ??
         predictionMap['choices'] ??
         predictionMap['predictionOptions'] ??
         predictionMap['prediction_options'];
@@ -236,18 +251,21 @@ class TwitchPredictionSnapshot {
       eventId: predictionId,
     );
     final winningOutcomeId = _readWinningOutcomeId(predictionMap);
-    final viewerOutcomeId = _readViewerOutcomeId(predictionMap) ??
-        viewerPrediction?.outcomeId;
+    final viewerOutcomeId =
+        _readViewerOutcomeId(predictionMap) ?? viewerPrediction?.outcomeId;
 
     final outcomes = rawOutcomes is List
         ? rawOutcomes
-            .whereType<Map>()
-            .map((json) => json.map((key, value) => MapEntry(key.toString(), value)))
-            .map(
-              (json) {
+              .whereType<Map>()
+              .map(
+                (json) =>
+                    json.map((key, value) => MapEntry(key.toString(), value)),
+              )
+              .map((json) {
                 final outcomeId = _readOutcomeId(json);
                 final title = _readString(json['title'] ?? json['name']) ?? '';
-                final isViewerOutcome = viewerOutcomeId != null &&
+                final isViewerOutcome =
+                    viewerOutcomeId != null &&
                     viewerOutcomeId.trim().isNotEmpty &&
                     _matchesIdentity(
                       id: outcomeId,
@@ -259,20 +277,26 @@ class TwitchPredictionSnapshot {
                   json,
                   winningOutcomeId: winningOutcomeId,
                   viewerOutcomeId: viewerOutcomeId,
-                  viewerPointsOverride:
-                      isViewerOutcome ? viewerPrediction?.points : null,
+                  viewerPointsOverride: isViewerOutcome
+                      ? viewerPrediction?.points
+                      : null,
                 );
-              },
-            )
-            .where((outcome) => outcome.id.isNotEmpty || outcome.title.isNotEmpty)
-            .toList(growable: false)
+              })
+              .where(
+                (outcome) => outcome.id.isNotEmpty || outcome.title.isNotEmpty,
+              )
+              .toList(growable: false)
         : const <TwitchPredictionOutcome>[];
 
     return TwitchPredictionSnapshot(
       id: predictionId ?? '',
-      title: _readString(predictionMap['title'] ?? predictionMap['question']) ?? '',
-      status: _readString(predictionMap['status'] ?? predictionMap['state']) ?? '',
-      totalPoints: _readInt(
+      title:
+          _readString(predictionMap['title'] ?? predictionMap['question']) ??
+          '',
+      status:
+          _readString(predictionMap['status'] ?? predictionMap['state']) ?? '',
+      totalPoints:
+          _readInt(
             predictionMap['totalPoints'] ??
                 predictionMap['total_points'] ??
                 predictionMap['totalChannelPoints'] ??
@@ -280,7 +304,8 @@ class TwitchPredictionSnapshot {
                 predictionMap['points'],
           ) ??
           outcomes.fold<int>(0, (sum, item) => sum + item.points),
-      totalUsers: _readInt(
+      totalUsers:
+          _readInt(
             predictionMap['totalUsers'] ??
                 predictionMap['total_users'] ??
                 predictionMap['totalParticipants'] ??
@@ -288,7 +313,9 @@ class TwitchPredictionSnapshot {
                 predictionMap['users'],
           ) ??
           outcomes.fold<int>(0, (sum, item) => sum + item.users),
-      createdAt: _readDate(predictionMap['createdAt'] ?? predictionMap['created_at']),
+      createdAt: _readDate(
+        predictionMap['createdAt'] ?? predictionMap['created_at'],
+      ),
       locksAt: _readDate(
         predictionMap['locksAt'] ??
             predictionMap['locks_at'] ??
@@ -317,13 +344,18 @@ class TwitchPredictionSnapshot {
     if (rawOutcomes is List) {
       for (final rawOutcome in rawOutcomes) {
         if (rawOutcome is! Map) continue;
-        final outcomeId = _readString(rawOutcome['id'] ?? rawOutcome['outcome_id']);
-        final topPredictors = rawOutcome['top_predictors'] ?? rawOutcome['topPredictors'];
+        final outcomeId = _readString(
+          rawOutcome['id'] ?? rawOutcome['outcome_id'],
+        );
+        final topPredictors =
+            rawOutcome['top_predictors'] ?? rawOutcome['topPredictors'];
         if (topPredictors is! List) continue;
 
         for (final predictor in topPredictors) {
           if (predictor is! Map) continue;
-          final userId = _readString(predictor['user_id'] ?? predictor['userId']);
+          final userId = _readString(
+            predictor['user_id'] ?? predictor['userId'],
+          );
           if (userId != viewerId) continue;
           viewerOutcome = outcomeId;
           viewerPoints = _readInt(predictor['points']) ?? viewerPoints;
@@ -332,9 +364,9 @@ class TwitchPredictionSnapshot {
       }
     }
 
-    if (viewerOutcome == null || viewerOutcome!.isEmpty) return this;
+    if (viewerOutcome == null || viewerOutcome.isEmpty) return this;
     return withViewerPrediction(
-      outcomeId: viewerOutcome!,
+      outcomeId: viewerOutcome,
       points: viewerPoints,
       addToExisting: false,
     );
@@ -354,10 +386,10 @@ class TwitchPredictionSnapshot {
     final outcomeId = previousViewerId != null && previousViewerId.isNotEmpty
         ? previousViewerId
         : previousViewer == null
-            ? ''
-            : previousViewer.id.isNotEmpty
-                ? previousViewer.id
-                : previousViewer.title;
+        ? ''
+        : previousViewer.id.isNotEmpty
+        ? previousViewer.id
+        : previousViewer.title;
 
     if (outcomeId.isEmpty) return this;
 
@@ -444,7 +476,8 @@ class TwitchPredictionOutcome {
   }) {
     final id = _readOutcomeId(json);
     final title = _readString(json['title'] ?? json['name']) ?? '';
-    final points = _readInt(
+    final points =
+        _readInt(
           json['points'] ??
               json['totalPoints'] ??
               json['total_points'] ??
@@ -454,7 +487,8 @@ class TwitchPredictionOutcome {
         ) ??
         0;
 
-    final users = _readInt(
+    final users =
+        _readInt(
           json['users'] ??
               json['totalUsers'] ??
               json['total_users'] ??
@@ -463,12 +497,12 @@ class TwitchPredictionOutcome {
         ) ??
         0;
 
-    final viewerPoints = viewerPointsOverride ??
-        _readViewerPointsFromOutcome(json) ??
-        0;
+    final viewerPoints =
+        viewerPointsOverride ?? _readViewerPointsFromOutcome(json) ?? 0;
 
     final viewerId = viewerOutcomeId?.trim();
-    final isViewerChoice = (_readBool(
+    final isViewerChoice =
+        (_readBool(
               json['isViewerChoice'] ??
                   json['viewerChoice'] ??
                   json['isMyChoice'] ??
@@ -481,7 +515,8 @@ class TwitchPredictionOutcome {
         viewerPoints > 0;
 
     final winnerId = winningOutcomeId?.trim();
-    final isWinner = (_readBool(json['winner'] ?? json['isWinner']) ?? false) ||
+    final isWinner =
+        (_readBool(json['winner'] ?? json['isWinner']) ?? false) ||
         (winnerId != null &&
             winnerId.isNotEmpty &&
             _matchesIdentity(id: id, title: title, identity: winnerId));
@@ -529,7 +564,8 @@ Map<String, dynamic> _findPredictionMap(List<Map<String, dynamic>> maps) {
   var bestScore = -1;
 
   for (final map in maps) {
-    final hasOutcomes = map['outcomes'] is List ||
+    final hasOutcomes =
+        map['outcomes'] is List ||
         map['choices'] is List ||
         map['predictionOptions'] is List ||
         map['prediction_options'] is List;
@@ -608,7 +644,8 @@ String? _readWinningOutcomeId(Map<String, dynamic> predictionMap) {
   );
   if (direct != null) return direct;
 
-  final winning = predictionMap['winningOutcome'] ?? predictionMap['winning_outcome'];
+  final winning =
+      predictionMap['winningOutcome'] ?? predictionMap['winning_outcome'];
   if (winning is Map) {
     return _readOutcomeIdFromObject(winning);
   }
@@ -669,10 +706,7 @@ _ViewerPredictionRecord? _readViewerPredictionRecord(
     );
   }
 
-  for (final map in <Map<String, dynamic>>[
-    predictionMap,
-    ...maps,
-  ]) {
+  for (final map in <Map<String, dynamic>>[predictionMap, ...maps]) {
     for (final key in const <String>[
       'viewerPrediction',
       'viewer_prediction',
@@ -763,7 +797,8 @@ _ViewerPredictionRecord? _readViewerPredictionRecordFromObject(
   final map = value.map((key, value) => MapEntry(key.toString(), value));
   final expectedEventId = eventId?.trim();
   if (expectedEventId != null && expectedEventId.isNotEmpty) {
-    final recordEventId = _readString(
+    final recordEventId =
+        _readString(
           map['eventID'] ??
               map['eventId'] ??
               map['event_id'] ??
@@ -786,7 +821,8 @@ _ViewerPredictionRecord? _readViewerPredictionRecordFromObject(
   // actual selected outcome is nested under `outcome.id`. Do not treat the
   // record id as an outcome id, otherwise viewerOutcomeId becomes the user's
   // Prediction id and cannot match either outcome card.
-  final outcomeId = _readOutcomeIdFromObject(map['outcome']) ??
+  final outcomeId =
+      _readOutcomeIdFromObject(map['outcome']) ??
       _readOutcomeIdFromObject(map['choice']) ??
       _readOutcomeIdFromObject(map['selectedOutcome']) ??
       _readOutcomeIdFromObject(map['selected_outcome']) ??

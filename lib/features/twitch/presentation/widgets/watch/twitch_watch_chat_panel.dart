@@ -86,11 +86,14 @@ class TwitchWatchChatPanel extends StatefulWidget {
 class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   static const Duration _closedPredictionAutoHideDelay = Duration(seconds: 15);
   static const Duration _manualPredictionAutoHideDelay = Duration(seconds: 15);
-  static const Duration _initialPredictionSuppressWindow = Duration(seconds: 12);
+  static const Duration _initialPredictionSuppressWindow = Duration(
+    seconds: 12,
+  );
 
   static final Map<String, bool> _showPinnedByChannel = <String, bool>{};
   static final Map<String, bool> _showPredictionByChannel = <String, bool>{};
-  static final Map<String, String> _lastPredictionIdByChannel = <String, String>{};
+  static final Map<String, String> _lastPredictionIdByChannel =
+      <String, String>{};
 
   final TwitchChatAppearanceController _appearanceController =
       TwitchChatAppearanceController();
@@ -123,9 +126,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     _visiblePrediction = _bestPredictionForPanel(widget.prediction);
     _restoreEngagementVisibility();
     _syncClosedPredictionAutoHide(_visiblePrediction);
-    _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream.listen(
-      _handleRealtimePrediction,
-    );
+    _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream
+        .listen(_handleRealtimePrediction);
   }
 
   @override
@@ -175,7 +177,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
   void _handleRealtimePrediction(TwitchPredictionSnapshot? prediction) {
     if (!mounted || prediction == null || !prediction.hasPrediction) return;
-    if (!_shouldAcceptRealtimePrediction(prediction, current: _visiblePrediction)) {
+    if (!_shouldAcceptRealtimePrediction(
+      prediction,
+      current: _visiblePrediction,
+    )) {
       return;
     }
 
@@ -228,9 +233,12 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   }) {
     final id = prediction?.id.trim() ?? '';
     final previousId = lastPredictionId?.trim() ?? '';
-    final shouldAutoHidePrediction = _shouldAutoHidePredictionBanner(prediction);
-    final oldShouldAutoHidePrediction =
-        _shouldAutoHidePredictionBanner(oldPrediction);
+    final shouldAutoHidePrediction = _shouldAutoHidePredictionBanner(
+      prediction,
+    );
+    final oldShouldAutoHidePrediction = _shouldAutoHidePredictionBanner(
+      oldPrediction,
+    );
 
     if (id.isNotEmpty && id != previousId) {
       lastPredictionId = id;
@@ -238,7 +246,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
       if (!_hasObservedPredictionThisSession) {
         _hasObservedPredictionThisSession = true;
-        if (_shouldSuppressFirstPredictionObservation(sourceRealtime: sourceRealtime)) {
+        if (_shouldSuppressFirstPredictionObservation(
+          sourceRealtime: sourceRealtime,
+        )) {
           _setShowPrediction(false, persist: true, rebuild: false);
           _syncClosedPredictionAutoHide(prediction);
           return;
@@ -410,9 +420,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.34),
+        color: Colors.black.withValues(alpha: 0.34),
         border: Border(
-          left: BorderSide(color: Colors.white.withOpacity(0.055)),
+          left: BorderSide(color: Colors.white.withValues(alpha: 0.055)),
         ),
       ),
       child: LayoutBuilder(
@@ -421,14 +431,19 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
             constraints: constraints,
             media: MediaQuery.of(context),
           );
-          final predictionHasData = prediction != null && prediction.hasPrediction;
-          final effectiveShowPinned = showPinned && !metrics.hideOptionalEngagement;
-          final effectiveShowPrediction = showPrediction &&
+          final predictionHasData =
+              prediction != null && prediction.hasPrediction;
+          final effectiveShowPinned =
+              showPinned && !metrics.hideOptionalEngagement;
+          final effectiveShowPrediction =
+              showPrediction &&
               !metrics.hideOptionalEngagement &&
               predictionHasData;
-          final showFloatingEngagement = effectiveShowPinned ||
+          final showFloatingEngagement =
+              effectiveShowPinned ||
               effectiveShowPrediction ||
-              (widget.engagementError != null && widget.engagementError!.isNotEmpty);
+              (widget.engagementError != null &&
+                  widget.engagementError!.isNotEmpty);
           final chatFontScale = _appearanceController.fontScale;
 
           return Column(
@@ -466,12 +481,12 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                         compact: metrics.verticalCompact,
                         onOpenMessageContext: (message) =>
                             showTwitchChatMessageContextSheet(
-                          context: context,
-                          selectedMessage: message,
-                          messages: currentRuntime?.messages ?? const [],
-                          thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                          fontScale: chatFontScale,
-                        ),
+                              context: context,
+                              selectedMessage: message,
+                              messages: currentRuntime?.messages ?? const [],
+                              thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                              fontScale: chatFontScale,
+                            ),
                       ),
                     ),
                     if (showFloatingEngagement)
@@ -483,13 +498,16 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                           maxHeight: metrics.maxUsableEngagementHeight,
                           channelPoints: widget.channelPoints,
                           pinnedMessages: pinned,
-                          prediction: effectiveShowPrediction ? prediction : null,
+                          prediction: effectiveShowPrediction
+                              ? prediction
+                              : null,
                           loading: widget.loadingEngagement,
                           error: widget.engagementError,
                           showPinned: effectiveShowPinned,
                           showPrediction: effectiveShowPrediction,
                           fontScale: chatFontScale,
-                          fallbackProfileImageUrl: widget.fallbackProfileImageUrl,
+                          fallbackProfileImageUrl:
+                              widget.fallbackProfileImageUrl,
                           fallbackDisplayName: widget.fallbackDisplayName,
                           fallbackUserId: widget.fallbackUserId,
                           fallbackLogin: widget.fallbackLogin,
@@ -512,7 +530,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 onOpenChannelPoints: widget.onOpenChannelPoints,
                 onOpenEmotes: widget.onOpenEmotes,
                 onOpenSpecialActions: widget.onOpenSpecialActions,
-                onCancelPendingSpecialMessage: widget.onCancelPendingSpecialMessage,
+                onCancelPendingSpecialMessage:
+                    widget.onCancelPendingSpecialMessage,
                 onSend: widget.onSend,
               ),
             ],

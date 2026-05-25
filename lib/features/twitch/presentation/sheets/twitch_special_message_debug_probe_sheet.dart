@@ -136,7 +136,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.58),
+                            color: Colors.white.withValues(alpha: 0.58),
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
@@ -203,10 +203,10 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                   padding: const EdgeInsets.all(10),
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.10),
+                    color: Colors.redAccent.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: Colors.redAccent.withOpacity(0.22),
+                      color: Colors.redAccent.withValues(alpha: 0.22),
                     ),
                   ),
                   child: Text(
@@ -276,7 +276,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
                 child: Text(
                   'Custom Persisted Query',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.86),
+                    color: Colors.white.withValues(alpha: 0.86),
                     fontSize: 12.5,
                     fontWeight: FontWeight.w900,
                   ),
@@ -296,7 +296,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
             title: Text(
               'Use Android/Drops client',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.78),
+                color: Colors.white.withValues(alpha: 0.78),
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -356,15 +356,15 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
         labelText: label,
         hintText: hint,
         labelStyle: TextStyle(
-          color: Colors.white.withOpacity(0.60),
+          color: Colors.white.withValues(alpha: 0.60),
           fontSize: 11,
         ),
         hintStyle: TextStyle(
-          color: Colors.white.withOpacity(0.28),
+          color: Colors.white.withValues(alpha: 0.28),
           fontSize: 11,
         ),
         filled: true,
-        fillColor: Colors.black.withOpacity(0.22),
+        fillColor: Colors.black.withValues(alpha: 0.22),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: TwitchUiColors.sheet.cardBorder),
@@ -389,7 +389,7 @@ class _TwitchSpecialMessageDebugProbeSheetStage251State
           '按 Run Probe 後會顯示 JSON。\n也可以貼 operationName / sha256Hash / variables 後按 Run Custom 直接測 persisted query。',
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.54),
+            color: Colors.white.withValues(alpha: 0.54),
             fontSize: 12.5,
             height: 1.45,
             fontWeight: FontWeight.w700,

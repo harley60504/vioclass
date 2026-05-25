@@ -49,7 +49,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
             decoration: BoxDecoration(
               color: const Color(0xFF1B1B23),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.075)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.075)),
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),

@@ -27,7 +27,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
   final Widget player;
   final Widget chat;
   final void Function({required double viewportWidth, required double value})
-      onSetChatPanelWidthForViewport;
+  onSetChatPanelWidthForViewport;
   final VoidCallback onPersistChatPanelWidth;
 
   const TwitchWatchResponsiveBody({
@@ -63,7 +63,9 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
           color: _watchBackgroundColor,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+              final layout = TwitchResponsiveLayout.fromConstraints(
+                constraints,
+              );
 
               if (!_enableWatchPlayer) {
                 return _DisabledPlayerLayout(
@@ -100,7 +102,9 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
 
   static EdgeInsets shellPaddingFor(TwitchResponsiveLayout layout) {
     if (layout.isPhonePortrait) return const EdgeInsets.all(8);
-    if (layout.width < 900 || layout.isPhoneLandscape) return const EdgeInsets.all(10);
+    if (layout.width < 900 || layout.isPhoneLandscape) {
+      return const EdgeInsets.all(10);
+    }
     return const EdgeInsets.all(14);
   }
 
@@ -117,7 +121,8 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .toDouble();
     final ratioWidth = usableWidth * chatPanelRatio;
     final minByViewport = usableWidth * minChatPanelRatio;
-    final boostedMinChatPanelWidth = minChatPanelWidth + _chatMinWidthVisualBoost;
+    final boostedMinChatPanelWidth =
+        minChatPanelWidth + _chatMinWidthVisualBoost;
     final boostedMaxEffectiveMinChatPanelWidth =
         maxEffectiveMinChatPanelWidth + _chatMinWidthVisualBoost;
     final minWidth = minByViewport
@@ -190,8 +195,9 @@ class _BottomChatLayout extends StatelessWidget {
         (availableWidth / TwitchWatchResponsiveBody._playerAspectRatio)
             .clamp(150.0, 320.0)
             .toDouble();
-    final maxPlayerHeightWithChat =
-        (availableHeight - 430.0).clamp(140.0, 320.0).toDouble();
+    final maxPlayerHeightWithChat = (availableHeight - 430.0)
+        .clamp(140.0, 320.0)
+        .toDouble();
     final playerHeight = preferredPlayerHeight
         .clamp(140.0, maxPlayerHeightWithChat)
         .toDouble();
@@ -209,10 +215,7 @@ class _BottomChatLayout extends StatelessWidget {
           else
             Expanded(child: _WatchSurface(child: player)),
           if (chatVisible) SizedBox(height: shellGap),
-          if (chatVisible)
-            Expanded(
-              child: _WatchSurface(child: chat),
-            ),
+          if (chatVisible) Expanded(child: _WatchSurface(child: chat)),
         ],
       ),
     );
@@ -226,7 +229,7 @@ class _SideChatLayout extends StatelessWidget {
   final Widget player;
   final Widget chat;
   final void Function({required double viewportWidth, required double value})
-      onSetChatPanelWidthForViewport;
+  onSetChatPanelWidthForViewport;
   final VoidCallback onPersistChatPanelWidth;
 
   const _SideChatLayout({
@@ -298,8 +301,8 @@ class _WatchSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.12),
-        border: Border.all(color: Colors.white.withOpacity(0.045)),
+        color: Colors.black.withValues(alpha: 0.12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.045)),
       ),
       child: child,
     );

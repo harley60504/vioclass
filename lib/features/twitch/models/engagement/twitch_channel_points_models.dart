@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element
+
 /// Channel Points data models and reward-normalization helpers.
 ///
 /// Keep Twitch response parsing that belongs to an individual reward here.
@@ -102,6 +104,7 @@ class TwitchChannelReward {
   final String id;
   final String title;
   final String prompt;
+
   /// UI display cost. This is what the Twitch rewards panel shows.
   final int cost;
 
@@ -241,9 +244,7 @@ class TwitchChannelReward {
     return type == null || type.isEmpty || type == 'CUSTOM';
   }
 
-  String? statusText({
-    int? balance,
-  }) {
+  String? statusText({int? balance}) {
     if (!isEnabled) return 'Disabled';
     if (isPaused) return 'Paused';
     if (!isInStock) return 'Out of stock';
@@ -307,37 +308,35 @@ class TwitchChannelReward {
     Map<String, dynamic> json, {
     required String source,
   }) {
-    final rewardType = _readString(json, const <String>['type']) ??
+    final rewardType =
+        _readString(json, const <String>['type']) ??
         _readString(json, const <String>['rewardType']);
     final pricingType =
         _readString(json, const <String>['pricingType']) ?? 'CHANNEL_POINTS';
 
-    final title = _readString(json, const <String>['title']) ??
+    final title =
+        _readString(json, const <String>['title']) ??
         _readString(json, const <String>['name']) ??
         _titleFromRewardType(rewardType) ??
         'Reward';
 
-    final cost = _resolveRewardCost(
-      json,
-      source: source,
-    );
+    final cost = _resolveRewardCost(json, source: source);
 
-    final serializedRedeemCost = _readInt(json, const <String>['redeemCost']) ??
+    final serializedRedeemCost =
+        _readInt(json, const <String>['redeemCost']) ??
         _readInt(json, const <String>['redeem_cost']);
     final redeemCost = serializedRedeemCost != null && serializedRedeemCost > 0
         ? serializedRedeemCost
-        : _resolveRewardRedeemCost(
-            json,
-            source: source,
-            displayCost: cost,
-          );
+        : _resolveRewardRedeemCost(json, source: source, displayCost: cost);
 
-    final customImageUrl = _readRewardImageUrl(
+    final customImageUrl =
+        _readRewardImageUrl(
           json,
           rootKeys: const <String>['image', 'customImage', 'custom_image'],
         ) ??
         '';
-    final defaultImageUrl = _readRewardImageUrl(
+    final defaultImageUrl =
+        _readRewardImageUrl(
           json,
           rootKeys: const <String>[
             'defaultImage',
@@ -350,28 +349,32 @@ class TwitchChannelReward {
     final imageUrl = customImageUrl.isNotEmpty
         ? customImageUrl
         : defaultImageUrl.isNotEmpty
-            ? defaultImageUrl
-            : (_readString(json, const <String>['imageUrl']) ??
-                    _readString(json, const <String>['image_url']) ??
-                    _findImageUrl(json) ??
-                    '');
+        ? defaultImageUrl
+        : (_readString(json, const <String>['imageUrl']) ??
+              _readString(json, const <String>['image_url']) ??
+              _findImageUrl(json) ??
+              '');
 
     final backgroundColor =
         _readString(json, const <String>['backgroundColor']) ??
-            _readString(json, const <String>['defaultBackgroundColor']) ??
-            '#9147FF';
+        _readString(json, const <String>['defaultBackgroundColor']) ??
+        '#9147FF';
 
-    final maxPerStreamSetting =
-        _readMap(json, const <String>['maxPerStreamSetting']);
-    final maxPerUserPerStreamSetting =
-        _readMap(json, const <String>['maxPerUserPerStreamSetting']);
-    final globalCooldownSetting =
-        _readMap(json, const <String>['globalCooldownSetting']);
+    final maxPerStreamSetting = _readMap(json, const <String>[
+      'maxPerStreamSetting',
+    ]);
+    final maxPerUserPerStreamSetting = _readMap(json, const <String>[
+      'maxPerUserPerStreamSetting',
+    ]);
+    final globalCooldownSetting = _readMap(json, const <String>[
+      'globalCooldownSetting',
+    ]);
 
     return TwitchChannelReward(
       id: _readString(json, const <String>['id']) ?? '',
       title: title,
-      prompt: _readString(json, const <String>['prompt']) ??
+      prompt:
+          _readString(json, const <String>['prompt']) ??
           _readString(json, const <String>['description']) ??
           '',
       cost: cost,
@@ -385,31 +388,26 @@ class TwitchChannelReward {
       isInStock: _readBool(json, const <String>['isInStock']) ?? true,
       isUserInputRequired:
           (_readBool(json, const <String>['isUserInputRequired']) ?? false) ||
-              rewardType == 'SEND_HIGHLIGHTED_MESSAGE' ||
-              rewardType == 'SINGLE_MESSAGE_BYPASS_SUB_MODE',
-      cooldownExpiresAt:
-          _readString(json, const <String>['cooldownExpiresAt']),
+          rewardType == 'SEND_HIGHLIGHTED_MESSAGE' ||
+          rewardType == 'SINGLE_MESSAGE_BYPASS_SUB_MODE',
+      cooldownExpiresAt: _readString(json, const <String>['cooldownExpiresAt']),
       maxPerStream:
           _readBool(maxPerStreamSetting, const <String>['isEnabled']) == true
-              ? _readInt(maxPerStreamSetting, const <String>['maxPerStream'])
-              : null,
-      maxPerUserPerStream: _readBool(
-                maxPerUserPerStreamSetting,
-                const <String>['isEnabled'],
-              ) ==
+          ? _readInt(maxPerStreamSetting, const <String>['maxPerStream'])
+          : null,
+      maxPerUserPerStream:
+          _readBool(maxPerUserPerStreamSetting, const <String>['isEnabled']) ==
               true
-          ? _readInt(
-              maxPerUserPerStreamSetting,
-              const <String>['maxPerUserPerStream'],
-            )
+          ? _readInt(maxPerUserPerStreamSetting, const <String>[
+              'maxPerUserPerStream',
+            ])
           : null,
       globalCooldownSeconds:
           _readBool(globalCooldownSetting, const <String>['isEnabled']) == true
-              ? _readInt(
-                  globalCooldownSetting,
-                  const <String>['globalCooldownSeconds'],
-                )
-              : _readInt(json, const <String>['globalCooldownSeconds']),
+          ? _readInt(globalCooldownSetting, const <String>[
+              'globalCooldownSeconds',
+            ])
+          : _readInt(json, const <String>['globalCooldownSeconds']),
       source: source,
       rewardType: rewardType,
       pricingType: pricingType,
@@ -440,18 +438,17 @@ class TwitchChannelRewardRedeemResult {
   }
 }
 
-int _resolveRewardCost(
-  Map<String, dynamic> json, {
-  required String source,
-}) {
+int _resolveRewardCost(Map<String, dynamic> json, {required String source}) {
   final lowerSource = source.trim().toLowerCase();
 
   final cost = _readInt(json, const <String>['cost']);
-  final minimumCost = _readInt(json, const <String>['minimumCost']) ??
+  final minimumCost =
+      _readInt(json, const <String>['minimumCost']) ??
       _readInt(json, const <String>['minimum_cost']) ??
       _readInt(json, const <String>['minCost']) ??
       _readInt(json, const <String>['min_cost']);
-  final defaultCost = _readInt(json, const <String>['defaultCost']) ??
+  final defaultCost =
+      _readInt(json, const <String>['defaultCost']) ??
       _readInt(json, const <String>['default_cost']) ??
       _readInt(json, const <String>['defaultPrice']) ??
       _readInt(json, const <String>['default_price']);
@@ -480,11 +477,13 @@ int _resolveRewardRedeemCost(
   final lowerSource = source.trim().toLowerCase();
 
   final cost = _readInt(json, const <String>['cost']);
-  final minimumCost = _readInt(json, const <String>['minimumCost']) ??
+  final minimumCost =
+      _readInt(json, const <String>['minimumCost']) ??
       _readInt(json, const <String>['minimum_cost']) ??
       _readInt(json, const <String>['minCost']) ??
       _readInt(json, const <String>['min_cost']);
-  final defaultCost = _readInt(json, const <String>['defaultCost']) ??
+  final defaultCost =
+      _readInt(json, const <String>['defaultCost']) ??
       _readInt(json, const <String>['default_cost']) ??
       _readInt(json, const <String>['defaultPrice']) ??
       _readInt(json, const <String>['default_price']);
@@ -507,10 +506,7 @@ int _resolveRewardRedeemCost(
   return 0;
 }
 
-int? _firstPositiveInt(
-  Map<String, dynamic> json,
-  List<List<String>> paths,
-) {
+int? _firstPositiveInt(Map<String, dynamic> json, List<List<String>> paths) {
   for (final path in paths) {
     final value = _readInt(json, path);
     if (value != null && value > 0) return value;
@@ -604,9 +600,7 @@ bool? _readBool(Object? root, List<String> path) {
 Map<String, dynamic>? _asStringMap(Object? value) {
   if (value is Map<String, dynamic>) return value;
   if (value is Map) {
-    return value.map(
-      (key, value) => MapEntry(key.toString(), value),
-    );
+    return value.map((key, value) => MapEntry(key.toString(), value));
   }
   return null;
 }

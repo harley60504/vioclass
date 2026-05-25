@@ -34,8 +34,9 @@ bool isChannelPointRewardAvailable(
   if (readChannelPointBool(reward['isPaused'])) return false;
   if (!readChannelPointBool(reward['isInStock'], fallback: true)) return false;
   if (_isCoolingDown(reward)) return false;
-  if (balance != null && balance < readChannelPointInt(reward['cost']))
+  if (balance != null && balance < readChannelPointInt(reward['cost'])) {
     return false;
+  }
 
   return true;
 }
@@ -44,17 +45,20 @@ String? channelPointRewardStatusText(
   Map<String, dynamic> reward, {
   required int? balance,
 }) {
-  if (!readChannelPointBool(reward['isEnabled'], fallback: true))
+  if (!readChannelPointBool(reward['isEnabled'], fallback: true)) {
     return 'Disabled';
+  }
   if (readChannelPointBool(reward['isPaused'])) return 'Paused';
-  if (!readChannelPointBool(reward['isInStock'], fallback: true))
+  if (!readChannelPointBool(reward['isInStock'], fallback: true)) {
     return 'Out of stock';
+  }
 
   final cooldown = _cooldownText(reward);
   if (cooldown != null) return cooldown;
 
-  if (balance != null && balance < readChannelPointInt(reward['cost']))
+  if (balance != null && balance < readChannelPointInt(reward['cost'])) {
     return '點數不足';
+  }
   if (readChannelPointBool(reward['isUserInputRequired'])) return '需要輸入';
   if (requiresChannelPointMessageInput(reward)) return '需要訊息';
   if (requiresChannelPointModifiedEmoteSelection(reward)) return '需要貼圖與效果';

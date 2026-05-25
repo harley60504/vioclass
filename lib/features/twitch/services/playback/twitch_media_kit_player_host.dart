@@ -72,7 +72,9 @@ class TwitchMediaKitPlayerHost {
       await _creatingPlayer;
       final created = _player;
       if (created == null) {
-        throw StateError('media_kit Player creation completed without a Player.');
+        throw StateError(
+          'media_kit Player creation completed without a Player.',
+        );
       }
       return created;
     }
@@ -242,15 +244,15 @@ class TwitchMediaKitPlayerSession {
     required String title,
     required Player player,
     required int generation,
-  })  : _title = title,
-        _player = player,
-        _generation = generation;
+  }) : _title = title,
+       _player = player,
+       _generation = generation;
 
   TwitchMediaKitPlayerSession._lazy({
     required String title,
     required int generation,
-  })  : _title = title,
-        _generation = generation;
+  }) : _title = title,
+       _generation = generation;
 
   Player? get playerOrNull => _player ?? TwitchMediaKitPlayerHost.playerOrNull;
 
@@ -259,7 +261,9 @@ class TwitchMediaKitPlayerSession {
   Player get player {
     final value = playerOrNull;
     if (value == null) {
-      throw StateError('TwitchMediaKitPlayerSession is not ready. Call ensureReady() first.');
+      throw StateError(
+        'TwitchMediaKitPlayerSession is not ready. Call ensureReady() first.',
+      );
     }
     return value;
   }
@@ -267,7 +271,9 @@ class TwitchMediaKitPlayerSession {
   VideoController get videoController {
     final value = videoControllerOrNull;
     if (value == null) {
-      throw StateError('TwitchMediaKitPlayerSession video surface is not ready. Call ensureReady() first.');
+      throw StateError(
+        'TwitchMediaKitPlayerSession video surface is not ready. Call ensureReady() first.',
+      );
     }
     return value;
   }
@@ -277,14 +283,17 @@ class TwitchMediaKitPlayerSession {
   String? get currentMediaUri => TwitchMediaKitPlayerHost.currentMediaUri;
 
   Future<void> ensureReady() async {
-    final hostPlayer = await TwitchMediaKitPlayerHost._ensurePlayerCreated(_title);
+    final hostPlayer = await TwitchMediaKitPlayerHost._ensurePlayerCreated(
+      _title,
+    );
     if (_released) return;
 
     _player = hostPlayer;
     _generation = TwitchMediaKitPlayerHost._generation;
 
     if (!_recreateVideoControllerPerWatchSession) {
-      _videoController ??= await TwitchMediaKitPlayerHost._createVideoController(hostPlayer);
+      _videoController ??=
+          await TwitchMediaKitPlayerHost._createVideoController(hostPlayer);
       return;
     }
 
@@ -295,7 +304,9 @@ class TwitchMediaKitPlayerSession {
     }
 
     _creatingVideoController = () async {
-      final controller = await TwitchMediaKitPlayerHost._createVideoController(hostPlayer);
+      final controller = await TwitchMediaKitPlayerHost._createVideoController(
+        hostPlayer,
+      );
       if (_released) return;
       _videoController = controller;
     }();

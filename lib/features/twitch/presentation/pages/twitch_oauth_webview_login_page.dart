@@ -27,9 +27,7 @@ import 'twitch_interaction_web_login_page.dart';
 /// - The same auth container captures official Twitch Web / kimne GQL token
 ///   after the main OAuth token is saved, so one-click login does not open
 ///   a separate Web/GQL step.
-enum TwitchOAuthWebViewTokenTarget {
-  main,
-}
+enum TwitchOAuthWebViewTokenTarget { main }
 
 class TwitchOAuthWebViewLoginPage extends StatefulWidget {
   final TwitchOAuthWebViewTokenTarget target;
@@ -114,7 +112,9 @@ class _TwitchOAuthWebViewLoginPageState
 
   String get _redirectUri {
     final text = _redirectUriController.text.trim();
-    return text.isNotEmpty ? text : TwitchOAuthWebViewLoginPage.legacyRedirectUri;
+    return text.isNotEmpty
+        ? text
+        : TwitchOAuthWebViewLoginPage.legacyRedirectUri;
   }
 
   List<String> get _scopes {
@@ -170,7 +170,8 @@ class _TwitchOAuthWebViewLoginPageState
   }
 
   static String sharedDesktopWebViewUserDataFolder() {
-    final path = '${Directory.systemTemp.path}${Platform.pathSeparator}'
+    final path =
+        '${Directory.systemTemp.path}${Platform.pathSeparator}'
         'new_twitch_app_shared_twitch_desktop_webview_v30';
     try {
       Directory(path).createSync(recursive: true);
@@ -200,20 +201,22 @@ class _TwitchOAuthWebViewLoginPageState
   bool _isRedirectUri(Uri uri) {
     final configured = Uri.tryParse(_redirectUri);
     if (configured != null) {
-      final sameScheme = uri.scheme.toLowerCase() == configured.scheme.toLowerCase();
+      final sameScheme =
+          uri.scheme.toLowerCase() == configured.scheme.toLowerCase();
       final sameHost = uri.host.toLowerCase() == configured.host.toLowerCase();
       final samePort = uri.hasPort
           ? uri.port == configured.port
           : configured.hasPort
-              ? false
-              : true;
+          ? false
+          : true;
       if (sameScheme && sameHost && samePort) return true;
     }
 
     final host = uri.host.toLowerCase();
     if (host != 'localhost' && host != '127.0.0.1') return false;
     final isHttpLocalhost3000 = uri.scheme == 'http' && uri.port == 3000;
-    final isHttpsLocalhostDefault = uri.scheme == 'https' && (!uri.hasPort || uri.port == 443);
+    final isHttpsLocalhostDefault =
+        uri.scheme == 'https' && (!uri.hasPort || uri.port == 443);
     return isHttpLocalhost3000 || isHttpsLocalhostDefault;
   }
 
@@ -234,14 +237,18 @@ class _TwitchOAuthWebViewLoginPageState
     if (error != null && error.isNotEmpty) {
       if (!mounted) return;
       setState(() {
-        _errorText = errorDescription?.isNotEmpty == true ? '$error：$errorDescription' : error;
+        _errorText = errorDescription?.isNotEmpty == true
+            ? '$error：$errorDescription'
+            : error;
         _statusText = 'Twitch OAuth 授權失敗。';
       });
       return;
     }
 
     final returnedState = params['state'];
-    if (returnedState == null || returnedState.isEmpty || returnedState != _state) {
+    if (returnedState == null ||
+        returnedState.isEmpty ||
+        returnedState != _state) {
       if (!mounted) return;
       setState(() {
         _errorText = 'OAuth state 不一致，已阻擋這次回傳。';
@@ -295,11 +302,15 @@ class _TwitchOAuthWebViewLoginPageState
       );
 
       await widget.mainAuthService.saveSession(
-        clientId: validation.clientId.trim().isNotEmpty ? validation.clientId.trim() : _clientId,
+        clientId: validation.clientId.trim().isNotEmpty
+            ? validation.clientId.trim()
+            : _clientId,
         token: token,
       );
 
-      if (_isMain && widget.mirrorMainTokenToInteraction && widget.interactionAuthService != null) {
+      if (_isMain &&
+          widget.mirrorMainTokenToInteraction &&
+          widget.interactionAuthService != null) {
         await widget.interactionAuthService!.setDropsClientId(
           TwitchApiConstants.twitchWebClientId,
           clearTokenOnChange: false,
@@ -358,7 +369,9 @@ class _TwitchOAuthWebViewLoginPageState
       try {
         webToken = _isDesktopAuthWindowPlatform
             ? await _readTwitchWebAuthTokenFromWindow(window)
-            : await _readTwitchWebAuthTokenFromEmbeddedWebView(embeddedController!);
+            : await _readTwitchWebAuthTokenFromEmbeddedWebView(
+                embeddedController!,
+              );
       } catch (_) {
         webToken = null;
       }
@@ -429,7 +442,6 @@ class _TwitchOAuthWebViewLoginPageState
     return _tryExtractTokenFromText(raw?.toString() ?? '');
   }
 
-
   Future<String?> _readTwitchWebAuthTokenFromEmbeddedWebView(
     InAppWebViewController controller,
   ) async {
@@ -475,10 +487,22 @@ class _TwitchOAuthWebViewLoginPageState
     }
 
     final patterns = <RegExp>[
-      RegExp(r'''["']auth-token["']\s*[:=]\s*["']([^"']+)["']''', caseSensitive: false),
-      RegExp(r'''["']authToken["']\s*[:=]\s*["']([^"']+)["']''', caseSensitive: false),
-      RegExp(r'''["']accessToken["']\s*[:=]\s*["']([^"']+)["']''', caseSensitive: false),
-      RegExp(r'''["']token["']\s*[:=]\s*["']([^"']{20,})["']''', caseSensitive: false),
+      RegExp(
+        r'''["']auth-token["']\s*[:=]\s*["']([^"']+)["']''',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'''["']authToken["']\s*[:=]\s*["']([^"']+)["']''',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'''["']accessToken["']\s*[:=]\s*["']([^"']+)["']''',
+        caseSensitive: false,
+      ),
+      RegExp(
+        r'''["']token["']\s*[:=]\s*["']([^"']{20,})["']''',
+        caseSensitive: false,
+      ),
     ];
 
     for (final pattern in patterns) {
@@ -500,7 +524,10 @@ class _TwitchOAuthWebViewLoginPageState
       for (final entry in value.entries) {
         final key = entry.key.toString().toLowerCase();
         final item = entry.value;
-        if ((key == 'auth-token' || key == 'authtoken' || key == 'accesstoken' || key == 'token') &&
+        if ((key == 'auth-token' ||
+                key == 'authtoken' ||
+                key == 'accesstoken' ||
+                key == 'token') &&
             item is String &&
             item.trim().length >= 20) {
           return item.trim();
@@ -557,15 +584,21 @@ query ChannelPointsContext($channelLogin: String!) {
 
     if (raw is! Map) throw StateError('GQL 回傳格式不是 Map：${raw.runtimeType}');
     final errors = raw['errors'];
-    if (errors is List && errors.isNotEmpty) throw StateError('GQL errors: $errors');
+    if (errors is List && errors.isNotEmpty) {
+      throw StateError('GQL errors: $errors');
+    }
     final data = raw['data'];
-    if (data is! Map || data['user'] == null) throw StateError('GQL 沒有回傳 data.user。');
+    if (data is! Map || data['user'] == null) {
+      throw StateError('GQL 沒有回傳 data.user。');
+    }
   }
 
   Map<String, String> _parseOAuthResponse(Uri uri) {
     final output = <String, String>{};
     if (uri.query.isNotEmpty) output.addAll(Uri.splitQueryString(uri.query));
-    if (uri.fragment.isNotEmpty) output.addAll(Uri.splitQueryString(uri.fragment));
+    if (uri.fragment.isNotEmpty) {
+      output.addAll(Uri.splitQueryString(uri.fragment));
+    }
     return output;
   }
 
@@ -702,9 +735,9 @@ query ChannelPointsContext($channelLogin: String!) {
     final uri = _buildAuthorizationUri();
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已複製 Twitch OAuth 連結')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已複製 Twitch OAuth 連結')));
   }
 
   Future<void> _tryManualInput() async {
@@ -717,7 +750,11 @@ query ChannelPointsContext($channelLogin: String!) {
       if (handled) return;
     }
 
-    await _saveAccessToken(accessToken: text, expiresIn: 14400, scopes: _scopes);
+    await _saveAccessToken(
+      accessToken: text,
+      expiresIn: 14400,
+      scopes: _scopes,
+    );
   }
 
   Future<void> _pasteAndTry() async {
@@ -740,7 +777,9 @@ query ChannelPointsContext($channelLogin: String!) {
         actions: [
           IconButton(
             tooltip: '關閉',
-            onPressed: _isCompleting ? null : () => Navigator.of(context).pop(false),
+            onPressed: _isCompleting
+                ? null
+                : () => Navigator.of(context).pop(false),
             icon: const Icon(Icons.close_rounded),
           ),
         ],
@@ -751,7 +790,11 @@ query ChannelPointsContext($channelLogin: String!) {
           if (_errorText != null) _buildErrorBanner(),
           if (_showAdvanced) _buildAdvancedPanel(),
           if (!_useEmbeddedMobileWebView) _buildActionBar(busy),
-          Expanded(child: _useEmbeddedMobileWebView ? _buildEmbeddedOAuthWebView() : _buildMainPanel(busy)),
+          Expanded(
+            child: _useEmbeddedMobileWebView
+                ? _buildEmbeddedOAuthWebView()
+                : _buildMainPanel(busy),
+          ),
           _buildBottomStatus(),
         ],
       ),
@@ -766,7 +809,9 @@ query ChannelPointsContext($channelLogin: String!) {
       child: Row(
         children: [
           Icon(
-            _windowOpen ? Icons.open_in_new_rounded : Icons.web_asset_off_rounded,
+            _windowOpen
+                ? Icons.open_in_new_rounded
+                : Icons.web_asset_off_rounded,
             color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white54,
           ),
           const SizedBox(width: 10),
@@ -775,11 +820,22 @@ query ChannelPointsContext($channelLogin: String!) {
               _statusText,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           if (_openingWindow || _isCompleting || _capturingGql)
-            const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFBF94FF))),
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFBF94FF),
+              ),
+            ),
         ],
       ),
     );
@@ -789,27 +845,53 @@ query ChannelPointsContext($channelLogin: String!) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: Colors.redAccent.withOpacity(0.18),
-      child: Text(_errorText!, style: const TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.w800)),
+      color: Colors.redAccent.withValues(alpha: 0.18),
+      child: Text(
+        _errorText!,
+        style: const TextStyle(
+          color: Colors.orangeAccent,
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 
   Widget _buildActionBar(bool busy) {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: const BoxDecoration(color: Color(0xFF0E0E10), border: Border(bottom: BorderSide(color: Color(0xFF2D2D35)))),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0E0E10),
+        border: Border(bottom: BorderSide(color: Color(0xFF2D2D35))),
+      ),
       child: Row(
         children: [
-          OutlinedButton.icon(onPressed: busy ? null : _reloadOAuth, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('重新開 OAuth')),
+          OutlinedButton.icon(
+            onPressed: busy ? null : _reloadOAuth,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('重新開 OAuth'),
+          ),
           const SizedBox(width: 8),
-          OutlinedButton.icon(onPressed: busy ? null : () => setState(() => _showAdvanced = !_showAdvanced), icon: const Icon(Icons.tune_rounded, size: 18), label: const Text('進階')),
+          OutlinedButton.icon(
+            onPressed: busy
+                ? null
+                : () => setState(() => _showAdvanced = !_showAdvanced),
+            icon: const Icon(Icons.tune_rounded, size: 18),
+            label: const Text('進階'),
+          ),
           const SizedBox(width: 8),
-          OutlinedButton.icon(onPressed: _copyAuthorizationUrl, icon: const Icon(Icons.copy_rounded, size: 18), label: const Text('複製 OAuth URL')),
+          OutlinedButton.icon(
+            onPressed: _copyAuthorizationUrl,
+            icon: const Icon(Icons.copy_rounded, size: 18),
+            label: const Text('複製 OAuth URL'),
+          ),
           const Spacer(),
           Flexible(
             child: Text(
               _useEmbeddedMobileWebView
-                  ? (_embeddedWebViewReady ? 'App 內 OAuth 頁已載入' : '等待 App 內 OAuth 頁...')
+                  ? (_embeddedWebViewReady
+                        ? 'App 內 OAuth 頁已載入'
+                        : '等待 App 內 OAuth 頁...')
                   : (_windowOpen ? 'desktop_webview_window 已開啟' : '等待授權視窗...'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -820,7 +902,6 @@ query ChannelPointsContext($channelLogin: String!) {
       ),
     );
   }
-
 
   Widget _buildEmbeddedOAuthWebView() {
     final url = _currentUrlText.trim().isEmpty
@@ -913,23 +994,36 @@ query ChannelPointsContext($channelLogin: String!) {
         decoration: BoxDecoration(
           color: const Color(0xFF111116),
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(_windowOpen ? Icons.login_rounded : Icons.login_outlined,
-                color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white38,
-                size: 58),
+            Icon(
+              _windowOpen ? Icons.login_rounded : Icons.login_outlined,
+              color: _windowOpen ? const Color(0xFF5CFFB1) : Colors.white38,
+              size: 58,
+            ),
             const SizedBox(height: 14),
-            const Text('主 OAuth token', style: TextStyle(color: Colors.white, fontSize: 21, fontWeight: FontWeight.w900)),
+            const Text(
+              '主 OAuth token',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 21,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               _shouldCaptureGql
                   ? '這一步會在同一個授權容器內完成主 OAuth，接著切回 Twitch 官方頁讀取 Web/GQL token，不再另外跳一次 Web/GQL。'
                   : '這一步會完成你的 App OAuth，OAuth redirect 到 localhost 時會直接攔截 access_token。',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, height: 1.4, fontWeight: FontWeight.w700),
+              style: const TextStyle(
+                color: Colors.white60,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 18),
             Wrap(
@@ -938,7 +1032,8 @@ query ChannelPointsContext($channelLogin: String!) {
               alignment: WrapAlignment.center,
               children: [
                 _StatusChip(done: _mainTokenSaved, label: '主 OAuth'),
-                if (_shouldCaptureGql) _StatusChip(done: _webGqlCaptured, label: '官方 Web/GQL'),
+                if (_shouldCaptureGql)
+                  _StatusChip(done: _webGqlCaptured, label: '官方 Web/GQL'),
               ],
             ),
             const SizedBox(height: 18),
@@ -946,13 +1041,22 @@ query ChannelPointsContext($channelLogin: String!) {
               onPressed: busy ? null : _reloadOAuth,
               icon: const Icon(Icons.open_in_new_rounded),
               label: Text(_windowOpen ? '重開 OAuth 視窗' : '開啟 OAuth 視窗'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF9146FF), foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF9146FF),
+                foregroundColor: Colors.white,
+              ),
             ),
             const SizedBox(height: 14),
-            SelectableText(_currentUrlText,
-                maxLines: 3,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white30, fontSize: 11, fontFamily: 'monospace')),
+            SelectableText(
+              _currentUrlText,
+              maxLines: 3,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white30,
+                fontSize: 11,
+                fontFamily: 'monospace',
+              ),
+            ),
           ],
         ),
       ),
@@ -971,7 +1075,11 @@ query ChannelPointsContext($channelLogin: String!) {
                 child: TextField(
                   controller: _clientIdController,
                   enabled: !_isCompleting,
-                  decoration: const InputDecoration(isDense: true, labelText: 'Client-ID', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'Client-ID',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -979,11 +1087,18 @@ query ChannelPointsContext($channelLogin: String!) {
                 child: TextField(
                   controller: _redirectUriController,
                   enabled: !_isCompleting,
-                  decoration: const InputDecoration(isDense: true, labelText: 'Redirect URI', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'Redirect URI',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
-              ElevatedButton(onPressed: _isCompleting ? null : _reloadOAuth, child: const Text('套用')),
+              ElevatedButton(
+                onPressed: _isCompleting ? null : _reloadOAuth,
+                child: const Text('套用'),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -995,13 +1110,24 @@ query ChannelPointsContext($channelLogin: String!) {
                   enabled: !_isCompleting,
                   minLines: 1,
                   maxLines: 3,
-                  decoration: const InputDecoration(isDense: true, labelText: 'redirect URL 或 access token', border: OutlineInputBorder()),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'redirect URL 或 access token',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
-              OutlinedButton.icon(onPressed: _isCompleting ? null : _pasteAndTry, icon: const Icon(Icons.content_paste), label: const Text('貼上')),
+              OutlinedButton.icon(
+                onPressed: _isCompleting ? null : _pasteAndTry,
+                icon: const Icon(Icons.content_paste),
+                label: const Text('貼上'),
+              ),
               const SizedBox(width: 8),
-              ElevatedButton(onPressed: _isCompleting ? null : _tryManualInput, child: const Text('保存')),
+              ElevatedButton(
+                onPressed: _isCompleting ? null : _tryManualInput,
+                child: const Text('保存'),
+              ),
             ],
           ),
         ],
@@ -1013,11 +1139,16 @@ query ChannelPointsContext($channelLogin: String!) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-      decoration: const BoxDecoration(color: Color(0xFF0E0E10), border: Border(top: BorderSide(color: Color(0xFF2A2A2E)))),
-      child: Text(_currentUrlText,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: Colors.white38, fontSize: 11)),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0E0E10),
+        border: Border(top: BorderSide(color: Color(0xFF2A2A2E))),
+      ),
+      child: Text(
+        _currentUrlText,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: Colors.white38, fontSize: 11),
+      ),
     );
   }
 }
@@ -1026,26 +1157,42 @@ class _StatusChip extends StatelessWidget {
   final bool done;
   final String label;
 
-  const _StatusChip({
-    required this.done,
-    required this.label,
-  });
+  const _StatusChip({required this.done, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: done ? Colors.greenAccent.withOpacity(0.14) : Colors.white.withOpacity(0.06),
+        color: done
+            ? Colors.greenAccent.withValues(alpha: 0.14)
+            : Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: done ? Colors.greenAccent.withOpacity(0.42) : Colors.white.withOpacity(0.10)),
+        border: Border.all(
+          color: done
+              ? Colors.greenAccent.withValues(alpha: 0.42)
+              : Colors.white.withValues(alpha: 0.10),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 15, color: done ? Colors.greenAccent : Colors.white54),
+          Icon(
+            done
+                ? Icons.check_circle_rounded
+                : Icons.radio_button_unchecked_rounded,
+            size: 15,
+            color: done ? Colors.greenAccent : Colors.white54,
+          ),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: done ? Colors.greenAccent : Colors.white54, fontSize: 12, fontWeight: FontWeight.w900)),
+          Text(
+            label,
+            style: TextStyle(
+              color: done ? Colors.greenAccent : Colors.white54,
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );

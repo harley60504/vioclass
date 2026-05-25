@@ -1,4 +1,6 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member
 
 extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
   Future<void> _loadWatchPreferences() async {
@@ -20,7 +22,8 @@ extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
                   _volume)
               .clamp(0.0, 100.0)
               .toDouble();
-      final savedMuted = prefs.getBool(_playerMutedPreferenceKey) ??
+      final savedMuted =
+          prefs.getBool(_playerMutedPreferenceKey) ??
           prefs.getBool(_legacyPlayerMutedPreferenceKey) ??
           false;
       final savedChatVisible =
@@ -71,8 +74,8 @@ extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
     final nextVolume = nextMuted
         ? 0.0
         : (_volume > 0.0 ? _volume : _lastNonZeroVolume)
-            .clamp(1.0, 100.0)
-            .toDouble();
+              .clamp(1.0, 100.0)
+              .toDouble();
     setState(() {
       _isMuted = nextMuted;
       if (!nextMuted) {
@@ -100,9 +103,12 @@ extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
 
   void _scheduleVolumePreferenceSave() {
     _volumePreferenceSaveDebounce?.cancel();
-    _volumePreferenceSaveDebounce = Timer(const Duration(milliseconds: 350), () {
-      unawaited(_saveVolumePreference());
-    });
+    _volumePreferenceSaveDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () {
+        unawaited(_saveVolumePreference());
+      },
+    );
   }
 
   Future<void> _saveVolumePreference() async {
@@ -132,11 +138,15 @@ extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(
         _chatPanelWidthPreferenceKey,
-        _chatPanelWidth.clamp(_minChatPanelWidth, _maxChatPanelWidth).toDouble(),
+        _chatPanelWidth
+            .clamp(_minChatPanelWidth, _maxChatPanelWidth)
+            .toDouble(),
       );
       await prefs.setDouble(
         _chatPanelRatioPreferenceKey,
-        _chatPanelRatio.clamp(_minStoredChatPanelRatio, _maxChatPanelRatio).toDouble(),
+        _chatPanelRatio
+            .clamp(_minStoredChatPanelRatio, _maxChatPanelRatio)
+            .toDouble(),
       );
     } catch (error) {
       debugPrint('save watch chat width preference failed: $error');
@@ -155,7 +165,9 @@ extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
     final effectiveMaxWidth = _maxChatPanelWidth
         .clamp(effectiveMinWidth, viewportWidth - 120.0)
         .toDouble();
-    final nextWidth = value.clamp(effectiveMinWidth, effectiveMaxWidth).toDouble();
+    final nextWidth = value
+        .clamp(effectiveMinWidth, effectiveMaxWidth)
+        .toDouble();
     final effectiveMinRatio = (effectiveMinWidth / viewportWidth)
         .clamp(_minStoredChatPanelRatio, _maxChatPanelRatio)
         .toDouble();

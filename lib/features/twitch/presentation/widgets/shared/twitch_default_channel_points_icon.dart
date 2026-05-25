@@ -3,10 +3,7 @@ import 'package:flutter/material.dart';
 class TwitchDefaultChannelPointsIcon extends StatelessWidget {
   final double size;
 
-  const TwitchDefaultChannelPointsIcon({
-    super.key,
-    this.size = 18,
-  });
+  const TwitchDefaultChannelPointsIcon({super.key, this.size = 18});
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +12,7 @@ class TwitchDefaultChannelPointsIcon extends StatelessWidget {
       width: size,
       height: size,
       filterQuality: FilterQuality.medium,
-      errorBuilder: (_, __, ___) {
+      errorBuilder: (_, _, _) {
         return CustomPaint(
           size: Size.square(size),
           painter: _TwitchDefaultChannelPointsIconPainter(),

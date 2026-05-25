@@ -20,31 +20,34 @@ class TwitchHypeTrainApiService {
   }) async {
     final raw = await getHypeTrainRaw(channelLogin: channelLogin);
     if (raw is! Map<String, dynamic>) {
-      throw StateError('Unexpected GetHypeTrainExecution response: ${raw.runtimeType}');
+      throw StateError(
+        'Unexpected GetHypeTrainExecution response: ${raw.runtimeType}',
+      );
     }
 
     return TwitchHypeTrainSnapshot.fromGqlResponse(raw);
   }
 
-  Future<dynamic> getHypeTrainRaw({
-    required String channelLogin,
-  }) async {
+  Future<dynamic> getHypeTrainRaw({required String channelLogin}) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
-      throw ArgumentError.value(channelLogin, 'channelLogin', 'channelLogin cannot be empty');
+      throw ArgumentError.value(
+        channelLogin,
+        'channelLogin',
+        'channelLogin cannot be empty',
+      );
     }
 
     return client.postJson<dynamic>(
       '${TwitchApiConstants.gqlEndpoint}#origin=twilight',
       data: <String, dynamic>{
         'operationName': 'GetHypeTrainExecution',
-        'variables': <String, dynamic>{
-          'userLogin': login,
-        },
+        'variables': <String, dynamic>{'userLogin': login},
         'extensions': <String, dynamic>{
           'persistedQuery': <String, dynamic>{
             'version': 1,
-            'sha256Hash': '086b4f88754c8270672b32069ff64695e5ee95c678fb7fe57bb027d12f8c83f7',
+            'sha256Hash':
+                '086b4f88754c8270672b32069ff64695e5ee95c678fb7fe57bb027d12f8c83f7',
           },
         },
       },

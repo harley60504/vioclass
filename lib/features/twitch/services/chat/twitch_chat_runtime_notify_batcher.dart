@@ -14,9 +14,7 @@ class TwitchChatRuntimeNotifyBatcher {
   Timer? _timer;
   bool _disposed = false;
 
-  TwitchChatRuntimeNotifyBatcher({
-    required this.interval,
-  });
+  TwitchChatRuntimeNotifyBatcher({required this.interval});
 
   void request(VoidCallback notify) {
     if (_disposed) return;

@@ -36,9 +36,12 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   List<TwitchOfficialEmote> _globalEmotes = const <TwitchOfficialEmote>[];
   List<TwitchOfficialEmote> _channelEmotes = const <TwitchOfficialEmote>[];
   List<TwitchOfficialEmote> _userEmotes = const <TwitchOfficialEmote>[];
-  List<TwitchOfficialEmote> _lockedChannelEmotes = const <TwitchOfficialEmote>[];
-  final Map<String, TwitchOfficialEmote> _favorites = <String, TwitchOfficialEmote>{};
-  final Map<String, TwitchOfficialEmote> _recent = <String, TwitchOfficialEmote>{};
+  List<TwitchOfficialEmote> _lockedChannelEmotes =
+      const <TwitchOfficialEmote>[];
+  final Map<String, TwitchOfficialEmote> _favorites =
+      <String, TwitchOfficialEmote>{};
+  final Map<String, TwitchOfficialEmote> _recent =
+      <String, TwitchOfficialEmote>{};
 
   List<TwitchOfficialEmote>? _allKnownEmotesCache;
   List<TwitchOfficialEmote>? _usableEmotesCache;
@@ -179,7 +182,8 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   }
 
   void _ensureRenderableLookupIndexes() {
-    if (_renderableByExactNameCache != null && _renderableByLowerNameCache != null) {
+    if (_renderableByExactNameCache != null &&
+        _renderableByLowerNameCache != null) {
       return;
     }
 
@@ -292,7 +296,9 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
           if (item is! Map) continue;
           final emote = _favoriteFromJson(Map<String, dynamic>.from(item));
           if (emote == null) continue;
-          next[_favoriteKey(emote)] = emote.copyWith(imageUrl: _imageUrlFor(emote));
+          next[_favoriteKey(emote)] = emote.copyWith(
+            imageUrl: _imageUrlFor(emote),
+          );
         }
       }
 
@@ -312,7 +318,9 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   Future<void> _saveFavoriteEmotes() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = favoriteEmotes.map((emote) => emote.toJson()).toList(growable: false);
+      final jsonList = favoriteEmotes
+          .map((emote) => emote.toJson())
+          .toList(growable: false);
       await prefs.setString(favoriteStorageKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Save official favorite emotes failed: $e');
@@ -338,7 +346,9 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
           if (item is! Map) continue;
           final emote = _favoriteFromJson(Map<String, dynamic>.from(item));
           if (emote == null) continue;
-          next[_favoriteKey(emote)] = emote.copyWith(imageUrl: _imageUrlFor(emote));
+          next[_favoriteKey(emote)] = emote.copyWith(
+            imageUrl: _imageUrlFor(emote),
+          );
           if (next.length >= maxRecentEmotes) break;
         }
       }
@@ -359,7 +369,9 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
   Future<void> _saveRecentEmotes() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonList = recentEmotes.map((emote) => emote.toJson()).toList(growable: false);
+      final jsonList = recentEmotes
+          .map((emote) => emote.toJson())
+          .toList(growable: false);
       await prefs.setString(recentStorageKey, jsonEncode(jsonList));
     } catch (e) {
       debugPrint('Save official recent emotes failed: $e');
@@ -440,25 +452,26 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         return;
       }
 
-      final results = await Future.wait<List<TwitchOfficialEmote>>(
-        <Future<List<TwitchOfficialEmote>>>[
-          api.fetchGlobalEmotes(
-            accessToken: accessToken,
-            clientId: clientId,
-          ).catchError((_) => <TwitchOfficialEmote>[]),
-          api.fetchChannelEmotes(
-            broadcasterId: cleanChannelId,
-            accessToken: accessToken,
-            clientId: clientId,
-          ).catchError((_) => <TwitchOfficialEmote>[]),
-          _fetchUserEmotesSafe(
-            userId: cleanViewerId,
-            broadcasterId: cleanChannelId,
-            accessToken: accessToken,
-            clientId: clientId,
-          ),
-        ],
-      );
+      final results = await Future.wait<List<TwitchOfficialEmote>>(<
+        Future<List<TwitchOfficialEmote>>
+      >[
+        api
+            .fetchGlobalEmotes(accessToken: accessToken, clientId: clientId)
+            .catchError((_) => <TwitchOfficialEmote>[]),
+        api
+            .fetchChannelEmotes(
+              broadcasterId: cleanChannelId,
+              accessToken: accessToken,
+              clientId: clientId,
+            )
+            .catchError((_) => <TwitchOfficialEmote>[]),
+        _fetchUserEmotesSafe(
+          userId: cleanViewerId,
+          broadcasterId: cleanChannelId,
+          accessToken: accessToken,
+          clientId: clientId,
+        ),
+      ]);
 
       final global = _unique(results[0], unlocked: true);
       final user = await _enrichUserEmoteOwnerDisplayNames(
@@ -488,8 +501,12 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
         }
       }
 
-      channel.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      locked.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+      channel.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+      locked.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
 
       _globalEmotes = _unique(global, unlocked: true);
       _channelEmotes = channel;
@@ -710,7 +727,8 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
 
     if (name.trim().isEmpty && id.trim().isEmpty) return null;
 
-    final sourceName = json['source']?.toString() ?? TwitchOfficialEmoteSource.global.name;
+    final sourceName =
+        json['source']?.toString() ?? TwitchOfficialEmoteSource.global.name;
     final source = TwitchOfficialEmoteSource.values.firstWhere(
       (item) => item.name == sourceName,
       orElse: () => TwitchOfficialEmoteSource.global,
@@ -774,24 +792,28 @@ class TwitchOfficialEmoteCacheService extends ChangeNotifier {
       'lookupIndexBuilt': _renderableByExactNameCache != null,
       'channelSample': channelEmotes
           .take(20)
-          .map((emote) => <String, dynamic>{
-                'name': emote.name,
-                'id': emote.id,
-                'imageUrl': emote.imageUrl,
-                'locked': emote.locked,
-                'emoteType': emote.emoteType,
-              })
+          .map(
+            (emote) => <String, dynamic>{
+              'name': emote.name,
+              'id': emote.id,
+              'imageUrl': emote.imageUrl,
+              'locked': emote.locked,
+              'emoteType': emote.emoteType,
+            },
+          )
           .toList(growable: false),
       'userSample': userEmotes
           .take(20)
-          .map((emote) => <String, dynamic>{
-                'name': emote.name,
-                'id': emote.id,
-                'ownerId': emote.ownerId,
-                'ownerDisplayName': emote.ownerDisplayName,
-                'emoteSetId': emote.emoteSetId,
-                'emoteType': emote.emoteType,
-              })
+          .map(
+            (emote) => <String, dynamic>{
+              'name': emote.name,
+              'id': emote.id,
+              'ownerId': emote.ownerId,
+              'ownerDisplayName': emote.ownerDisplayName,
+              'emoteSetId': emote.emoteSetId,
+              'emoteType': emote.emoteType,
+            },
+          )
           .toList(growable: false),
     };
   }

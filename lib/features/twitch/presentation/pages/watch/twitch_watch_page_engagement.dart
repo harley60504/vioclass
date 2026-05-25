@@ -1,7 +1,8 @@
-part of twitch_watch_page;
+part of '../twitch_watch_page.dart';
 
-final Map<int, String> _lastNotifiedChannelPointClaimByState =
-    <int, String>{};
+// ignore_for_file: invalid_use_of_protected_member
+
+final Map<int, String> _lastNotifiedChannelPointClaimByState = <int, String>{};
 final Map<int, int> _lastChannelPointBalanceByState = <int, int>{};
 final Map<int, Timer> _channelPointPollingTimerByState = <int, Timer>{};
 final Map<int, Set<String>> _processingChannelPointBonusByState =
@@ -10,7 +11,10 @@ final Map<int, Set<String>> _doneChannelPointBonusByState =
     <int, Set<String>>{};
 
 extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
-  Future<void> _runDeferredEngagementStartup(int generation, String channel) async {
+  Future<void> _runDeferredEngagementStartup(
+    int generation,
+    String channel,
+  ) async {
     try {
       await _refreshEngagement(
         showSnackOnError: false,
@@ -48,10 +52,9 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
         }
 
         if (_loadingEngagement || _engagementBootstrapping) return;
-        unawaited(_refreshEngagement(
-          showSnackOnError: false,
-          notifyBalanceDelta: true,
-        ));
+        unawaited(
+          _refreshEngagement(showSnackOnError: false, notifyBalanceDelta: true),
+        );
       },
     );
   }
@@ -148,21 +151,27 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
     }
 
     final bonusKey = '$_channelLogin:$claimId';
-    final processing = _processingChannelPointBonusByState
-        .putIfAbsent(key, () => <String>{});
-    final done = _doneChannelPointBonusByState
-        .putIfAbsent(key, () => <String>{});
+    final processing = _processingChannelPointBonusByState.putIfAbsent(
+      key,
+      () => <String>{},
+    );
+    final done = _doneChannelPointBonusByState.putIfAbsent(
+      key,
+      () => <String>{},
+    );
 
     if (processing.contains(bonusKey) || done.contains(bonusKey)) return;
 
     processing.add(bonusKey);
-    unawaited(_collectAvailableChannelPointBonus(
-      stateKey: key,
-      bonusKey: bonusKey,
-      channelId: resolvedChannelId,
-      claimId: claimId,
-      channelPoints: channelPoints,
-    ));
+    unawaited(
+      _collectAvailableChannelPointBonus(
+        stateKey: key,
+        bonusKey: bonusKey,
+        channelId: resolvedChannelId,
+        claimId: claimId,
+        channelPoints: channelPoints,
+      ),
+    );
   }
 
   Future<void> _collectAvailableChannelPointBonus({
@@ -187,7 +196,9 @@ extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
           .add(bonusKey);
 
       if (!mounted) return;
-      final earned = result.pointsEarned > 0 ? result.pointsEarned : fallbackPoints;
+      final earned = result.pointsEarned > 0
+          ? result.pointsEarned
+          : fallbackPoints;
       twitchAppNotificationCenter.showSuccess(
         title: '已領取 $pointName',
         message: '$_channelLogin +$earned 點。',

@@ -43,17 +43,14 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
       height: headerHeight,
       padding: EdgeInsets.fromLTRB(12, compact ? 5 : 8, 10, compact ? 5 : 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.028),
+        color: Colors.white.withValues(alpha: 0.028),
         border: Border(
-          bottom: BorderSide(color: Colors.white.withOpacity(0.060)),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.060)),
         ),
       ),
       child: Row(
         children: [
-          _ConnectionBadge(
-            connected: connected,
-            compact: compact,
-          ),
+          _ConnectionBadge(connected: connected, compact: compact),
           const SizedBox(width: 9),
           Expanded(
             child: Text(
@@ -80,8 +77,8 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
             tooltip: predictionVisible
                 ? '隱藏賭盤通知'
                 : hasPrediction
-                    ? '顯示賭盤通知'
-                    : '沒有賭盤',
+                ? '顯示賭盤通知'
+                : '沒有賭盤',
             icon: Icons.how_to_vote_rounded,
             active: predictionVisible,
             enabled: hasPrediction,
@@ -110,10 +107,7 @@ class _ConnectionBadge extends StatelessWidget {
   final bool connected;
   final bool compact;
 
-  const _ConnectionBadge({
-    required this.connected,
-    required this.compact,
-  });
+  const _ConnectionBadge({required this.connected, required this.compact});
 
   @override
   Widget build(BuildContext context) {
@@ -124,9 +118,13 @@ class _ConnectionBadge extends StatelessWidget {
       height: compact ? 25 : 28,
       padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 8),
       decoration: BoxDecoration(
-        color: connected ? color.withOpacity(0.10) : Colors.white.withOpacity(0.042),
+        color: connected
+            ? color.withValues(alpha: 0.10)
+            : Colors.white.withValues(alpha: 0.042),
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        border: Border.all(color: color.withOpacity(connected ? 0.30 : 0.16)),
+        border: Border.all(
+          color: color.withValues(alpha: connected ? 0.30 : 0.16),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -140,7 +138,7 @@ class _ConnectionBadge extends StatelessWidget {
               boxShadow: connected
                   ? <BoxShadow>[
                       BoxShadow(
-                        color: color.withOpacity(0.38),
+                        color: color.withValues(alpha: 0.38),
                         blurRadius: 6,
                       ),
                     ]
@@ -190,9 +188,9 @@ class _HeaderIconButton extends StatelessWidget {
           height: 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.052),
+            color: Colors.white.withValues(alpha: 0.052),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(color: Colors.white.withOpacity(0.080)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.080)),
           ),
           child: loading
               ? const SizedBox(
@@ -241,13 +239,13 @@ class _HeaderToggleButton extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active
-                ? _softAccent.withOpacity(0.18)
-                : Colors.white.withOpacity(0.052),
+                ? _softAccent.withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.052),
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
             border: Border.all(
               color: active
-                  ? _softAccentText.withOpacity(0.28)
-                  : Colors.white.withOpacity(0.080),
+                  ? _softAccentText.withValues(alpha: 0.28)
+                  : Colors.white.withValues(alpha: 0.080),
             ),
           ),
           child: Icon(icon, size: 16, color: enabled ? color : Colors.white24),
