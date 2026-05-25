@@ -2,24 +2,31 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../api/auth/twitch_auth_api_service.dart';
 import '../../../api/chat/twitch_irc_api_service.dart';
+import '../../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
+import '../../../services/auth/twitch_auth_service.dart';
+import '../../../services/auth/twitch_drops_auth_service.dart';
 import '../../../services/chat/twitch_badge_cache_service.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
+import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../services/special_actions/twitch_viewer_special_message_runtime.dart';
+import '../twitch_watch_feature_ports.dart';
 
 class TwitchWatchChatController extends ChangeNotifier {
-  final dynamic authService;
-  final dynamic dropsAuthService;
-  final dynamic authApi;
-  final dynamic recentMessagesApi;
-  final dynamic chatPort;
-  final dynamic engagementPort;
-  final dynamic specialMessagesRuntime;
+  final TwitchAuthService authService;
+  final TwitchDropsAuthService dropsAuthService;
+  final TwitchAuthApiService authApi;
+  final TwitchRecentMessagesApiService recentMessagesApi;
+  final TwitchWatchChatPort chatPort;
+  final TwitchWatchEngagementPort engagementPort;
+  final TwitchViewerSpecialMessageRuntimeStage251 specialMessagesRuntime;
   final String Function() channelLogin;
   final String? Function() channelId;
   final String? Function() viewerId;
-  final dynamic Function() channelPointsSnapshot;
+  final TwitchChannelPointsRuntimeSnapshot? Function() channelPointsSnapshot;
   final Future<void> Function({bool showSnackOnError}) refreshEngagement;
   final Future<void> Function({bool autoSelectPending}) refreshSpecialMessages;
   final void Function(String channelId) onChannelIdResolved;
