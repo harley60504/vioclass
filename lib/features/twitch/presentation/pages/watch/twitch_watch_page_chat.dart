@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../models/special_actions/twitch_pending_special_message.dart';
@@ -34,7 +35,9 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
     try {
       await chatController.sendMessage(message);
       messageController.clear();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('watch chat send failed: $error');
+    }
   }
 
   Future<void> runDeferredSpecialMessagesStartup(
