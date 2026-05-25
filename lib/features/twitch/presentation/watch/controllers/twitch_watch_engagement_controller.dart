@@ -43,7 +43,11 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     TwitchHypeTrainController? hypeTrainController,
   }) : hypeTrainController =
            hypeTrainController ??
-           TwitchHypeTrainController(api: const TwitchHypeTrainApiService());
+           TwitchHypeTrainController(
+             api: const TwitchHypeTrainApiService(),
+             isCurrentChannel: (login) =>
+                 login.trim().toLowerCase() == channelLogin(),
+           );
 
   void ensureChannelPointPolling({
     required int generation,

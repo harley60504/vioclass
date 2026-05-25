@@ -5,12 +5,15 @@ import '../../models/engagement/twitch_hype_train.dart';
 
 class TwitchHypeTrainController extends ChangeNotifier {
   final TwitchHypeTrainApiService api;
+  final bool Function(String channelLogin)? isCurrentChannel;
 
   TwitchHypeTrainSnapshot? snapshot;
   bool loading = false;
   Object? error;
+  int _refreshSerial = 0;
+  bool _disposed = false;
 
-  TwitchHypeTrainController({required this.api});
+  TwitchHypeTrainController({required this.api, this.isCurrentChannel});
 
   Duration get remainingDuration {
     return snapshot?.remainingDuration ?? Duration.zero;
@@ -21,6 +24,7 @@ class TwitchHypeTrainController extends ChangeNotifier {
     String? channelId,
   }) async {
     final login = channelLogin.trim().toLowerCase();
+    final serial = ++_refreshSerial;
     if (login.isEmpty) {
       clear();
       return;
@@ -28,37 +32,56 @@ class TwitchHypeTrainController extends ChangeNotifier {
 
     loading = true;
     error = null;
-    notifyListeners();
+    _notifyIfAlive();
 
     try {
       final next = await api.getHypeTrainStatus(
         channelLogin: login,
         channelId: channelId,
       );
+      if (!_isCurrentRefresh(serial, login)) return;
       if (next == null || next.isActive) {
         snapshot = next;
       } else {
         snapshot = null;
       }
     } catch (caughtError) {
+      if (!_isCurrentRefresh(serial, login)) return;
       error = caughtError;
     } finally {
-      loading = false;
-      notifyListeners();
+      if (_isCurrentRefresh(serial, login)) {
+        loading = false;
+        _notifyIfAlive();
+      }
     }
   }
 
   void clear() {
     if (snapshot == null && !loading && error == null) return;
+    _refreshSerial++;
     snapshot = null;
     loading = false;
     error = null;
-    notifyListeners();
+    _notifyIfAlive();
+  }
+
+  bool _isCurrentRefresh(int serial, String login) {
+    return !_disposed &&
+        serial == _refreshSerial &&
+        (isCurrentChannel?.call(login) ?? true);
+  }
+
+  void _notifyIfAlive() {
+    if (!_disposed) notifyListeners();
   }
 
   @override
   void dispose() {
-    clear();
+    _disposed = true;
+    _refreshSerial++;
+    snapshot = null;
+    loading = false;
+    error = null;
     super.dispose();
   }
 }

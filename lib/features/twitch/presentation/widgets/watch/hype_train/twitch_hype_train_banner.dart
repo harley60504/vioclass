@@ -53,6 +53,11 @@ class _TwitchHypeTrainBannerState extends State<TwitchHypeTrainBanner> {
 
     _timer ??= Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
+      final snapshot = widget.controller.snapshot;
+      if (snapshot == null || !snapshot.isActive) {
+        _timer?.cancel();
+        _timer = null;
+      }
       setState(() {});
     });
     if (mounted) setState(() {});
@@ -112,7 +117,7 @@ class _HypeTrainBannerBody extends StatelessWidget {
                   const SizedBox(width: 7),
                   Expanded(
                     child: Text(
-                      '發燒列車 Lv.${snapshot.level}',
+                      '發燒列車 / Hype Train Lv.${snapshot.level}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelLarge?.copyWith(
@@ -157,7 +162,9 @@ class _HypeTrainBannerBody extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    snapshot.displayTypeLabel,
+                    snapshot.isSharedTrain
+                        ? '${snapshot.displayTypeLabel} · Shared'
+                        : snapshot.displayTypeLabel,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: const Color(0xFFFFD28A),
                       fontWeight: FontWeight.w800,

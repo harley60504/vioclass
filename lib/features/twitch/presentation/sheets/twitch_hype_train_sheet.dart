@@ -44,7 +44,16 @@ class TwitchHypeTrainSheet extends StatelessWidget {
             ),
             _InfoRow(label: 'Started', value: _formatDate(snapshot.startedAt)),
             _InfoRow(label: 'Expires', value: _formatDate(snapshot.expiresAt)),
+            _InfoRow(label: 'Ended', value: _formatDate(snapshot.endedAt)),
+            _InfoRow(
+              label: 'Cooldown',
+              value: _formatDate(snapshot.cooldownEndsAt),
+            ),
             _InfoRow(label: 'Type', value: snapshot.type),
+            _InfoRow(
+              label: 'Shared Train',
+              value: snapshot.isSharedTrain ? 'Yes' : 'No',
+            ),
             const SizedBox(height: 16),
             _SectionTitle('Top Contributions'),
             if (snapshot.topContributions.isEmpty)

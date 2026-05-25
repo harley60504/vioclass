@@ -2,6 +2,7 @@ class TwitchHypeTrainSnapshot {
   final String id;
   final String channelId;
   final String channelLogin;
+  final String channelDisplayName;
   final int level;
   final int total;
   final int progress;
@@ -9,6 +10,7 @@ class TwitchHypeTrainSnapshot {
   final DateTime? startedAt;
   final DateTime? expiresAt;
   final DateTime? endedAt;
+  final DateTime? cooldownEndsAt;
   final String type;
   final bool isSharedTrain;
   final List<TwitchHypeTrainContribution> topContributions;
@@ -18,6 +20,7 @@ class TwitchHypeTrainSnapshot {
     required this.id,
     required this.channelId,
     required this.channelLogin,
+    required this.channelDisplayName,
     required this.level,
     required this.total,
     required this.progress,
@@ -25,45 +28,190 @@ class TwitchHypeTrainSnapshot {
     required this.startedAt,
     required this.expiresAt,
     required this.endedAt,
+    required this.cooldownEndsAt,
     required this.type,
     required this.isSharedTrain,
     required this.topContributions,
     required this.sharedTrainParticipants,
   });
 
+  factory TwitchHypeTrainSnapshot.empty({
+    String channelLogin = '',
+    String channelId = '',
+  }) {
+    return TwitchHypeTrainSnapshot(
+      id: '',
+      channelId: channelId,
+      channelLogin: channelLogin.trim().toLowerCase(),
+      channelDisplayName: '',
+      level: 0,
+      total: 0,
+      progress: 0,
+      goal: 0,
+      startedAt: null,
+      expiresAt: null,
+      endedAt: DateTime.fromMillisecondsSinceEpoch(0),
+      cooldownEndsAt: null,
+      type: '',
+      isSharedTrain: false,
+      topContributions: const <TwitchHypeTrainContribution>[],
+      sharedTrainParticipants: const <TwitchHypeTrainParticipant>[],
+    );
+  }
+
   factory TwitchHypeTrainSnapshot.fromJson(Map<String, dynamic> json) {
     final source = _readSnapshotSource(json);
+    final channel = _readMap(source['channel'] ?? source['broadcaster']);
     final participants = _readList(
       source['sharedTrainParticipants'] ??
+          source['shared_train_participants'] ??
           source['participants'] ??
-          source['sharedParticipants'],
+          source['sharedParticipants'] ??
+          source['shared_participants'],
     );
 
     return TwitchHypeTrainSnapshot(
-      id: _readString(source['id']),
-      channelId: _readString(source['channelId'] ?? source['channelID']),
-      channelLogin: _readString(
-        source['channelLogin'] ?? source['channelName'] ?? source['login'],
-      ).toLowerCase(),
-      level: _readInt(source['level'] ?? source['currentLevel']),
-      total: _readInt(source['total'] ?? source['totalProgress']),
-      progress: _readInt(source['progress'] ?? source['currentProgress']),
-      goal: _readInt(source['goal'] ?? source['levelGoal']),
-      startedAt: _readDate(source['startedAt'] ?? source['startTime']),
-      expiresAt: _readDate(
-        source['expiresAt'] ?? source['expirationTime'] ?? source['endsAt'],
+      id: _readString(source['id'] ?? source['hypeTrainId']),
+      channelId: _readString(
+        source['channelId'] ??
+            source['channelID'] ??
+            source['channel_id'] ??
+            source['broadcasterId'] ??
+            source['broadcaster_id'] ??
+            channel['id'],
       ),
-      endedAt: _readDate(source['endedAt'] ?? source['endTime']),
-      type: _readString(source['type'] ?? source['__typename']),
+      channelLogin: _readString(
+        source['channelLogin'] ??
+            source['channel_login'] ??
+            source['channelName'] ??
+            source['channel_name'] ??
+            source['login'] ??
+            channel['login'],
+      ).toLowerCase(),
+      channelDisplayName: _readString(
+        source['channelDisplayName'] ??
+            source['channel_display_name'] ??
+            source['displayName'] ??
+            source['display_name'] ??
+            channel['displayName'] ??
+            channel['display_name'] ??
+            channel['login'],
+      ),
+      level: _readInt(source['level'] ?? source['currentLevel']),
+      total: _readInt(
+        source['total'] ??
+            source['totalProgress'] ??
+            source['total_progress'] ??
+            source['totalContribution'] ??
+            source['total_contribution'],
+      ),
+      progress: _readInt(
+        source['progress'] ??
+            source['currentProgress'] ??
+            source['current_progress'],
+      ),
+      goal: _readInt(
+        source['goal'] ??
+            source['levelGoal'] ??
+            source['level_goal'] ??
+            source['currentGoal'] ??
+            source['current_goal'],
+      ),
+      startedAt: _readDate(
+        source['startedAt'] ?? source['started_at'] ?? source['startTime'],
+      ),
+      expiresAt: _readDate(
+        source['expiresAt'] ??
+            source['expires_at'] ??
+            source['expirationTime'] ??
+            source['endsAt'] ??
+            source['ends_at'],
+      ),
+      endedAt: _readDate(
+        source['endedAt'] ?? source['ended_at'] ?? source['endTime'],
+      ),
+      cooldownEndsAt: _readDate(
+        source['cooldownEndsAt'] ??
+            source['cooldown_ends_at'] ??
+            source['cooldownEndTime'],
+      ),
+      type: _readString(source['type'] ?? source['trainType']),
       isSharedTrain:
-          _readBool(source['isSharedTrain'] ?? source['sharedTrain']) ||
+          _readBool(
+            source['isSharedTrain'] ??
+                source['is_shared_train'] ??
+                source['sharedTrain'] ??
+                source['shared_train'],
+          ) ||
           participants.isNotEmpty,
       topContributions: _readList(
-        source['topContributions'] ?? source['contributors'],
+        source['topContributions'] ??
+            source['top_contributions'] ??
+            source['contributors'] ??
+            source['contributions'],
       ).map(TwitchHypeTrainContribution.fromJson).toList(growable: false),
       sharedTrainParticipants: participants
           .map(TwitchHypeTrainParticipant.fromJson)
           .toList(growable: false),
+    );
+  }
+
+  static Map<String, TwitchHypeTrainSnapshot?> mapFromJson(Object? raw) {
+    final source = _readBulkSource(raw);
+    final result = <String, TwitchHypeTrainSnapshot?>{};
+
+    if (source is Map) {
+      for (final entry in source.entries) {
+        final login = entry.key.toString().trim().toLowerCase();
+        result[login] = fromDynamic(entry.value, fallbackChannelLogin: login);
+      }
+      return result;
+    }
+
+    if (source is List) {
+      for (final item in source) {
+        final snapshot = fromDynamic(item);
+        final login = snapshot?.channelLogin.trim().toLowerCase() ?? '';
+        if (login.isNotEmpty) result[login] = snapshot;
+      }
+    }
+
+    return result;
+  }
+
+  static TwitchHypeTrainSnapshot? fromDynamic(
+    Object? raw, {
+    String? fallbackChannelLogin,
+  }) {
+    if (raw == null) return null;
+    final map = _readMap(raw);
+    if (map.isEmpty) return null;
+    final snapshot = TwitchHypeTrainSnapshot.fromJson(map);
+    final login = snapshot.channelLogin.isNotEmpty
+        ? snapshot.channelLogin
+        : fallbackChannelLogin?.trim().toLowerCase() ?? '';
+    if (login == snapshot.channelLogin) return snapshot;
+    return snapshot.copyWith(channelLogin: login);
+  }
+
+  TwitchHypeTrainSnapshot copyWith({String? channelLogin, String? channelId}) {
+    return TwitchHypeTrainSnapshot(
+      id: id,
+      channelId: channelId ?? this.channelId,
+      channelLogin: channelLogin ?? this.channelLogin,
+      channelDisplayName: channelDisplayName,
+      level: level,
+      total: total,
+      progress: progress,
+      goal: goal,
+      startedAt: startedAt,
+      expiresAt: expiresAt,
+      endedAt: endedAt,
+      cooldownEndsAt: cooldownEndsAt,
+      type: type,
+      isSharedTrain: isSharedTrain,
+      topContributions: topContributions,
+      sharedTrainParticipants: sharedTrainParticipants,
     );
   }
 
@@ -72,6 +220,7 @@ class TwitchHypeTrainSnapshot {
       'id': id,
       'channelId': channelId,
       'channelLogin': channelLogin,
+      'channelDisplayName': channelDisplayName,
       'level': level,
       'total': total,
       'progress': progress,
@@ -79,6 +228,7 @@ class TwitchHypeTrainSnapshot {
       'startedAt': startedAt?.toIso8601String(),
       'expiresAt': expiresAt?.toIso8601String(),
       'endedAt': endedAt?.toIso8601String(),
+      'cooldownEndsAt': cooldownEndsAt?.toIso8601String(),
       'type': type,
       'isSharedTrain': isSharedTrain,
       'topContributions': topContributions
@@ -105,7 +255,7 @@ class TwitchHypeTrainSnapshot {
   bool get isActive {
     if (endedAt != null) return false;
     final expires = expiresAt;
-    return expires == null || expires.isAfter(DateTime.now());
+    return expires != null && expires.isAfter(DateTime.now());
   }
 
   String get displayTypeLabel {
@@ -136,18 +286,33 @@ class TwitchHypeTrainContribution {
   });
 
   factory TwitchHypeTrainContribution.fromJson(Map<String, dynamic> json) {
-    final user = _readMap(json['user'] ?? json['viewer']);
+    final user = _readMap(
+      json['user'] ?? json['viewer'] ?? json['contributor'],
+    );
     return TwitchHypeTrainContribution(
-      userId: _readString(json['userId'] ?? json['userID'] ?? user['id']),
-      userLogin: _readString(json['userLogin'] ?? user['login']).toLowerCase(),
+      userId: _readString(
+        json['userId'] ?? json['userID'] ?? json['user_id'] ?? user['id'],
+      ),
+      userLogin: _readString(
+        json['userLogin'] ?? json['user_login'] ?? user['login'],
+      ).toLowerCase(),
       displayName: _readString(
-        json['displayName'] ?? user['displayName'] ?? user['login'],
+        json['displayName'] ??
+            json['display_name'] ??
+            user['displayName'] ??
+            user['display_name'] ??
+            user['login'],
       ),
       profileImageUrl: _readString(
-        json['profileImageUrl'] ?? user['profileImageURL'],
+        json['profileImageUrl'] ??
+            json['profile_image_url'] ??
+            user['profileImageURL'] ??
+            user['profile_image_url'],
       ),
       amount: _readInt(json['amount'] ?? json['total'] ?? json['score']),
-      type: _readString(json['type'] ?? json['contributionType']),
+      type: _readString(
+        json['type'] ?? json['contributionType'] ?? json['contribution_type'],
+      ),
     );
   }
 
@@ -186,20 +351,35 @@ class TwitchHypeTrainParticipant {
     final channel = _readMap(json['channel'] ?? json['user']);
     return TwitchHypeTrainParticipant(
       channelId: _readString(
-        json['channelId'] ?? json['channelID'] ?? channel['id'],
+        json['channelId'] ??
+            json['channelID'] ??
+            json['channel_id'] ??
+            channel['id'],
       ),
       channelLogin: _readString(
-        json['channelLogin'] ?? json['login'] ?? channel['login'],
+        json['channelLogin'] ??
+            json['channel_login'] ??
+            json['login'] ??
+            channel['login'],
       ).toLowerCase(),
       displayName: _readString(
-        json['displayName'] ?? channel['displayName'] ?? channel['login'],
+        json['displayName'] ??
+            json['display_name'] ??
+            channel['displayName'] ??
+            channel['display_name'] ??
+            channel['login'],
       ),
       profileImageUrl: _readString(
-        json['profileImageUrl'] ?? channel['profileImageURL'],
+        json['profileImageUrl'] ??
+            json['profile_image_url'] ??
+            channel['profileImageURL'] ??
+            channel['profile_image_url'],
       ),
       level: _readInt(json['level'] ?? json['currentLevel']),
-      progress: _readInt(json['progress'] ?? json['currentProgress']),
-      goal: _readInt(json['goal'] ?? json['levelGoal']),
+      progress: _readInt(
+        json['progress'] ?? json['currentProgress'] ?? json['current_progress'],
+      ),
+      goal: _readInt(json['goal'] ?? json['levelGoal'] ?? json['level_goal']),
     );
   }
 
@@ -217,7 +397,27 @@ class TwitchHypeTrainParticipant {
 }
 
 Map<String, dynamic> _readSnapshotSource(Map<String, dynamic> json) {
+  final direct = _firstMap(json, const <String>[
+    'hypeTrain',
+    'hype_train',
+    'hypeTrainStatus',
+    'hype_train_status',
+    'status',
+    'result',
+  ]);
+  if (direct != null) return direct;
+
   final data = _readMap(json['data']);
+  final dataStatus = _firstMap(data, const <String>[
+    'hypeTrain',
+    'hype_train',
+    'hypeTrainStatus',
+    'hype_train_status',
+    'status',
+    'result',
+  ]);
+  if (dataStatus != null) return dataStatus;
+
   final user = _readMap(data['user']);
   final channel = _readMap(user['channel']);
   final hypeTrain = _readMap(channel['hypeTrain']);
@@ -227,9 +427,46 @@ Map<String, dynamic> _readSnapshotSource(Map<String, dynamic> json) {
       ...execution,
       'channelId': channel['id'] ?? user['id'],
       'channelLogin': user['login'],
+      'channelDisplayName': user['displayName'],
     };
   }
-  return json;
+  return data.isNotEmpty && !_looksLikeGraphQlEnvelope(data) ? data : json;
+}
+
+Object? _readBulkSource(Object? raw) {
+  final map = _readMap(raw);
+  if (map.isEmpty) return raw;
+  final source =
+      map['statuses'] ??
+      map['hypeTrainStatuses'] ??
+      map['hype_train_statuses'] ??
+      map['hypeTrains'] ??
+      map['hype_trains'] ??
+      map['results'] ??
+      map['data'];
+  if (source == null || identical(source, raw)) return raw;
+
+  final nested = _readMap(source);
+  if (nested.isEmpty) return source;
+  return nested['statuses'] ??
+      nested['hypeTrainStatuses'] ??
+      nested['hype_train_statuses'] ??
+      nested['hypeTrains'] ??
+      nested['hype_trains'] ??
+      nested['results'] ??
+      source;
+}
+
+Map<String, dynamic>? _firstMap(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final map = _readMap(json[key]);
+    if (map.isNotEmpty) return map;
+  }
+  return null;
+}
+
+bool _looksLikeGraphQlEnvelope(Map<String, dynamic> value) {
+  return value.containsKey('user') && value.length == 1;
 }
 
 Map<String, dynamic> _readMap(Object? value) {
