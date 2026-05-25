@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../api/engagement/twitch_hype_train_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../../services/notifications/twitch_app_notification_service.dart';
 
 class TwitchWatchEngagementController extends ChangeNotifier {
@@ -13,6 +15,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   final String? Function() channelId;
   final String? Function() viewerId;
   final bool Function(int generation, String channel) isCurrentWatchTask;
+  final TwitchHypeTrainController hypeTrainController;
 
   final Map<int, String> _lastNotifiedChannelPointClaimByState =
       <int, String>{};
@@ -37,7 +40,10 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     required this.channelId,
     required this.viewerId,
     required this.isCurrentWatchTask,
-  });
+    TwitchHypeTrainController? hypeTrainController,
+  }) : hypeTrainController =
+           hypeTrainController ??
+           TwitchHypeTrainController(api: const TwitchHypeTrainApiService());
 
   void ensureChannelPointPolling({
     required int generation,
@@ -103,8 +109,13 @@ class TwitchWatchEngagementController extends ChangeNotifier {
       channelLogin: login,
       channelId: currentChannelId,
     );
-
     if (login != channelLogin()) return;
+    unawaited(
+      hypeTrainController.refresh(
+        channelLogin: login,
+        channelId: currentChannelId,
+      ),
+    );
     final lastError = snapshot.error;
     if (snapshot.channelPoints != null) {
       channelPointsSnapshot = snapshot.channelPoints;
@@ -274,6 +285,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     channelPointsSnapshot = null;
     prediction = null;
     pinnedMessages = const <dynamic>[];
+    hypeTrainController.clear();
     engagementError = null;
     loadingEngagement = false;
     loadingEmotes = false;
@@ -285,6 +297,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     for (final timer in _channelPointPollingTimerByState.values) {
       timer.cancel();
     }
+    hypeTrainController.dispose();
     super.dispose();
   }
 }

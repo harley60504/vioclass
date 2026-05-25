@@ -8,6 +8,7 @@ import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../widgets/watch/twitch_watch_chat_panel.dart';
 import '../../widgets/watch/twitch_watch_player_area.dart';
 import '../twitch_watch_feature_ports.dart';
@@ -122,6 +123,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final TwitchPendingSpecialMessage? pendingSpecialMessage;
   final List<dynamic> pinnedMessages;
   final TwitchPredictionSnapshot? prediction;
+  final TwitchHypeTrainController hypeTrainController;
   final bool loadingEmotes;
   final bool loadingEngagement;
   final String? engagementError;
@@ -146,6 +148,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     this.pendingSpecialMessage,
     required this.pinnedMessages,
     required this.prediction,
+    required this.hypeTrainController,
     required this.loadingEmotes,
     required this.loadingEngagement,
     required this.engagementError,
@@ -182,6 +185,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       pendingSpecialMessage: pendingSpecialMessage,
       pinnedMessages: pinnedMessages,
       prediction: prediction,
+      hypeTrainController: hypeTrainController,
       loadingEngagement: loadingEngagement,
       engagementError: engagementError,
       messageController: messageController,

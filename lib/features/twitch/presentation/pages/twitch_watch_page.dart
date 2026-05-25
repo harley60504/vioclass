@@ -15,6 +15,7 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../services/engagement/twitch_hype_train_controller.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
@@ -186,6 +187,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   TwitchPendingSpecialMessage? get pendingSpecialMessage =>
       chatController.pendingSpecialMessage;
   TwitchPredictionSnapshot? get prediction => engagementController.prediction;
+  TwitchHypeTrainController get hypeTrainController =>
+      engagementController.hypeTrainController;
   List<dynamic> get pinnedMessages => engagementController.pinnedMessages;
 
   TwitchWatchSheetPortLauncher get sheetLauncher =>
@@ -415,6 +418,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       pendingSpecialMessage: pendingSpecialMessage,
       pinnedMessages: pinnedMessages,
       prediction: prediction,
+      hypeTrainController: hypeTrainController,
       loadingEmotes: loadingEmotes || emoteBootstrapping,
       loadingEngagement: loadingEngagement || engagementBootstrapping,
       engagementError: engagementError,

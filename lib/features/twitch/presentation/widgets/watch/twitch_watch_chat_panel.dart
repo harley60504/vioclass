@@ -9,6 +9,7 @@ import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../settings/twitch_chat_appearance_controller.dart';
 import '../../sheets/twitch_chat_appearance_sheet.dart';
@@ -18,6 +19,7 @@ import 'chat/twitch_watch_chat_header_bar.dart';
 import 'chat/twitch_watch_chat_input_section.dart';
 import 'chat/twitch_watch_chat_layout_metrics.dart';
 import 'chat/twitch_watch_chat_message_area.dart';
+import 'hype_train/twitch_hype_train_banner.dart';
 
 class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchChatRuntime? runtime;
@@ -35,6 +37,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchPendingSpecialMessage? pendingSpecialMessage;
   final List<dynamic> pinnedMessages;
   final TwitchPredictionSnapshot? prediction;
+  final TwitchHypeTrainController hypeTrainController;
   final bool loadingEngagement;
   final String? engagementError;
   final TextEditingController messageController;
@@ -65,6 +68,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     this.pendingSpecialMessage,
     required this.pinnedMessages,
     required this.prediction,
+    required this.hypeTrainController,
     required this.loadingEngagement,
     required this.engagementError,
     required this.messageController,
@@ -467,6 +471,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                   controller: _appearanceController,
                 ),
               ),
+              TwitchHypeTrainBanner(controller: widget.hypeTrainController),
               Expanded(
                 child: Stack(
                   clipBehavior: Clip.none,
