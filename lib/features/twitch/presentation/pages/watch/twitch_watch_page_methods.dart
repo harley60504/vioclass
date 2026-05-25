@@ -1,6 +1,6 @@
 // ignore_for_file: invalid_use_of_protected_member
 
-// Stage 220M legacy shell.
+// Legacy methods shell.
 //
 // The original monolithic WatchPage methods extension was split into:
 // - twitch_watch_page_preferences.dart
