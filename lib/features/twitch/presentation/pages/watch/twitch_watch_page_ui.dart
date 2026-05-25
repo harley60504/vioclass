@@ -3,6 +3,17 @@ part of '../twitch_watch_page.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension _TwitchWatchPageUiMethods on _TwitchWatchPageState {
+  void _notifyControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _setResolvedChannelId(String channelId) {
+    final next = channelId.trim();
+    if (next.isEmpty || next == _channelId) return;
+    _channelId = next;
+    if (mounted) setState(() {});
+  }
+
   Future<void> _enterMobileImmersiveByDefault() async {
     if (!TwitchFullscreenController.isMobilePlatform) return;
     try {

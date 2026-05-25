@@ -38,15 +38,15 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
 
     setState(() {
       _loadingWatch = true;
-      _playerError = null;
-      _engagementError = null;
-      _relationshipError = null;
       _chatBootstrapping = false;
       _engagementBootstrapping = false;
       _emoteBootstrapping = false;
       _relationshipBootstrapping = false;
-      _loadingSpecialMessages = false;
     });
+    _playbackController.resetError();
+    _engagementController.engagementError = null;
+    _relationshipController.relationshipError = null;
+    _chatController.loadingSpecialMessages = false;
 
     try {
       await _stopCurrentSession(clearStatus: false, cancelDeferredTasks: false);
@@ -66,31 +66,10 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
   }
 
   Future<void> _loadPlayer(String channel) async {
-    if (!_enableWatchPlayer) {
-      if (mounted) {
-        setState(() {
-          _loadingPlayer = false;
-          _playerError = null;
-        });
-      }
-      return;
-    }
-
-    setState(() {
-      _loadingPlayer = true;
-      _playerError = null;
-    });
-
-    try {
-      await _watchPorts.player.openLive(channelLogin: channel);
-      await _applyPlayerVolume();
-      await _waitForInitialPlaybackSettle();
-    } catch (error) {
-      _playerError = error.toString();
-      rethrow;
-    } finally {
-      if (mounted) setState(() => _loadingPlayer = false);
-    }
+    return _playbackController.loadPlayer(
+      channelLogin: channel,
+      enabled: _enableWatchPlayer,
+    );
   }
 
   Future<void> _waitForInitialPlaybackSettle() async {
@@ -192,7 +171,7 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       if (!_isCurrentWatchTask(generation, channel)) return;
       final nextChannelId = startup.channelId.trim();
       if (nextChannelId.isNotEmpty && nextChannelId != _channelId) {
-        setState(() => _channelId = nextChannelId);
+        _setResolvedChannelId(nextChannelId);
       }
     } catch (error) {
       debugPrint('prepare watch background snapshot failed: $error');
@@ -224,26 +203,20 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
       _cancelDeferredWatchTasks();
     }
 
-    await _chatRuntime?.disconnect();
+    await _chatController.disconnect();
     _watchPorts.emotes.clear();
+    _engagementController.reset();
+    _chatController.resetSpecialMessages();
+    _playbackController.resetError();
+    _relationshipController.reset();
 
     if (!mounted) return;
     setState(() {
       _channelId = null;
-      _channelPointsSnapshot = null;
-      _specialMessagesSnapshot = null;
-      _pendingSpecialMessage = null;
-      _prediction = null;
-      _pinnedMessages = const <dynamic>[];
-      _engagementError = null;
-      _playerError = null;
-      _relationshipError = null;
-      _isFollowing = false;
       _chatBootstrapping = false;
       _engagementBootstrapping = false;
       _emoteBootstrapping = false;
       _relationshipBootstrapping = false;
-      _loadingSpecialMessages = false;
     });
   }
 }
