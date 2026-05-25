@@ -213,7 +213,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                   : error != null
                   ? _OverlayMessage(
                       icon: Icons.error_outline_rounded,
-                      message: '載入貼圖清單失敗：$error',
+                      message: '載入貼圖清單失敗：',
                     )
                   : choosingModifier
                   ? _ModifierGrid(
@@ -412,7 +412,7 @@ class _ModifierGrid extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: preview == null ? null : () => onConfirm(preview),
-                  child: const Text('確定'),
+                  child: const Text('選擇'),
                 ),
               ),
             ],
@@ -437,7 +437,7 @@ class _ModifierActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: modifier.token,
+      message: _modifierLabel(_modifierKey(modifier)),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: () => onSelected(modifier),
@@ -455,31 +455,404 @@ class _ModifierActionButton extends StatelessWidget {
                   : TwitchUiColors.sheet.cardBorder,
             ),
           ),
-          child: Icon(
-            _modifierIcon(modifier.modifierId),
-            color: Colors.white,
-            size: 24,
-          ),
+          child: Center(child: _modifierIconWidget(modifier)),
         ),
       ),
     );
   }
 }
 
+Widget _modifierIconWidget(TwitchChannelPointEmoteModification modifier) {
+  switch (_modifierKey(modifier)) {
+    case 'BW':
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: CustomPaint(painter: _BlackWhiteModifierPainter()),
+      );
+    case 'HF':
+      return const SizedBox(
+        width: 24,
+        height: 24,
+        child: CustomPaint(painter: _HorizontalFlipModifierPainter()),
+      );
+    case 'SQ':
+      return const SizedBox(
+        width: 25,
+        height: 20,
+        child: CustomPaint(painter: _SquishModifierPainter()),
+      );
+    case 'SG':
+      return const SizedBox(
+        width: 27,
+        height: 18,
+        child: CustomPaint(painter: _SunglassesModifierPainter()),
+      );
+    case 'TK':
+      return const SizedBox(
+        width: 27,
+        height: 22,
+        child: CustomPaint(painter: _ThinkingHandModifierPainter()),
+      );
+    default:
+      return Icon(
+        _modifierIcon(modifier.modifierId),
+        color: Colors.white,
+        size: 24,
+      );
+  }
+}
+
+String _modifierKey(TwitchChannelPointEmoteModification modifier) {
+  final candidates = <String>[
+    modifier.modifierId,
+    modifier.id,
+    modifier.token,
+  ].map((value) => value.trim().toUpperCase());
+
+  for (final value in candidates) {
+    final compact = value.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (value == 'BW' ||
+        value.endsWith('_BW') ||
+        compact.endsWith('BW') ||
+        compact.contains('BLACKWHITE') ||
+        compact.contains('GRAYSCALE') ||
+        compact.contains('GREYSCALE')) {
+      return 'BW';
+    }
+    if (value == 'HF' ||
+        value.endsWith('_HF') ||
+        compact.endsWith('HF') ||
+        compact.contains('HORIZONTALFLIP') ||
+        compact.contains('FLIPHORIZONTAL')) {
+      return 'HF';
+    }
+    if (value == 'SQ' ||
+        value.endsWith('_SQ') ||
+        compact.endsWith('SQ') ||
+        compact.contains('SQUISH') ||
+        compact.contains('SQUEEZE') ||
+        compact.contains('COMPRESS')) {
+      return 'SQ';
+    }
+    if (value == 'SG' ||
+        value.endsWith('_SG') ||
+        compact.endsWith('SG') ||
+        compact.contains('SUNGLASSES')) {
+      return 'SG';
+    }
+    if (value == 'TK' ||
+        value.endsWith('_TK') ||
+        compact.endsWith('TK') ||
+        compact.contains('THINK')) {
+      return 'TK';
+    }
+  }
+  return modifier.modifierId.trim().toUpperCase();
+}
+
 IconData _modifierIcon(String modifierId) {
   switch (modifierId.trim().toUpperCase()) {
     case 'BW':
-      return Icons.contrast_rounded;
+      return Icons.filter_b_and_w;
     case 'HF':
       return Icons.flip_rounded;
     case 'SQ':
-      return Icons.unfold_less_rounded;
+      return Icons.compress_rounded;
     case 'SG':
-      return Icons.thumb_up_alt_rounded;
+      return Icons.dark_mode_rounded;
     case 'TK':
-      return Icons.auto_fix_high_rounded;
+      return Icons.back_hand_rounded;
     default:
       return Icons.auto_fix_high_rounded;
+  }
+}
+
+class _BlackWhiteModifierPainter extends CustomPainter {
+  const _BlackWhiteModifierPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final circle = Offset(size.width * 0.5, size.height * 0.5);
+    canvas.drawCircle(circle, size.shortestSide * 0.39, paint);
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.18, size.height * 0.82)
+        ..lineTo(size.width * 0.82, size.height * 0.18)
+        ..lineTo(size.width * 0.82, size.height * 0.42)
+        ..lineTo(size.width * 0.42, size.height * 0.82)
+        ..close(),
+      Paint()
+        ..color = const Color(0xFF18181B)
+        ..style = PaintingStyle.fill,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _HorizontalFlipModifierPainter extends CustomPainter {
+  const _HorizontalFlipModifierPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final line = Paint()
+      ..color = Colors.white
+      ..strokeWidth = size.width * 0.08
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          0,
+          size.height * 0.20,
+          size.width * 0.22,
+          size.height * 0.60,
+        ),
+        Radius.circular(size.width * 0.04),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.78,
+          size.height * 0.20,
+          size.width * 0.22,
+          size.height * 0.60,
+        ),
+        Radius.circular(size.width * 0.04),
+      ),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.50, size.height * 0.14),
+      Offset(size.width * 0.50, size.height * 0.86),
+      line,
+    );
+    for (final y in <double>[0.25, 0.40, 0.60, 0.75]) {
+      canvas.drawCircle(
+        Offset(size.width * 0.64, size.height * y),
+        size.width * 0.035,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SquishModifierPainter extends CustomPainter {
+  const _SquishModifierPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final radius = Radius.circular(size.height * 0.18);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.18,
+          size.height * 0.35,
+          size.width * 0.64,
+          size.height * 0.24,
+        ),
+        radius,
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          0,
+          size.height * 0.18,
+          size.width * 0.26,
+          size.height * 0.52,
+        ),
+        radius,
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.74,
+          size.height * 0.18,
+          size.width * 0.26,
+          size.height * 0.52,
+        ),
+        radius,
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SunglassesModifierPainter extends CustomPainter {
+  const _SunglassesModifierPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final lensWidth = size.width * 0.36;
+    final lensHeight = size.height * 0.62;
+    final top = size.height * 0.24;
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, top, lensWidth, lensHeight),
+        Radius.circular(size.height * 0.18),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(size.width - lensWidth, top, lensWidth, lensHeight),
+        Radius.circular(size.height * 0.18),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          lensWidth * 0.86,
+          top + lensHeight * 0.20,
+          size.width - lensWidth * 1.72,
+          lensHeight * 0.18,
+        ),
+        Radius.circular(size.height * 0.08),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.02,
+          0,
+          size.width * 0.24,
+          size.height * 0.16,
+        ),
+        Radius.circular(size.height * 0.08),
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.74,
+          0,
+          size.width * 0.24,
+          size.height * 0.16,
+        ),
+        Radius.circular(size.height * 0.08),
+      ),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _ThinkingHandModifierPainter extends CustomPainter {
+  const _ThinkingHandModifierPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    final radius = Radius.circular(size.height * 0.12);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.28,
+          size.height * 0.38,
+          size.width * 0.42,
+          size.height * 0.32,
+        ),
+        radius,
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.52,
+          size.height * 0.28,
+          size.width * 0.42,
+          size.height * 0.20,
+        ),
+        radius,
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.43,
+          size.height * 0.04,
+          size.width * 0.18,
+          size.height * 0.44,
+        ),
+        radius,
+      ),
+      paint,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(
+          size.width * 0.20,
+          size.height * 0.62,
+          size.width * 0.44,
+          size.height * 0.22,
+        ),
+        radius,
+      ),
+      paint,
+    );
+    canvas.drawCircle(
+      Offset(size.width * 0.72, size.height * 0.40),
+      size.height * 0.13,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+String _modifierLabel(String modifierId) {
+  switch (modifierId.trim().toUpperCase()) {
+    case 'BW':
+      return '黑白';
+    case 'HF':
+      return '水平翻轉';
+    case 'SQ':
+      return '壓縮';
+    case 'SG':
+      return '太陽眼鏡';
+    case 'TK':
+      return '思考中';
+    default:
+      return modifierId;
   }
 }
 
