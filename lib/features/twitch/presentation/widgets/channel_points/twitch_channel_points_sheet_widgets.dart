@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 
-import '../../localization/twitch_reward_localizer.dart';
+import '../../../localization/twitch_reward_localizer.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 import 'twitch_channel_points_sheet_utils.dart';
