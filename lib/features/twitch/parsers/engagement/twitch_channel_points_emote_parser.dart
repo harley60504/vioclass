@@ -184,7 +184,11 @@ class TwitchChannelPointsEmoteParser {
         }
       }
 
-      modifications.sort(
+      final effectiveModifications = modifications.isEmpty
+          ? _standardModifiedEmotes(base)
+          : modifications;
+
+      effectiveModifications.sort(
         (a, b) => a.token.toLowerCase().compareTo(b.token.toLowerCase()),
       );
 
@@ -193,7 +197,7 @@ class TwitchChannelPointsEmoteParser {
           id: base.id,
           token: base.token,
           emoteType: base.emoteType.isEmpty ? 'SUBSCRIPTION' : base.emoteType,
-          modifications: modifications,
+          modifications: effectiveModifications,
         ),
       );
     }
@@ -330,6 +334,22 @@ class TwitchChannelPointsEmoteParser {
 
     return output;
   }
+}
+
+List<TwitchChannelPointEmoteModification> _standardModifiedEmotes(
+  TwitchChannelPointEmoteOption base,
+) {
+  // Twitch's built-in modified emote suffixes are documented as:
+  // BW grayscale, HF horizontal flip, SQ squished, SG sunglasses, TK thinking.
+  return const <String>['BW', 'HF', 'SQ', 'SG', 'TK']
+      .map((suffix) {
+        return TwitchChannelPointEmoteModification(
+          id: '${base.id}_$suffix',
+          modifierId: suffix,
+          token: '${base.token}_$suffix',
+        );
+      })
+      .toList(growable: false);
 }
 
 /// Backward-compatible top-level helper for code that already imports the old

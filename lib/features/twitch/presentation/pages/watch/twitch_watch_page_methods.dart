@@ -1,5 +1,3 @@
-part of '../twitch_watch_page.dart';
-
 // ignore_for_file: invalid_use_of_protected_member
 
 // Stage 220M legacy shell.

@@ -139,6 +139,7 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
                 ),
                 emotes: _emoteOverlay.visibleEmotes(),
                 selectedBaseEmote: _emoteOverlay.selectedBaseEmote,
+                selectedModifier: _emoteOverlay.selectedModifier,
                 loading: _emoteOverlay.loading,
                 error: _emoteOverlay.error,
                 query: _emoteOverlay.query,
@@ -157,7 +158,8 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
                 onClose: _closeEmoteOverlay,
                 onReload: _reloadEmoteOverlay,
                 onChooseEmote: _completeChooseEmote,
-                onChooseModifier: _completeModifyEmote,
+                onChooseModifier: _previewModifyEmote,
+                onConfirmModifier: _completeModifyEmote,
               ),
             ),
         ],
@@ -287,6 +289,12 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     setState(() {
       _emoteCompleter = null;
       _emoteOverlay = const TwitchChannelPointsEmoteOverlayState.hidden();
+    });
+  }
+
+  void _previewModifyEmote(TwitchChannelPointEmoteModification modifier) {
+    setState(() {
+      _emoteOverlay = _emoteOverlay.selectModifier(modifier);
     });
   }
 

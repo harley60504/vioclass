@@ -12,6 +12,7 @@ class TwitchChannelPointsEmoteOverlayState {
   final Map<String, dynamic>? reward;
   final List<TwitchChannelPointEmoteOption> emotes;
   final TwitchChannelPointEmoteOption? selectedBaseEmote;
+  final TwitchChannelPointEmoteModification? selectedModifier;
   final bool loading;
   final String? error;
   final String query;
@@ -21,6 +22,7 @@ class TwitchChannelPointsEmoteOverlayState {
     required this.reward,
     required this.emotes,
     required this.selectedBaseEmote,
+    required this.selectedModifier,
     required this.loading,
     required this.error,
     required this.query,
@@ -31,6 +33,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward = null,
       emotes = const <TwitchChannelPointEmoteOption>[],
       selectedBaseEmote = null,
+      selectedModifier = null,
       loading = false,
       error = null,
       query = '';
@@ -46,6 +49,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: const <TwitchChannelPointEmoteOption>[],
       selectedBaseEmote: null,
+      selectedModifier: null,
       loading: true,
       error: null,
       query: '',
@@ -58,6 +62,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: const <TwitchChannelPointEmoteOption>[],
       selectedBaseEmote: null,
+      selectedModifier: null,
       loading: true,
       error: null,
       query: query,
@@ -72,6 +77,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: nextEmotes,
       selectedBaseEmote: selectedBaseEmote,
+      selectedModifier: selectedModifier,
       loading: false,
       error: null,
       query: query,
@@ -84,6 +90,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: emotes,
       selectedBaseEmote: selectedBaseEmote,
+      selectedModifier: selectedModifier,
       loading: false,
       error: error.toString(),
       query: query,
@@ -96,6 +103,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: emotes,
       selectedBaseEmote: selectedBaseEmote,
+      selectedModifier: selectedModifier,
       loading: loading,
       error: error,
       query: value.trim().toLowerCase(),
@@ -110,6 +118,7 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: emotes,
       selectedBaseEmote: emote,
+      selectedModifier: null,
       loading: loading,
       error: error,
       query: '',
@@ -122,9 +131,25 @@ class TwitchChannelPointsEmoteOverlayState {
       reward: reward,
       emotes: emotes,
       selectedBaseEmote: null,
+      selectedModifier: null,
       loading: loading,
       error: error,
       query: '',
+    );
+  }
+
+  TwitchChannelPointsEmoteOverlayState selectModifier(
+    TwitchChannelPointEmoteModification modifier,
+  ) {
+    return TwitchChannelPointsEmoteOverlayState(
+      mode: mode,
+      reward: reward,
+      emotes: emotes,
+      selectedBaseEmote: selectedBaseEmote,
+      selectedModifier: modifier,
+      loading: loading,
+      error: error,
+      query: query,
     );
   }
 

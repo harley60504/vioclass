@@ -1,71 +1,71 @@
-part of '../twitch_watch_page.dart';
+import '../twitch_watch_page.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
-extension _TwitchWatchPageEngagementMethods on _TwitchWatchPageState {
-  Future<void> _runDeferredEngagementStartup(
+extension TwitchWatchPageEngagementMethods on TwitchWatchPageState {
+  Future<void> runDeferredEngagementStartup(
     int generation,
     String channel,
   ) async {
     try {
-      await _refreshEngagement(
+      await refreshEngagement(
         showSnackOnError: false,
         notifyBalanceDelta: false,
       );
     } finally {
-      if (_isCurrentWatchTask(generation, channel)) {
-        setState(() => _engagementBootstrapping = false);
-        _ensureChannelPointPolling(generation: generation, channel: channel);
+      if (isCurrentWatchTask(generation, channel)) {
+        setState(() => engagementBootstrapping = false);
+        ensureChannelPointPolling(generation: generation, channel: channel);
       }
     }
   }
 
-  void _ensureChannelPointPolling({
+  void ensureChannelPointPolling({
     required int generation,
     required String channel,
   }) {
-    _engagementController.ensureChannelPointPolling(
+    engagementController.ensureChannelPointPolling(
       generation: generation,
       channel: channel,
-      engagementBootstrapping: () => _engagementBootstrapping,
+      engagementBootstrapping: () => engagementBootstrapping,
     );
   }
 
-  Future<void> _runDeferredEmoteStartup(int generation, String channel) async {
+  Future<void> runDeferredEmoteStartup(int generation, String channel) async {
     try {
-      await _loadThirdPartyEmotes();
+      await loadThirdPartyEmotes();
     } finally {
-      if (_isCurrentWatchTask(generation, channel)) {
-        setState(() => _emoteBootstrapping = false);
+      if (isCurrentWatchTask(generation, channel)) {
+        setState(() => emoteBootstrapping = false);
       }
     }
   }
 
-  Future<void> _loadThirdPartyEmotes({bool forceRefresh = false}) {
-    return _engagementController.loadThirdPartyEmotes(
+  Future<void> loadThirdPartyEmotes({bool forceRefresh = false}) {
+    return engagementController.loadThirdPartyEmotes(
       forceRefresh: forceRefresh,
     );
   }
 
-  Future<void> _refreshEngagement({
+  Future<void> refreshEngagement({
     bool showSnackOnError = true,
     bool notifyBalanceDelta = true,
   }) {
-    return _engagementController.refreshEngagement(
+    return engagementController.refreshEngagement(
       showSnackOnError: showSnackOnError,
       notifyBalanceDelta: notifyBalanceDelta,
     );
   }
 
-  Future<void> _openEmotePicker() {
-    return _sheetLauncher.openEmotePicker(context);
+  Future<void> openEmotePicker() {
+    return sheetLauncher.openEmotePicker(context);
   }
 
-  Future<void> _openChannelPointsSheet() {
-    return _sheetLauncher.openChannelPointsSheet(context);
+  Future<void> openChannelPointsSheet() {
+    return sheetLauncher.openChannelPointsSheet(context);
   }
 
-  Future<void> _openPredictionBetSheet() {
-    return _sheetLauncher.openPredictionBetSheet(context);
+  Future<void> openPredictionBetSheet() {
+    return sheetLauncher.openPredictionBetSheet(context);
   }
 }

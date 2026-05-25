@@ -1,8 +1,16 @@
-part of '../twitch_watch_page.dart';
+import 'package:media_kit/media_kit.dart';
 
-// ignore_for_file: invalid_use_of_protected_member
+import '../../../api/auth/twitch_auth_api_service.dart';
+import '../../../api/chat/twitch_recent_messages_api_service.dart';
+import '../../../api/core/twitch_api_client.dart';
+import '../../../services/auth/twitch_auth_service.dart';
+import '../../../services/auth/twitch_drops_auth_service.dart';
+import '../../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../../services/playback/twitch_media_kit_player_host.dart';
+import '../../../services/watch/twitch_watch_services.dart';
+import '../../watch/twitch_watch_feature_ports.dart';
 
-class _TwitchWatchSessionHandles {
+class TwitchWatchSessionHandles {
   final TwitchWatchServices services;
   final TwitchWatchFeaturePorts ports;
 
@@ -14,7 +22,7 @@ class _TwitchWatchSessionHandles {
   final TwitchRecentMessagesApiService recentMessagesApi;
   final TwitchMediaKitPlayerSession playerSession;
 
-  _TwitchWatchSessionHandles._({
+  TwitchWatchSessionHandles._({
     required this.services,
     required this.ports,
     required this.apiClient,
@@ -26,11 +34,11 @@ class _TwitchWatchSessionHandles {
     required this.playerSession,
   });
 
-  factory _TwitchWatchSessionHandles.create({required String playerTitle}) {
+  factory TwitchWatchSessionHandles.create({required String playerTitle}) {
     final services = TwitchWatchServices.create(playerTitle: playerTitle);
     final ports = TwitchWatchFeaturePorts.fromServices(services);
 
-    return _TwitchWatchSessionHandles._(
+    return TwitchWatchSessionHandles._(
       services: services,
       ports: ports,
       apiClient: services.apiClient,

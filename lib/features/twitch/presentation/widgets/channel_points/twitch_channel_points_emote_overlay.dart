@@ -13,6 +13,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
   final String rewardTitle;
   final List<TwitchChannelPointEmoteOption> emotes;
   final TwitchChannelPointEmoteOption? selectedBaseEmote;
+  final TwitchChannelPointEmoteModification? selectedModifier;
   final bool loading;
   final String? error;
   final String query;
@@ -22,6 +23,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
   final Future<void> Function() onReload;
   final ValueChanged<TwitchChannelPointEmoteOption> onChooseEmote;
   final ValueChanged<TwitchChannelPointEmoteModification> onChooseModifier;
+  final ValueChanged<TwitchChannelPointEmoteModification> onConfirmModifier;
 
   const ChannelPointEmoteMenuOverlay({
     super.key,
@@ -29,6 +31,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
     required this.rewardTitle,
     required this.emotes,
     required this.selectedBaseEmote,
+    required this.selectedModifier,
     required this.loading,
     required this.error,
     required this.query,
@@ -38,6 +41,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
     required this.onReload,
     required this.onChooseEmote,
     required this.onChooseModifier,
+    required this.onConfirmModifier,
   });
 
   @override
@@ -212,7 +216,12 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                       message: '載入貼圖清單失敗：$error',
                     )
                   : choosingModifier
-                  ? _ModifierGrid(emote: base, onSelected: onChooseModifier)
+                  ? _ModifierGrid(
+                      emote: base,
+                      selectedModifier: selectedModifier,
+                      onSelected: onChooseModifier,
+                      onConfirm: onConfirmModifier,
+                    )
                   : emotes.isEmpty
                   ? _EmoteEmptyMessage(mode: mode, query: query)
                   : _EmoteGrid(emotes: emotes, onSelected: onChooseEmote),
@@ -325,13 +334,21 @@ class _EmoteEmptyMessage extends StatelessWidget {
 
 class _ModifierGrid extends StatelessWidget {
   final TwitchChannelPointEmoteOption emote;
+  final TwitchChannelPointEmoteModification? selectedModifier;
   final ValueChanged<TwitchChannelPointEmoteModification> onSelected;
+  final ValueChanged<TwitchChannelPointEmoteModification> onConfirm;
 
-  const _ModifierGrid({required this.emote, required this.onSelected});
+  const _ModifierGrid({
+    required this.emote,
+    required this.selectedModifier,
+    required this.onSelected,
+    required this.onConfirm,
+  });
 
   @override
   Widget build(BuildContext context) {
     final modifications = emote.modifications;
+    final preview = selectedModifier;
 
     if (modifications.isEmpty) {
       return const _OverlayMessage(
@@ -340,72 +357,129 @@ class _ModifierGrid extends StatelessWidget {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth >= 760
-            ? 5
-            : constraints.maxWidth >= 560
-            ? 4
-            : constraints.maxWidth >= 420
-            ? 3
-            : 2;
-
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 16),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            mainAxisExtent: constraints.maxWidth < 420 ? 104.0 : 114.0,
-          ),
-          itemCount: modifications.length,
-          itemBuilder: (context, index) {
-            final modifier = modifications[index];
-            return RepaintBoundary(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => onSelected(modifier),
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: TwitchUiColors.sheet.cardFill,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: TwitchUiColors.sheet.cardBorder),
-                  ),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Center(
-                          child: _OptimizedChannelPointEmoteImage(
-                            imageUrl: modifier.imageUrl.isNotEmpty
-                                ? modifier.imageUrl
-                                : emote.imageUrl,
-                            cacheSize: _channelPointModifierCacheSize,
-                            fallbackIcon: Icons.auto_fix_high_rounded,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        modifier.token,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black,
+                  border: Border.all(color: const Color(0xFFFFF232), width: 2),
+                ),
+                child: ClipOval(
+                  child: _OptimizedChannelPointEmoteImage(
+                    imageUrl: preview?.imageUrl ?? emote.imageUrl,
+                    cacheSize: _channelPointModifierCacheSize,
                   ),
                 ),
               ),
-            );
-          },
-        );
-      },
+              const SizedBox(height: 8),
+              Text(
+                preview?.token ?? emote.token,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  for (final modifier in modifications)
+                    _ModifierActionButton(
+                      modifier: modifier,
+                      selected: modifier.id == preview?.id,
+                      onSelected: onSelected,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: preview == null ? null : () => onConfirm(preview),
+                  child: const Text('確定'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
+  }
+}
+
+class _ModifierActionButton extends StatelessWidget {
+  final TwitchChannelPointEmoteModification modifier;
+  final bool selected;
+  final ValueChanged<TwitchChannelPointEmoteModification> onSelected;
+
+  const _ModifierActionButton({
+    required this.modifier,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: modifier.token,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(6),
+        onTap: () => onSelected(modifier),
+        child: Container(
+          width: 56,
+          height: 50,
+          decoration: BoxDecoration(
+            color: selected
+                ? TwitchUiColors.primary.withValues(alpha: 0.24)
+                : TwitchUiColors.sheet.cardFill,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: selected
+                  ? TwitchUiColors.primary
+                  : TwitchUiColors.sheet.cardBorder,
+            ),
+          ),
+          child: Icon(
+            _modifierIcon(modifier.modifierId),
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _modifierIcon(String modifierId) {
+  switch (modifierId.trim().toUpperCase()) {
+    case 'BW':
+      return Icons.contrast_rounded;
+    case 'HF':
+      return Icons.flip_rounded;
+    case 'SQ':
+      return Icons.unfold_less_rounded;
+    case 'SG':
+      return Icons.thumb_up_alt_rounded;
+    case 'TK':
+      return Icons.auto_fix_high_rounded;
+    default:
+      return Icons.auto_fix_high_rounded;
   }
 }
 
@@ -443,19 +517,17 @@ class _OverlayMessage extends StatelessWidget {
 class _OptimizedChannelPointEmoteImage extends StatelessWidget {
   final String imageUrl;
   final int cacheSize;
-  final IconData fallbackIcon;
 
   const _OptimizedChannelPointEmoteImage({
     required this.imageUrl,
     required this.cacheSize,
-    this.fallbackIcon = Icons.emoji_emotions,
   });
 
   @override
   Widget build(BuildContext context) {
     final url = imageUrl.trim();
     if (url.isEmpty) {
-      return Icon(fallbackIcon, color: Colors.white54);
+      return const Icon(Icons.emoji_emotions, color: Colors.white54);
     }
 
     return RepaintBoundary(
@@ -465,7 +537,8 @@ class _OptimizedChannelPointEmoteImage extends StatelessWidget {
         cacheWidth: cacheSize,
         cacheHeight: cacheSize,
         filterQuality: FilterQuality.low,
-        errorBuilder: (_, _, _) => Icon(fallbackIcon, color: Colors.white54),
+        errorBuilder: (_, _, _) =>
+            const Icon(Icons.emoji_emotions, color: Colors.white54),
       ),
     );
   }

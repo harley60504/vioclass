@@ -1,40 +1,42 @@
-part of '../twitch_watch_page.dart';
+import 'dart:async';
+
+import '../twitch_watch_page.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
-extension _TwitchWatchPagePreferenceMethods on _TwitchWatchPageState {
-  Future<void> _loadWatchPreferences() async {
-    await _preferencesController.load();
-    _bindPlayerVolumeStream();
+extension TwitchWatchPagePreferenceMethods on TwitchWatchPageState {
+  Future<void> loadWatchPreferences() async {
+    await preferencesController.load();
+    bindPlayerVolumeStream();
   }
 
-  void _bindPlayerVolumeStream() {
-    final previousCancel = _playerVolumeSubscription?.cancel();
+  void bindPlayerVolumeStream() {
+    final previousCancel = playerVolumeSubscription?.cancel();
     if (previousCancel != null) unawaited(previousCancel);
-    _playerVolumeSubscription = null;
+    playerVolumeSubscription = null;
   }
 
-  Future<void> _setPlayerVolume(double value) {
-    return _preferencesController.setPlayerVolume(value);
+  Future<void> setPlayerVolume(double value) {
+    return preferencesController.setPlayerVolume(value);
   }
 
-  Future<void> _togglePlayerMute() {
-    return _preferencesController.togglePlayerMute();
+  Future<void> togglePlayerMute() {
+    return preferencesController.togglePlayerMute();
   }
 
-  Future<void> _applyPlayerVolume() {
-    return _preferencesController.applyPlayerVolume();
+  Future<void> applyPlayerVolume() {
+    return preferencesController.applyPlayerVolume();
   }
 
-  Future<void> _saveChatPanelWidthPreference() {
-    return _preferencesController.saveChatPanelWidthPreference();
+  Future<void> saveChatPanelWidthPreference() {
+    return preferencesController.saveChatPanelWidthPreference();
   }
 
-  void _setChatPanelWidthForViewport({
+  void setChatPanelWidthForViewport({
     required double viewportWidth,
     required double value,
   }) {
-    _preferencesController.setChatPanelWidthForViewport(
+    preferencesController.setChatPanelWidthForViewport(
       viewportWidth: viewportWidth,
       value: value,
     );

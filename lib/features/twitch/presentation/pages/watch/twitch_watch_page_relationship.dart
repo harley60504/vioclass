@@ -1,40 +1,41 @@
-part of '../twitch_watch_page.dart';
+import '../../dialogs/twitch_subscribe_webview_dialog_v1.dart';
+import '../twitch_watch_page.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
-extension _TwitchWatchPageRelationshipMethods on _TwitchWatchPageState {
-  Future<void> _runDeferredRelationshipStartup(
+extension TwitchWatchPageRelationshipMethods on TwitchWatchPageState {
+  Future<void> runDeferredRelationshipStartup(
     int generation,
     String channel,
   ) async {
     try {
-      await _refreshRelationshipStatus(channelLogin: channel);
+      await refreshRelationshipStatus(channelLogin: channel);
     } finally {
-      if (_isCurrentWatchTask(generation, channel)) {
-        setState(() => _relationshipBootstrapping = false);
+      if (isCurrentWatchTask(generation, channel)) {
+        setState(() => relationshipBootstrapping = false);
       }
     }
   }
 
-  Future<void> _refreshRelationshipStatus({String? channelLogin}) {
-    return _relationshipController.refreshRelationshipStatus(
+  Future<void> refreshRelationshipStatus({String? channelLogin}) {
+    return relationshipController.refreshRelationshipStatus(
       targetChannelLogin: channelLogin,
     );
   }
 
-  Future<void> _toggleFollowChannel() {
-    return _relationshipController.toggleFollowChannel();
+  Future<void> toggleFollowChannel() {
+    return relationshipController.toggleFollowChannel();
   }
 
-  Future<void> _openSubscribePage() async {
+  Future<void> openSubscribePage() async {
     try {
       await showTwitchSubscribeWebViewDialogV1(
         context: context,
-        initialUri: _relationshipController.buildSubscribeUri(),
-        channelLogin: _channelLogin,
+        initialUri: relationshipController.buildSubscribeUri(),
+        channelLogin: channelLogin,
       );
     } catch (error) {
-      _showSnack('開啟訂閱頁失敗：$error');
+      showSnack('開啟訂閱頁失敗：$error');
     }
   }
 }

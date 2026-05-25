@@ -1,79 +1,86 @@
-part of '../twitch_watch_page.dart';
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
+import '../twitch_watch_page.dart';
+import 'twitch_watch_page_chat.dart';
+import 'twitch_watch_page_engagement.dart';
+import 'twitch_watch_page_relationship.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
-extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
-  Future<void> _loadAuth() async {
-    setState(() => _loadingAuth = true);
+extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
+  Future<void> loadAuth() async {
+    setState(() => loadingAuth = true);
     try {
-      await _authService.loadStoredSession();
-      await _webGqlAuthService.loadStoredSession();
-      await _dropsAuthService.loadStoredSession();
+      await authService.loadStoredSession();
+      await webGqlAuthService.loadStoredSession();
+      await dropsAuthService.loadStoredSession();
 
-      final token = await _authService.getValidAccessToken();
+      final token = await authService.getValidAccessToken();
       if (token == null || token.isEmpty) {
-        if (mounted) setState(() => _loadingAuth = false);
+        if (mounted) setState(() => loadingAuth = false);
         return;
       }
 
-      final validation = await _authApi.validateToken(token);
+      final validation = await authApi.validateToken(token);
       if (!mounted) return;
       setState(() {
-        _viewerLogin = validation.login;
-        _viewerId = validation.userId;
-        _loadingAuth = false;
+        viewerLogin = validation.login;
+        viewerId = validation.userId;
+        loadingAuth = false;
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _loadingAuth = false);
-      _showSnack('OAuth 載入失敗：$error');
+      setState(() => loadingAuth = false);
+      showSnack('OAuth 載入失敗：$error');
     }
   }
 
-  Future<void> _loadWatch() async {
-    if (_loadingWatch) return;
-    final channel = _channelLogin;
-    _cancelDeferredWatchTasks();
-    final generation = ++_watchLoadGeneration;
+  Future<void> loadWatch() async {
+    if (loadingWatch) return;
+    final channel = channelLogin;
+    cancelDeferredWatchTasks();
+    final generation = ++watchLoadGeneration;
 
     setState(() {
-      _loadingWatch = true;
-      _chatBootstrapping = false;
-      _engagementBootstrapping = false;
-      _emoteBootstrapping = false;
-      _relationshipBootstrapping = false;
+      loadingWatch = true;
+      chatBootstrapping = false;
+      engagementBootstrapping = false;
+      emoteBootstrapping = false;
+      relationshipBootstrapping = false;
     });
-    _playbackController.resetError();
-    _engagementController.engagementError = null;
-    _relationshipController.relationshipError = null;
-    _chatController.loadingSpecialMessages = false;
+    playbackController.resetError();
+    engagementController.engagementError = null;
+    relationshipController.relationshipError = null;
+    chatController.loadingSpecialMessages = false;
 
     try {
-      await _stopCurrentSession(clearStatus: false, cancelDeferredTasks: false);
-      if (!_isCurrentWatchTask(generation, channel)) return;
+      await stopCurrentSession(clearStatus: false, cancelDeferredTasks: false);
+      if (!isCurrentWatchTask(generation, channel)) return;
 
-      setState(() => _loadingWatch = false);
+      setState(() => loadingWatch = false);
       unawaited(
-        _runWatchStartupPipeline(channel: channel, generation: generation),
+        runWatchStartupPipeline(channel: channel, generation: generation),
       );
     } catch (error) {
-      if (mounted) _showSnack('載入 Watch Page 失敗：$error');
+      if (mounted) showSnack('載入 Watch Page 失敗：$error');
     } finally {
-      if (mounted && generation == _watchLoadGeneration && _loadingWatch) {
-        setState(() => _loadingWatch = false);
+      if (mounted && generation == watchLoadGeneration && loadingWatch) {
+        setState(() => loadingWatch = false);
       }
     }
   }
 
-  Future<void> _loadPlayer(String channel) async {
-    return _playbackController.loadPlayer(
+  Future<void> loadPlayer(String channel) async {
+    return playbackController.loadPlayer(
       channelLogin: channel,
-      enabled: _enableWatchPlayer,
+      enabled: enableWatchPlayer,
     );
   }
 
-  Future<void> _waitForInitialPlaybackSettle() async {
-    final player = _playerSession.playerOrNull;
+  Future<void> waitForInitialPlaybackSettle() async {
+    final player = playerSession.playerOrNull;
     if (player == null) return;
 
     if (player.state.playing) {
@@ -100,7 +107,7 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     return completer.future;
   }
 
-  Future<void> _runWatchStartupPipeline({
+  Future<void> runWatchStartupPipeline({
     required String channel,
     required int generation,
   }) async {
@@ -111,112 +118,112 @@ extension _TwitchWatchPageStartupMethods on _TwitchWatchPageState {
     //    background work, so the blocking mask still only waits on player/chat.
     // 3. Relationship / emotes continue as background tasks after the startup
     //    snapshot gives us channelId.
-    await _yieldToUi();
-    if (!_isCurrentWatchTask(generation, channel)) return;
+    await yieldToUi();
+    if (!isCurrentWatchTask(generation, channel)) return;
 
-    if (_enableWatchPlayer) {
+    if (enableWatchPlayer) {
       try {
-        await _loadPlayer(channel);
+        await loadPlayer(channel);
       } catch (error) {
-        if (!_isCurrentWatchTask(generation, channel)) return;
-        _showSnack('播放器載入失敗：$error');
+        if (!isCurrentWatchTask(generation, channel)) return;
+        showSnack('播放器載入失敗：$error');
       }
     }
 
-    await _yieldToUi();
-    if (!_isCurrentWatchTask(generation, channel)) return;
+    await yieldToUi();
+    if (!isCurrentWatchTask(generation, channel)) return;
 
     setState(() {
-      _chatBootstrapping = true;
-      _relationshipBootstrapping = true;
-      _engagementBootstrapping = true;
-      _emoteBootstrapping = true;
+      chatBootstrapping = true;
+      relationshipBootstrapping = true;
+      engagementBootstrapping = true;
+      emoteBootstrapping = true;
     });
 
     unawaited(
-      _runWatchBackgroundStartup(channel: channel, generation: generation),
+      runWatchBackgroundStartup(channel: channel, generation: generation),
     );
-    await _runDeferredChatStartup(channel, generation);
+    await runDeferredChatStartup(channel, generation);
   }
 
-  Future<void> _runWatchBackgroundStartup({
+  Future<void> runWatchBackgroundStartup({
     required String channel,
     required int generation,
   }) async {
-    if (!_isCurrentWatchTask(generation, channel)) return;
+    if (!isCurrentWatchTask(generation, channel)) return;
 
-    await _prepareWatchBackgroundSnapshot(generation, channel);
-    if (!_isCurrentWatchTask(generation, channel)) return;
+    await prepareWatchBackgroundSnapshot(generation, channel);
+    if (!isCurrentWatchTask(generation, channel)) return;
 
     await Future.wait<void>([
-      _runDeferredRelationshipStartup(generation, channel),
-      _runDeferredEngagementStartup(generation, channel),
-      _runDeferredEmoteStartup(generation, channel),
-      _runDeferredSpecialMessagesStartup(generation, channel),
+      runDeferredRelationshipStartup(generation, channel),
+      runDeferredEngagementStartup(generation, channel),
+      runDeferredEmoteStartup(generation, channel),
+      runDeferredSpecialMessagesStartup(generation, channel),
     ]);
   }
 
-  Future<void> _yieldToUi() async {
+  Future<void> yieldToUi() async {
     await Future<void>.delayed(Duration.zero);
   }
 
-  Future<void> _prepareWatchBackgroundSnapshot(
+  Future<void> prepareWatchBackgroundSnapshot(
     int generation,
     String channel,
   ) async {
     try {
-      final startup = await _watchPorts.chat.fetchStartupSnapshot(
+      final startup = await watchPorts.chat.fetchStartupSnapshot(
         channelLogin: channel,
       );
-      if (!_isCurrentWatchTask(generation, channel)) return;
+      if (!isCurrentWatchTask(generation, channel)) return;
       final nextChannelId = startup.channelId.trim();
-      if (nextChannelId.isNotEmpty && nextChannelId != _channelId) {
-        _setResolvedChannelId(nextChannelId);
+      if (nextChannelId.isNotEmpty && nextChannelId != channelId) {
+        setResolvedChannelId(nextChannelId);
       }
     } catch (error) {
       debugPrint('prepare watch background snapshot failed: $error');
     }
   }
 
-  bool _isCurrentWatchTask(int generation, String channel) {
+  bool isCurrentWatchTask(int generation, String channel) {
     return mounted &&
-        generation == _watchLoadGeneration &&
-        channel.trim().toLowerCase() == _channelLogin;
+        generation == watchLoadGeneration &&
+        channel.trim().toLowerCase() == channelLogin;
   }
 
-  void _cancelDeferredWatchTasks() {
+  void cancelDeferredWatchTasks() {
     if (!mounted) return;
     setState(() {
-      _chatBootstrapping = false;
-      _engagementBootstrapping = false;
-      _emoteBootstrapping = false;
-      _relationshipBootstrapping = false;
+      chatBootstrapping = false;
+      engagementBootstrapping = false;
+      emoteBootstrapping = false;
+      relationshipBootstrapping = false;
     });
   }
 
-  Future<void> _stopCurrentSession({
+  Future<void> stopCurrentSession({
     bool clearStatus = true,
     bool cancelDeferredTasks = true,
   }) async {
     if (cancelDeferredTasks) {
-      _watchLoadGeneration++;
-      _cancelDeferredWatchTasks();
+      watchLoadGeneration++;
+      cancelDeferredWatchTasks();
     }
 
-    await _chatController.disconnect();
-    _watchPorts.emotes.clear();
-    _engagementController.reset();
-    _chatController.resetSpecialMessages();
-    _playbackController.resetError();
-    _relationshipController.reset();
+    await chatController.disconnect();
+    watchPorts.emotes.clear();
+    engagementController.reset();
+    chatController.resetSpecialMessages();
+    playbackController.resetError();
+    relationshipController.reset();
 
     if (!mounted) return;
     setState(() {
-      _channelId = null;
-      _chatBootstrapping = false;
-      _engagementBootstrapping = false;
-      _emoteBootstrapping = false;
-      _relationshipBootstrapping = false;
+      channelId = null;
+      chatBootstrapping = false;
+      engagementBootstrapping = false;
+      emoteBootstrapping = false;
+      relationshipBootstrapping = false;
     });
   }
 }
