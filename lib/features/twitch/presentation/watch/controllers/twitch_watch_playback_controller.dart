@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+import '../twitch_watch_feature_ports.dart';
+
 class TwitchWatchPlaybackController extends ChangeNotifier {
-  final dynamic playerPort;
+  final TwitchWatchPlayerPort playerPort;
   final Future<void> Function() applyPlayerVolume;
   final Future<void> Function() waitForInitialPlaybackSettle;
 
