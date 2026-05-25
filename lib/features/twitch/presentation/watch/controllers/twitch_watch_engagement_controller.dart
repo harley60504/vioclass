@@ -44,7 +44,9 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   }) : hypeTrainController =
            hypeTrainController ??
            TwitchHypeTrainController(
-             api: const TwitchHypeTrainApiService(),
+             api:
+                 engagementPort.services?.hypeTrainApi ??
+                 const TwitchHypeTrainApiService(),
              isCurrentChannel: (login) =>
                  login.trim().toLowerCase() == channelLogin(),
            );

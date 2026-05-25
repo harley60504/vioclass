@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../models/engagement/twitch_hype_train.dart';
+import '../core/twitch_web_gql_persisted_api_service.dart';
 
 typedef TwitchHypeTrainCommandExecutor =
     Future<Object?> Function({
@@ -11,17 +12,22 @@ typedef TwitchHypeTrainCommandExecutor =
 class TwitchHypeTrainApiService {
   static const String getStatusOperationName = 'get_hype_train_status';
   static const String getBulkStatusOperationName = 'get_bulk_hype_train_status';
+  static const String _twitchOperationName = 'GetHypeTrainExecution';
+  static const String _twitchSha256Hash =
+      '086b4f88754c8270672b32069ff64695e5ee95c678fb7fe57bb027d12f8c83f7';
 
   final Object? client;
   final String? clientId;
   final Future<String?> Function()? accessTokenProvider;
   final TwitchHypeTrainCommandExecutor? commandExecutor;
+  final TwitchWebGqlPersistedApiService? gql;
 
   const TwitchHypeTrainApiService({
     this.client,
     this.clientId,
     this.accessTokenProvider,
     this.commandExecutor,
+    this.gql,
   });
 
   Future<TwitchHypeTrainSnapshot> getHypeTrainSnapshot({
@@ -37,6 +43,25 @@ class TwitchHypeTrainApiService {
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) return null;
+
+    final gql = this.gql;
+    if (gql != null) {
+      final raw = await gql.single(
+        TwitchWebGqlPersistedOperation(
+          operationName: _twitchOperationName,
+          variables: <String, dynamic>{'userLogin': login},
+          sha256Hash: _twitchSha256Hash,
+        ),
+      );
+      if (raw.hasErrors) {
+        debugPrint('$_twitchOperationName returned errors: ${raw.response}');
+        return null;
+      }
+      return TwitchHypeTrainSnapshot.fromDynamic(
+        raw.response,
+        fallbackChannelLogin: login,
+      );
+    }
 
     final executor = commandExecutor;
     if (executor == null) {
@@ -75,6 +100,31 @@ class TwitchHypeTrainApiService {
     }.toList(growable: false);
 
     if (uniqueLogins.isEmpty) return const <String, TwitchHypeTrainSnapshot?>{};
+
+    final gql = this.gql;
+    if (gql != null) {
+      final results = await gql.batch(
+        uniqueLogins
+            .map(
+              (login) => TwitchWebGqlPersistedOperation(
+                operationName: _twitchOperationName,
+                variables: <String, dynamic>{'userLogin': login},
+                sha256Hash: _twitchSha256Hash,
+              ),
+            )
+            .toList(growable: false),
+      );
+
+      return <String, TwitchHypeTrainSnapshot?>{
+        for (var i = 0; i < uniqueLogins.length; i++)
+          uniqueLogins[i]: i < results.length && !results[i].hasErrors
+              ? TwitchHypeTrainSnapshot.fromDynamic(
+                  results[i].response,
+                  fallbackChannelLogin: uniqueLogins[i],
+                )
+              : null,
+      };
+    }
 
     final executor = commandExecutor;
     if (executor == null) {

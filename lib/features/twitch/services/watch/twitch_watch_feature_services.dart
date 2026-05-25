@@ -1,4 +1,4 @@
-﻿// PATCH VERSION: twitch_watch_feature_services_stage251b_special_message_debug
+// PATCH VERSION: twitch_watch_feature_services_stage251b_special_message_debug
 //
 // Feature-facing service groups for Watch composition.
 //
@@ -15,6 +15,7 @@ import '../../api/core/twitch_gql_api_service.dart';
 import '../../api/core/twitch_web_gql_persisted_api_service.dart';
 import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../api/engagement/twitch_drops_prediction_api_service.dart';
+import '../../api/engagement/twitch_hype_train_api_service.dart';
 import '../../api/engagement/twitch_pinned_chat_api_service.dart';
 import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../api/engagement/twitch_subscribe_api_service_v1.dart';
@@ -95,6 +96,7 @@ class TwitchWatchEngagementServices {
   final TwitchPinnedChatApiService pinnedChatApi;
   final TwitchPredictionApiService publicPredictionApi;
   final TwitchDropsPredictionApiService dropsPredictionApi;
+  final TwitchHypeTrainApiService hypeTrainApi;
 
   const TwitchWatchEngagementServices({
     required this.channelPointsApi,
@@ -102,6 +104,7 @@ class TwitchWatchEngagementServices {
     required this.pinnedChatApi,
     required this.publicPredictionApi,
     required this.dropsPredictionApi,
+    required this.hypeTrainApi,
   });
 }
 

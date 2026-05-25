@@ -10,6 +10,7 @@ import '../../api/emotes/twitch_official_emote_api_service.dart';
 import '../../api/emotes/twitch_third_party_emote_api_service.dart';
 import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../api/engagement/twitch_drops_prediction_api_service.dart';
+import '../../api/engagement/twitch_hype_train_api_service.dart';
 import '../../api/engagement/twitch_pinned_chat_api_service.dart';
 import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../api/engagement/twitch_streamnook_modified_emote_redeem_api.dart';
@@ -204,6 +205,7 @@ class TwitchWatchServices {
     final publicPredictionApi = TwitchPredictionApiService(
       gql: publicWebGqlApi,
     );
+    final hypeTrainApi = TwitchHypeTrainApiService(gql: publicWebGqlApi);
     final dropsPredictionApi = TwitchDropsPredictionApiService(
       client: apiClient,
       tokenProvider: dropsAuthService.getToken,
@@ -257,6 +259,7 @@ class TwitchWatchServices {
       pinnedChatApi: pinnedChatApi,
       publicPredictionApi: publicPredictionApi,
       dropsPredictionApi: dropsPredictionApi,
+      hypeTrainApi: hypeTrainApi,
     );
     final specialMessagesStage251 = TwitchWatchSpecialMessageServicesStage251(
       api: specialMessageApiStage251,
