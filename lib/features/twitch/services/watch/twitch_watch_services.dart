@@ -25,7 +25,6 @@ import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
-import '../../services/special_actions/twitch_viewer_special_message_debug_probe.dart';
 import '../../services/special_actions/twitch_viewer_special_message_runtime.dart';
 import 'twitch_watch_feature_services.dart';
 
@@ -53,8 +52,6 @@ class TwitchWatchServices {
   final TwitchDropsPredictionApiService dropsPredictionApi;
   final TwitchViewerSpecialMessageApiServiceStage251 specialMessageApiStage251;
   final TwitchViewerSpecialMessageRuntimeStage251 specialMessageRuntimeStage251;
-  final TwitchViewerSpecialMessageDebugProbeStage251
-  specialMessageDebugProbeStage251;
   final TwitchMediaKitPlayerSession playerSession;
 
   final TwitchWatchCoreServices core;
@@ -90,7 +87,6 @@ class TwitchWatchServices {
     required this.dropsPredictionApi,
     required this.specialMessageApiStage251,
     required this.specialMessageRuntimeStage251,
-    required this.specialMessageDebugProbeStage251,
     required this.playerSession,
     required this.core,
     required this.auth,
@@ -219,14 +215,6 @@ class TwitchWatchServices {
         TwitchViewerSpecialMessageRuntimeStage251(
           api: specialMessageApiStage251,
         );
-    final specialMessageDebugProbeStage251 =
-        TwitchViewerSpecialMessageDebugProbeStage251(
-          api: specialMessageApiStage251,
-          runtime: specialMessageRuntimeStage251,
-          webTokenProvider: webGqlAuthService.getToken,
-          dropsTokenProvider: dropsAuthService.getToken,
-          dropsClientIdProvider: () => dropsAuthService.dropsClientId,
-        );
     final playerSession = TwitchMediaKitPlayerHost.acquire(title: playerTitle);
 
     final core = TwitchWatchCoreServices(
@@ -264,7 +252,6 @@ class TwitchWatchServices {
     final specialMessagesStage251 = TwitchWatchSpecialMessageServicesStage251(
       api: specialMessageApiStage251,
       runtime: specialMessageRuntimeStage251,
-      debugProbe: specialMessageDebugProbeStage251,
     );
     final relationship = TwitchWatchRelationshipServices(
       relationshipApi: relationshipApi,
@@ -295,7 +282,6 @@ class TwitchWatchServices {
       dropsPredictionApi: dropsPredictionApi,
       specialMessageApiStage251: specialMessageApiStage251,
       specialMessageRuntimeStage251: specialMessageRuntimeStage251,
-      specialMessageDebugProbeStage251: specialMessageDebugProbeStage251,
       playerSession: playerSession,
       core: core,
       auth: auth,

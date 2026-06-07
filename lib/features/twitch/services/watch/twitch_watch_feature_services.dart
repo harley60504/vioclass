@@ -29,7 +29,6 @@ import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
-import '../../services/special_actions/twitch_viewer_special_message_debug_probe.dart';
 import '../../services/special_actions/twitch_viewer_special_message_runtime.dart';
 
 class TwitchWatchCoreServices {
@@ -111,12 +110,10 @@ class TwitchWatchEngagementServices {
 class TwitchWatchSpecialMessageServicesStage251 {
   final TwitchViewerSpecialMessageApiServiceStage251 api;
   final TwitchViewerSpecialMessageRuntimeStage251 runtime;
-  final TwitchViewerSpecialMessageDebugProbeStage251 debugProbe;
 
   const TwitchWatchSpecialMessageServicesStage251({
     required this.api,
     required this.runtime,
-    required this.debugProbe,
   });
 }
 

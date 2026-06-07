@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
-import '../../sheets/twitch_special_message_debug_probe_sheet.dart';
 import '../../sheets/twitch_special_message_sheet.dart';
 import '../twitch_watch_page.dart';
 
@@ -138,31 +137,6 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
         );
         return true;
       },
-      onOpenDebugProbe: openSpecialMessageDebugProbeSheet,
-    );
-  }
-
-  Future<void> openSpecialMessageDebugProbeSheet() async {
-    await showTwitchSpecialMessageDebugProbeSheetStage251(
-      context: context,
-      onRunProbe: () => watchServices.specialMessagesStage251.debugProbe.run(
-        channelLogin: channelLogin,
-        channelId: channelId,
-        viewerId: viewerId,
-      ),
-      onRunCustomPersistedOperation:
-          ({
-            required operationName,
-            required sha256Hash,
-            required variables,
-            useAndroidClient = false,
-          }) => watchServices.specialMessagesStage251.debugProbe
-              .runCustomPersistedOperation(
-                operationName: operationName,
-                sha256Hash: sha256Hash,
-                variables: variables,
-                useAndroidClient: useAndroidClient,
-              ),
     );
   }
 

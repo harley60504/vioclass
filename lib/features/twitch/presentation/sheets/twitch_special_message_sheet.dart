@@ -15,7 +15,6 @@ Future<void> showTwitchSpecialMessageSheetStage251({
   required void Function(TwitchResubNotificationStage251 resub) onShareResub,
   required Future<bool> Function(TwitchChatIdentityBadgeStage251 badge)
   onSelectBadge,
-  required VoidCallback onOpenDebugProbe,
 }) {
   return showTwitchResponsiveSheet<void>(
     context: context,
@@ -27,7 +26,6 @@ Future<void> showTwitchSpecialMessageSheetStage251({
       onShareWatchStreak: onShareWatchStreak,
       onShareResub: onShareResub,
       onSelectBadge: onSelectBadge,
-      onOpenDebugProbe: onOpenDebugProbe,
     ),
   );
 }
@@ -42,7 +40,6 @@ class _TwitchSpecialMessageSheetStage251 extends StatefulWidget {
   final void Function(TwitchResubNotificationStage251 resub) onShareResub;
   final Future<bool> Function(TwitchChatIdentityBadgeStage251 badge)
   onSelectBadge;
-  final VoidCallback onOpenDebugProbe;
 
   const _TwitchSpecialMessageSheetStage251({
     required this.initialSnapshot,
@@ -51,7 +48,6 @@ class _TwitchSpecialMessageSheetStage251 extends StatefulWidget {
     required this.onShareWatchStreak,
     required this.onShareResub,
     required this.onSelectBadge,
-    required this.onOpenDebugProbe,
   });
 
   @override
@@ -88,9 +84,6 @@ class _TwitchSpecialMessageSheetStage251State
       icon: Icons.auto_awesome_rounded,
       loading: _loading,
       onRefresh: _loading ? null : _refresh,
-      trailing: <Widget>[
-        _TwitchSpecialMessageDebugButton(onPressed: widget.onOpenDebugProbe),
-      ],
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
         child: Column(
@@ -169,38 +162,6 @@ class _TwitchSpecialMessageSheetStage251State
     } finally {
       if (mounted) setState(() => _selectingBadgeId = null);
     }
-  }
-}
-
-class _TwitchSpecialMessageDebugButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _TwitchSpecialMessageDebugButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: 'Debug',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        onTap: onPressed,
-        child: Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: TwitchUiColors.sheet.cardFill,
-            shape: BoxShape.circle,
-            border: Border.all(color: TwitchUiColors.sheet.cardBorder),
-          ),
-          child: const Icon(
-            Icons.science_rounded,
-            color: TwitchUiColors.primarySoft,
-            size: 19,
-          ),
-        ),
-      ),
-    );
   }
 }
 
