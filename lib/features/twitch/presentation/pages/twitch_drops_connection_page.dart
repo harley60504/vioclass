@@ -39,7 +39,6 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
   TwitchDropsConnectionCheck? result;
   final Set<String> claimingDropInstanceIds = <String>{};
   bool checking = false;
-  bool showDebug = false;
   String statusText = '尚未載入 Drops。';
 
   @override
@@ -166,13 +165,6 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
         ),
         actions: <Widget>[
           IconButton(
-            tooltip: showDebug ? '隱藏 Debug' : '顯示 Debug',
-            onPressed: () => setState(() => showDebug = !showDebug),
-            icon: Icon(
-              showDebug ? Icons.bug_report : Icons.bug_report_outlined,
-            ),
-          ),
-          IconButton(
             tooltip: '重新整理 Drops',
             onPressed: checking ? null : () => unawaited(runCheck()),
             icon: checking
@@ -219,30 +211,6 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
                     claimingDropInstanceIds: claimingDropInstanceIds,
                     onClaimDrop: claimDrop,
                   ),
-                if (showDebug && current != null) ...<Widget>[
-                  const SizedBox(height: 14),
-                  _DebugCard(
-                    title: 'Debug Result',
-                    subtitle: 'connection / parsed snapshot',
-                    text: current.prettyJson,
-                  ),
-                  const SizedBox(height: 14),
-                  _DebugCard(
-                    title: 'Inventory response preview',
-                    subtitle: current.inventoryRootSummary,
-                    text: current.inventoryPreview.isEmpty
-                        ? '沒有 response preview。'
-                        : current.inventoryPreview,
-                  ),
-                  const SizedBox(height: 14),
-                  _DebugCard(
-                    title: 'Campaigns response preview',
-                    subtitle: current.campaignsRootSummary,
-                    text: current.campaignsPreview.isEmpty
-                        ? '沒有 response preview。'
-                        : current.campaignsPreview,
-                  ),
-                ],
               ],
             ),
           );
@@ -1199,58 +1167,3 @@ class _SimpleInfoCard extends StatelessWidget {
   }
 }
 
-class _DebugCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String text;
-
-  const _DebugCard({
-    required this.title,
-    required this.subtitle,
-    required this.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _kPanel,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: const TextStyle(
-              color: Colors.white54,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 10),
-          SelectableText(
-            text,
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 11.5,
-              height: 1.35,
-              fontFamily: 'monospace',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

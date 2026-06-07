@@ -8,7 +8,6 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
-import '../../services/notifications/twitch_app_notification_service.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
@@ -181,18 +180,6 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     });
   }
 
-  void showInternalNotificationTest() {
-    final hasDropsToken =
-        dropsAuthService.accessToken?.trim().isNotEmpty ?? false;
-    final tokenLabel = hasDropsToken ? 'Drops token 已存在' : '尚未登入 Drops token';
-
-    twitchAppNotificationCenter.showSuccess(
-      title: '程式內部通知測試',
-      message: '$tokenLabel。之後 Drops 可領取、進度完成、token 失效都會先走這個 App 內通知。',
-      duration: const Duration(seconds: 6),
-    );
-  }
-
   Future<void> openDropsConnectorPage() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
@@ -298,7 +285,6 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           onRefresh: refreshCurrentPage,
           onLogin: runLinkedTwitchLoginFlow,
           onOpenDropsConnector: openDropsConnectorPage,
-          onTestAppNotification: showInternalNotificationTest,
           onLogout: logout,
         ),
         Expanded(child: _buildHomeContent()),
