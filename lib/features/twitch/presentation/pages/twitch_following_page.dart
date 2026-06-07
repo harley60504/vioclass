@@ -500,6 +500,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         sectionTitle: '追隨中的直播',
         streamCount: filtered.length,
         streams: filtered,
+        onReturnFromStream: refreshStreams,
         footer: TwitchDiscoveryFooter(
           loadingMore: loadingMore,
           hasMore: hasMore,

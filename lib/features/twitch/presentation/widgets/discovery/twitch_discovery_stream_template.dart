@@ -23,6 +23,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final int streamCount;
   final List<TwitchLiveStream> streams;
   final Widget footer;
+  final Future<void> Function()? onReturnFromStream;
 
   const TwitchDiscoveryStreamGrid({
     super.key,
@@ -32,6 +33,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
     required this.streamCount,
     required this.streams,
     required this.footer,
+    this.onReturnFromStream,
   });
 
   @override
@@ -137,13 +139,20 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => TwitchWatchRouteGuard(
-          initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
-        ),
-      ),
-    );
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => TwitchWatchRouteGuard(
+              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
+                stream,
+              ),
+            ),
+          ),
+        )
+        .then((_) {
+          final callback = onReturnFromStream;
+          if (callback != null) unawaited(callback());
+        });
   }
 }
 

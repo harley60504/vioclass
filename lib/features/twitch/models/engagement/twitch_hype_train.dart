@@ -62,6 +62,7 @@ class TwitchHypeTrainSnapshot {
   factory TwitchHypeTrainSnapshot.fromJson(Map<String, dynamic> json) {
     final source = _readSnapshotSource(json);
     final channel = _readMap(source['channel'] ?? source['broadcaster']);
+    final progress = _progressMap(source);
     final participants = _readList(
       source['sharedTrainParticipants'] ??
           source['shared_train_participants'] ??
@@ -97,21 +98,28 @@ class TwitchHypeTrainSnapshot {
             channel['display_name'] ??
             channel['login'],
       ),
-      level: _readInt(source['level'] ?? source['currentLevel']),
+      level: _readInt(
+        progress['level']?['value'] ??
+            source['level'] ??
+            source['currentLevel'],
+      ),
       total: _readInt(
-        source['total'] ??
+        progress['total'] ??
+            source['total'] ??
             source['totalProgress'] ??
             source['total_progress'] ??
             source['totalContribution'] ??
             source['total_contribution'],
       ),
       progress: _readInt(
-        source['progress'] ??
+        progress['progression'] ??
+            source['progress'] ??
             source['currentProgress'] ??
             source['current_progress'],
       ),
       goal: _readInt(
-        source['goal'] ??
+        progress['goal'] ??
+            source['goal'] ??
             source['levelGoal'] ??
             source['level_goal'] ??
             source['currentGoal'] ??
@@ -396,6 +404,11 @@ class TwitchHypeTrainParticipant {
   }
 }
 
+/// Extracts StreamNook's nested GetHypeTrainExecution progress payload.
+Map<String, dynamic> _progressMap(Map<String, dynamic> source) {
+  return _readMap(source['progress']);
+}
+
 Map<String, dynamic> _readSnapshotSource(Map<String, dynamic> json) {
   final direct = _firstMap(json, const <String>[
     'hypeTrain',
@@ -423,14 +436,29 @@ Map<String, dynamic> _readSnapshotSource(Map<String, dynamic> json) {
   final hypeTrain = _readMap(channel['hypeTrain']);
   final execution = _readMap(hypeTrain['execution']);
   if (execution.isNotEmpty) {
-    return <String, dynamic>{
-      ...execution,
-      'channelId': channel['id'] ?? user['id'],
-      'channelLogin': user['login'],
-      'channelDisplayName': user['displayName'],
-    };
+    return _buildExecutionResult(execution, channel, user);
+  }
+
+  // 備援：hypeTrain 可能直接在 user 底下（不在 channel 裡）
+  final directHypeTrain = _readMap(user['hypeTrain']);
+  final directExecution = _readMap(directHypeTrain['execution']);
+  if (directExecution.isNotEmpty) {
+    return _buildExecutionResult(directExecution, channel, user);
   }
   return data.isNotEmpty && !_looksLikeGraphQlEnvelope(data) ? data : json;
+}
+
+Map<String, dynamic> _buildExecutionResult(
+  Map<String, dynamic> execution,
+  Map<String, dynamic> channel,
+  Map<String, dynamic> user,
+) {
+  return <String, dynamic>{
+    ...execution,
+    'channelId': channel['id'] ?? user['id'],
+    'channelLogin': user['login'],
+    'channelDisplayName': user['displayName'],
+  };
 }
 
 Object? _readBulkSource(Object? raw) {

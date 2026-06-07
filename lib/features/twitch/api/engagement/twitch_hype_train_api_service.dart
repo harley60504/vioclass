@@ -14,7 +14,7 @@ class TwitchHypeTrainApiService {
   static const String getBulkStatusOperationName = 'get_bulk_hype_train_status';
   static const String _twitchOperationName = 'GetHypeTrainExecution';
   static const String _twitchSha256Hash =
-      '086b4f88754c8270672b32069ff64695e5ee95c678fb7fe57bb027d12f8c83f7';
+      '8a39e843c94c5109a4cfb9badc641733e2205c60f5ee30e9b55edf0ad9db870a';
 
   final Object? client;
   final String? clientId;
@@ -54,15 +54,23 @@ class TwitchHypeTrainApiService {
         ),
       );
       if (raw.hasErrors) {
-        debugPrint('$_twitchOperationName returned errors: ${raw.response}');
+        debugPrint(
+          '[$_twitchOperationName] GQL errors for $login: ${raw.response}',
+        );
         return null;
       }
-      return TwitchHypeTrainSnapshot.fromDynamic(
+      final snapshot = TwitchHypeTrainSnapshot.fromDynamic(
         raw.response,
         fallbackChannelLogin: login,
       );
+      debugPrint(
+        '[$_twitchOperationName] $login -> '
+        'active=${snapshot?.isActive ?? false} '
+        'level=${snapshot?.level ?? 0} '
+        'id=${snapshot?.id ?? "(none)"}',
+      );
+      return snapshot;
     }
-
     final executor = commandExecutor;
     if (executor == null) {
       debugPrint(
