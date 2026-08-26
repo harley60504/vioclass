@@ -99,6 +99,42 @@ class TwitchDiscoveryService {
     return _parseStreamPage(raw);
   }
 
+  Future<TwitchFollowedChannelPageResult> fetchFollowedChannels({
+    String? after,
+    int first = 100,
+    bool attachProfiles = true,
+  }) async {
+    final auth = await resolveViewerAuth();
+
+    if (!auth.canReadFollows) {
+      throw const TwitchApiException(
+        '追隨頻道需要 user:read:follows scope，請重新 OAuth 授權。',
+      );
+    }
+
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/channels/followed',
+      queryParameters: <String, dynamic>{
+        'user_id': auth.viewerId,
+        'first': first.clamp(1, 100),
+        if (after != null && after.trim().isNotEmpty) 'after': after.trim(),
+      },
+      headers: _helixHeaders(auth),
+    );
+
+    final page = _parseFollowedChannelPage(raw);
+    if (!attachProfiles || page.channels.isEmpty) return page;
+
+    final channels = await _attachFollowedChannelProfiles(
+      auth: auth,
+      channels: page.channels,
+    );
+    return TwitchFollowedChannelPageResult(
+      channels: channels,
+      cursor: page.cursor,
+    );
+  }
+
   Future<TwitchStreamPageResult> fetchBrowseStreams({
     String? after,
     String? gameId,
@@ -139,6 +175,165 @@ class TwitchDiscoveryService {
     );
 
     return _parseGamePage(raw);
+  }
+
+  Future<TwitchChannelVideoPageResult> fetchChannelVideos({
+    required String userId,
+    String? after,
+    int first = 20,
+    String type = 'archive',
+  }) async {
+    final auth = await resolveViewerAuth();
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) {
+      throw const TwitchApiException('缺少頻道 user id，無法讀取 VOD。');
+    }
+
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/videos',
+      queryParameters: <String, dynamic>{
+        'user_id': cleanUserId,
+        'first': first.clamp(1, 100),
+        'type': type,
+        if (after != null && after.trim().isNotEmpty) 'after': after.trim(),
+      },
+      headers: _helixHeaders(auth),
+    );
+
+    return _parseChannelVideoPage(raw);
+  }
+
+  Future<TwitchChannelClipPageResult> fetchChannelClips({
+    required String broadcasterId,
+    String? after,
+    int first = 30,
+  }) async {
+    final auth = await resolveViewerAuth();
+    final cleanBroadcasterId = broadcasterId.trim();
+    if (cleanBroadcasterId.isEmpty) {
+      throw const TwitchApiException('缺少頻道 user id，無法讀取 Clips。');
+    }
+
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/clips',
+      queryParameters: <String, dynamic>{
+        'broadcaster_id': cleanBroadcasterId,
+        'first': first.clamp(1, 100),
+        if (after != null && after.trim().isNotEmpty) 'after': after.trim(),
+      },
+      headers: _helixHeaders(auth),
+    );
+
+    return _parseChannelClipPage(raw);
+  }
+
+  Future<TwitchChannelAboutResult> fetchChannelAbout({
+    required String login,
+  }) async {
+    final cleanLogin = login.trim().toLowerCase();
+    if (cleanLogin.isEmpty) {
+      return const TwitchChannelAboutResult(
+        panels: <TwitchChannelPanel>[],
+        socialLinks: <TwitchChannelSocialLink>[],
+      );
+    }
+
+    final raw = await client.postJson<Map<String, dynamic>>(
+      TwitchApiConstants.gqlEndpoint,
+      data: <String, dynamic>{
+        'operationName': 'ChannelPanels',
+        'query': '''
+query ChannelPanels(\$login: String!) {
+  user(login: \$login) {
+    panels {
+      __typename
+      id
+      type
+      ... on DefaultPanel {
+        title
+        description
+        imageURL
+        linkURL
+      }
+    }
+    channel {
+      socialMedias {
+        name
+        title
+        url
+      }
+    }
+  }
+}
+''',
+        'variables': <String, dynamic>{'login': cleanLogin},
+      },
+      headers: <String, String>{
+        ...TwitchApiConstants.twitchWebHeaders,
+        'Client-ID': TwitchApiConstants.twitchWebClientId,
+        'Content-Type': 'application/json',
+      },
+    );
+
+    final errors = raw['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      throw TwitchApiException('Twitch panels GQL returned errors.');
+    }
+
+    return _parseChannelAbout(raw);
+  }
+
+  Future<List<TwitchFollowedChannel>> _attachFollowedChannelProfiles({
+    required TwitchViewerAuthSnapshot auth,
+    required List<TwitchFollowedChannel> channels,
+  }) async {
+    final ids = channels
+        .map((channel) => channel.broadcasterId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (ids.isEmpty) return channels;
+
+    final profiles = <String, Map<String, String>>{};
+
+    for (var start = 0; start < ids.length; start += 100) {
+      final end = (start + 100) > ids.length ? ids.length : start + 100;
+      final chunk = ids.sublist(start, end);
+
+      final raw = await client.getJson<Map<String, dynamic>>(
+        '${TwitchApiConstants.helixBaseUrl}/users',
+        queryParameters: <String, dynamic>{'id': chunk},
+        headers: _helixHeaders(auth),
+      );
+
+      final data = raw['data'];
+      if (data is! List) continue;
+
+      for (final user in data.whereType<Map<String, dynamic>>()) {
+        final id = user['id']?.toString().trim() ?? '';
+        if (id.isEmpty) continue;
+        profiles[id] = <String, String>{
+          'profileImageUrl': user['profile_image_url']?.toString().trim() ?? '',
+          'offlineImageUrl': user['offline_image_url']?.toString().trim() ?? '',
+          'description': user['description']?.toString().trim() ?? '',
+        };
+      }
+    }
+
+    if (profiles.isEmpty) return channels;
+
+    return channels
+        .map((channel) {
+          final profile = profiles[channel.broadcasterId];
+          if (profile == null) return channel;
+          return channel.copyWith(
+            profileImageUrl: profile['profileImageUrl'],
+            offlineImageUrl: profile['offlineImageUrl'],
+            description: profile['description'],
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<Map<String, String>> fetchProfileImagesForLogins(
@@ -199,6 +394,98 @@ class TwitchDiscoveryService {
     return TwitchGamePageResult(
       games: games,
       cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+    );
+  }
+
+  TwitchFollowedChannelPageResult _parseFollowedChannelPage(
+    Map<String, dynamic> raw,
+  ) {
+    final data = raw['data'];
+    final pagination = raw['pagination'];
+
+    final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
+    final channels = data is List
+        ? data
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchFollowedChannel.fromHelixJson)
+              .where((channel) => channel.channelLogin.isNotEmpty)
+              .toList(growable: false)
+        : const <TwitchFollowedChannel>[];
+
+    return TwitchFollowedChannelPageResult(
+      channels: channels,
+      cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+    );
+  }
+
+  TwitchChannelVideoPageResult _parseChannelVideoPage(
+    Map<String, dynamic> raw,
+  ) {
+    final data = raw['data'];
+    final pagination = raw['pagination'];
+
+    final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
+    final videos = data is List
+        ? data
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchChannelVideo.fromHelixJson)
+              .where((video) => video.id.trim().isNotEmpty)
+              .toList(growable: false)
+        : const <TwitchChannelVideo>[];
+
+    return TwitchChannelVideoPageResult(
+      videos: videos,
+      cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+    );
+  }
+
+  TwitchChannelClipPageResult _parseChannelClipPage(
+    Map<String, dynamic> raw,
+  ) {
+    final data = raw['data'];
+    final pagination = raw['pagination'];
+
+    final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
+    final clips = data is List
+        ? data
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchChannelClip.fromHelixJson)
+              .where((clip) => clip.id.trim().isNotEmpty)
+              .toList(growable: false)
+        : const <TwitchChannelClip>[];
+
+    return TwitchChannelClipPageResult(
+      clips: clips,
+      cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+    );
+  }
+
+  TwitchChannelAboutResult _parseChannelAbout(Map<String, dynamic> raw) {
+    final data = raw['data'];
+    final user = data is Map ? data['user'] : null;
+    final panels = user is Map ? user['panels'] : null;
+    final channel = user is Map ? user['channel'] : null;
+    final socialMedias = channel is Map ? channel['socialMedias'] : null;
+
+    final parsedPanels = panels is List
+        ? panels
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchChannelPanel.fromGqlJson)
+              .where((panel) => panel.hasContent)
+              .toList(growable: false)
+        : const <TwitchChannelPanel>[];
+
+    final parsedSocialLinks = socialMedias is List
+        ? socialMedias
+              .whereType<Map<String, dynamic>>()
+              .map(TwitchChannelSocialLink.fromGqlJson)
+              .where((link) => link.hasContent)
+              .toList(growable: false)
+        : const <TwitchChannelSocialLink>[];
+
+    return TwitchChannelAboutResult(
+      panels: parsedPanels,
+      socialLinks: parsedSocialLinks,
     );
   }
 

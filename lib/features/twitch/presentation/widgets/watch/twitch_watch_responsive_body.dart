@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:flutter/gestures.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../responsive/twitch_responsive_layout.dart';
 import 'twitch_watch_chat_resize_handle.dart';
@@ -26,6 +26,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
   final double maxChatPanelRatio;
   final Widget player;
   final Widget chat;
+  final Widget? belowPlayer;
   final void Function({required double viewportWidth, required double value})
   onSetChatPanelWidthForViewport;
   final VoidCallback onPersistChatPanelWidth;
@@ -44,6 +45,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     required this.maxChatPanelRatio,
     required this.player,
     required this.chat,
+    this.belowPlayer,
     required this.onSetChatPanelWidthForViewport,
     required this.onPersistChatPanelWidth,
   });
@@ -81,6 +83,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                   chatVisible: chatVisible,
                   player: player,
                   chat: chat,
+                  belowPlayer: belowPlayer,
                 );
               }
 
@@ -90,6 +93,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                 chatPanelWidth: _effectiveChatPanelWidthForViewport(layout),
                 player: player,
                 chat: chat,
+                belowPlayer: belowPlayer,
                 onSetChatPanelWidthForViewport: onSetChatPanelWidthForViewport,
                 onPersistChatPanelWidth: onPersistChatPanelWidth,
               );
@@ -176,12 +180,14 @@ class _BottomChatLayout extends StatelessWidget {
   final bool chatVisible;
   final Widget player;
   final Widget chat;
+  final Widget? belowPlayer;
 
   const _BottomChatLayout({
     required this.layout,
     required this.chatVisible,
     required this.player,
     required this.chat,
+    required this.belowPlayer,
   });
 
   @override
@@ -213,7 +219,9 @@ class _BottomChatLayout extends StatelessWidget {
               child: _WatchSurface(child: player),
             )
           else
-            Expanded(child: _WatchSurface(child: player)),
+            Expanded(
+              child: _PlayerColumn(player: player, belowPlayer: belowPlayer),
+            ),
           if (chatVisible) SizedBox(height: shellGap),
           if (chatVisible) Expanded(child: _WatchSurface(child: chat)),
         ],
@@ -228,6 +236,7 @@ class _SideChatLayout extends StatelessWidget {
   final double chatPanelWidth;
   final Widget player;
   final Widget chat;
+  final Widget? belowPlayer;
   final void Function({required double viewportWidth, required double value})
   onSetChatPanelWidthForViewport;
   final VoidCallback onPersistChatPanelWidth;
@@ -238,6 +247,7 @@ class _SideChatLayout extends StatelessWidget {
     required this.chatPanelWidth,
     required this.player,
     required this.chat,
+    required this.belowPlayer,
     required this.onSetChatPanelWidthForViewport,
     required this.onPersistChatPanelWidth,
   });
@@ -259,7 +269,7 @@ class _SideChatLayout extends StatelessWidget {
         children: [
           Expanded(
             flex: layout.isPhoneLandscape ? 10 : 1,
-            child: _WatchSurface(child: player),
+            child: _PlayerColumn(player: player, belowPlayer: belowPlayer),
           ),
           if (chatVisible)
             SizedBox(
@@ -288,6 +298,94 @@ class _SideChatLayout extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _PlayerColumn extends StatefulWidget {
+  final Widget player;
+  final Widget? belowPlayer;
+
+  const _PlayerColumn({required this.player, required this.belowPlayer});
+
+  @override
+  State<_PlayerColumn> createState() => _PlayerColumnState();
+}
+
+class _PlayerColumnState extends State<_PlayerColumn> {
+  late final PageController _pageController;
+  late final ScrollController _aboutScrollController;
+  bool _switchingPage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _aboutScrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _aboutScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _showPage(int page) async {
+    if (_switchingPage || !_pageController.hasClients) return;
+    _switchingPage = true;
+    try {
+      await _pageController.animateToPage(
+        page,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      _switchingPage = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final content = widget.belowPlayer;
+    if (content == null) return _WatchSurface(child: widget.player);
+
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      scrollDirection: Axis.vertical,
+      children: <Widget>[
+        Listener(
+          onPointerSignal: (event) {
+            if (event is PointerScrollEvent && event.scrollDelta.dy > 0) {
+              _showPage(1);
+            }
+          },
+          child: _WatchSurface(child: widget.player),
+        ),
+        _WatchSurface(
+          child: Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent &&
+                  event.scrollDelta.dy < 0 &&
+                  _aboutScrollController.hasClients &&
+                  _aboutScrollController.offset <= 0) {
+                _showPage(0);
+              }
+            },
+            child: Scrollbar(
+              controller: _aboutScrollController,
+              thumbVisibility: true,
+              interactive: true,
+              child: SingleChildScrollView(
+                controller: _aboutScrollController,
+                padding: EdgeInsets.zero,
+                child: content,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -19,6 +19,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
   Future<void> loadPlayer({
     required String channelLogin,
     required bool enabled,
+    bool forceOpen = true,
   }) async {
     if (!enabled) {
       loadingPlayer = false;
@@ -32,7 +33,10 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await playerPort.openLive(channelLogin: channelLogin);
+      await playerPort.openLive(
+        channelLogin: channelLogin,
+        forceOpen: forceOpen,
+      );
       await applyPlayerVolume();
       await waitForInitialPlaybackSettle();
     } catch (error) {

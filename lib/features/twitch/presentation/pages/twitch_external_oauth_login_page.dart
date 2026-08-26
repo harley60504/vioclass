@@ -23,6 +23,7 @@ class TwitchExternalOAuthLoginPage extends StatelessWidget {
       'chat:edit',
       'user:read:emotes',
       'user:read:follows',
+      'clips:edit',
     ],
   });
 

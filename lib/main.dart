@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'features/twitch/platform/twitch_desktop_webview_entry.dart';
 
 const bool _disableDebugSemantics = bool.fromEnvironment(
   'TWITCH_DISABLE_DEBUG_SEMANTICS',
@@ -13,7 +14,9 @@ const bool _filterAxTreeDebugLogs = bool.fromEnvironment(
   defaultValue: true,
 );
 
-void main() {
+void main(List<String> args) {
+  if (tryRunTwitchDesktopWebViewEntry(args)) return;
+
   WidgetsFlutterBinding.ensureInitialized();
   _installDebugLogFilter();
 

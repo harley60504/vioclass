@@ -19,6 +19,70 @@ class TwitchDropsQueryPresets {
 
   static String campaignsJson({bool pretty = false}) {
     return _encode(const <String, dynamic>{
+      'query': '''
+        query DropCampaigns {
+          currentUser {
+            id
+            login
+            dropCampaigns {
+              id
+              name
+              owner {
+                id
+                name
+              }
+              game {
+                id
+                name
+                displayName
+                boxArtURL
+              }
+              status
+              startAt
+              endAt
+              description
+              detailsURL
+              accountLinkURL
+              self {
+                isAccountConnected
+              }
+              allow {
+                isEnabled
+                channels {
+                  id
+                  name
+                }
+              }
+              timeBasedDrops {
+                id
+                name
+                requiredMinutesWatched
+                startAt
+                endAt
+                benefitEdges {
+                  benefit {
+                    id
+                    name
+                    imageAssetURL
+                  }
+                }
+                self {
+                  currentMinutesWatched
+                  isClaimed
+                  hasPreconditionsMet
+                  dropInstanceID
+                }
+              }
+            }
+          }
+        }
+      ''',
+      'variables': <String, dynamic>{},
+    }, pretty: pretty);
+  }
+
+  static String dashboardCampaignsJson({bool pretty = false}) {
+    return _encode(const <String, dynamic>{
       'operationName': 'ViewerDropsDashboard',
       'variables': <String, dynamic>{'fetchRewardCampaigns': false},
       'extensions': <String, dynamic>{

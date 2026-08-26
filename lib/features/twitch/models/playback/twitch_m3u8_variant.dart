@@ -16,6 +16,42 @@ class TwitchPlaybackResult {
   });
 }
 
+class TwitchVodPlaybackResult {
+  final Uri masterUri;
+  final Uri playlistUri;
+  final String masterPlaylistText;
+  final List<TwitchM3u8Variant> variants;
+  final TwitchM3u8Variant? selectedVariant;
+
+  const TwitchVodPlaybackResult({
+    required this.masterUri,
+    required this.playlistUri,
+    required this.masterPlaylistText,
+    required this.variants,
+    required this.selectedVariant,
+  });
+}
+
+class TwitchClipPlaybackResult {
+  final Uri playbackUri;
+  final List<TwitchM3u8Variant> variants;
+  final TwitchM3u8Variant selectedVariant;
+  final String? sourceVideoId;
+  final int? sourceVodOffsetSeconds;
+  final double? durationSeconds;
+  final String? broadcasterLogin;
+
+  const TwitchClipPlaybackResult({
+    required this.playbackUri,
+    required this.variants,
+    required this.selectedVariant,
+    this.sourceVideoId,
+    this.sourceVodOffsetSeconds,
+    this.durationSeconds,
+    this.broadcasterLogin,
+  });
+}
+
 class TwitchM3u8Variant {
   final String name;
   final String url;

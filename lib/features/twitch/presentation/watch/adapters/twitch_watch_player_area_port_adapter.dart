@@ -20,6 +20,9 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final String? error;
   final VoidCallback onBack;
   final VoidCallback? onReload;
+  final VoidCallback? onOpenChannel;
+  final VoidCallback? onCreateClip;
+  final bool creatingClip;
   final VoidCallback onStop;
   final bool relationshipBusy;
   final String? relationshipError;
@@ -37,7 +40,16 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final double volume;
   final VoidCallback? onToggleMute;
   final ValueChanged<double>? onVolumeChanged;
+  final List<TwitchM3u8Variant>? qualityVariants;
+  final TwitchM3u8Variant? currentVariant;
+  final ValueChanged<TwitchM3u8Variant>? onQualitySelected;
   final ValueChanged<String>? onError;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
 
   const TwitchWatchPlayerAreaPortAdapter({
     super.key,
@@ -46,6 +58,9 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     required this.error,
     required this.onBack,
     required this.onReload,
+    this.onOpenChannel,
+    this.onCreateClip,
+    this.creatingClip = false,
     required this.onStop,
     this.relationshipBusy = false,
     this.relationshipError,
@@ -63,7 +78,16 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     this.volume = 100,
     this.onToggleMute,
     this.onVolumeChanged,
+    this.qualityVariants,
+    this.currentVariant,
+    this.onQualitySelected,
     this.onError,
+    this.hasDvrReplay = false,
+    this.showLiveEdgeLabel = false,
+    this.liveDvrDuration,
+    this.liveDvrStartedAt,
+    this.onOpenDvrReplayAt,
+    this.onReturnToLive,
   });
 
   @override
@@ -76,10 +100,12 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       metadata: metadata,
       loading: loading,
       error: error,
-      qualityVariants: port.qualityVariants,
-      currentVariant: port.currentVariant,
+      qualityVariants: qualityVariants ?? port.qualityVariants,
+      currentVariant: currentVariant ?? port.currentVariant,
       qualityBusy: port.runtime.switchingQuality || loading,
-      onQualitySelected: (variant) => unawaited(_switchQuality(port, variant)),
+      onQualitySelected:
+          onQualitySelected ??
+          (variant) => unawaited(_switchQuality(port, variant)),
       relationshipBusy: relationshipBusy,
       relationshipError: relationshipError,
       isFollowing: isFollowing,
@@ -98,7 +124,16 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       onVolumeChanged: onVolumeChanged,
       onBack: onBack,
       onReload: onReload,
+      onOpenChannel: onOpenChannel,
+      onCreateClip: onCreateClip,
+      creatingClip: creatingClip,
       onStop: onStop,
+      hasDvrReplay: hasDvrReplay,
+      showLiveEdgeLabel: showLiveEdgeLabel,
+      liveDvrDuration: liveDvrDuration,
+      liveDvrStartedAt: liveDvrStartedAt,
+      onOpenDvrReplayAt: onOpenDvrReplayAt,
+      onReturnToLive: onReturnToLive,
     );
   }
 
@@ -137,6 +172,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final VoidCallback onOpenPrediction;
   final VoidCallback? onOpenSpecialActions;
   final VoidCallback? onCancelPendingSpecialMessage;
+  final bool showHeader;
 
   const TwitchWatchChatPanelPortAdapter({
     super.key,
@@ -162,6 +198,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.onOpenPrediction,
     this.onOpenSpecialActions,
     this.onCancelPendingSpecialMessage,
+    this.showHeader = true,
   });
 
   @override
@@ -198,6 +235,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onOpenPrediction: onOpenPrediction,
       onOpenSpecialActions: openAction,
       onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
+      showHeader: showHeader,
     );
   }
 }

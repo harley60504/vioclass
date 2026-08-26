@@ -12,12 +12,9 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
   final bool predictionVisible;
   final bool hasPinned;
   final bool hasPrediction;
-  final bool loading;
   final bool compact;
   final VoidCallback onTogglePinned;
   final VoidCallback onTogglePrediction;
-  final VoidCallback onRefresh;
-  final VoidCallback onOpenAppearance;
 
   const TwitchWatchChatHeaderBar({
     super.key,
@@ -27,12 +24,9 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
     required this.predictionVisible,
     required this.hasPinned,
     required this.hasPrediction,
-    required this.loading,
     required this.compact,
     required this.onTogglePinned,
     required this.onTogglePrediction,
-    required this.onRefresh,
-    required this.onOpenAppearance,
   });
 
   @override
@@ -51,20 +45,7 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
       child: Row(
         children: [
           _ConnectionBadge(connected: connected, compact: compact),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Text(
-              'STREAM CHAT',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: TwitchUiColors.textPrimary,
-                fontSize: compact ? 12 : 13,
-                fontWeight: TwitchUiFontWeight.heavy,
-                letterSpacing: 0.45,
-              ),
-            ),
-          ),
+          const Spacer(),
           _HeaderToggleButton(
             tooltip: showPinned ? '隱藏置頂留言' : '顯示置頂留言',
             icon: Icons.push_pin_rounded,
@@ -83,19 +64,6 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
             active: predictionVisible,
             enabled: hasPrediction,
             onTap: onTogglePrediction,
-          ),
-          const SizedBox(width: 5),
-          _HeaderIconButton(
-            tooltip: '聊天室字體',
-            icon: Icons.format_size_rounded,
-            onTap: onOpenAppearance,
-          ),
-          const SizedBox(width: 5),
-          _HeaderIconButton(
-            tooltip: '刷新互動',
-            icon: Icons.refresh_rounded,
-            loading: loading,
-            onTap: loading ? null : onRefresh,
           ),
         ],
       ),
@@ -158,52 +126,6 @@ class _ConnectionBadge extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  final String tooltip;
-  final IconData icon;
-  final bool loading;
-  final VoidCallback? onTap;
-
-  const _HeaderIconButton({
-    required this.tooltip,
-    required this.icon,
-    this.loading = false,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        onTap: onTap,
-        child: Container(
-          width: 32,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.052),
-            borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.080)),
-          ),
-          child: loading
-              ? const SizedBox(
-                  width: 15,
-                  height: 15,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Icon(
-                  icon,
-                  size: 17,
-                  color: onTap == null ? Colors.white24 : _softAccentText,
-                ),
-        ),
       ),
     );
   }

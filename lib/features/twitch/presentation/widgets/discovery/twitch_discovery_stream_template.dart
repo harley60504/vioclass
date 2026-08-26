@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../services/discovery/twitch_discovery_service.dart';
 import '../../pages/twitch_watch_route_guard.dart';
 import 'twitch_stream_card.dart';
 
@@ -17,7 +18,9 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final int streamCount;
   final List<TwitchLiveStream> streams;
   final Widget footer;
+  final List<Widget> extraSliversBeforeFooter;
   final Future<void> Function()? onReturnFromStream;
+  final TwitchDiscoveryService? discoveryService;
 
   const TwitchDiscoveryStreamGrid({
     super.key,
@@ -27,7 +30,9 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
     required this.streamCount,
     required this.streams,
     required this.footer,
+    this.extraSliversBeforeFooter = const <Widget>[],
     this.onReturnFromStream,
+    this.discoveryService,
   });
 
   @override
@@ -108,6 +113,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                       ),
                     ),
                   ),
+                  ...extraSliversBeforeFooter,
                   SliverToBoxAdapter(child: footer),
                 ],
               ),
@@ -126,6 +132,14 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
               initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
                 stream,
               ),
+              initialOfflineChannel: TwitchFollowedChannel(
+                broadcasterId: stream.userId,
+                broadcasterLogin: stream.userLogin,
+                broadcasterName: stream.userName,
+                followedAt: null,
+                profileImageUrl: stream.profileImageUrl,
+              ),
+              initialDiscoveryService: discoveryService,
             ),
           ),
         )

@@ -14,6 +14,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../models/discovery/twitch_live_stream.dart';
+import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../navigation/twitch_route_observer.dart';
 import 'twitch_watch_page.dart';
@@ -28,6 +30,8 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   final bool? initialIsMature;
   final int? initialViewerCount;
   final String? initialProfileImageUrl;
+  final TwitchFollowedChannel? initialOfflineChannel;
+  final TwitchDiscoveryService? initialDiscoveryService;
 
   const TwitchWatchRouteGuard({
     super.key,
@@ -40,6 +44,8 @@ class TwitchWatchRouteGuard extends StatefulWidget {
     this.initialIsMature,
     this.initialViewerCount,
     this.initialProfileImageUrl,
+    this.initialOfflineChannel,
+    this.initialDiscoveryService,
   });
 
   @override
@@ -130,6 +136,8 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         initialIsMature: widget.initialIsMature,
         initialViewerCount: widget.initialViewerCount,
         initialProfileImageUrl: widget.initialProfileImageUrl,
+        initialOfflineChannel: widget.initialOfflineChannel,
+        initialDiscoveryService: widget.initialDiscoveryService,
       ),
     );
   }

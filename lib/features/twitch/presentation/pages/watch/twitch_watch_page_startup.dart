@@ -2,12 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../models/discovery/twitch_live_stream.dart';
+import '../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../services/playback/twitch_media_kit_player_host.dart';
 import '../twitch_watch_page.dart';
 import 'twitch_watch_page_chat.dart';
 import 'twitch_watch_page_engagement.dart';
 import 'twitch_watch_page_relationship.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
+
+const double _liveDvrLiveEdgeRatio = 0.98;
 
 extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   Future<void> loadAuth() async {
@@ -72,10 +77,11 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     }
   }
 
-  Future<void> loadPlayer(String channel) async {
+  Future<void> loadPlayer(String channel, {bool forceOpen = true}) async {
     return playbackController.loadPlayer(
       channelLogin: channel,
       enabled: enableWatchPlayer,
+      forceOpen: forceOpen,
     );
   }
 
@@ -111,22 +117,54 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required String channel,
     required int generation,
   }) async {
-    // Stage 245A startup order:
-    // 1. Open player first for fastest first paint.
-    // 2. Start chat and engagement bootstrap at the same time.
-    //    Engagement covers channel points, prediction, and pinned chat. It is
-    //    background work, so the blocking mask still only waits on player/chat.
-    // 3. Relationship / emotes continue as background tasks after the startup
-    //    snapshot gives us channelId.
     await yieldToUi();
     if (!isCurrentWatchTask(generation, channel)) return;
 
     if (enableWatchPlayer) {
       try {
-        await loadPlayer(channel);
+        final loadedInitialClip = await loadInitialClipPlayback(
+          channel: channel,
+          generation: generation,
+        );
+        if (!isCurrentWatchTask(generation, channel)) return;
+        if (loadedInitialClip) {
+          setState(() {
+            relationshipBootstrapping = true;
+            emoteBootstrapping = true;
+          });
+          unawaited(runDeferredRelationshipStartup(generation, channel));
+          unawaited(runDeferredEmoteStartup(generation, channel));
+          return;
+        }
+
+        final loadedInitialVod = await loadInitialVodPlayback(
+          channel: channel,
+          generation: generation,
+        );
+        if (!loadedInitialVod) {
+          if (widget.initialVodPlaybackOnly) {
+            showSnack('VOD 載入失敗，沒有切回直播。');
+          } else {
+            await loadPlayer(channel);
+            if (!isCurrentWatchTask(generation, channel)) return;
+            unawaited(
+              prepareActiveGrowingVod(channel: channel, generation: generation),
+            );
+          }
+        }
       } catch (error) {
         if (!isCurrentWatchTask(generation, channel)) return;
-        showSnack('播放器載入失敗：$error');
+        if (widget.initialVodPlaybackOnly) {
+          showSnack('VOD 載入失敗：$error');
+          return;
+        }
+        final loadedVod = await loadOfflineVodFallback(
+          channel: channel,
+          generation: generation,
+        );
+        if (!loadedVod) {
+          showSnack('播放器載入失敗：$error');
+        }
       }
     }
 
@@ -191,8 +229,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         channel.trim().toLowerCase() == channelLogin;
   }
 
-  void cancelDeferredWatchTasks() {
+  void cancelDeferredWatchTasks({bool rebuild = true}) {
     if (!mounted) return;
+    if (!rebuild) {
+      chatBootstrapping = false;
+      engagementBootstrapping = false;
+      emoteBootstrapping = false;
+      relationshipBootstrapping = false;
+      return;
+    }
     setState(() {
       chatBootstrapping = false;
       engagementBootstrapping = false;
@@ -214,8 +259,19 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     watchPorts.emotes.clear();
     engagementController.reset();
     chatController.resetSpecialMessages();
+    vodReplayController.stop();
     playbackController.resetError();
     relationshipController.reset();
+    offlineVodFallbackVideo = null;
+    activeGrowingVodVideo = null;
+    currentVodQualityVideo = null;
+    currentClipQualityClip = null;
+    vodQualityVariants = const <TwitchM3u8Variant>[];
+    currentVodQualityVariant = null;
+    warmedLiveDvrVideoId = null;
+    warmedLiveDvrQualityKey = null;
+    preferVodReplayChat = false;
+    watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
 
     if (!mounted) return;
     setState(() {
@@ -225,5 +281,555 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       emoteBootstrapping = false;
       relationshipBootstrapping = false;
     });
+  }
+
+  Future<bool> loadOfflineVodFallback({
+    required String channel,
+    required int generation,
+  }) async {
+    final fallbackChannel = widget.initialOfflineChannel;
+    final discoveryService = widget.initialDiscoveryService;
+    if (fallbackChannel == null || discoveryService == null) return false;
+
+    try {
+      final page = await discoveryService.fetchChannelVideos(
+        userId: fallbackChannel.broadcasterId,
+        first: 1,
+      );
+      if (!isCurrentWatchTask(generation, channel)) return false;
+      if (page.videos.isEmpty) return false;
+
+      final video = page.videos.first;
+      if (video.isLikelyGrowingArchive) return false;
+      return openVodPlayback(
+        channel: channel,
+        generation: generation,
+        video: video,
+      );
+    } catch (error) {
+      if (isCurrentWatchTask(generation, channel)) {
+        debugPrint('offline VOD fallback failed: $error');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> loadInitialVodPlayback({
+    required String channel,
+    required int generation,
+  }) async {
+    final video = widget.initialVodVideo;
+    if (video == null) return false;
+
+    try {
+      rememberMediaUriForRouteRestore();
+      if (video.isLikelyGrowingArchive) {
+        activeGrowingVodVideo = video;
+        await switchToLiveDvrReplay(video: video, ratio: 0.92);
+        if (mounted) setState(() {});
+        return true;
+      }
+      return openVodPlayback(
+        channel: channel,
+        generation: generation,
+        video: video,
+      );
+    } catch (error) {
+      if (isCurrentWatchTask(generation, channel)) {
+        debugPrint('initial VOD playback failed: $error');
+      }
+      return false;
+    }
+  }
+
+  Future<bool> loadInitialClipPlayback({
+    required String channel,
+    required int generation,
+  }) async {
+    final clip = widget.initialClip;
+    if (clip == null) return false;
+
+    try {
+      rememberMediaUriForRouteRestore();
+      final playback = await watchServices.playbackApi.resolveClipPlayback(
+        clipSlug: clip.id,
+        preferredQuality: 'source',
+      );
+      if (!isCurrentWatchTask(generation, channel)) return false;
+
+      vodQualityVariants = playback.variants;
+      currentVodQualityVariant = playback.selectedVariant;
+      currentVodQualityVideo = null;
+      currentClipQualityClip = clip;
+
+      await playerSession.ensureReady();
+      await playerSession.openOrResume(
+        uri: playback.playbackUri.toString(),
+        play: true,
+        forceOpen: true,
+      );
+      await preferencesController.applyPlayerVolume();
+      await waitForInitialPlaybackSettle();
+
+      watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
+      preferVodReplayChat = true;
+      playbackController.setError(null);
+
+      final replayVideoId = (playback.sourceVideoId?.trim().isNotEmpty ?? false)
+          ? playback.sourceVideoId!.trim()
+          : clip.videoId.trim();
+      final replayOffset = playback.sourceVodOffsetSeconds ?? clip.vodOffset;
+      final replayChannel =
+          (playback.broadcasterLogin?.trim().isNotEmpty ?? false)
+          ? playback.broadcasterLogin!.trim()
+          : channel;
+      if (replayVideoId.isNotEmpty && replayOffset >= 0) {
+        await vodReplayController.start(
+          videoId: replayVideoId,
+          channelLogin: replayChannel,
+          player: playerSession.player,
+          timelineOffsetSeconds: replayOffset.toDouble(),
+        );
+      }
+      if (mounted) setState(() {});
+      return true;
+    } catch (error) {
+      if (isCurrentWatchTask(generation, channel)) {
+        debugPrint('initial clip playback failed: $error');
+        showSnack('Clip 載入失敗：$error');
+      }
+      return false;
+    }
+  }
+
+  void rememberMediaUriForRouteRestore() {
+    if (restoreMediaUriOnDispose != null) return;
+    final current = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+    if (current == null || current.isEmpty) return;
+    restoreMediaUriOnDispose = current;
+  }
+
+  Future<void> prepareActiveGrowingVod({
+    required String channel,
+    required int generation,
+  }) async {
+    final fallbackChannel = widget.initialOfflineChannel;
+    final discoveryService = widget.initialDiscoveryService;
+    if (fallbackChannel == null || discoveryService == null) return;
+
+    try {
+      final page = await discoveryService.fetchChannelVideos(
+        userId: fallbackChannel.broadcasterId,
+        first: 1,
+      );
+      if (!isCurrentWatchTask(generation, channel)) return;
+      final video = page.videos.isEmpty ? null : page.videos.first;
+      activeGrowingVodVideo = video != null && video.isLikelyGrowingArchive
+          ? video
+          : null;
+      if (activeGrowingVodVideo == null) warmedLiveDvrVideoId = null;
+      watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+      if (activeGrowingVodVideo != null) {
+        unawaited(
+          warmLiveDvrBridgeSource(
+            video: activeGrowingVodVideo!,
+            channel: channel,
+            generation: generation,
+          ),
+        );
+      }
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (isCurrentWatchTask(generation, channel)) {
+        debugPrint('prepare active growing VOD failed: $error');
+      }
+    }
+  }
+
+  Future<void> warmLiveDvrBridgeSource({
+    required TwitchChannelVideo video,
+    required String channel,
+    required int generation,
+  }) async {
+    if (!video.isLikelyGrowingArchive) return;
+
+    try {
+      final playlist = await watchServices.playbackApi.resolveVodPlaylist(
+        videoId: video.id,
+        preferredQuality: _preferredLiveDvrQuality(),
+      );
+      if (!isCurrentWatchTask(generation, channel)) return;
+      final warmed = await watchPorts.player.runtime.warmLiveDvrBridge(
+        dvrPlaylistUri: playlist.playlistUri,
+      );
+      vodQualityVariants = playlist.variants;
+      currentVodQualityVariant = playlist.selectedVariant;
+      currentVodQualityVideo = video;
+      currentClipQualityClip = null;
+      if (warmed) {
+        warmedLiveDvrVideoId = video.id;
+        warmedLiveDvrQualityKey = playlist.selectedVariant?.adAwareQualityKey;
+      }
+    } catch (error) {
+      warmedLiveDvrVideoId = null;
+      if (isCurrentWatchTask(generation, channel)) {
+        debugPrint('warm live DVR bridge failed: $error');
+      }
+    }
+  }
+
+  Future<bool> prepareLiveDvrBridgeSource(TwitchChannelVideo? video) async {
+    if (video == null || !video.isLikelyGrowingArchive) {
+      watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+      return false;
+    }
+
+    final preferredQuality = _preferredLiveDvrQuality();
+    final preferredQualityKey = _normalizeWatchQualityKey(preferredQuality);
+    if (warmedLiveDvrVideoId == video.id &&
+        (preferredQualityKey == null ||
+            warmedLiveDvrQualityKey == preferredQualityKey) &&
+        watchPorts.player.runtime.hasWarmLiveDvrBridge) {
+      debugPrint(
+        '[LiveDvrBridge] reuse warmed active archive video=${video.id}',
+      );
+      return true;
+    }
+
+    try {
+      final playlist = await watchServices.playbackApi.resolveVodPlaylist(
+        videoId: video.id,
+        preferredQuality: preferredQuality,
+      );
+      watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+      final warmed = await watchPorts.player.runtime.warmLiveDvrBridge(
+        dvrPlaylistUri: playlist.playlistUri,
+      );
+      vodQualityVariants = playlist.variants;
+      currentVodQualityVariant = playlist.selectedVariant;
+      currentVodQualityVideo = video;
+      currentClipQualityClip = null;
+      debugPrint(
+        '[LiveDvrBridge] active archive warmed video=${video.id} '
+        'dvr=${playlist.playlistUri} warmed=$warmed',
+      );
+      if (warmed) warmedLiveDvrVideoId = video.id;
+      if (warmed) {
+        warmedLiveDvrQualityKey = playlist.selectedVariant?.adAwareQualityKey;
+      }
+      return warmed;
+    } catch (error) {
+      watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+      warmedLiveDvrVideoId = null;
+      warmedLiveDvrQualityKey = null;
+      debugPrint('prepare live DVR bridge failed: $error');
+      return false;
+    }
+  }
+
+  Future<void> openActiveDvrReplay({double initialRatio = 0.92}) async {
+    final generation = watchLoadGeneration;
+    final channel = channelLogin;
+    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+      await seekLiveDvrBridgePlayback(initialRatio);
+      return;
+    }
+
+    var video = activeGrowingVodVideo;
+
+    if (video == null) {
+      await prepareActiveGrowingVod(channel: channel, generation: generation);
+      video = activeGrowingVodVideo;
+    }
+    if (video == null) {
+      showSnack('目前找不到可回看的直播 VOD。');
+      return;
+    }
+
+    if (video.isLikelyGrowingArchive) {
+      await switchToLiveDvrReplay(video: video, ratio: initialRatio);
+      return;
+    }
+
+    final loaded = await openVodPlayback(
+      channel: channel,
+      generation: generation,
+      video: video,
+      initialRatio: initialRatio,
+    );
+    if (!loaded) showSnack('DVR 回放載入失敗。');
+  }
+
+  Future<void> returnToLivePlayback() async {
+    debugPrint('[LiveDvrBridge] return to low-latency live requested');
+    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+      await switchToLowLatencyLivePlayback();
+      return;
+    }
+    if (!watchPorts.player.runtime.usingExternalVodPlayback) return;
+
+    offlineVodFallbackVideo = null;
+    await switchToLowLatencyLivePlayback();
+  }
+
+  Future<void> switchToLiveDvrReplay({
+    required TwitchChannelVideo video,
+    required double ratio,
+  }) async {
+    final prepared = await prepareLiveDvrBridgeSource(video);
+    if (!prepared) {
+      showSnack('目前找不到可用的 DVR 播放來源。');
+      return;
+    }
+    await seekLiveDvrBridgePlayback(ratio);
+  }
+
+  Future<void> seekLiveDvrBridgePlayback(double ratio) async {
+    final atLiveEdge = ratio >= _liveDvrLiveEdgeRatio;
+    if (atLiveEdge) {
+      await switchToLowLatencyLivePlayback();
+      return;
+    }
+    final video = activeGrowingVodVideo;
+    final timelineDuration =
+        watchPorts.player.runtime.liveDvrBridgeDuration ??
+        video?.parsedDuration;
+    final timelineOffsetSeconds =
+        timelineDuration == null || timelineDuration.inMilliseconds <= 0
+        ? null
+        : timelineDuration.inMilliseconds *
+              ratio.clamp(0.0, _liveDvrLiveEdgeRatio) /
+              1000;
+    final playbackUrl = await watchPorts.player.runtime.seekLiveDvrBridgeRatio(
+      ratio,
+    );
+    if (playbackUrl == null) return;
+    await playerSession.openOrResume(
+      uri: playbackUrl,
+      play: true,
+      forceOpen: true,
+    );
+    await preferencesController.applyPlayerVolume();
+    if (video != null) {
+      await vodReplayController.start(
+        videoId: video.id,
+        channelLogin: channelLogin,
+        player: playerSession.player,
+        timelineOffsetSeconds: timelineOffsetSeconds,
+      );
+      preferVodReplayChat = true;
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> switchToLowLatencyLivePlayback() async {
+    debugPrint('[LiveDvrBridge] switch to low-latency live');
+    watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+    vodReplayController.stop();
+    preferVodReplayChat = false;
+    playbackController.setError(null);
+    if (mounted) setState(() {});
+    final preparedUri = await watchPorts.player.runtime
+        .prepareLowLatencyLiveFromWarmUpstream();
+    if (preparedUri != null) {
+      await playerSession.openOrResume(
+        uri: preparedUri.toString(),
+        play: true,
+        forceOpen: true,
+      );
+    } else {
+      await loadPlayer(channelLogin, forceOpen: true);
+    }
+    await preferencesController.applyPlayerVolume();
+  }
+
+  Future<bool> openVodPlayback({
+    required String channel,
+    required int generation,
+    required TwitchChannelVideo video,
+    double? initialRatio,
+    Duration? initialLiveBackoff,
+  }) async {
+    if (video.isLikelyGrowingArchive) {
+      activeGrowingVodVideo = video;
+      debugPrint(
+        '[WatchVodOnly] growing archive redirected to live DVR bridge',
+      );
+      await switchToLiveDvrReplay(video: video, ratio: initialRatio ?? 0.92);
+      return true;
+    }
+
+    final playlist = await watchServices.playbackApi.resolveVodPlaylist(
+      videoId: video.id,
+    );
+    vodQualityVariants = playlist.variants;
+    currentVodQualityVariant = playlist.selectedVariant;
+    currentVodQualityVideo = video;
+    currentClipQualityClip = null;
+    debugPrint(
+      '[WatchVodOnly] video=${video.id} '
+      'growing=${video.isLikelyGrowingArchive} '
+      'duration=${video.duration} playlist=${playlist.playlistUri} '
+      'variant=${playlist.selectedVariant?.name} '
+      'variants=${playlist.variants.length}',
+    );
+    if (!isCurrentWatchTask(generation, channel)) return false;
+
+    await playerSession.ensureReady();
+    final playbackUri = playlist.playlistUri;
+    debugPrint(
+      '[WatchVodOnly] playbackUri=$playbackUri '
+      'viaGrowingDvrProxy=${video.isLikelyGrowingArchive}',
+    );
+    if (!isCurrentWatchTask(generation, channel)) return false;
+    final expectedDuration = video.parsedDuration;
+    final initialStartPosition = _initialVodStartPosition(
+      duration: expectedDuration,
+      initialRatio: initialRatio,
+      initialLiveBackoff: initialLiveBackoff,
+    );
+    await playerSession.openOrResume(
+      uri: playbackUri.toString(),
+      play: true,
+      forceOpen: true,
+      startPosition: initialStartPosition,
+    );
+    await preferencesController.applyPlayerVolume();
+    await waitForInitialPlaybackSettle();
+    final duration = playerSession.player.state.duration;
+    if (duration.inMilliseconds > 500) {
+      final liveBackoff = initialLiveBackoff;
+      if (liveBackoff != null) {
+        final target = duration > liveBackoff
+            ? duration - liveBackoff
+            : Duration.zero;
+        await playerSession.player.seek(target);
+      } else {
+        final ratio = initialRatio;
+        if (ratio != null) {
+          final target = Duration(
+            milliseconds: (duration.inMilliseconds * ratio.clamp(0.0, 0.98))
+                .round(),
+          );
+          await playerSession.player.seek(target);
+        }
+      }
+    }
+
+    if (!isCurrentWatchTask(generation, channel)) return false;
+    watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
+    offlineVodFallbackVideo = video;
+    preferVodReplayChat = true;
+    playbackController.setError(null);
+    await vodReplayController.start(
+      videoId: video.id,
+      channelLogin: channel,
+      player: playerSession.player,
+    );
+    if (mounted) setState(() {});
+    return true;
+  }
+
+  Future<void> switchVodQuality(TwitchM3u8Variant variant) async {
+    final video = currentVodQualityVideo ?? activeGrowingVodVideo;
+    final clip = currentClipQualityClip;
+    if (video == null && clip == null) return;
+
+    try {
+      playbackController.setError(null);
+      if (clip != null && video == null) {
+        final position = playerSession.player.state.position;
+        await playerSession.openOrResume(
+          uri: variant.url,
+          play: true,
+          forceOpen: true,
+          startPosition: position,
+        );
+        currentVodQualityVariant = variant;
+        await preferencesController.applyPlayerVolume();
+        if (mounted) setState(() {});
+        return;
+      }
+
+      if (video == null) return;
+      if (video.isLikelyGrowingArchive) {
+        final selectedUri = Uri.tryParse(variant.url);
+        if (selectedUri == null) {
+          throw StateError('VOD 畫質 URL 無效。');
+        }
+        final warmed = await watchPorts.player.runtime.warmLiveDvrBridge(
+          dvrPlaylistUri: selectedUri,
+        );
+        if (!warmed) throw StateError('DVR 畫質切換失敗。');
+        currentVodQualityVariant = variant;
+        currentVodQualityVideo = video;
+        warmedLiveDvrVideoId = video.id;
+        warmedLiveDvrQualityKey = variant.adAwareQualityKey;
+        final ratio =
+            watchPorts.player.runtime.liveDvrBridgeTimelineRatio ?? 0.92;
+        await seekLiveDvrBridgePlayback(ratio);
+        return;
+      }
+
+      final duration = playerSession.player.state.duration;
+      final position = playerSession.player.state.position;
+      final startPosition = duration.inMilliseconds > 500
+          ? Duration(
+              milliseconds: position.inMilliseconds.clamp(
+                0,
+                duration.inMilliseconds,
+              ),
+            )
+          : Duration.zero;
+      await playerSession.openOrResume(
+        uri: variant.url,
+        play: true,
+        forceOpen: true,
+        startPosition: startPosition,
+      );
+      currentVodQualityVariant = variant;
+      currentVodQualityVideo = video;
+      await preferencesController.applyPlayerVolume();
+    } catch (error) {
+      playbackController.setError(error.toString());
+      showSnack('VOD 畫質切換失敗：$error');
+    }
+    if (mounted) setState(() {});
+  }
+
+  String _preferredLiveDvrQuality() {
+    final current = watchPorts.player.runtime.currentVariant;
+    if (current == null) return 'source';
+    final key = current.adAwareQualityKey.trim();
+    return key.isEmpty || key == 'unknown' ? current.name : key;
+  }
+
+  String? _normalizeWatchQualityKey(String value) {
+    final text = value.trim().toLowerCase();
+    if (text.isEmpty || text == 'source' || text == 'best') return null;
+    return text
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll('_', '')
+        .replaceAll('-', '');
+  }
+
+  Duration? _initialVodStartPosition({
+    required Duration? duration,
+    required double? initialRatio,
+    required Duration? initialLiveBackoff,
+  }) {
+    if (duration == null || duration.inMilliseconds <= 500) return null;
+
+    if (initialLiveBackoff != null) {
+      return duration > initialLiveBackoff
+          ? duration - initialLiveBackoff
+          : Duration.zero;
+    }
+
+    if (initialRatio == null) return null;
+    return Duration(
+      milliseconds: (duration.inMilliseconds * initialRatio.clamp(0.0, 0.98))
+          .round(),
+    );
   }
 }

@@ -15,9 +15,8 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   final VoidCallback? onShowGameMenu;
   final VoidCallback onShowLanguageMenu;
   final Future<void> Function() onRefresh;
-  final Future<void> Function() onLogin;
   final Future<void> Function() onOpenDropsConnector;
-  final Future<void> Function() onLogout;
+  final Future<void> Function() onOpenSettings;
   final bool forceTwoRows;
 
   const TwitchStreamHomeToolbar({
@@ -29,9 +28,8 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
     required this.onShowGameMenu,
     required this.onShowLanguageMenu,
     required this.onRefresh,
-    required this.onLogin,
     required this.onOpenDropsConnector,
-    required this.onLogout,
+    required this.onOpenSettings,
     this.forceTwoRows = false,
   });
 
@@ -64,11 +62,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         onPressed: () => onOpenDropsConnector(),
       ),
       const SizedBox(width: 4),
-      TwitchStreamHomeAccountMenu(
-        onLogin: onLogin,
-        onRefresh: onRefresh,
-        onLogout: onLogout,
-      ),
+      TwitchStreamHomeAccountMenu(onOpenSettings: onOpenSettings),
     ];
 
     if (forceTwoRows) {

@@ -7,6 +7,7 @@ import '../../../../models/emotes/twitch_official_emote.dart';
 import '../../../../models/emotes/twitch_third_party_emote.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../links/twitch_chat_link_preview.dart';
 import '../../shared/twitch_emote_image.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
@@ -39,7 +40,15 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
         break;
       case TwitchChatRenderSegmentType.link:
         spans.add(
-          TextSpan(text: segment.content, style: _linkTextStyle(metrics)),
+          WidgetSpan(
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            child: TwitchChatLinkText(
+              text: segment.url ?? segment.content,
+              style: _linkTextStyle(metrics),
+              dense: true,
+            ),
+          ),
         );
         break;
       case TwitchChatRenderSegmentType.twitchEmote:
@@ -735,9 +744,8 @@ class _LinkSegment extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      segment.content,
-      textAlign: TextAlign.left,
+    return TwitchChatLinkText(
+      text: segment.url ?? segment.content,
       style: _linkTextStyle(metrics),
     );
   }

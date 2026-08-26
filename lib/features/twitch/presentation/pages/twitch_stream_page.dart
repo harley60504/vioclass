@@ -8,6 +8,9 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../settings/twitch_chat_appearance_controller.dart';
+import '../settings/twitch_player_settings_controller.dart';
+import '../sheets/twitch_app_settings_sheet.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
@@ -41,6 +44,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   late final TwitchWebGqlAuthService webGqlAuthService;
   late final TwitchAuthApiService authApi;
   late final TwitchDiscoveryService discoveryService;
+  late final TwitchChatAppearanceController chatAppearanceController;
+  late final TwitchPlayerSettingsController playerSettingsController;
 
   TwitchHomeSection selectedSection = TwitchHomeSection.following;
 
@@ -65,15 +70,21 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       authService: authService,
       authApi: authApi,
     );
+    chatAppearanceController = TwitchChatAppearanceController();
+    playerSettingsController = TwitchPlayerSettingsController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadLoginState());
+      unawaited(chatAppearanceController.load());
+      unawaited(playerSettingsController.load());
     });
   }
 
   @override
   void dispose() {
     searchController.dispose();
+    chatAppearanceController.dispose();
+    playerSettingsController.dispose();
     apiClient.close(force: true);
     super.dispose();
   }
@@ -185,9 +196,25 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       MaterialPageRoute<void>(
         builder: (_) => TwitchDropsConnectionPage(
           apiClient: apiClient,
+          authService: authService,
+          authApi: authApi,
           dropsAuthService: dropsAuthService,
         ),
       ),
+    );
+  }
+
+  Future<void> openSettings() {
+    return showTwitchAppSettingsSheet(
+      context: context,
+      chatAppearanceController: chatAppearanceController,
+      playerSettingsController: playerSettingsController,
+      viewerLabel: () => viewerLabel,
+      loginStatus: () => loginStatus,
+      loadingLoginState: () => loadingLoginState,
+      onLogin: runLinkedTwitchLoginFlow,
+      onRefreshLogin: () => _loadLoginState(refreshPages: true),
+      onLogout: logout,
     );
   }
 
@@ -283,9 +310,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
             }
           },
           onRefresh: refreshCurrentPage,
-          onLogin: runLinkedTwitchLoginFlow,
           onOpenDropsConnector: openDropsConnectorPage,
-          onLogout: logout,
+          onOpenSettings: openSettings,
         ),
         Expanded(child: _buildHomeContent()),
       ],

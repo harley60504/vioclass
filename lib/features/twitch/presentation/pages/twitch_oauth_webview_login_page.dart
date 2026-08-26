@@ -66,6 +66,7 @@ class TwitchOAuthWebViewLoginPage extends StatefulWidget {
     'chat:read',
     'chat:edit',
     'user:read:emotes',
+    'clips:edit',
   ];
 
   @override

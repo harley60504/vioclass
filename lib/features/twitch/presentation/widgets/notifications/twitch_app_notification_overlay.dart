@@ -166,15 +166,25 @@ class _TwitchAppNotificationCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      IconButton(
-                        tooltip: '關閉通知',
-                        visualDensity: VisualDensity.compact,
-                        splashRadius: 18,
-                        onPressed: onDismiss,
-                        icon: Icon(
-                          Icons.close_rounded,
-                          color: Colors.white.withValues(alpha: 0.58),
-                          size: 19,
+                      Semantics(
+                        button: true,
+                        label: '關閉通知',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: onDismiss,
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            alignment: Alignment.center,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.close_rounded,
+                              color: Colors.white.withValues(alpha: 0.58),
+                              size: 19,
+                            ),
+                          ),
                         ),
                       ),
                     ],

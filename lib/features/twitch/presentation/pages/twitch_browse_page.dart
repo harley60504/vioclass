@@ -872,6 +872,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
             : '探索直播 · $selectedGameName',
         streamCount: filtered.length,
         streams: filtered,
+        discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
         footer: TwitchDiscoveryFooter(
           loadingMore: loadingMore,

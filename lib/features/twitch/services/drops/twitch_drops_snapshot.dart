@@ -2,7 +2,7 @@ class TwitchDropsSnapshot {
   final String viewerId;
   final String viewerLogin;
   final List<TwitchDropCampaign> inventoryCampaigns;
-  final List<TwitchDropCampaignSummary> activeCampaigns;
+  final List<TwitchDropCampaign> activeCampaigns;
 
   const TwitchDropsSnapshot({
     required this.viewerId,
@@ -26,10 +26,15 @@ class TwitchDropsSnapshot {
 
     final activeCampaigns = rawActiveCampaigns
         .whereType<Map>()
-        .map(TwitchDropCampaignSummary.fromJson)
-        .where((campaign) => campaign.id.isNotEmpty)
+        .map(TwitchDropCampaign.fromJson)
+        .where(
+          (campaign) =>
+              campaign.id.isNotEmpty &&
+              campaign.gameName.isNotEmpty &&
+              campaign.status.toUpperCase() != 'EXPIRED',
+        )
         .toList(growable: false);
-    final activeById = <String, TwitchDropCampaignSummary>{
+    final activeById = <String, TwitchDropCampaign>{
       for (final campaign in activeCampaigns) campaign.id: campaign,
     };
 
@@ -138,11 +143,15 @@ class TwitchDropCampaign {
   final String gameName;
   final String gameId;
   final String imageUrl;
+  final String ownerName;
+  final String description;
   final String detailsUrl;
   final String accountLinkUrl;
   final DateTime? startAt;
   final DateTime? endAt;
   final bool isAccountConnected;
+  final bool allowEnabled;
+  final List<TwitchDropAllowedChannel> allowedChannels;
   final List<TwitchDrop> timeBasedDrops;
 
   const TwitchDropCampaign({
@@ -152,18 +161,29 @@ class TwitchDropCampaign {
     required this.gameName,
     required this.gameId,
     required this.imageUrl,
+    required this.ownerName,
+    required this.description,
     required this.detailsUrl,
     required this.accountLinkUrl,
     required this.startAt,
     required this.endAt,
     required this.isAccountConnected,
+    required this.allowEnabled,
+    required this.allowedChannels,
     required this.timeBasedDrops,
   });
 
   factory TwitchDropCampaign.fromJson(Map raw) {
     final self = _asMap(raw['self']);
     final game = _asMap(raw['game']);
+    final owner = _asMap(raw['owner']);
+    final allow = _asMap(raw['allow']);
     final drops = _asList(raw['timeBasedDrops']);
+    final allowedChannels = _asList(allow?['channels'])
+        .whereType<Map>()
+        .map(TwitchDropAllowedChannel.fromJson)
+        .where((channel) => channel.id.isNotEmpty || channel.name.isNotEmpty)
+        .toList(growable: false);
 
     final campaign = TwitchDropCampaign(
       id: _string(raw['id']),
@@ -174,11 +194,15 @@ class TwitchDropCampaign {
           : _string(game?['displayName']),
       gameId: _string(game?['id']),
       imageUrl: _campaignDisplayImageUrl(raw: raw, game: game),
+      ownerName: _string(owner?['name']),
+      description: _string(raw['description']),
       detailsUrl: _string(raw['detailsURL']),
       accountLinkUrl: _string(raw['accountLinkURL']),
       startAt: _date(raw['startAt']),
       endAt: _date(raw['endAt']),
       isAccountConnected: self?['isAccountConnected'] == true,
+      allowEnabled: allow?['isEnabled'] == true,
+      allowedChannels: allowedChannels,
       timeBasedDrops: const <TwitchDrop>[],
     );
 
@@ -201,6 +225,7 @@ class TwitchDropCampaign {
 
   TwitchDropCampaign copyWith({
     String? imageUrl,
+    String? description,
     List<TwitchDrop>? timeBasedDrops,
   }) {
     return TwitchDropCampaign(
@@ -210,11 +235,15 @@ class TwitchDropCampaign {
       gameName: gameName,
       gameId: gameId,
       imageUrl: imageUrl ?? this.imageUrl,
+      ownerName: ownerName,
+      description: description ?? this.description,
       detailsUrl: detailsUrl,
       accountLinkUrl: accountLinkUrl,
       startAt: startAt,
       endAt: endAt,
       isAccountConnected: isAccountConnected,
+      allowEnabled: allowEnabled,
+      allowedChannels: allowedChannels,
       timeBasedDrops: timeBasedDrops ?? this.timeBasedDrops,
     );
   }
@@ -227,13 +256,37 @@ class TwitchDropCampaign {
       'gameName': gameName,
       'gameId': gameId,
       'imageUrl': imageUrl,
+      'ownerName': ownerName,
+      'description': description,
       'detailsUrl': detailsUrl,
       'accountLinkUrl': accountLinkUrl,
       'startAt': startAt?.toIso8601String(),
       'endAt': endAt?.toIso8601String(),
       'isAccountConnected': isAccountConnected,
+      'allowEnabled': allowEnabled,
+      'allowedChannels': allowedChannels
+          .map((channel) => channel.toJson())
+          .toList(),
       'timeBasedDrops': timeBasedDrops.map((drop) => drop.toJson()).toList(),
     };
+  }
+}
+
+class TwitchDropAllowedChannel {
+  final String id;
+  final String name;
+
+  const TwitchDropAllowedChannel({required this.id, required this.name});
+
+  factory TwitchDropAllowedChannel.fromJson(Map raw) {
+    return TwitchDropAllowedChannel(
+      id: _string(raw['id']),
+      name: _string(raw['name']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{'id': id, 'name': name};
   }
 }
 

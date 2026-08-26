@@ -5,19 +5,28 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
+import '../../api/channel/twitch_user_api_service.dart';
 import '../../api/chat/twitch_recent_messages_api_service.dart';
+import '../../api/chat/twitch_vod_comments_api_service.dart';
+import '../../api/core/twitch_helix_api_service.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../models/discovery/twitch_live_stream.dart';
 import '../../models/engagement/twitch_prediction.dart';
+import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/special_actions/twitch_pending_special_message.dart';
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
+import '../../services/chat/twitch_vod_chat_replay_runtime.dart';
+import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/engagement/twitch_hype_train_controller.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
+import '../../services/playback/twitch_vod_snapshot_playlist_proxy.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
 import '../watch/controllers/twitch_watch_chat_controller.dart';
@@ -29,8 +38,11 @@ import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
 import '../watch/twitch_watch_port_scope.dart';
 import '../watch/twitch_watch_scope.dart';
-import '../widgets/watch/twitch_watch_blocking_startup_overlay.dart';
+import '../dialogs/twitch_clip_editor_dialog.dart';
+import '../widgets/channel/twitch_channel_about_section.dart';
+import '../widgets/watch/chat/twitch_vod_replay_chat_panel.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
+import 'twitch_channel_page.dart';
 
 import 'watch/twitch_watch_page_session.dart';
 import 'watch/twitch_watch_page_preferences.dart';
@@ -65,6 +77,11 @@ class TwitchWatchPage extends StatefulWidget {
   final bool? initialIsMature;
   final int? initialViewerCount;
   final String? initialProfileImageUrl;
+  final TwitchFollowedChannel? initialOfflineChannel;
+  final TwitchDiscoveryService? initialDiscoveryService;
+  final TwitchChannelVideo? initialVodVideo;
+  final TwitchChannelClip? initialClip;
+  final bool initialVodPlaybackOnly;
 
   const TwitchWatchPage({
     super.key,
@@ -77,6 +94,11 @@ class TwitchWatchPage extends StatefulWidget {
     this.initialIsMature,
     this.initialViewerCount,
     this.initialProfileImageUrl,
+    this.initialOfflineChannel,
+    this.initialDiscoveryService,
+    this.initialVodVideo,
+    this.initialClip,
+    this.initialVodPlaybackOnly = false,
   });
 
   TwitchStreamHeaderMetadata get resolvedInitialMetadata {
@@ -134,6 +156,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   late final TwitchWatchEngagementController engagementController;
   late final TwitchWatchRelationshipController relationshipController;
   late final TwitchWatchPlaybackController playbackController;
+  late final TwitchVodChatReplayRuntime vodReplayController;
+  late final TwitchVodSnapshotPlaylistProxy vodSnapshotPlaylistProxy;
 
   TwitchWatchServices get watchServices => session.services;
   TwitchWatchFeaturePorts get watchPorts => session.ports;
@@ -146,11 +170,12 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   TwitchMediaKitPlayerSession get playerSession => session.playerSession;
 
   StreamSubscription<double>? playerVolumeSubscription;
-
   int watchLoadGeneration = 0;
+  String? restoreMediaUriOnDispose;
 
   bool loadingAuth = true;
   bool loadingWatch = false;
+  bool creatingClip = false;
   bool fullscreenMode = false;
   bool mobileImmersiveEntered = false;
   bool chatBootstrapping = false;
@@ -190,6 +215,20 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   TwitchHypeTrainController get hypeTrainController =>
       engagementController.hypeTrainController;
   List<dynamic> get pinnedMessages => engagementController.pinnedMessages;
+  TwitchChannelVideo? offlineVodFallbackVideo;
+  TwitchChannelVideo? activeGrowingVodVideo;
+  TwitchChannelVideo? currentVodQualityVideo;
+  TwitchChannelClip? currentClipQualityClip;
+  List<TwitchM3u8Variant> vodQualityVariants = const <TwitchM3u8Variant>[];
+  TwitchM3u8Variant? currentVodQualityVariant;
+  String? warmedLiveDvrVideoId;
+  String? warmedLiveDvrQualityKey;
+  bool preferVodReplayChat = false;
+  List<TwitchChannelPanel> aboutPanels = const <TwitchChannelPanel>[];
+  List<TwitchChannelSocialLink> aboutSocialLinks =
+      const <TwitchChannelSocialLink>[];
+  String? aboutErrorText;
+  bool loadingAboutPanels = false;
 
   TwitchWatchSheetPortLauncher get sheetLauncher =>
       TwitchWatchSheetPortLauncher(
@@ -223,22 +262,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       connectingChat ||
       chatBootstrapping;
 
-  bool get showBlockingStartupMask {
-    return loadingAuth ||
-        loadingWatch ||
-        chatBootstrapping ||
-        connectingChat ||
-        (enableWatchPlayer && loadingPlayer);
-  }
-
-  String get startupMaskTitle {
-    if (loadingAuth) return '正在準備 Twitch 工作階段...';
-    if (loadingWatch) return '正在準備觀看頁...';
-    if (enableWatchPlayer && loadingPlayer) return '正在啟動播放器...';
-    if (chatBootstrapping || connectingChat) return '正在連線聊天室...';
-    return '正在載入...';
-  }
-
   void notifyControllerChanged() {
     if (mounted) setState(() {});
   }
@@ -263,6 +286,115 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Future<void> createLiveClip() async {
+    if (creatingClip) return;
+    if (watchPorts.player.runtime.usingExternalVodPlayback ||
+        watchPorts.player.runtime.usingLiveDvrBridge ||
+        offlineVodFallbackVideo != null ||
+        currentClipQualityClip != null) {
+      showSnack('目前在 VOD/Clip 模式，請先回直播再建立 Clip。');
+      return;
+    }
+
+    final activeChannelId = channelId?.trim();
+    final fallbackChannelId =
+        widget.initialOfflineChannel?.broadcasterId.trim() ?? '';
+    final cleanChannelId = activeChannelId != null && activeChannelId.isNotEmpty
+        ? activeChannelId
+        : fallbackChannelId;
+    if (cleanChannelId.isEmpty) {
+      showSnack('正在取得頻道資訊，稍後再試一次。');
+      return;
+    }
+
+    setState(() => creatingClip = true);
+    try {
+      final live = await watchServices.clipApi.getLiveBroadcast(
+        broadcasterId: cleanChannelId,
+      );
+      final startedAt = live.startedAt;
+      final offsetSeconds = startedAt == null
+          ? 0.0
+          : DateTime.now()
+                .toUtc()
+                .difference(startedAt.toUtc())
+                .inSeconds
+                .toDouble();
+      if (offsetSeconds < 30) {
+        showSnack('直播剛開始，至少約 30 秒後才能剪 Clip。');
+        return;
+      }
+      if (!mounted) return;
+      setState(() => creatingClip = false);
+      await showTwitchClipEditorDialog(
+        context: context,
+        clipApi: watchServices.clipApi,
+        broadcastId: live.broadcastId,
+        offsetSeconds: offsetSeconds,
+        channelName: channelLogin,
+      );
+    } catch (error) {
+      final message = error.toString();
+      if (message.contains('Drops / Android token')) {
+        showSnack('Clip 剪輯失敗：請先補 Drops / Android token。');
+      } else if (_looksLikeClipDisabledError(message)) {
+        showSnack('這個實況主可能沒有開放 Clip。');
+      } else {
+        showSnack('Clip 剪輯失敗：$error');
+      }
+    } finally {
+      if (mounted) setState(() => creatingClip = false);
+    }
+  }
+
+  bool _looksLikeClipDisabledError(String message) {
+    final lower = message.toLowerCase();
+    return lower.contains('disabled') ||
+        lower.contains('forbidden') ||
+        lower.contains('notfound') ||
+        lower.contains('createclip') ||
+        lower.contains('createrawmedia') ||
+        lower.contains('raw media') ||
+        lower.contains('rawmedia') ||
+        lower.contains('clip finalize') ||
+        lower.contains('沒有回傳 raw media') ||
+        lower.contains('一直沒有完成處理');
+  }
+
+  Future<void> loadChannelAboutPanels() async {
+    final login = channelLogin;
+    if (login.trim().isEmpty) return;
+    setState(() {
+      loadingAboutPanels = true;
+      aboutErrorText = null;
+      aboutPanels = const <TwitchChannelPanel>[];
+      aboutSocialLinks = const <TwitchChannelSocialLink>[];
+    });
+
+    try {
+      final discoveryService =
+          widget.initialDiscoveryService ??
+          TwitchDiscoveryService(
+            client: watchServices.apiClient,
+            authService: authService,
+            authApi: authApi,
+          );
+      final loaded = await discoveryService.fetchChannelAbout(login: login);
+      if (!mounted || login != channelLogin) return;
+      setState(() {
+        aboutPanels = loaded.panels;
+        aboutSocialLinks = loaded.socialLinks;
+        loadingAboutPanels = false;
+      });
+    } catch (error) {
+      if (!mounted || login != channelLogin) return;
+      setState(() {
+        aboutErrorText = error.toString();
+        loadingAboutPanels = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -272,6 +404,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
     );
     messageController = TextEditingController();
     session = TwitchWatchSessionHandles.create(playerTitle: 'Twitch Raw Proxy');
+    vodSnapshotPlaylistProxy = TwitchVodSnapshotPlaylistProxy();
     preferencesController = TwitchWatchPreferencesController(
       applyVolume: (volume) async {
         final player = playerSession.playerOrNull;
@@ -301,9 +434,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       refreshSpecialMessages: ({bool autoSelectPending = true}) =>
           refreshSpecialMessages(autoSelectPending: autoSelectPending),
       onChannelIdResolved: setResolvedChannelId,
-      onViewerResolved: (viewerLogin, viewerId) {
-        viewerLogin = viewerLogin;
-        viewerId = viewerId;
+      onViewerResolved: (resolvedViewerLogin, resolvedViewerId) {
+        viewerLogin = resolvedViewerLogin;
+        viewerId = resolvedViewerId;
       },
       showMessage: showSnack,
     )..addListener(notifyControllerChanged);
@@ -328,6 +461,12 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       applyPlayerVolume: applyPlayerVolume,
       waitForInitialPlaybackSettle: waitForInitialPlaybackSettle,
     )..addListener(notifyControllerChanged);
+    vodReplayController = TwitchVodChatReplayRuntime(
+      api: TwitchVodCommentsApiService(
+        client: watchServices.apiClient,
+        badgeCache: TwitchBadgeCacheService(),
+      ),
+    )..addListener(notifyControllerChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await enterMobileImmersiveByDefault();
@@ -335,23 +474,29 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       await loadWatchPreferences();
       if (!mounted) return;
       await loadAuth();
-      if (mounted) await loadWatch();
+      if (mounted) {
+        await loadWatch();
+        unawaited(loadChannelAboutPanels());
+      }
     });
   }
 
   @override
   void dispose() {
-    cancelDeferredWatchTasks();
+    cancelDeferredWatchTasks(rebuild: false);
     channelController.dispose();
     messageController.dispose();
 
     unawaited(watchPorts.player.disposeRuntime());
     playbackController.removeListener(notifyControllerChanged);
+    vodReplayController.removeListener(notifyControllerChanged);
     relationshipController.removeListener(notifyControllerChanged);
     engagementController.removeListener(notifyControllerChanged);
     chatController.removeListener(notifyControllerChanged);
     preferencesController.removeListener(notifyControllerChanged);
     playbackController.dispose();
+    vodReplayController.dispose();
+    unawaited(vodSnapshotPlaylistProxy.dispose());
     relationshipController.dispose();
     engagementController.dispose();
     chatController.dispose();
@@ -362,7 +507,17 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       unawaited(volumeSubscriptionCancel);
     }
 
-    unawaited(playerSession.pauseCurrent().catchError((_) {}));
+    final restoreUri = restoreMediaUriOnDispose;
+    if (restoreUri != null && restoreUri.trim().isNotEmpty) {
+      unawaited(
+        TwitchMediaKitPlayerHost.restoreSharedMedia(
+          uri: restoreUri,
+          play: true,
+        ).catchError((_) {}),
+      );
+    } else {
+      unawaited(playerSession.pauseCurrent().catchError((_) {}));
+    }
     playerSession.release();
 
     if (fullscreenMode || mobileImmersiveEntered) {
@@ -373,13 +528,104 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
     super.dispose();
   }
 
+  Future<void> openCurrentChannelSheet(
+    TwitchStreamHeaderMetadata metadata,
+  ) async {
+    final login = metadata.channelLogin.trim().toLowerCase();
+    if (login.isEmpty) {
+      showSnack('目前沒有可開啟的頻道資訊。');
+      return;
+    }
+
+    final knownChannel = widget.initialOfflineChannel;
+    final knownChannelId = knownChannel?.broadcasterId.trim().isNotEmpty == true
+        ? knownChannel!.broadcasterId.trim()
+        : channelId?.trim() ?? '';
+    final discoveryService = TwitchDiscoveryService(
+      client: watchServices.apiClient,
+      authService: authService,
+      authApi: authApi,
+    );
+    if (knownChannelId.isNotEmpty) {
+      final channel = TwitchFollowedChannel(
+        broadcasterId: knownChannelId,
+        broadcasterLogin:
+            knownChannel?.broadcasterLogin.trim().isNotEmpty == true
+            ? knownChannel!.broadcasterLogin
+            : login,
+        broadcasterName: knownChannel?.broadcasterName.trim().isNotEmpty == true
+            ? knownChannel!.broadcasterName
+            : login,
+        followedAt: knownChannel?.followedAt,
+        profileImageUrl: knownChannel?.profileImageUrl.trim().isNotEmpty == true
+            ? knownChannel!.profileImageUrl
+            : metadata.profileImageUrl,
+        offlineImageUrl: knownChannel?.offlineImageUrl ?? '',
+        description: knownChannel?.description ?? '',
+      );
+
+      await showTwitchChannelSheet(
+        context: context,
+        discoveryService: discoveryService,
+        channel: channel,
+      );
+      return;
+    }
+
+    try {
+      final userApi = TwitchUserApiService(
+        helix: TwitchHelixApiService(
+          client: watchServices.apiClient,
+          accessTokenProvider: authService.getValidAccessToken,
+        ),
+        gql: watchServices.publicGqlApi,
+      );
+      final user = await userApi.getChannelProfileByLogin(login);
+      if (!mounted) return;
+      if (user == null || user.id.trim().isEmpty) {
+        showSnack('頻道資訊讀取失敗，無法開啟 About/VOD。');
+        return;
+      }
+
+      final channel = TwitchFollowedChannel(
+        broadcasterId: user.id,
+        broadcasterLogin: user.login.isEmpty ? login : user.login,
+        broadcasterName: user.displayName.isEmpty ? login : user.displayName,
+        followedAt: null,
+        profileImageUrl: user.profileImageUrl.isEmpty
+            ? metadata.profileImageUrl
+            : user.profileImageUrl,
+        offlineImageUrl: user.offlineImageUrl,
+        description: user.description,
+      );
+
+      await showTwitchChannelSheet(
+        context: context,
+        discoveryService: discoveryService,
+        channel: channel,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      showSnack('頻道資訊讀取失敗：$error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final runtime = chatRuntime;
+    final fallbackVideo = offlineVodFallbackVideo;
     final metadata = widget.resolvedInitialMetadata.copyWith(
       channelLogin: channelLogin,
+      streamTitle: fallbackVideo == null
+          ? widget.resolvedInitialMetadata.streamTitle
+          : fallbackVideo.title,
+      gameName: widget.resolvedInitialMetadata.gameName,
+      clearViewerCount: fallbackVideo != null,
     );
 
+    final usingVodQuality =
+        watchPorts.player.runtime.usingLiveDvrBridge ||
+        watchPorts.player.runtime.usingExternalVodPlayback;
     final playerArea = TwitchWatchPlayerAreaPortAdapter(
       metadata: metadata,
       loading: loadingPlayer,
@@ -399,17 +645,60 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       volume: volume,
       onToggleMute: () => unawaited(togglePlayerMute()),
       onVolumeChanged: (value) => unawaited(setPlayerVolume(value)),
+      qualityVariants: usingVodQuality ? vodQualityVariants : null,
+      currentVariant: usingVodQuality ? currentVodQualityVariant : null,
+      onQualitySelected: usingVodQuality
+          ? (variant) => unawaited(switchVodQuality(variant))
+          : null,
       onBack: () => Navigator.of(context).maybePop(),
-      onReload: busy ? null : loadWatch,
+      onReload: busy
+          ? null
+          : () {
+              unawaited(loadWatch());
+              unawaited(loadChannelAboutPanels());
+            },
+      onOpenChannel: () => unawaited(openCurrentChannelSheet(metadata)),
+      onCreateClip: () => unawaited(createLiveClip()),
+      creatingClip: creatingClip,
       onStop: () => stopCurrentSession(),
+      hasDvrReplay:
+          watchPorts.player.runtime.usingLiveDvrBridge ||
+          watchPorts.player.runtime.usingExternalVodPlayback ||
+          activeGrowingVodVideo != null,
+      showLiveEdgeLabel:
+          watchPorts.player.runtime.usingLiveDvrBridge ||
+          activeGrowingVodVideo != null,
+      liveDvrDuration:
+          watchPorts.player.runtime.liveDvrBridgeDuration ??
+          activeGrowingVodVideo?.parsedDuration,
+      liveDvrStartedAt:
+          activeGrowingVodVideo?.createdAt ??
+          activeGrowingVodVideo?.publishedAt,
+      onOpenDvrReplayAt: watchPorts.player.runtime.usingLiveDvrBridge
+          ? (ratio) => unawaited(seekLiveDvrBridgePlayback(ratio))
+          : activeGrowingVodVideo == null
+          ? null
+          : (ratio) => unawaited(openActiveDvrReplay(initialRatio: ratio)),
+      onReturnToLive: () {
+        unawaited(returnToLivePlayback());
+      },
       onError: (message) {
         if (!mounted) return;
         playbackController.setError(message);
         showSnack('播放器操作失敗：$message');
       },
     );
+    final belowPlayer = TwitchChannelAboutSection(
+      metadata: metadata,
+      description: widget.initialOfflineChannel?.description ?? '',
+      panels: aboutPanels,
+      socialLinks: aboutSocialLinks,
+      loading: loadingAboutPanels,
+      errorText: aboutErrorText,
+      onRetry: () => unawaited(loadChannelAboutPanels()),
+    );
 
-    final chatPanel = TwitchWatchChatPanelPortAdapter(
+    final liveChatPanel = TwitchWatchChatPanelPortAdapter(
       runtime: runtime,
       viewerLogin: viewerLogin,
       viewerId: viewerId,
@@ -433,6 +722,42 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       onOpenSpecialActions: openSpecialMessagesSheet,
       onCancelPendingSpecialMessage: clearPendingSpecialMessage,
     );
+    final liveChatPanelWithoutHeader = TwitchWatchChatPanelPortAdapter(
+      runtime: runtime,
+      viewerLogin: viewerLogin,
+      viewerId: viewerId,
+      metadata: metadata,
+      channelPoints: channelPointsSnapshot,
+      pendingSpecialMessage: pendingSpecialMessage,
+      pinnedMessages: pinnedMessages,
+      prediction: prediction,
+      hypeTrainController: hypeTrainController,
+      loadingEmotes: loadingEmotes || emoteBootstrapping,
+      loadingEngagement: loadingEngagement || engagementBootstrapping,
+      engagementError: engagementError,
+      messageController: messageController,
+      sending: sending,
+      onSend: sendMessage,
+      onOpenEmotes: openEmotePicker,
+      onRefreshEmotes: () => loadThirdPartyEmotes(forceRefresh: true),
+      onRefreshEngagement: () => refreshEngagement(showSnackOnError: true),
+      onOpenChannelPoints: openChannelPointsSheet,
+      onOpenPrediction: openPredictionBetSheet,
+      onOpenSpecialActions: openSpecialMessagesSheet,
+      onCancelPendingSpecialMessage: clearPendingSpecialMessage,
+      showHeader: false,
+    );
+    final shouldShowVodReplayChat =
+        offlineVodFallbackVideo != null || vodReplayController.active;
+    final chatPanel = !shouldShowVodReplayChat
+        ? liveChatPanel
+        : TwitchVodReplayChatPanel(
+            runtime: vodReplayController,
+            liveChat: liveChatPanelWithoutHeader,
+            preferredMode: preferVodReplayChat
+                ? TwitchVodReplayChatMode.replay
+                : TwitchVodReplayChatMode.live,
+          );
 
     final scaffold = Scaffold(
       backgroundColor: const Color(0xFF0E0E10),
@@ -452,21 +777,13 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
               maxChatPanelRatio: maxChatPanelRatio,
               player: playerArea,
               chat: chatPanel,
+              belowPlayer: belowPlayer,
               onSetChatPanelWidthForViewport: setChatPanelWidthForViewport,
               onPersistChatPanelWidth: () {
                 unawaited(saveChatPanelWidthPreference());
               },
             ),
           ),
-          if (showBlockingStartupMask)
-            Positioned.fill(
-              child: TwitchWatchBlockingStartupOverlay(
-                title: startupMaskTitle,
-                subtitle: enableWatchPlayer
-                    ? '先啟動播放器，再連線聊天室；互動資料與貼圖會在背景補上。'
-                    : '正在連線聊天室；互動資料與貼圖會在背景補上。',
-              ),
-            ),
         ],
       ),
     );

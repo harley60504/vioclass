@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../links/twitch_chat_link_preview.dart';
 import '../../shared/twitch_ui_avatar.dart';
 
 class TwitchPinnedMessageBanner extends StatefulWidget {
@@ -194,17 +195,29 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                         duration: const Duration(milliseconds: 150),
                         curve: Curves.easeOutCubic,
                         alignment: Alignment.topCenter,
-                        child: Text(
-                          cleanText,
+                        child: RichText(
                           maxLines: _expanded ? 12 : 2,
                           overflow: _expanded
                               ? TextOverflow.visible
                               : TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: const Color(0xFFF5F0FF),
-                            fontSize: bodyFontSize,
-                            height: 1.24,
-                            fontWeight: TwitchUiFontWeight.body,
+                          text: TextSpan(
+                            children: buildTwitchChatLinkifiedSpans(
+                              context: context,
+                              text: cleanText,
+                              textStyle: TextStyle(
+                                color: const Color(0xFFF5F0FF),
+                                fontSize: bodyFontSize,
+                                height: 1.24,
+                                fontWeight: TwitchUiFontWeight.body,
+                              ),
+                              linkStyle: TextStyle(
+                                color: const Color(0xFF8AB4F8),
+                                fontSize: bodyFontSize,
+                                height: 1.24,
+                                fontWeight: FontWeight.w800,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
                           ),
                         ),
                       ),

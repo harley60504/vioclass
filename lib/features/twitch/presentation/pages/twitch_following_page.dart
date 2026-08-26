@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
+import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_login_required_view.dart';
 import 'twitch_stream_refresh_reconciler.dart';
@@ -39,13 +40,17 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   final ScrollController scrollController = ScrollController();
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
+  List<TwitchFollowedChannel> offlineFollowedChannels =
+      const <TwitchFollowedChannel>[];
   String? nextCursor;
   String? errorText;
   String? paginationError;
+  String? offlineError;
   String currentLanguage = '';
 
   bool loadingFirstPage = true;
   bool loadingMore = false;
+  bool loadingOfflineChannels = false;
   bool hasMore = true;
 
   int _refreshGeneration = 0;
@@ -121,10 +126,13 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       loadingFirstPage = !hadExistingStreams;
       errorText = null;
       paginationError = null;
+      offlineError = null;
+      loadingOfflineChannels = true;
       if (clearExisting) {
         nextCursor = null;
         hasMore = true;
         loadedStreams = const <TwitchLiveStream>[];
+        offlineFollowedChannels = const <TwitchFollowedChannel>[];
       }
     });
 
@@ -139,13 +147,19 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       );
       if (!mounted || generation != _refreshGeneration) return;
 
+      final offline = await _fetchOfflineFollowedChannels(refreshed.streams);
+      if (!mounted || generation != _refreshGeneration) return;
+
       setState(() {
         loadedStreams = refreshed.streams;
+        offlineFollowedChannels = offline.channels;
         nextCursor = refreshed.cursor;
         hasMore = refreshed.hasMore;
         loadingFirstPage = false;
+        loadingOfflineChannels = false;
         errorText = null;
         paginationError = null;
+        offlineError = offline.errorText;
       });
 
       if (jumpToTop || clearExisting) {
@@ -160,6 +174,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           paginationError = error.toString();
         }
         loadingFirstPage = false;
+        loadingOfflineChannels = false;
       });
     }
   }
@@ -201,6 +216,42 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       cursor: cursor,
       hasMore: hasMorePage,
     );
+  }
+
+  Future<_OfflineFollowedResult> _fetchOfflineFollowedChannels(
+    List<TwitchLiveStream> liveStreams,
+  ) async {
+    try {
+      final page = await widget.discoveryService.fetchFollowedChannels(
+        first: _followedPageSize,
+      );
+
+      final liveIds = liveStreams
+          .map((stream) => stream.userId.trim())
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final liveLogins = liveStreams
+          .map((stream) => stream.channelLogin)
+          .where((login) => login.isNotEmpty)
+          .toSet();
+
+      final offline = page.channels
+          .where((channel) {
+            final id = channel.broadcasterId.trim();
+            final login = channel.channelLogin;
+            if (id.isNotEmpty && liveIds.contains(id)) return false;
+            if (login.isNotEmpty && liveLogins.contains(login)) return false;
+            return true;
+          })
+          .toList(growable: false);
+
+      return _OfflineFollowedResult(channels: offline);
+    } catch (error) {
+      return _OfflineFollowedResult(
+        channels: const <TwitchFollowedChannel>[],
+        errorText: error.toString(),
+      );
+    }
   }
 
   Future<void> loadMore() async {
@@ -309,6 +360,22 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
             ...stream.tags,
           ].join(' ').toLowerCase();
 
+          return haystack.contains(keyword);
+        })
+        .toList(growable: false);
+  }
+
+  List<TwitchFollowedChannel> _filteredOfflineChannels() {
+    final keyword = widget.searchText.trim().toLowerCase();
+    if (keyword.isEmpty) return offlineFollowedChannels;
+
+    return offlineFollowedChannels
+        .where((channel) {
+          final haystack = <String>[
+            channel.broadcasterName,
+            channel.broadcasterLogin,
+            channel.description,
+          ].join(' ').toLowerCase();
           return haystack.contains(keyword);
         })
         .toList(growable: false);
@@ -444,8 +511,11 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredStreams();
+    final filteredOffline = _filteredOfflineChannels();
 
-    if (loadingFirstPage && loadedStreams.isEmpty) {
+    if (loadingFirstPage &&
+        loadedStreams.isEmpty &&
+        offlineFollowedChannels.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF9146FF)),
       );
@@ -474,16 +544,22 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       );
     }
 
-    if (loadedStreams.isEmpty) {
+    if (loadedStreams.isEmpty &&
+        offlineFollowedChannels.isEmpty &&
+        !loadingOfflineChannels) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.favorite_border_rounded,
         title: '目前追隨頻道沒有直播',
-        message: '稍後重新整理，或切到瀏覽頁探索其他直播。',
+        message: offlineError?.trim().isNotEmpty == true
+            ? '直播清單為空，離線追隨頻道也讀取失敗：$offlineError'
+            : '稍後重新整理，或切到瀏覽頁探索其他直播。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
 
-    if (filtered.isEmpty) {
+    if (filtered.isEmpty &&
+        filteredOffline.isEmpty &&
+        !loadingOfflineChannels) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
         title: '找不到符合條件的追隨直播',
@@ -500,7 +576,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         sectionTitle: '追隨中的直播',
         streamCount: filtered.length,
         streams: filtered,
+        discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
+        extraSliversBeforeFooter: _offlineSlivers(filteredOffline),
         footer: TwitchDiscoveryFooter(
           loadingMore: loadingMore,
           hasMore: hasMore,
@@ -509,6 +587,66 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         ),
       ),
     );
+  }
+
+  List<Widget> _offlineSlivers(List<TwitchFollowedChannel> channels) {
+    if (loadingOfflineChannels) {
+      return const <Widget>[
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(26, 0, 26, 24),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF9146FF),
+                    strokeWidth: 2.4,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  '正在整理未開台的追隨頻道...',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (channels.isEmpty) return const <Widget>[];
+
+    return <Widget>[
+      TwitchDiscoverySectionHeader(
+        icon: Icons.video_library_rounded,
+        title: '未開台追隨頻道',
+        count: channels.length,
+      ).asSliverBox(),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 300,
+            mainAxisExtent: 168,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return TwitchOfflineChannelCard(
+              channel: channels[index],
+              discoveryService: widget.discoveryService,
+            );
+          }, childCount: channels.length),
+        ),
+      ),
+    ];
   }
 }
 
@@ -522,4 +660,15 @@ class _FollowingRefreshWindow {
     required this.cursor,
     required this.hasMore,
   });
+}
+
+class _OfflineFollowedResult {
+  final List<TwitchFollowedChannel> channels;
+  final String? errorText;
+
+  const _OfflineFollowedResult({required this.channels, this.errorText});
+}
+
+extension _SliverBoxWidget on Widget {
+  Widget asSliverBox() => SliverToBoxAdapter(child: this);
 }

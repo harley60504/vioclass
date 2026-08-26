@@ -136,6 +136,7 @@ class TwitchMediaKitPlayerHost {
     required String uri,
     bool play = true,
     bool forceOpen = false,
+    Duration? startPosition,
   }) async {
     if (!_enableWatchPlayer) {
       _currentMediaUri = null;
@@ -163,12 +164,26 @@ class TwitchMediaKitPlayerHost {
     }
 
     if (session._released) return;
-    await session.player.open(Media(safeUri), play: play);
+    await session.player.open(Media(safeUri, start: startPosition), play: play);
     if (!session._released) {
       _currentMediaUri = safeUri;
     } else {
       unawaited(session.player.pause().catchError((_) {}));
     }
+  }
+
+  static Future<void> restoreSharedMedia({
+    required String uri,
+    bool play = true,
+  }) async {
+    final player = _player;
+    if (player == null) return;
+
+    final safeUri = uri.trim();
+    if (safeUri.isEmpty) return;
+
+    await player.open(Media(safeUri), play: play);
+    _currentMediaUri = safeUri;
   }
 
   static Future<void> pauseShared() async {
@@ -193,11 +208,6 @@ class TwitchMediaKitPlayerHost {
   static void _release(TwitchMediaKitPlayerSession session) {
     if (session.generation != _generation) return;
 
-    final player = _player;
-    if (player != null) {
-      unawaited(player.pause().catchError((_) {}));
-    }
-
     session._detachVideoSurface();
 
     _refCount = (_refCount - 1).clamp(0, 1 << 20).toInt();
@@ -206,6 +216,10 @@ class TwitchMediaKitPlayerHost {
     // Keep the native player and current media attached after the last
     // WatchPage leaves. Re-entering a stream can resume the same local source
     // without rebuilding media_kit, but audio stays paused while off-page.
+    final player = _player;
+    if (player != null) {
+      unawaited(player.pause().catchError((_) {}));
+    }
   }
 
   static Future<void> disposeNow() async {
@@ -322,12 +336,14 @@ class TwitchMediaKitPlayerSession {
     required String uri,
     bool play = true,
     bool forceOpen = false,
+    Duration? startPosition,
   }) {
     return TwitchMediaKitPlayerHost.openOrResume(
       this,
       uri: uri,
       play: play,
       forceOpen: forceOpen,
+      startPosition: startPosition,
     );
   }
 

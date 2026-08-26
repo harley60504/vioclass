@@ -17,6 +17,9 @@ class WatchTopActionBar extends StatelessWidget {
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
   final VoidCallback? onReload;
+  final VoidCallback? onOpenChannel;
+  final VoidCallback? onCreateClip;
+  final bool creatingClip;
   final VoidCallback onStop;
 
   const WatchTopActionBar({
@@ -29,6 +32,9 @@ class WatchTopActionBar extends StatelessWidget {
     required this.onToggleFollow,
     required this.onSubscribe,
     required this.onReload,
+    this.onOpenChannel,
+    this.onCreateClip,
+    this.creatingClip = false,
     required this.onStop,
   });
 
@@ -37,16 +43,6 @@ class WatchTopActionBar extends StatelessWidget {
       await player.pause();
     } catch (_) {}
     onBack();
-  }
-
-  Future<void> _stopPlaybackOnly() async {
-    try {
-      await player.stop();
-    } catch (_) {
-      try {
-        await player.pause();
-      } catch (_) {}
-    }
   }
 
   @override
@@ -64,8 +60,9 @@ class WatchTopActionBar extends StatelessWidget {
           onBack: () => unawaited(_pauseThenBack()),
           onToggleFollow: onToggleFollow,
           onSubscribe: onSubscribe,
-          onReload: onReload,
-          onStopPlaybackOnly: () => unawaited(_stopPlaybackOnly()),
+          onOpenChannel: onOpenChannel,
+          onCreateClip: onCreateClip,
+          creatingClip: creatingClip,
         );
 
         final content = metrics.compact
@@ -73,11 +70,13 @@ class WatchTopActionBar extends StatelessWidget {
                 metrics: metrics,
                 actions: actions,
                 metadata: metadata,
+                onOpenChannel: onOpenChannel,
               )
             : _WideWatchTopActionContent(
                 metrics: metrics,
                 actions: actions,
                 metadata: metadata,
+                onOpenChannel: onOpenChannel,
               );
 
         return _ScaledWatchTopActionSlot(
@@ -130,8 +129,9 @@ class _WatchTopActionButtons {
   final VoidCallback onBack;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
-  final VoidCallback? onReload;
-  final VoidCallback onStopPlaybackOnly;
+  final VoidCallback? onOpenChannel;
+  final VoidCallback? onCreateClip;
+  final bool creatingClip;
 
   const _WatchTopActionButtons({
     required this.metadata,
@@ -141,8 +141,9 @@ class _WatchTopActionButtons {
     required this.onBack,
     required this.onToggleFollow,
     required this.onSubscribe,
-    required this.onReload,
-    required this.onStopPlaybackOnly,
+    required this.onOpenChannel,
+    required this.onCreateClip,
+    required this.creatingClip,
   });
 
   Widget buildBackButton() {
@@ -162,6 +163,21 @@ class _WatchTopActionButtons {
 
   List<Widget> buildRightActions() {
     return <Widget>[
+      ChannelLibraryButton(
+        compact: metrics.compact,
+        tiny: metrics.tiny,
+        height: metrics.controlHeight,
+        onPressed: onOpenChannel,
+      ),
+      SizedBox(width: metrics.actionGap),
+      CreateClipButton(
+        compact: metrics.compact,
+        tiny: metrics.tiny,
+        height: metrics.controlHeight,
+        busy: creatingClip,
+        onPressed: onCreateClip,
+      ),
+      SizedBox(width: metrics.actionGap),
       FollowButton(
         followed: isFollowing,
         busy: followBusy,
@@ -177,32 +193,6 @@ class _WatchTopActionButtons {
         height: metrics.controlHeight,
         onPressed: onSubscribe,
       ),
-      SizedBox(width: metrics.actionGap),
-      RoundIconButton(
-        tooltip: '重新載入',
-        icon: Icons.refresh,
-        iconColor: const Color(0xFFA78BFA),
-        backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.22),
-        borderColor: const Color(0xFFA78BFA).withValues(alpha: 0.24),
-        glowOpacity: 0.20,
-        compact: metrics.compact,
-        tiny: metrics.tiny,
-        height: metrics.controlHeight,
-        onPressed: onReload,
-      ),
-      SizedBox(width: metrics.actionGap),
-      RoundIconButton(
-        tooltip: '停止播放',
-        icon: Icons.close,
-        iconColor: const Color(0xFFFF6B81),
-        backgroundColor: const Color(0xFF7F1D1D).withValues(alpha: 0.24),
-        borderColor: const Color(0xFFFF6B81).withValues(alpha: 0.26),
-        glowOpacity: 0.20,
-        compact: metrics.compact,
-        tiny: metrics.tiny,
-        height: metrics.controlHeight,
-        onPressed: onStopPlaybackOnly,
-      ),
     ];
   }
 }
@@ -211,11 +201,13 @@ class _CompactWatchTopActionContent extends StatelessWidget {
   final _WatchTopActionBarMetrics metrics;
   final _WatchTopActionButtons actions;
   final TwitchStreamHeaderMetadata metadata;
+  final VoidCallback? onOpenChannel;
 
   const _CompactWatchTopActionContent({
     required this.metrics,
     required this.actions,
     required this.metadata,
+    required this.onOpenChannel,
   });
 
   @override
@@ -229,6 +221,7 @@ class _CompactWatchTopActionContent extends StatelessWidget {
           metadata: metadata,
           tiny: metrics.tiny,
           height: metrics.controlHeight,
+          onOpenChannel: onOpenChannel,
         ),
         const Spacer(),
         SizedBox(width: metrics.actionGap),
@@ -242,11 +235,13 @@ class _WideWatchTopActionContent extends StatelessWidget {
   final _WatchTopActionBarMetrics metrics;
   final _WatchTopActionButtons actions;
   final TwitchStreamHeaderMetadata metadata;
+  final VoidCallback? onOpenChannel;
 
   const _WideWatchTopActionContent({
     required this.metrics,
     required this.actions,
     required this.metadata,
+    required this.onOpenChannel,
   });
 
   @override
@@ -261,6 +256,7 @@ class _WideWatchTopActionContent extends StatelessWidget {
             metadata: metadata,
             compact: false,
             height: metrics.controlHeight,
+            onOpenChannel: onOpenChannel,
           ),
         ),
         const SizedBox(width: 12),

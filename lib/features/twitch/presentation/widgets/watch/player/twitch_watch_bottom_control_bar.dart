@@ -12,6 +12,7 @@ import 'twitch_player_more_actions_button.dart';
 import 'twitch_player_pip_button.dart';
 import 'twitch_player_quality_button.dart';
 import 'twitch_player_volume_control.dart';
+import 'twitch_vod_playback_strip.dart';
 
 class WatchBottomControlBar extends StatelessWidget {
   final Player player;
@@ -28,6 +29,12 @@ class WatchBottomControlBar extends StatelessWidget {
   final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
 
   const WatchBottomControlBar({
     super.key,
@@ -45,6 +52,12 @@ class WatchBottomControlBar extends StatelessWidget {
     required this.onQualityChanged,
     required this.onToggleChat,
     required this.onToggleFullscreen,
+    this.hasDvrReplay = false,
+    this.showLiveEdgeLabel = false,
+    this.liveDvrDuration,
+    this.liveDvrStartedAt,
+    this.onOpenDvrReplayAt,
+    this.onReturnToLive,
   });
 
   @override
@@ -85,6 +98,12 @@ class WatchBottomControlBar extends StatelessWidget {
                         onQualityChanged: onQualityChanged,
                         onToggleChat: onToggleChat,
                         onToggleFullscreen: onToggleFullscreen,
+                        hasDvrReplay: hasDvrReplay,
+                        showLiveEdgeLabel: showLiveEdgeLabel,
+                        liveDvrDuration: liveDvrDuration,
+                        liveDvrStartedAt: liveDvrStartedAt,
+                        onOpenDvrReplayAt: onOpenDvrReplayAt,
+                        onReturnToLive: onReturnToLive,
                         veryNarrow: layout.veryNarrow,
                       )
                     : _WideWatchBottomControls(
@@ -103,6 +122,12 @@ class WatchBottomControlBar extends StatelessWidget {
                         onQualityChanged: onQualityChanged,
                         onToggleChat: onToggleChat,
                         onToggleFullscreen: onToggleFullscreen,
+                        hasDvrReplay: hasDvrReplay,
+                        showLiveEdgeLabel: showLiveEdgeLabel,
+                        liveDvrDuration: liveDvrDuration,
+                        liveDvrStartedAt: liveDvrStartedAt,
+                        onOpenDvrReplayAt: onOpenDvrReplayAt,
+                        onReturnToLive: onReturnToLive,
                       ),
               ),
             );
@@ -198,6 +223,12 @@ class _CompactWatchBottomControls extends StatelessWidget {
   final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
   final bool veryNarrow;
 
   const _CompactWatchBottomControls({
@@ -216,6 +247,12 @@ class _CompactWatchBottomControls extends StatelessWidget {
     required this.onQualityChanged,
     required this.onToggleChat,
     required this.onToggleFullscreen,
+    required this.hasDvrReplay,
+    required this.showLiveEdgeLabel,
+    required this.liveDvrDuration,
+    required this.liveDvrStartedAt,
+    required this.onOpenDvrReplayAt,
+    required this.onReturnToLive,
     required this.veryNarrow,
   });
 
@@ -238,11 +275,36 @@ class _CompactWatchBottomControls extends StatelessWidget {
           const Spacer(),
         ] else ...[
           Expanded(
-            child: TwitchLivePlaybackStrip(
-              player: player,
-              playerRuntime: playerRuntime,
-              compact: true,
-            ),
+            child: playerRuntime.usingExternalVodPlayback
+                ? TwitchVodPlaybackStrip(
+                    player: player,
+                    compact: true,
+                    showLiveEdgeLabel: showLiveEdgeLabel,
+                    liveTimelineDuration: liveDvrDuration,
+                    liveTimelineStartedAt: liveDvrStartedAt,
+                    onReturnToLive: onReturnToLive,
+                  )
+                : hasDvrReplay
+                ? TwitchVodPlaybackStrip(
+                    player: player,
+                    compact: true,
+                    showLiveEdgeLabel: true,
+                    forceLiveEdge: true,
+                    liveTimelineDuration: liveDvrDuration,
+                    liveTimelineStartedAt: liveDvrStartedAt,
+                    timelineValue: playerRuntime.usingLiveDvrBridge
+                        ? playerRuntime.liveDvrBridgeTimelineRatio
+                        : 1.0,
+                    timelineValueAdvancesWithPlayer:
+                        playerRuntime.usingLiveDvrBridge,
+                    onOpenDvrReplayAt: onOpenDvrReplayAt,
+                    onReturnToLive: onReturnToLive,
+                  )
+                : TwitchLivePlaybackStrip(
+                    player: player,
+                    playerRuntime: playerRuntime,
+                    compact: true,
+                  ),
           ),
         ],
         SizedBox(width: veryNarrow ? 2 : 6),
@@ -295,6 +357,12 @@ class _WideWatchBottomControls extends StatelessWidget {
   final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
 
   const _WideWatchBottomControls({
     required this.player,
@@ -312,6 +380,12 @@ class _WideWatchBottomControls extends StatelessWidget {
     required this.onQualityChanged,
     required this.onToggleChat,
     required this.onToggleFullscreen,
+    required this.hasDvrReplay,
+    required this.showLiveEdgeLabel,
+    required this.liveDvrDuration,
+    required this.liveDvrStartedAt,
+    required this.onOpenDvrReplayAt,
+    required this.onReturnToLive,
   });
 
   @override
@@ -321,10 +395,33 @@ class _WideWatchBottomControls extends StatelessWidget {
         _PlayPauseButton(player: player, playing: playing, size: 32),
         const SizedBox(width: 16),
         Expanded(
-          child: TwitchLivePlaybackStrip(
-            player: player,
-            playerRuntime: playerRuntime,
-          ),
+          child: playerRuntime.usingExternalVodPlayback
+              ? TwitchVodPlaybackStrip(
+                  player: player,
+                  showLiveEdgeLabel: showLiveEdgeLabel,
+                  liveTimelineDuration: liveDvrDuration,
+                  liveTimelineStartedAt: liveDvrStartedAt,
+                  onReturnToLive: onReturnToLive,
+                )
+              : hasDvrReplay
+              ? TwitchVodPlaybackStrip(
+                  player: player,
+                  showLiveEdgeLabel: true,
+                  forceLiveEdge: true,
+                  liveTimelineDuration: liveDvrDuration,
+                  liveTimelineStartedAt: liveDvrStartedAt,
+                  timelineValue: playerRuntime.usingLiveDvrBridge
+                      ? playerRuntime.liveDvrBridgeTimelineRatio
+                      : 1.0,
+                  timelineValueAdvancesWithPlayer:
+                      playerRuntime.usingLiveDvrBridge,
+                  onOpenDvrReplayAt: onOpenDvrReplayAt,
+                  onReturnToLive: onReturnToLive,
+                )
+              : TwitchLivePlaybackStrip(
+                  player: player,
+                  playerRuntime: playerRuntime,
+                ),
         ),
         const SizedBox(width: 16),
         _WideVolumeControl(
@@ -559,11 +656,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      TwitchLivePlaybackStrip(
-                        player: player,
-                        playerRuntime: playerRuntime,
-                        compact: false,
-                      ),
+                      TwitchVodPlaybackStrip(player: player),
                     ],
                   ),
                 ),

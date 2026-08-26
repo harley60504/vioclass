@@ -6,9 +6,7 @@ import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
-import '../shared/twitch_glass.dart';
 import 'player/twitch_media_kit_video_surface.dart';
-import 'player/twitch_player_common_buttons.dart';
 import 'player/twitch_watch_controls_overlay.dart';
 
 /// Repaint isolation switches for profiling the 2nd-entry FPS drop.
@@ -41,6 +39,9 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final String? error;
   final VoidCallback onBack;
   final VoidCallback? onReload;
+  final VoidCallback? onOpenChannel;
+  final VoidCallback? onCreateClip;
+  final bool creatingClip;
   final VoidCallback onStop;
 
   final List<TwitchM3u8Variant>? qualityVariants;
@@ -67,6 +68,12 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final VoidCallback? onToggleMute;
   final ValueChanged<double>? onVolumeChanged;
   final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
 
   const TwitchWatchPlayerArea({
     super.key,
@@ -78,6 +85,9 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     required this.error,
     required this.onBack,
     required this.onReload,
+    this.onOpenChannel,
+    this.onCreateClip,
+    this.creatingClip = false,
     required this.onStop,
     this.qualityVariants,
     this.currentVariant,
@@ -100,6 +110,12 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     this.onToggleMute,
     this.onVolumeChanged,
     this.onQualityChanged,
+    this.hasDvrReplay = false,
+    this.showLiveEdgeLabel = false,
+    this.liveDvrDuration,
+    this.liveDvrStartedAt,
+    this.onOpenDvrReplayAt,
+    this.onReturnToLive,
   });
 
   @override
@@ -132,6 +148,9 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     onToggleFollow: onToggleFollow,
                     onSubscribe: onSubscribe,
                     onReload: onReload,
+                    onOpenChannel: onOpenChannel,
+                    onCreateClip: onCreateClip,
+                    creatingClip: creatingClip,
                     onStop: onStop,
                     player: state.player!,
                     playerRuntime: playerRuntime,
@@ -147,20 +166,16 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     onQualityChanged: state.effectiveOnQualityChanged,
                     onToggleChat: onToggleChat,
                     onToggleFullscreen: onToggleFullscreen,
+                    hasDvrReplay: hasDvrReplay,
+                    showLiveEdgeLabel: showLiveEdgeLabel,
+                    liveDvrDuration: liveDvrDuration,
+                    liveDvrStartedAt: liveDvrStartedAt,
+                    onOpenDvrReplayAt: onOpenDvrReplayAt,
+                    onReturnToLive: onReturnToLive,
                   ),
                 )
               : null,
-          waitingOverlay:
-              state.shouldShowWaitingOverlay && !_debugHidePlayerOverlay
-              ? RepaintBoundary(
-                  child: _WatchControlsNotReadyOverlay(
-                    metadata: metadata,
-                    loading: loading || playerRuntime.loading,
-                    onBack: onBack,
-                    onReload: onReload,
-                  ),
-                )
-              : null,
+          waitingOverlay: null,
           debugLabel: _debugShowPlayerIsolationLabel
               ? _buildIsolationDebugLabel()
               : null,
@@ -346,85 +361,6 @@ class _WatchPlayerIsolationLabel extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _WatchControlsNotReadyOverlay extends StatelessWidget {
-  final TwitchStreamHeaderMetadata metadata;
-  final bool loading;
-  final VoidCallback onBack;
-  final VoidCallback? onReload;
-
-  const _WatchControlsNotReadyOverlay({
-    required this.metadata,
-    required this.loading,
-    required this.onBack,
-    required this.onReload,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(
-          left: 12,
-          right: 12,
-          top: 12,
-          child: TwitchGlassSurface(
-            borderRadius: BorderRadius.circular(18),
-            backgroundColor: Colors.black.withValues(alpha: 0.34),
-            borderColor: Colors.white.withValues(alpha: 0.10),
-            blurSigma: 18,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Row(
-                children: [
-                  PlainIconButton(
-                    tooltip: '返回',
-                    icon: Icons.arrow_back,
-                    size: 24,
-                    onPressed: onBack,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      metadata.displayName.isNotEmpty
-                          ? metadata.displayName
-                          : metadata.channelLogin,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  PlainIconButton(
-                    tooltip: '重新載入',
-                    icon: Icons.refresh,
-                    size: 24,
-                    onPressed: onReload,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        if (loading)
-          const Positioned.fill(
-            child: IgnorePointer(
-              child: Center(
-                child: SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 2.5),
-                ),
-              ),
-            ),
-          ),
-      ],
     );
   }
 }

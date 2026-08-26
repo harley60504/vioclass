@@ -24,6 +24,7 @@ class TwitchWatchPlayerLoader {
   }) async {
     final uri = await playerRuntime.loadLivePlaylist(
       channelLogin: channelLogin,
+      probeDvr: false,
     );
 
     if (uri == null) {

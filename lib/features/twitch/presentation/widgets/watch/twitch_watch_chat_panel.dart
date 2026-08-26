@@ -12,7 +12,6 @@ import '../../../services/engagement/twitch_channel_points_runtime_service.dart'
 import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../settings/twitch_chat_appearance_controller.dart';
-import '../../sheets/twitch_chat_appearance_sheet.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
 import 'chat/twitch_watch_chat_engagement_area.dart';
 import 'chat/twitch_watch_chat_header_bar.dart';
@@ -50,6 +49,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final VoidCallback onOpenPrediction;
   final VoidCallback? onOpenSpecialActions;
   final VoidCallback? onCancelPendingSpecialMessage;
+  final bool showHeader;
 
   const TwitchWatchChatPanel({
     super.key,
@@ -81,6 +81,7 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.onOpenPrediction,
     this.onOpenSpecialActions,
     this.onCancelPendingSpecialMessage,
+    this.showHeader = true,
   });
 
   @override
@@ -452,25 +453,21 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
           return Column(
             children: [
-              TwitchWatchChatHeaderBar(
-                connected: currentRuntime?.connected ?? false,
-                showPinned: effectiveShowPinned,
-                showPrediction: showPrediction,
-                predictionVisible: effectiveShowPrediction,
-                hasPinned: pinned.isNotEmpty && !metrics.hideOptionalEngagement,
-                hasPrediction: predictionHasData,
-                loading: widget.loadingEngagement,
-                compact: metrics.verticalCompact,
-                onTogglePinned: () {
-                  _setShowPinned(!showPinned);
-                },
-                onTogglePrediction: _togglePredictionVisibility,
-                onRefresh: widget.onRefreshEngagement,
-                onOpenAppearance: () => showTwitchChatAppearanceSheet(
-                  context: context,
-                  controller: _appearanceController,
+              if (widget.showHeader)
+                TwitchWatchChatHeaderBar(
+                  connected: currentRuntime?.connected ?? false,
+                  showPinned: effectiveShowPinned,
+                  showPrediction: showPrediction,
+                  predictionVisible: effectiveShowPrediction,
+                  hasPinned:
+                      pinned.isNotEmpty && !metrics.hideOptionalEngagement,
+                  hasPrediction: predictionHasData,
+                  compact: metrics.verticalCompact,
+                  onTogglePinned: () {
+                    _setShowPinned(!showPinned);
+                  },
+                  onTogglePrediction: _togglePredictionVisibility,
                 ),
-              ),
               TwitchHypeTrainBanner(controller: widget.hypeTrainController),
               Expanded(
                 child: Stack(

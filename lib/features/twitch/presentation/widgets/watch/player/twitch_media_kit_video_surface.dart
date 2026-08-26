@@ -13,6 +13,7 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
   final double aspectRatio;
   final BoxFit fit;
   final bool reportAndroidPipSourceRect;
+  final VideoControlsBuilder? controls;
 
   const TwitchMediaKitVideoSurface({
     super.key,
@@ -20,6 +21,7 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
     this.aspectRatio = twitchWatchVideoAspectRatio,
     this.fit = BoxFit.contain,
     this.reportAndroidPipSourceRect = true,
+    this.controls = NoVideoControls,
   });
 
   @override
@@ -90,7 +92,7 @@ class _TwitchMediaKitVideoSurfaceState
               child: Video(
                 controller: widget.controller,
                 fit: widget.fit,
-                controls: NoVideoControls,
+                controls: widget.controls,
               ),
             ),
           );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../links/twitch_chat_link_preview.dart';
 import 'twitch_chat_message_content.dart';
 import 'twitch_chat_message_special_style.dart';
 import 'twitch_chat_message_timestamp.dart';
@@ -36,6 +37,8 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final previewItems = extractTwitchChatPreviewUrls(message.message);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       child: GestureDetector(
@@ -53,16 +56,25 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),
-              child: TwitchChatMessageContent(
-                message: message,
-                thirdPartyEmotes: thirdPartyEmotes,
-                officialEmotes: officialEmotes,
-                displayColor: displayColor,
-                displayNameText: displayNameText,
-                showSystemMessage: true,
-                showTimestamp: showTimestamp,
-                metrics: metrics,
-                animateEmotes: animateEmotes,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TwitchChatMessageContent(
+                    message: message,
+                    thirdPartyEmotes: thirdPartyEmotes,
+                    officialEmotes: officialEmotes,
+                    displayColor: displayColor,
+                    displayNameText: displayNameText,
+                    showSystemMessage: true,
+                    showTimestamp: showTimestamp,
+                    metrics: metrics,
+                    animateEmotes: animateEmotes,
+                  ),
+                  TwitchChatLinkPreviewColumn(
+                    items: previewItems,
+                    fontScale: metrics.scale,
+                  ),
+                ],
               ),
             ),
           ),
@@ -104,6 +116,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
     final bannerText = metadata.systemMessage?.trim();
     final hasVisibleChatText =
         message.message.trim().isNotEmpty || message.segments.isNotEmpty;
+    final previewItems = extractTwitchChatPreviewUrls(message.message);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -195,6 +208,10 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                           compact: true,
                           metrics: metrics,
                           animateEmotes: animateEmotes,
+                        ),
+                        TwitchChatLinkPreviewColumn(
+                          items: previewItems,
+                          fontScale: metrics.scale,
                         ),
                       ],
                     ],

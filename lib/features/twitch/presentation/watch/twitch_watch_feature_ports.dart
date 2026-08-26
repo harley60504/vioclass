@@ -49,17 +49,18 @@ class TwitchWatchPlayerPort {
   Future<void> openLive({
     required String channelLogin,
     bool play = true,
+    bool forceOpen = true,
   }) async {
     final uri = await loadLivePlaylist(channelLogin: channelLogin);
     if (uri == null) {
-      throw StateError('播放清單載入失敗，沒有 playlist uri。');
+      final runtimeError = services.playerRuntime.error;
+      throw StateError(runtimeError?.toString() ?? '播放清單載入失敗，沒有 playlist uri。');
     }
 
     await services.playerSession.openOrResume(
       uri: uri.toString(),
       play: play,
-      // Initial open still has to attach media_kit to the stable outer proxy.
-      forceOpen: true,
+      forceOpen: forceOpen,
     );
   }
 

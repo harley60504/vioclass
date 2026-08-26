@@ -21,6 +21,9 @@ class WatchControlsOverlay extends StatefulWidget {
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
   final VoidCallback? onReload;
+  final VoidCallback? onOpenChannel;
+  final VoidCallback? onCreateClip;
+  final bool creatingClip;
   final VoidCallback onStop;
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -36,6 +39,12 @@ class WatchControlsOverlay extends StatefulWidget {
   final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
 
   const WatchControlsOverlay({
     super.key,
@@ -49,6 +58,9 @@ class WatchControlsOverlay extends StatefulWidget {
     required this.onToggleFollow,
     required this.onSubscribe,
     required this.onReload,
+    this.onOpenChannel,
+    this.onCreateClip,
+    this.creatingClip = false,
     required this.onStop,
     required this.player,
     required this.playerRuntime,
@@ -64,6 +76,12 @@ class WatchControlsOverlay extends StatefulWidget {
     required this.onQualityChanged,
     required this.onToggleChat,
     required this.onToggleFullscreen,
+    this.hasDvrReplay = false,
+    this.showLiveEdgeLabel = false,
+    this.liveDvrDuration,
+    this.liveDvrStartedAt,
+    this.onOpenDvrReplayAt,
+    this.onReturnToLive,
   });
 
   @override
@@ -234,6 +252,9 @@ class _WatchChromeStack extends StatelessWidget {
             onToggleFollow: widget.onToggleFollow,
             onSubscribe: widget.onSubscribe,
             onReload: widget.onReload,
+            onOpenChannel: widget.onOpenChannel,
+            onCreateClip: widget.onCreateClip,
+            creatingClip: widget.creatingClip,
             onStop: widget.onStop,
           ),
         ),
@@ -259,6 +280,12 @@ class _WatchChromeStack extends StatelessWidget {
               onQualityChanged: widget.onQualityChanged,
               onToggleChat: widget.onToggleChat,
               onToggleFullscreen: widget.onToggleFullscreen,
+              hasDvrReplay: widget.hasDvrReplay,
+              showLiveEdgeLabel: widget.showLiveEdgeLabel,
+              liveDvrDuration: widget.liveDvrDuration,
+              liveDvrStartedAt: widget.liveDvrStartedAt,
+              onOpenDvrReplayAt: widget.onOpenDvrReplayAt,
+              onReturnToLive: widget.onReturnToLive,
             ),
           ),
         ),

@@ -10,12 +10,14 @@ class WatchCompactAvatarTile extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool tiny;
   final double height;
+  final VoidCallback? onOpenChannel;
 
   const WatchCompactAvatarTile({
     super.key,
     required this.metadata,
     required this.tiny,
     required this.height,
+    this.onOpenChannel,
   });
 
   @override
@@ -31,14 +33,21 @@ class WatchCompactAvatarTile extends StatelessWidget {
         borderColor: Colors.white.withValues(alpha: 0.10),
         blurSigma: 0,
         boxShadow: const <BoxShadow>[],
-        child: SizedBox(
-          width: height,
-          height: height,
-          child: Center(
-            child: _WatchChannelAvatar(
-              imageUrl: data.profileImageUrl,
-              channelLogin: data.channelLogin,
-              size: size,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onOpenChannel,
+            borderRadius: BorderRadius.circular(tiny ? 14 : 16),
+            child: SizedBox(
+              width: height,
+              height: height,
+              child: Center(
+                child: _WatchChannelAvatar(
+                  imageUrl: data.profileImageUrl,
+                  channelLogin: data.channelLogin,
+                  size: size,
+                ),
+              ),
             ),
           ),
         ),
@@ -51,12 +60,14 @@ class WatchStreamHeaderCard extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool compact;
   final double height;
+  final VoidCallback? onOpenChannel;
 
   const WatchStreamHeaderCard({
     super.key,
     required this.metadata,
     required this.compact,
     required this.height,
+    this.onOpenChannel,
   });
 
   @override
@@ -79,10 +90,22 @@ class WatchStreamHeaderCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              _WatchChannelAvatar(
-                imageUrl: data.profileImageUrl,
-                channelLogin: data.channelLogin,
-                size: avatarSize,
+              Material(
+                color: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: onOpenChannel,
+                  customBorder: const CircleBorder(),
+                  child: Padding(
+                    padding: const EdgeInsets.all(2),
+                    child: _WatchChannelAvatar(
+                      imageUrl: data.profileImageUrl,
+                      channelLogin: data.channelLogin,
+                      size: avatarSize,
+                    ),
+                  ),
+                ),
               ),
               SizedBox(width: compact ? 8 : 10),
               Expanded(

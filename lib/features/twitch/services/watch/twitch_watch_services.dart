@@ -2,6 +2,7 @@ import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/channel/twitch_private_gql_relationship_api_service_v1.dart';
 import '../../api/chat/twitch_chat_startup_api_service.dart';
 import '../../api/chat/twitch_recent_messages_api_service.dart';
+import '../../api/clips/twitch_clip_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../api/core/twitch_gql_api_service.dart';
@@ -38,6 +39,7 @@ class TwitchWatchServices {
   final TwitchWebGqlPersistedApiService publicWebGqlApi;
   final TwitchWebGqlPersistedApiService specialAndroidGqlApi;
   final TwitchPlaybackApiService playbackApi;
+  final TwitchClipApiService clipApi;
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final TwitchChatStartupApiService chatStartupApi;
   final TwitchRecentMessagesApiService recentMessagesApi;
@@ -73,6 +75,7 @@ class TwitchWatchServices {
     required this.publicWebGqlApi,
     required this.specialAndroidGqlApi,
     required this.playbackApi,
+    required this.clipApi,
     required this.playerRuntime,
     required this.chatStartupApi,
     required this.recentMessagesApi,
@@ -128,6 +131,13 @@ class TwitchWatchServices {
       accessTokenProvider: dropsAuthService.getToken,
     );
     final playbackApi = TwitchPlaybackApiService(gql: publicGqlApi);
+    final clipApi = TwitchClipApiService(
+      client: apiClient,
+      accessTokenProvider: authService.getValidAccessToken,
+      clientIdProvider: () async => authService.clientId,
+      rawMediaAccessTokenProvider: dropsAuthService.getToken,
+      rawMediaClientIdProvider: () async => dropsAuthService.dropsClientId,
+    );
     final playerRuntime = TwitchPlaylistPlayerRuntime(playbackApi: playbackApi);
     final chatStartupApi = TwitchChatStartupApiService(gql: publicWebGqlApi);
     final recentMessagesApi = TwitchRecentMessagesApiService(client: apiClient);
@@ -268,6 +278,7 @@ class TwitchWatchServices {
       publicWebGqlApi: publicWebGqlApi,
       specialAndroidGqlApi: specialAndroidGqlApi,
       playbackApi: playbackApi,
+      clipApi: clipApi,
       playerRuntime: playerRuntime,
       chatStartupApi: chatStartupApi,
       recentMessagesApi: recentMessagesApi,

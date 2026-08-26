@@ -59,32 +59,43 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
       return const TwitchStreamPage();
     }
 
-    return const Scaffold(
-      backgroundColor: Color(0xFF0E0E10),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.live_tv_rounded,
-              color: Color(0xFF9146FF),
-              size: 64,
-            ),
-            SizedBox(height: 18),
-            Text(
-              'Starting VioClass...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
+    return Scaffold(
+      backgroundColor: const Color(0xFF0E0E10),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxHeight < 150) {
+            return const Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Color(0xFF9146FF),
+                  strokeWidth: 2.6,
+                ),
               ),
+            );
+          }
+
+          return const Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.live_tv_rounded, color: Color(0xFF9146FF), size: 64),
+                SizedBox(height: 18),
+                Text(
+                  'Starting VioClass...',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                SizedBox(height: 14),
+                CircularProgressIndicator(color: Color(0xFF9146FF)),
+              ],
             ),
-            SizedBox(height: 14),
-            CircularProgressIndicator(
-              color: Color(0xFF9146FF),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
