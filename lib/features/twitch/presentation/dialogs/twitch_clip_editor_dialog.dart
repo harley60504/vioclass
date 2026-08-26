@@ -1,11 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../api/clips/twitch_clip_api_service.dart';
+import '../../api/playback/twitch_playback_api_service.dart';
+import '../../models/playback/twitch_m3u8_variant.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 const double _minClipLength = 5;
@@ -14,6 +15,7 @@ const double _maxClipLength = 60;
 Future<void> showTwitchClipEditorDialog({
   required BuildContext context,
   required TwitchClipApiService clipApi,
+  required TwitchPlaybackApiService playbackApi,
   String? vodId,
   String? broadcastId,
   required double offsetSeconds,
@@ -28,6 +30,7 @@ Future<void> showTwitchClipEditorDialog({
       height: MediaQuery.sizeOf(context).height * 0.86,
       child: _TwitchClipEditorDialogBody(
         clipApi: clipApi,
+        playbackApi: playbackApi,
         vodId: vodId,
         broadcastId: broadcastId,
         offsetSeconds: offsetSeconds,
@@ -39,6 +42,7 @@ Future<void> showTwitchClipEditorDialog({
 
 class _TwitchClipEditorDialogBody extends StatefulWidget {
   final TwitchClipApiService clipApi;
+  final TwitchPlaybackApiService playbackApi;
   final String? vodId;
   final String? broadcastId;
   final double offsetSeconds;
@@ -46,6 +50,7 @@ class _TwitchClipEditorDialogBody extends StatefulWidget {
 
   const _TwitchClipEditorDialogBody({
     required this.clipApi,
+    required this.playbackApi,
     required this.vodId,
     required this.broadcastId,
     required this.offsetSeconds,
@@ -70,6 +75,8 @@ class _TwitchClipEditorDialogBodyState
   bool _loading = true;
   bool _creating = false;
   String? _errorText;
+  TwitchCreateClipResult? _createdClip;
+  String? _createdClipTitle;
 
   double get _duration => _session?.durationSeconds ?? 0;
   double get _length => (_end - _start).clamp(0, _maxClipLength).toDouble();
@@ -104,7 +111,7 @@ class _TwitchClipEditorDialogBodyState
       setState(() {
         _position = position.inMilliseconds / 1000;
       });
-      if (_end > _start && _position >= _end) {
+      if (_createdClip == null && _end > _start && _position >= _end) {
         unawaited(player.pause());
       }
     });
@@ -188,15 +195,16 @@ class _TwitchClipEditorDialogBodyState
         durationSeconds: length,
         title: title,
       );
-      final url = result.publicUrl;
-      if (url.isNotEmpty) {
-        await Clipboard.setData(ClipboardData(text: url));
-      }
+      await widget.clipApi.waitForClipRenderReady(clipSlug: result.id);
+      final playback = await _waitForClipPlayback(result.id);
       if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(url.isEmpty ? 'Clip 已建立。' : 'Clip 已建立，連結已複製。')),
-      );
+      await _openCreatedClipPlayback(playback.playbackUri.toString());
+      if (!mounted) return;
+      setState(() {
+        _createdClip = result;
+        _createdClipTitle = title;
+        _creating = false;
+      });
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -204,6 +212,71 @@ class _TwitchClipEditorDialogBodyState
         _errorText = _clipEditorErrorText(error);
       });
     }
+  }
+
+  Future<void> _openCreatedClipPlayback(String playbackUrl) async {
+    final url = playbackUrl.trim();
+    if (url.isEmpty) {
+      throw StateError('Clip 播放 URL 是空的。');
+    }
+
+    await _positionSubscription?.cancel();
+    _positionSubscription = null;
+    final oldPlayer = _player;
+    _player = null;
+    _videoController = null;
+    if (mounted) setState(() {});
+    if (oldPlayer != null) await oldPlayer.dispose();
+
+    final player = await Player.create(
+      configuration: const PlayerConfiguration(title: 'Clip Playback'),
+    );
+    final controller = await VideoController.create(
+      player,
+      configuration: const VideoControllerConfiguration(
+        enableHardwareAcceleration: true,
+        androidAttachSurfaceAfterVideoParameters: false,
+        hwdec: 'auto-safe',
+      ),
+    );
+    if (!mounted) {
+      await player.dispose();
+      return;
+    }
+
+    _player = player;
+    _videoController = controller;
+    _position = 0;
+    _positionSubscription = player.stream.position.listen((position) {
+      if (!mounted) return;
+      setState(() => _position = position.inMilliseconds / 1000);
+    });
+    setState(() {});
+    await player.open(Media(url), play: true);
+  }
+
+  Future<TwitchClipPlaybackResult> _waitForClipPlayback(String clipSlug) async {
+    final slug = clipSlug.trim();
+    if (slug.isEmpty) {
+      throw StateError('Twitch 回傳的 Clip slug 是空的。');
+    }
+
+    Object? lastError;
+    for (var attempt = 0; attempt < 10; attempt += 1) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+      }
+      try {
+        final playback = await widget.playbackApi.resolveClipPlayback(
+          clipSlug: slug,
+          preferredQuality: 'source',
+        );
+        if (playback.variants.isNotEmpty) return playback;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw StateError('Clip 已建立，但 Twitch 還沒準備好播放：$lastError');
   }
 
   @override
@@ -288,6 +361,7 @@ class _TwitchClipEditorDialogBodyState
     if (_session == null) {
       return _ErrorView(errorText: _errorText, onRetry: _begin);
     }
+    final createdClip = _createdClip;
     final controller = _videoController;
     return Column(
       children: [
@@ -305,147 +379,209 @@ class _TwitchClipEditorDialogBodyState
             color: Color(0xFF15151A),
             border: Border(top: BorderSide(color: Color(0xFF2D2D35))),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    _formatSeconds(_start),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Expanded(
-                    child: RangeSlider(
-                      min: 0,
-                      max: _duration <= 0 ? 1 : _duration,
-                      values: RangeValues(_start, _end),
-                      onChanged: _creating
-                          ? null
-                          : (values) {
-                              final length = values.end - values.start;
-                              if (length < _minClipLength ||
-                                  length > _maxClipLength) {
-                                return;
-                              }
-                              setState(() {
-                                _start = values.start;
-                                _end = values.end;
-                              });
+          child: createdClip == null
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          _formatSeconds(_start),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Expanded(
+                          child: RangeSlider(
+                            min: 0,
+                            max: _duration <= 0 ? 1 : _duration,
+                            values: RangeValues(_start, _end),
+                            onChanged: _creating
+                                ? null
+                                : (values) {
+                                    final length = values.end - values.start;
+                                    if (length < _minClipLength ||
+                                        length > _maxClipLength) {
+                                      return;
+                                    }
+                                    setState(() {
+                                      _start = values.start;
+                                      _end = values.end;
+                                    });
+                                  },
+                            onChangeEnd: (values) {
+                              unawaited(
+                                _player?.seek(
+                                  Duration(
+                                    milliseconds: (values.start * 1000).round(),
+                                  ),
+                                ),
+                              );
                             },
-                      onChangeEnd: (values) {
-                        unawaited(
-                          _player?.seek(
-                            Duration(
-                              milliseconds: (values.start * 1000).round(),
+                          ),
+                        ),
+                        Text(
+                          _formatSeconds(_end),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          '${_formatSeconds(_position)} / ${_formatSeconds(_duration)}',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${_length.toStringAsFixed(1)}s',
+                          style: TextStyle(
+                            color:
+                                _length < _minClipLength ||
+                                    _length > _maxClipLength
+                                ? Colors.redAccent
+                                : const Color(0xFFBF94FF),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _titleController,
+                            enabled: !_creating,
+                            maxLength: 100,
+                            style: const TextStyle(color: Colors.white),
+                            decoration: const InputDecoration(
+                              counterText: '',
+                              hintText: 'Clip 標題',
+                              hintStyle: TextStyle(color: Colors.white38),
+                              filled: true,
+                              fillColor: Color(0xFF202027),
+                              border: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Color(0xFF393944),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Color(0xFF393944),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(
+                                  color: Color(0xFF9146FF),
+                                ),
+                              ),
+                              isDense: true,
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-                  Text(
-                    _formatSeconds(_end),
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  Text(
-                    '${_formatSeconds(_position)} / ${_formatSeconds(_duration)}',
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${_length.toStringAsFixed(1)}s',
-                    style: TextStyle(
-                      color:
-                          _length < _minClipLength || _length > _maxClipLength
-                          ? Colors.redAccent
-                          : const Color(0xFFBF94FF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _titleController,
-                      enabled: !_creating,
-                      maxLength: 100,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        counterText: '',
-                        hintText: 'Clip 標題',
-                        hintStyle: TextStyle(color: Colors.white38),
-                        filled: true,
-                        fillColor: Color(0xFF202027),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF393944)),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF393944)),
+                        const SizedBox(width: 10),
+                        IconButton.filledTonal(
+                          tooltip: null,
+                          onPressed: _creating ? null : _previewSelection,
+                          icon: const Icon(Icons.play_arrow_rounded),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF9146FF)),
+                        const SizedBox(width: 10),
+                        FilledButton.icon(
+                          onPressed: _creating ? null : _createClip,
+                          icon: _creating
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.movie_creation_outlined),
+                          label: Text(_creating ? '建立中' : '建立 Clip'),
                         ),
-                        isDense: true,
+                      ],
+                    ),
+                    if (_errorText != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _errorText!,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton.filledTonal(
-                    tooltip: null,
-                    onPressed: _creating ? null : _previewSelection,
-                    icon: const Icon(Icons.play_arrow_rounded),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton.icon(
-                    onPressed: _creating ? null : _createClip,
-                    icon: _creating
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.movie_creation_outlined),
-                    label: Text(_creating ? '建立中' : '建立 Clip'),
-                  ),
-                ],
-              ),
-              if (_errorText != null) ...[
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _errorText!,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                    ],
+                  ],
+                )
+              : _CreatedClipControls(
+                  title: _createdClipTitle ?? 'Clip',
+                  onClose: () => Navigator.of(context).pop(),
                 ),
-              ],
+        ),
+      ],
+    );
+  }
+}
+
+class _CreatedClipControls extends StatelessWidget {
+  final String title;
+  final VoidCallback onClose;
+
+  const _CreatedClipControls({required this.title, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Icon(Icons.check_circle_rounded, color: Color(0xFF57F287)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Clip 已建立',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ),
+        const SizedBox(width: 12),
+        FilledButton(onPressed: onClose, child: const Text('關閉')),
       ],
     );
   }

@@ -45,6 +45,16 @@ class TwitchClipEditSession {
   });
 }
 
+class TwitchClipRenderStatus {
+  final bool ready;
+  final String? thumbnailUrl;
+
+  const TwitchClipRenderStatus({
+    required this.ready,
+    required this.thumbnailUrl,
+  });
+}
+
 class TwitchClipApiService {
   static const String _createRawMediaHash =
       '19cbfe94f0aff2e1338fd8ee472d90c8d334e17a84ebe8b06dcb236bd9394dfd';
@@ -52,6 +62,8 @@ class TwitchClipApiService {
       'dfc972bc2a6d70778cb63256123fd1a6a024bec914a947de47ea500b75fc9216';
   static const String _getRawMediaHash =
       'a702cc4a4701f0e32fd666630ca707806dc502103f5810323c3ab32d98179fac';
+  static const String _shareClipRenderStatusHash =
+      '324783ea014524fa10a88739aa507de7a52f9624574dba9739a52b8c97d885cf';
 
   final TwitchApiClient client;
   final TwitchClipAccessTokenProvider accessTokenProvider;
@@ -292,6 +304,65 @@ class TwitchClipApiService {
     }
 
     throw TwitchApiException('clip finalize 失敗：$lastError');
+  }
+
+  Future<TwitchClipRenderStatus> getClipRenderStatus({
+    required String clipSlug,
+  }) async {
+    final slug = clipSlug.trim();
+    if (slug.isEmpty) {
+      throw const TwitchApiException('缺少 Clip slug，無法確認處理狀態。');
+    }
+
+    final raw = await _clipGql(
+      operationName: 'ShareClipRenderStatus',
+      variables: <String, dynamic>{'slug': slug},
+      hash: _shareClipRenderStatusHash,
+    );
+    final asset = _readPath(raw, const <Object>['data', 'clip', 'assets', 0]);
+    if (asset is! Map) {
+      return const TwitchClipRenderStatus(ready: false, thumbnailUrl: null);
+    }
+
+    final state = asset['creationState']?.toString() ?? '';
+    final thumbnailUrl = asset['thumbnailURL']?.toString().trim();
+    final qualities = asset['videoQualities'];
+    final hasPlayableSource =
+        qualities is List &&
+        qualities.any((quality) {
+          if (quality is! Map) return false;
+          return (quality['sourceURL']?.toString().trim() ?? '').isNotEmpty;
+        });
+
+    return TwitchClipRenderStatus(
+      ready: state.toUpperCase() == 'CREATED' && hasPlayableSource,
+      thumbnailUrl: thumbnailUrl != null && thumbnailUrl.isNotEmpty
+          ? thumbnailUrl
+          : null,
+    );
+  }
+
+  Future<TwitchClipRenderStatus> waitForClipRenderReady({
+    required String clipSlug,
+  }) async {
+    TwitchClipRenderStatus? lastStatus;
+    Object? lastError;
+    for (var attempt = 0; attempt < 30; attempt += 1) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+      }
+      try {
+        lastStatus = await getClipRenderStatus(clipSlug: clipSlug);
+        if (lastStatus.ready) return lastStatus;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    if (lastError != null) {
+      throw TwitchApiException('Clip 已建立，但 Twitch 還沒完成處理：$lastError');
+    }
+    return lastStatus ??
+        const TwitchClipRenderStatus(ready: false, thumbnailUrl: null);
   }
 
   Future<Map<String, dynamic>> _clipGql({

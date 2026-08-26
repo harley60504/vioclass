@@ -329,6 +329,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       await showTwitchClipEditorDialog(
         context: context,
         clipApi: watchServices.clipApi,
+        playbackApi: watchServices.playbackApi,
         broadcastId: live.broadcastId,
         offsetSeconds: offsetSeconds,
         channelName: channelLogin,
