@@ -1,4 +1,4 @@
-# new_twitch_app
+# VioClass
 
 A new Flutter project.
 
