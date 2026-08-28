@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
 class TwitchChannelAboutSection extends StatelessWidget {
@@ -136,7 +137,7 @@ class _PanelSection extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 18),
         child: Center(
-          child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+          child: CircularProgressIndicator(color: TwitchUiColors.primary),
         ),
       );
     }

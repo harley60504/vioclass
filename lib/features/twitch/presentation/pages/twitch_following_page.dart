@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -516,7 +517,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         loadedStreams.isEmpty &&
         offlineFollowedChannels.isEmpty) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+        child: CircularProgressIndicator(color: TwitchUiColors.primary),
       );
     }
 

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../../pages/twitch_watch_route_guard.dart';
 import 'twitch_stream_card.dart';
 
@@ -247,7 +248,7 @@ class TwitchDiscoveryFooter extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: Center(
-          child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+          child: CircularProgressIndicator(color: TwitchUiColors.primary),
         ),
       );
     }

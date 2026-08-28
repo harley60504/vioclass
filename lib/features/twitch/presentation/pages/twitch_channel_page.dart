@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import '../widgets/shared/twitch_cached_image_layer.dart';
 import 'twitch_watch_page.dart';
@@ -489,7 +490,7 @@ class _PanelSection extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 18),
         child: Center(
-          child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+          child: CircularProgressIndicator(color: TwitchUiColors.primary),
         ),
       );
     }
@@ -860,7 +861,7 @@ class _ClipTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loadingFirstPage) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+        child: CircularProgressIndicator(color: TwitchUiColors.primary),
       );
     }
 
@@ -1147,7 +1148,7 @@ class _VodTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loadingFirstPage) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF9146FF)),
+        child: CircularProgressIndicator(color: TwitchUiColors.primary),
       );
     }
 
