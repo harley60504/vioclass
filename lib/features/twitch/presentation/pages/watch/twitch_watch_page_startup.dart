@@ -535,7 +535,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     } catch (error) {
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('initial clip playback failed: $error');
-        showSnack('片段載入失敗：$error');
+        showSnack('片段暫時載入失敗，請稍後再試。');
       }
       return false;
     }
@@ -960,7 +960,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       );
     } catch (error) {
       playbackController.setError(error.toString());
-      showSnack('VOD 畫質切換失敗：$error');
+      showSnack('VOD 畫質切換失敗，請稍後再試。');
     }
     if (mounted) setState(() {});
   }
