@@ -11,6 +11,7 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'twitch_drops_device_login_page.dart';
 import 'twitch_interaction_web_login_page.dart';
@@ -621,7 +622,9 @@ query ChannelPointsContext($channelLogin: String!) {
                       ),
                     ),
                     child: _loadingStored
-                        ? const CircularProgressIndicator()
+                        ? const CircularProgressIndicator(
+                            color: TwitchUiColors.primarySoft,
+                          )
                         : Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -688,67 +691,6 @@ query ChannelPointsContext($channelLogin: String!) {
                                 onLogout: _logoutTwitch,
                                 onFinish: _finish,
                               ),
-                              /* Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              alignment: WrapAlignment.center,
-                              children: [
-                                ElevatedButton.icon(
-                                  onPressed: busy ? null : _runUnifiedLoginFlow,
-                                  icon: _runningUnifiedLogin
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.auto_awesome_rounded),
-                                  label: const Text('一鍵完成 Twitch 登入'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF9146FF),
-                                    foregroundColor: Colors.white,
-                                  ),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: busy ? null : _loadStoredSession,
-                                  icon: const Icon(Icons.refresh_rounded),
-                                  label: const Text('重新檢查'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: busy ? null : _openWebGqlLogin,
-                                  icon: const Icon(Icons.language_rounded),
-                                  label: const Text('只補官方 Web/GQL'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: busy ? null : _openMainLogin,
-                                  icon: const Icon(Icons.person_rounded),
-                                  label: const Text('只補主 OAuth'),
-                                ),
-                                OutlinedButton.icon(
-                                  onPressed: busy ? null : _openDropsLogin,
-                                  icon: const Icon(Icons.vpn_key_rounded),
-                                  label: const Text('只補 Drops / Android'),
-                                ),
-                                TextButton.icon(
-                                  onPressed: busy ? null : _logoutTwitch,
-                                  icon: _loggingOut
-                                      ? const SizedBox(
-                                          width: 14,
-                                          height: 14,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
-                                        )
-                                      : const Icon(Icons.logout_rounded),
-                                  label: const Text('登出'),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: Colors.redAccent,
-                                  ),
-                                ),
-                                ElevatedButton.icon(
-                                  onPressed: _completeLogin && !busy ? _finish : null,
-                                  icon: const Icon(Icons.check_rounded),
-                                  label: const Text('進入 App'),
-                                ),
-                              ],
-                            ), */
                             ],
                           ),
                   ),
@@ -802,7 +744,10 @@ class _LoginActionButtons extends StatelessWidget {
             ? const SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: TwitchUiColors.primarySoft,
+                ),
               )
             : const Icon(Icons.auto_awesome_rounded),
         label: const Text('一鍵完成 Twitch 登入'),
@@ -845,7 +790,10 @@ class _LoginActionButtons extends StatelessWidget {
             ? const SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: TwitchUiColors.primarySoft,
+                ),
               )
             : const Icon(Icons.logout_rounded),
         label: const Text('登出'),
