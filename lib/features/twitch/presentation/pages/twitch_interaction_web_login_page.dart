@@ -673,7 +673,7 @@ query ChannelPointsContext($channelLogin: String!) {
           OutlinedButton.icon(
             onPressed: busy ? null : () => _probeAndMaybeSave(),
             icon: const Icon(Icons.key_rounded, size: 18),
-            label: const Text('檢查 GQL token'),
+            label: const Text('檢查 GQL 授權'),
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
@@ -689,9 +689,7 @@ query ChannelPointsContext($channelLogin: String!) {
                       ? (_embeddedWebViewReady
                             ? 'App 內 Web/GQL 頁已載入'
                             : '等待 App 內 Web/GQL 頁...')
-                      : (_windowOpen
-                            ? 'desktop_webview_window 已開啟'
-                            : '等待視窗開啟')),
+                      : (_windowOpen ? '桌面登入視窗已開啟' : '等待視窗開啟')),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.white54, fontSize: 12),

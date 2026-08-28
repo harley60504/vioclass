@@ -381,7 +381,7 @@ class _TwitchDropsDeviceLoginPageState
       appBar: AppBar(
         backgroundColor: const Color(0xFF18181B),
         foregroundColor: Colors.white,
-        title: const Text('Drops / Android Token 登入'),
+        title: const Text('Drops / Android 授權登入'),
         actions: [
           IconButton(
             tooltip: '重新產生',
