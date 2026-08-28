@@ -49,7 +49,7 @@ class _TwitchDropsDeviceLoginPageState
 
   int _intervalSeconds = 5;
 
-  String _statusText = '正在啟動 Drops / Android device flow...';
+  String _statusText = '正在準備 Drops / Android 授權...';
   String? _errorText;
   String? _lastPollText;
   String? _currentUrl;
@@ -93,7 +93,7 @@ class _TwitchDropsDeviceLoginPageState
       _errorText = null;
       _lastPollText = null;
       _currentUrl = null;
-      _statusText = '正在清理舊 Drops token 並啟動 Android device flow...';
+      _statusText = '正在清理舊授權並啟動 Drops / Android 登入...';
     });
 
     try {
@@ -131,8 +131,8 @@ class _TwitchDropsDeviceLoginPageState
         _openingWindow = false;
         _authWindowOpen = false;
         _embeddedWebViewReady = false;
-        _errorText = '啟動 Drops device flow 失敗：$e';
-        _statusText = 'Drops / Android token 尚未登入。';
+        _errorText = '啟動 Drops / Android 授權失敗：$e';
+        _statusText = 'Drops / Android 尚未登入。';
       });
     }
   }
@@ -292,9 +292,8 @@ class _TwitchDropsDeviceLoginPageState
           if (!valid) {
             setState(() {
               _polling = false;
-              _errorText =
-                  '已取得 token，但 validate client_id 不是 Drops / Android client。請重新授權。';
-              _lastPollText = 'Drops token validate 失敗。';
+              _errorText = '已取得授權，但不是 Drops / Android app。請重新授權。';
+              _lastPollText = 'Drops 授權驗證失敗。';
             });
             _schedulePoll();
             return;
@@ -305,7 +304,7 @@ class _TwitchDropsDeviceLoginPageState
           await _closeAuthWindow();
           setState(() {
             _polling = false;
-            _statusText = 'Drops / Android token 登入完成。';
+            _statusText = 'Drops / Android 登入完成。';
             _lastPollText = '授權成功，正在返回登入檢查頁...';
           });
           await Future<void>.delayed(const Duration(milliseconds: 500));
@@ -336,7 +335,7 @@ class _TwitchDropsDeviceLoginPageState
           _pollTimer?.cancel();
           setState(() {
             _polling = false;
-            _errorText = result.message ?? 'Drops device flow 登入失敗。';
+            _errorText = result.message ?? 'Drops / Android 登入失敗。';
             _lastPollText = '請重新產生代碼。';
           });
           return;
