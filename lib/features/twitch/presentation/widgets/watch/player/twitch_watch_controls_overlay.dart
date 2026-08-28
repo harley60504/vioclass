@@ -18,13 +18,12 @@ class WatchControlsOverlay extends StatefulWidget {
   final bool isFollowing;
   final bool followBusy;
   final VoidCallback onBack;
+  final VoidCallback? onHome;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
-  final VoidCallback? onReload;
   final VoidCallback? onOpenChannel;
   final VoidCallback? onCreateClip;
   final bool creatingClip;
-  final VoidCallback onStop;
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final bool muted;
@@ -55,13 +54,12 @@ class WatchControlsOverlay extends StatefulWidget {
     required this.isFollowing,
     required this.followBusy,
     required this.onBack,
+    this.onHome,
     required this.onToggleFollow,
     required this.onSubscribe,
-    required this.onReload,
     this.onOpenChannel,
     this.onCreateClip,
     this.creatingClip = false,
-    required this.onStop,
     required this.player,
     required this.playerRuntime,
     required this.muted,
@@ -247,15 +245,13 @@ class _WatchChromeStack extends StatelessWidget {
             metadata: widget.metadata,
             isFollowing: widget.isFollowing,
             followBusy: widget.followBusy,
-            player: widget.player,
             onBack: widget.onBack,
+            onHome: widget.onHome,
             onToggleFollow: widget.onToggleFollow,
             onSubscribe: widget.onSubscribe,
-            onReload: widget.onReload,
             onOpenChannel: widget.onOpenChannel,
             onCreateClip: widget.onCreateClip,
             creatingClip: widget.creatingClip,
-            onStop: widget.onStop,
           ),
         ),
         Positioned(

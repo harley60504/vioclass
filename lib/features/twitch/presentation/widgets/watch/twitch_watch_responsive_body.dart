@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../responsive/twitch_responsive_layout.dart';
+import 'player/twitch_player_only_surface.dart';
 import 'twitch_watch_chat_resize_handle.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
@@ -58,7 +59,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
       animation: pip,
       builder: (context, _) {
         if (pip.shouldRenderPlayerOnly || fullscreenMode) {
-          return _PlayerOnlySurface(player: player);
+          return TwitchPlayerOnlySurface(player: player);
         }
 
         return ColoredBox(
@@ -136,20 +137,6 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
-  }
-}
-
-class _PlayerOnlySurface extends StatelessWidget {
-  final Widget player;
-
-  const _PlayerOnlySurface({required this.player});
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black,
-      child: SizedBox.expand(child: player),
-    );
   }
 }
 

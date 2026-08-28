@@ -25,9 +25,11 @@ import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/engagement/twitch_hype_train_controller.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/playback/twitch_vod_snapshot_playlist_proxy.dart';
 import '../../services/window/twitch_fullscreen_controller.dart';
+import '../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
 import '../watch/controllers/twitch_watch_chat_controller.dart';
 import '../watch/controllers/twitch_watch_engagement_controller.dart';
@@ -38,17 +40,22 @@ import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
 import '../watch/twitch_watch_port_scope.dart';
 import '../watch/twitch_watch_scope.dart';
+import '../mini_player/twitch_mini_player_controller.dart';
+import '../watch/twitch_playback_session_controller.dart';
 import '../dialogs/twitch_clip_editor_dialog.dart';
 import '../widgets/channel/twitch_channel_about_section.dart';
 import '../widgets/watch/chat/twitch_vod_replay_chat_panel.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
+import '../settings/twitch_player_settings_controller.dart';
 import 'twitch_channel_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'watch/twitch_watch_page_session.dart';
 import 'watch/twitch_watch_page_preferences.dart';
 import 'watch/twitch_watch_page_startup.dart';
 import 'watch/twitch_watch_page_chat.dart';
 import 'watch/twitch_watch_page_engagement.dart';
+import 'watch/twitch_watch_page_navigation.dart';
 import 'watch/twitch_watch_page_relationship.dart';
 import 'watch/twitch_watch_page_ui.dart';
 
@@ -79,9 +86,14 @@ class TwitchWatchPage extends StatefulWidget {
   final String? initialProfileImageUrl;
   final TwitchFollowedChannel? initialOfflineChannel;
   final TwitchDiscoveryService? initialDiscoveryService;
+  final TwitchChannelVideo? initialActiveDvrVideo;
   final TwitchChannelVideo? initialVodVideo;
   final TwitchChannelClip? initialClip;
+  final double? initialVodReplayRatio;
+  final bool initialPreferVodReplayChat;
   final bool initialVodPlaybackOnly;
+  final bool initialReuseCurrentPlayback;
+  final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
 
   const TwitchWatchPage({
     super.key,
@@ -96,9 +108,14 @@ class TwitchWatchPage extends StatefulWidget {
     this.initialProfileImageUrl,
     this.initialOfflineChannel,
     this.initialDiscoveryService,
+    this.initialActiveDvrVideo,
     this.initialVodVideo,
     this.initialClip,
+    this.initialVodReplayRatio,
+    this.initialPreferVodReplayChat = false,
     this.initialVodPlaybackOnly = false,
+    this.initialReuseCurrentPlayback = false,
+    this.initialPlayerRuntime,
   });
 
   TwitchStreamHeaderMetadata get resolvedInitialMetadata {
@@ -171,7 +188,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
 
   StreamSubscription<double>? playerVolumeSubscription;
   int watchLoadGeneration = 0;
-  String? restoreMediaUriOnDispose;
+  TwitchPlaybackSessionState? restorePlaybackOnDispose;
+  bool handedOffToMiniPlayer = false;
+  bool leavingToMiniPlayer = false;
+  bool reuseCurrentPlaybackOnNextLiveLoad = false;
 
   bool loadingAuth = true;
   bool loadingWatch = false;
@@ -399,12 +419,16 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   @override
   void initState() {
     super.initState();
+    reuseCurrentPlaybackOnNextLiveLoad = widget.initialReuseCurrentPlayback;
 
     channelController = TextEditingController(
       text: widget.resolvedInitialMetadata.channelLogin,
     );
     messageController = TextEditingController();
-    session = TwitchWatchSessionHandles.create(playerTitle: 'Twitch Raw Proxy');
+    session = TwitchWatchSessionHandles.create(
+      playerTitle: 'Twitch Raw Proxy',
+      playerRuntime: widget.initialPlayerRuntime,
+    );
     vodSnapshotPlaylistProxy = TwitchVodSnapshotPlaylistProxy();
     preferencesController = TwitchWatchPreferencesController(
       applyVolume: (volume) async {
@@ -469,7 +493,13 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       ),
     )..addListener(notifyControllerChanged);
 
+    if (widget.initialReuseCurrentPlayback) {
+      unawaited(primeReusedPlaybackSurface());
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await syncWatchPageAutoPip();
+      if (!mounted) return;
       await enterMobileImmersiveByDefault();
       if (!mounted) return;
       await loadWatchPreferences();
@@ -482,13 +512,41 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
     });
   }
 
+  Future<void> primeReusedPlaybackSurface() async {
+    try {
+      final moved = TwitchMiniPlayerController.instance.moveActiveSurfaceInto(
+        playerSession,
+      );
+      if (!moved) {
+        await playerSession.ensureReady();
+      }
+      final player = playerSession.playerOrNull;
+      if (player != null && !player.state.playing) {
+        await player.play();
+      }
+      if (!mounted) return;
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        TwitchMiniPlayerController.instance.close(pausePlayback: false);
+      });
+    } catch (_) {
+      // The regular watch startup path will still attempt a normal live load.
+    }
+  }
+
   @override
   void dispose() {
+    watchLoadGeneration++;
+    if (!handedOffToMiniPlayer) {
+      unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
+    }
     cancelDeferredWatchTasks(rebuild: false);
     channelController.dispose();
     messageController.dispose();
 
-    unawaited(watchPorts.player.disposeRuntime());
+    if (!handedOffToMiniPlayer) {
+      unawaited(watchPorts.player.disposeRuntime());
+    }
     playbackController.removeListener(notifyControllerChanged);
     vodReplayController.removeListener(notifyControllerChanged);
     relationshipController.removeListener(notifyControllerChanged);
@@ -497,7 +555,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
     preferencesController.removeListener(notifyControllerChanged);
     playbackController.dispose();
     vodReplayController.dispose();
-    unawaited(vodSnapshotPlaylistProxy.dispose());
+    if (!handedOffToMiniPlayer) {
+      unawaited(vodSnapshotPlaylistProxy.dispose());
+    }
     relationshipController.dispose();
     engagementController.dispose();
     chatController.dispose();
@@ -508,11 +568,15 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       unawaited(volumeSubscriptionCancel);
     }
 
-    final restoreUri = restoreMediaUriOnDispose;
-    if (restoreUri != null && restoreUri.trim().isNotEmpty) {
+    final restorePlayback = restorePlaybackOnDispose;
+    if (handedOffToMiniPlayer) {
+      // The shared player is now owned by the in-app mini player.
+    } else if (restorePlayback != null &&
+        restorePlayback.mediaUri.trim().isNotEmpty) {
+      TwitchPlaybackSessionController.instance.restorePlayback(restorePlayback);
       unawaited(
         TwitchMediaKitPlayerHost.restoreSharedMedia(
-          uri: restoreUri,
+          uri: restorePlayback.mediaUri,
           play: true,
         ).catchError((_) {}),
       );
@@ -525,8 +589,20 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       unawaited(TwitchFullscreenController.exitFullscreen());
     }
 
-    session.closeApiClient();
+    if (!handedOffToMiniPlayer) {
+      session.closeApiClient();
+    }
     super.dispose();
+  }
+
+  Future<void> syncWatchPageAutoPip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled =
+        prefs.getBool(
+          TwitchPlayerSettingsController.androidPipEnabledPreferenceKey,
+        ) ??
+        true;
+    await TwitchAndroidPipController.instance.setAutoEnterEnabled(enabled);
   }
 
   Future<void> openCurrentChannelSheet(
@@ -651,17 +727,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
       onQualitySelected: usingVodQuality
           ? (variant) => unawaited(switchVodQuality(variant))
           : null,
-      onBack: () => Navigator.of(context).maybePop(),
-      onReload: busy
-          ? null
-          : () {
-              unawaited(loadWatch());
-              unawaited(loadChannelAboutPanels());
-            },
+      onBack: () => unawaited(leaveToMiniPlayer()),
+      onHome: () => unawaited(returnToHome()),
       onOpenChannel: () => unawaited(openCurrentChannelSheet(metadata)),
       onCreateClip: () => unawaited(createLiveClip()),
       creatingClip: creatingClip,
-      onStop: () => stopCurrentSession(),
       hasDvrReplay:
           watchPorts.player.runtime.usingLiveDvrBridge ||
           watchPorts.player.runtime.usingExternalVodPlayback ||
@@ -760,32 +830,39 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
                 : TwitchVodReplayChatMode.live,
           );
 
-    final scaffold = Scaffold(
-      backgroundColor: const Color(0xFF0E0E10),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: TwitchWatchResponsiveBody(
-              chatVisible: fullscreenMode ? false : chatVisible,
-              fullscreenMode: fullscreenMode,
-              chatPanelWidth: chatPanelWidth,
-              chatPanelRatio: chatPanelRatio,
-              minChatPanelWidth: minChatPanelWidth,
-              maxEffectiveMinChatPanelWidth: maxEffectiveMinChatPanelWidth,
-              maxChatPanelWidth: maxChatPanelWidth,
-              minChatPanelRatio: minChatPanelRatio,
-              minStoredChatPanelRatio: minStoredChatPanelRatio,
-              maxChatPanelRatio: maxChatPanelRatio,
-              player: playerArea,
-              chat: chatPanel,
-              belowPlayer: belowPlayer,
-              onSetChatPanelWidthForViewport: setChatPanelWidthForViewport,
-              onPersistChatPanelWidth: () {
-                unawaited(saveChatPanelWidthPreference());
-              },
+    final scaffold = PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop || leavingToMiniPlayer) return;
+        unawaited(leaveToMiniPlayer());
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0E0E10),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: TwitchWatchResponsiveBody(
+                chatVisible: fullscreenMode ? false : chatVisible,
+                fullscreenMode: fullscreenMode,
+                chatPanelWidth: chatPanelWidth,
+                chatPanelRatio: chatPanelRatio,
+                minChatPanelWidth: minChatPanelWidth,
+                maxEffectiveMinChatPanelWidth: maxEffectiveMinChatPanelWidth,
+                maxChatPanelWidth: maxChatPanelWidth,
+                minChatPanelRatio: minChatPanelRatio,
+                minStoredChatPanelRatio: minStoredChatPanelRatio,
+                maxChatPanelRatio: maxChatPanelRatio,
+                player: playerArea,
+                chat: chatPanel,
+                belowPlayer: belowPlayer,
+                onSetChatPanelWidthForViewport: setChatPanelWidthForViewport,
+                onPersistChatPanelWidth: () {
+                  unawaited(saveChatPanelWidthPreference());
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 

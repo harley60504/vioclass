@@ -19,11 +19,10 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final bool loading;
   final String? error;
   final VoidCallback onBack;
-  final VoidCallback? onReload;
+  final VoidCallback? onHome;
   final VoidCallback? onOpenChannel;
   final VoidCallback? onCreateClip;
   final bool creatingClip;
-  final VoidCallback onStop;
   final bool relationshipBusy;
   final String? relationshipError;
   final bool isFollowing;
@@ -57,11 +56,10 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.onBack,
-    required this.onReload,
+    this.onHome,
     this.onOpenChannel,
     this.onCreateClip,
     this.creatingClip = false,
-    required this.onStop,
     this.relationshipBusy = false,
     this.relationshipError,
     this.isFollowing = false,
@@ -123,11 +121,10 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       onToggleMute: onToggleMute,
       onVolumeChanged: onVolumeChanged,
       onBack: onBack,
-      onReload: onReload,
+      onHome: onHome,
       onOpenChannel: onOpenChannel,
       onCreateClip: onCreateClip,
       creatingClip: creatingClip,
-      onStop: onStop,
       hasDvrReplay: hasDvrReplay,
       showLiveEdgeLabel: showLiveEdgeLabel,
       liveDvrDuration: liveDvrDuration,

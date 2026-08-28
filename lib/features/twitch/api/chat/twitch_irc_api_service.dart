@@ -18,6 +18,7 @@ class TwitchIrcApiService {
   String? _currentNick;
   final Map<String, String> _currentUserStateTags = <String, String>{};
   Completer<Map<String, String>>? _userStateCompleter;
+  bool _disposed = false;
 
   final StreamController<TwitchChatMessage> _messagesController =
       StreamController<TwitchChatMessage>.broadcast();
@@ -42,6 +43,9 @@ class TwitchIrcApiService {
     String? accessToken,
     String nick = 'justinfan12345',
   }) async {
+    if (_disposed) {
+      throw StateError('TwitchIrcApiService has been disposed.');
+    }
     await disconnect();
 
     final login = channelLogin.trim().toLowerCase();
@@ -68,10 +72,10 @@ class TwitchIrcApiService {
     _subscription = ws.stream.listen(
       handleSocketMessage,
       onError: (Object error, StackTrace stackTrace) {
-        _rawLinesController.add('ERROR $error');
+        _addRawLine('ERROR $error');
       },
       onDone: () {
-        _rawLinesController.add('DISCONNECTED');
+        _addRawLine('DISCONNECTED');
       },
       cancelOnError: false,
     );
@@ -97,13 +101,18 @@ class TwitchIrcApiService {
   }
 
   void handleSocketMessage(dynamic event) {
+    if (_disposed ||
+        _rawLinesController.isClosed ||
+        _messagesController.isClosed) {
+      return;
+    }
     final text = event is List<int> ? utf8.decode(event) : event.toString();
     final lines = text
         .split(RegExp(r'\r?\n'))
         .where((line) => line.trim().isNotEmpty);
 
     for (final line in lines) {
-      _rawLinesController.add(line);
+      _addRawLine(line);
 
       if (line.startsWith('PING')) {
         final payload = line.contains(':')
@@ -127,7 +136,7 @@ class TwitchIrcApiService {
       }
 
       if (parsed.command.isNotEmpty) {
-        _messagesController.add(parsed);
+        _addMessage(parsed);
       }
     }
   }
@@ -179,7 +188,18 @@ class TwitchIrcApiService {
   }
 
   void _send(String line) {
+    if (_disposed) return;
     _channel?.sink.add('$line\r\n');
+  }
+
+  void _addRawLine(String line) {
+    if (_disposed || _rawLinesController.isClosed) return;
+    _rawLinesController.add(line);
+  }
+
+  void _addMessage(TwitchChatMessage message) {
+    if (_disposed || _messagesController.isClosed) return;
+    _messagesController.add(message);
   }
 
   Future<List<TwitchChatMessage>> collectMessages({
@@ -246,6 +266,7 @@ class TwitchIrcApiService {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     await disconnect();
     await _messagesController.close();
     await _rawLinesController.close();

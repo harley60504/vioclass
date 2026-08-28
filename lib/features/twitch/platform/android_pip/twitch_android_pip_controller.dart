@@ -89,6 +89,16 @@ class TwitchAndroidPipController extends ChangeNotifier {
     }
   }
 
+  Future<void> setAutoEnterEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+
+    try {
+      await _channel.invokeMethod<void>('setAutoPipEnabled', <String, Object>{
+        'enabled': enabled,
+      });
+    } catch (_) {}
+  }
+
   Future<void> _prepareManualPictureInPictureFrame() async {
     _setPreparingPictureInPicture(true);
     await Future<void>.delayed(_manualPrepareFrameDelay);

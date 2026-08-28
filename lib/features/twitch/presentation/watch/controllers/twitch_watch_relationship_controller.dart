@@ -1,6 +1,24 @@
 import 'package:flutter/foundation.dart';
 
+class _CachedRelationshipStatus {
+  final bool isFollowing;
+  final String? userId;
+  final DateTime storedAt;
+
+  const _CachedRelationshipStatus({
+    required this.isFollowing,
+    required this.userId,
+    required this.storedAt,
+  });
+
+  bool get fresh =>
+      DateTime.now().difference(storedAt) < const Duration(minutes: 2);
+}
+
 class TwitchWatchRelationshipController extends ChangeNotifier {
+  static final Map<String, _CachedRelationshipStatus> _relationshipCache =
+      <String, _CachedRelationshipStatus>{};
+
   final dynamic relationshipPort;
   final String Function() channelLogin;
   final String? Function() channelId;
@@ -27,6 +45,17 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
   Future<void> refreshRelationshipStatus({String? targetChannelLogin}) async {
     final login = (targetChannelLogin ?? channelLogin()).trim().toLowerCase();
     if (login.isEmpty || checkingRelationship) return;
+    final cacheKey = _cacheKey(login);
+    final cached = _relationshipCache[cacheKey];
+    if (cached != null && cached.fresh) {
+      _applySnapshot(
+        following: cached.isFollowing,
+        resolvedUserId: cached.userId,
+      );
+      relationshipError = null;
+      notifyListeners();
+      return;
+    }
 
     checkingRelationship = true;
     relationshipError = null;
@@ -38,13 +67,14 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
         targetUserId: channelId(),
         viewerUserId: viewerId(),
       );
-      isFollowing = snapshot.isFollowing == true;
+      final following = snapshot.isFollowing == true;
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
-      final currentChannelId = channelId();
-      if ((currentChannelId == null || currentChannelId.trim().isEmpty) &&
-          resolvedUserId.isNotEmpty) {
-        onChannelIdResolved(resolvedUserId);
-      }
+      _applySnapshot(following: following, resolvedUserId: resolvedUserId);
+      _relationshipCache[cacheKey] = _CachedRelationshipStatus(
+        isFollowing: following,
+        userId: resolvedUserId.isEmpty ? null : resolvedUserId,
+        storedAt: DateTime.now(),
+      );
       relationshipError = null;
     } catch (error) {
       relationshipError = error.toString();
@@ -75,13 +105,14 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
               targetUserId: channelId(),
               viewerUserId: viewerId(),
             );
-      isFollowing = snapshot.isFollowing == true;
+      final following = snapshot.isFollowing == true;
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
-      final currentChannelId = channelId();
-      if ((currentChannelId == null || currentChannelId.trim().isEmpty) &&
-          resolvedUserId.isNotEmpty) {
-        onChannelIdResolved(resolvedUserId);
-      }
+      _applySnapshot(following: following, resolvedUserId: resolvedUserId);
+      _relationshipCache[_cacheKey(login)] = _CachedRelationshipStatus(
+        isFollowing: following,
+        userId: resolvedUserId.isEmpty ? null : resolvedUserId,
+        storedAt: DateTime.now(),
+      );
       relationshipError = null;
       showMessage(isFollowing ? '已追隨 $login' : '已取消追隨 $login');
     } catch (error) {
@@ -103,5 +134,20 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
     isFollowing = false;
     relationshipError = null;
     notifyListeners();
+  }
+
+  String _cacheKey(String login) {
+    final viewer = viewerId()?.trim();
+    return '${viewer == null || viewer.isEmpty ? 'anonymous' : viewer}|$login';
+  }
+
+  void _applySnapshot({required bool following, String? resolvedUserId}) {
+    isFollowing = following;
+    final cleanUserId = resolvedUserId?.trim() ?? '';
+    final currentChannelId = channelId();
+    if ((currentChannelId == null || currentChannelId.trim().isEmpty) &&
+        cleanUserId.isNotEmpty) {
+      onChannelIdResolved(cleanUserId);
+    }
   }
 }

@@ -10,6 +10,8 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
+import '../mini_player/twitch_mini_player_controller.dart';
+import '../mini_player/twitch_mini_player_overlay.dart';
 import '../sheets/twitch_app_settings_sheet.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
@@ -230,30 +232,44 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _kBackground,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: <Color>[
-              Color(0xFF25113C),
-              Color(0xFF11111A),
-              Color(0xFF07070B),
+      body: AnimatedBuilder(
+        animation: playerSettingsController,
+        builder: (context, _) {
+          return Stack(
+            children: <Widget>[
+              DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: <Color>[
+                      Color(0xFF25113C),
+                      Color(0xFF11111A),
+                      Color(0xFF07070B),
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final layout = TwitchResponsiveLayout.fromConstraints(
+                        constraints,
+                      );
+                      return layout.shouldUseBottomHomeNavigation
+                          ? _buildMobileShell(layout)
+                          : _buildDesktopShell(layout);
+                    },
+                  ),
+                ),
+              ),
+              TwitchMiniPlayerOverlay(
+                controller: TwitchMiniPlayerController.instance,
+                discoveryService: discoveryService,
+                androidPipEnabled: playerSettingsController.androidPipEnabled,
+              ),
             ],
-          ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final layout = TwitchResponsiveLayout.fromConstraints(
-                constraints,
-              );
-              return layout.shouldUseBottomHomeNavigation
-                  ? _buildMobileShell(layout)
-                  : _buildDesktopShell(layout);
-            },
-          ),
-        ),
+          );
+        },
       ),
     );
   }

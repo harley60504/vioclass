@@ -7,6 +7,7 @@ import '../../../services/auth/twitch_auth_service.dart';
 import '../../../services/auth/twitch_drops_auth_service.dart';
 import '../../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../../services/playback/twitch_media_kit_player_host.dart';
+import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../../services/watch/twitch_watch_services.dart';
 import '../../watch/twitch_watch_feature_ports.dart';
 
@@ -34,8 +35,14 @@ class TwitchWatchSessionHandles {
     required this.playerSession,
   });
 
-  factory TwitchWatchSessionHandles.create({required String playerTitle}) {
-    final services = TwitchWatchServices.create(playerTitle: playerTitle);
+  factory TwitchWatchSessionHandles.create({
+    required String playerTitle,
+    TwitchPlaylistPlayerRuntime? playerRuntime,
+  }) {
+    final services = TwitchWatchServices.create(
+      playerTitle: playerTitle,
+      playerRuntime: playerRuntime,
+    );
     final ports = TwitchWatchFeaturePorts.fromServices(services);
 
     return TwitchWatchSessionHandles._(

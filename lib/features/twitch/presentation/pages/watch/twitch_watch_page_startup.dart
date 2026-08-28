@@ -5,9 +5,12 @@ import 'package:flutter/foundation.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../services/playback/twitch_media_kit_player_host.dart';
+import '../../watch/twitch_playback_session_controller.dart';
+import '../../watch/twitch_watch_playback_kind.dart';
 import '../twitch_watch_page.dart';
 import 'twitch_watch_page_chat.dart';
 import 'twitch_watch_page_engagement.dart';
+import 'twitch_watch_playback_state.dart';
 import 'twitch_watch_page_relationship.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
@@ -47,6 +50,8 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final channel = channelLogin;
     cancelDeferredWatchTasks();
     final generation = ++watchLoadGeneration;
+    final reuseCurrentPlayback = reuseCurrentPlaybackOnNextLiveLoad;
+    reuseCurrentPlaybackOnNextLiveLoad = false;
 
     setState(() {
       loadingWatch = true;
@@ -61,12 +66,26 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     chatController.loadingSpecialMessages = false;
 
     try {
-      await stopCurrentSession(clearStatus: false, cancelDeferredTasks: false);
-      if (!isCurrentWatchTask(generation, channel)) return;
+      final restoredPlayback = reuseCurrentPlayback
+          ? await restoreCurrentPlaybackBundle(channel, generation)
+          : false;
+      if (!restoredPlayback) {
+        await stopCurrentSession(
+          clearStatus: false,
+          cancelDeferredTasks: false,
+        );
+        if (!isCurrentWatchTask(generation, channel)) return;
+        restoreActiveDvrAvailabilityAfterMiniResume(channel, generation);
+      }
 
       setState(() => loadingWatch = false);
       unawaited(
-        runWatchStartupPipeline(channel: channel, generation: generation),
+        runWatchStartupPipeline(
+          channel: channel,
+          generation: generation,
+          reuseCurrentLivePlayback: reuseCurrentPlayback,
+          skipPlaybackStartup: restoredPlayback,
+        ),
       );
     } catch (error) {
       if (mounted) showSnack('載入 Watch Page 失敗：$error');
@@ -77,11 +96,91 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     }
   }
 
+  Future<bool> restoreCurrentPlaybackBundle(
+    String channel,
+    int generation,
+  ) async {
+    final state = TwitchPlaybackSessionController.instance.playableState;
+    if (state == null) return false;
+    final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+    if (currentUri == null ||
+        currentUri.isEmpty ||
+        currentUri != state.mediaUri.trim()) {
+      return false;
+    }
+
+    await playerSession.ensureReady();
+    if (!isCurrentWatchTask(generation, channel)) return false;
+    await preferencesController.applyPlayerVolume();
+    playbackController.setError(null);
+
+    activeGrowingVodVideo = state.activeDvrVideo;
+    currentVodQualityVideo = state.kind == TwitchWatchPlaybackKind.clip
+        ? null
+        : state.vodVideo ?? state.activeDvrVideo;
+    currentClipQualityClip = state.clip;
+    offlineVodFallbackVideo = state.kind == TwitchWatchPlaybackKind.vod
+        ? state.vodVideo
+        : null;
+    preferVodReplayChat = state.preferVodReplayChat;
+
+    if (state.kind == TwitchWatchPlaybackKind.vod ||
+        state.kind == TwitchWatchPlaybackKind.clip) {
+      watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
+    }
+
+    final replayVideo = state.kind == TwitchWatchPlaybackKind.clip
+        ? state.clip?.videoId.trim()
+        : state.vodVideo?.id.trim() ?? state.activeDvrVideo?.id.trim();
+    if (state.preferVodReplayChat &&
+        replayVideo != null &&
+        replayVideo.isNotEmpty) {
+      final timelineOffsetSeconds = state.kind == TwitchWatchPlaybackKind.clip
+          ? state.clip?.vodOffset.toDouble()
+          : null;
+      unawaited(
+        vodReplayController.start(
+          videoId: replayVideo,
+          channelLogin: channel,
+          player: playerSession.player,
+          timelineOffsetSeconds: timelineOffsetSeconds,
+        ),
+      );
+    }
+
+    if (mounted) setState(() {});
+    return true;
+  }
+
   Future<void> loadPlayer(String channel, {bool forceOpen = true}) async {
-    return playbackController.loadPlayer(
+    await playbackController.loadPlayer(
       channelLogin: channel,
       enabled: enableWatchPlayer,
       forceOpen: forceOpen,
+    );
+    markOwnedPlayback(
+      kind: TwitchWatchPlaybackKind.live,
+      mediaUri: TwitchMediaKitPlayerHost.currentMediaUri,
+    );
+  }
+
+  void restoreActiveDvrAvailabilityAfterMiniResume(
+    String channel,
+    int generation,
+  ) {
+    if (!widget.initialReuseCurrentPlayback) return;
+    final video = widget.initialActiveDvrVideo;
+    if (video == null || !video.isLikelyGrowingArchive) return;
+
+    activeGrowingVodVideo = video;
+    currentVodQualityVideo ??= video;
+    preferVodReplayChat = widget.initialPreferVodReplayChat;
+    unawaited(
+      warmLiveDvrBridgeSource(
+        video: video,
+        channel: channel,
+        generation: generation,
+      ),
     );
   }
 
@@ -116,11 +215,20 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   Future<void> runWatchStartupPipeline({
     required String channel,
     required int generation,
+    bool reuseCurrentLivePlayback = false,
+    bool skipPlaybackStartup = false,
   }) async {
     await yieldToUi();
     if (!isCurrentWatchTask(generation, channel)) return;
 
-    if (enableWatchPlayer) {
+    var chatStartedEarly = false;
+    if (reuseCurrentLivePlayback) {
+      setState(() => chatBootstrapping = true);
+      chatStartedEarly = true;
+      unawaited(runDeferredChatStartup(channel, generation));
+    }
+
+    if (enableWatchPlayer && !skipPlaybackStartup) {
       try {
         final loadedInitialClip = await loadInitialClipPlayback(
           channel: channel,
@@ -144,8 +252,27 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         if (!loadedInitialVod) {
           if (widget.initialVodPlaybackOnly) {
             showSnack('VOD 載入失敗，沒有切回直播。');
+          } else if (reuseCurrentLivePlayback) {
+            playbackController.setError(null);
+            await preferencesController.applyPlayerVolume();
+            markOwnedPlayback(
+              kind:
+                  widget.initialActiveDvrVideo != null &&
+                      widget.initialPreferVodReplayChat
+                  ? TwitchWatchPlaybackKind.liveDvr
+                  : TwitchWatchPlaybackKind.live,
+              mediaUri: TwitchMediaKitPlayerHost.currentMediaUri,
+            );
+            if (activeGrowingVodVideo == null) {
+              unawaited(
+                prepareActiveGrowingVod(
+                  channel: channel,
+                  generation: generation,
+                ),
+              );
+            }
           } else {
-            await loadPlayer(channel);
+            await loadPlayer(channel, forceOpen: !reuseCurrentLivePlayback);
             if (!isCurrentWatchTask(generation, channel)) return;
             unawaited(
               prepareActiveGrowingVod(channel: channel, generation: generation),
@@ -172,7 +299,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     if (!isCurrentWatchTask(generation, channel)) return;
 
     setState(() {
-      chatBootstrapping = true;
+      if (!chatStartedEarly) chatBootstrapping = true;
       relationshipBootstrapping = true;
       engagementBootstrapping = true;
       emoteBootstrapping = true;
@@ -181,7 +308,9 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     unawaited(
       runWatchBackgroundStartup(channel: channel, generation: generation),
     );
-    await runDeferredChatStartup(channel, generation);
+    if (!chatStartedEarly) {
+      await runDeferredChatStartup(channel, generation);
+    }
   }
 
   Future<void> runWatchBackgroundStartup({
@@ -272,6 +401,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     warmedLiveDvrQualityKey = null;
     preferVodReplayChat = false;
     watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+    clearOwnedPlayback();
 
     if (!mounted) return;
     setState(() {
@@ -325,7 +455,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       rememberMediaUriForRouteRestore();
       if (video.isLikelyGrowingArchive) {
         activeGrowingVodVideo = video;
-        await switchToLiveDvrReplay(video: video, ratio: 0.92);
+        await switchToLiveDvrReplay(
+          video: video,
+          ratio: widget.initialVodReplayRatio ?? 0.92,
+        );
         if (mounted) setState(() {});
         return true;
       }
@@ -333,6 +466,8 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         channel: channel,
         generation: generation,
         video: video,
+        initialRatio: widget.initialVodReplayRatio,
+        reuseCurrentPlayback: widget.initialReuseCurrentPlayback,
       );
     } catch (error) {
       if (isCurrentWatchTask(generation, channel)) {
@@ -362,14 +497,22 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       currentVodQualityVideo = null;
       currentClipQualityClip = clip;
 
-      await playerSession.ensureReady();
-      await playerSession.openOrResume(
-        uri: playback.playbackUri.toString(),
-        play: true,
-        forceOpen: true,
+      if (widget.initialReuseCurrentPlayback) {
+        await playerSession.ensureReady();
+        await preferencesController.applyPlayerVolume();
+      } else {
+        final playbackUri = playback.playbackUri.toString();
+        await playbackController.openMedia(
+          uri: playbackUri,
+          play: true,
+          forceOpen: true,
+          waitForSettle: true,
+        );
+      }
+      markOwnedPlayback(
+        kind: TwitchWatchPlaybackKind.clip,
+        mediaUri: playback.playbackUri.toString(),
       );
-      await preferencesController.applyPlayerVolume();
-      await waitForInitialPlaybackSettle();
 
       watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
       preferVodReplayChat = true;
@@ -403,10 +546,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }
 
   void rememberMediaUriForRouteRestore() {
-    if (restoreMediaUriOnDispose != null) return;
-    final current = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
-    if (current == null || current.isEmpty) return;
-    restoreMediaUriOnDispose = current;
+    if (restorePlaybackOnDispose != null) return;
+    final current = TwitchPlaybackSessionController.instance.playableState;
+    if (current == null) return;
+    restorePlaybackOnDispose = current;
   }
 
   Future<void> prepareActiveGrowingVod({
@@ -430,6 +573,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       if (activeGrowingVodVideo == null) warmedLiveDvrVideoId = null;
       watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
       if (activeGrowingVodVideo != null) {
+        markOwnedPlayback(
+          kind: currentPlaybackKind,
+          mediaUri: TwitchMediaKitPlayerHost.currentMediaUri,
+        );
         unawaited(
           warmLiveDvrBridgeSource(
             video: activeGrowingVodVideo!,
@@ -469,6 +616,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       if (warmed) {
         warmedLiveDvrVideoId = video.id;
         warmedLiveDvrQualityKey = playlist.selectedVariant?.adAwareQualityKey;
+        markOwnedPlayback(
+          kind: currentPlaybackKind,
+          mediaUri: TwitchMediaKitPlayerHost.currentMediaUri,
+        );
       }
     } catch (error) {
       warmedLiveDvrVideoId = null;
@@ -604,12 +755,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       ratio,
     );
     if (playbackUrl == null) return;
-    await playerSession.openOrResume(
+    await playbackController.openMedia(
       uri: playbackUrl,
       play: true,
       forceOpen: true,
     );
-    await preferencesController.applyPlayerVolume();
+    markOwnedPlayback(
+      kind: TwitchWatchPlaybackKind.liveDvr,
+      mediaUri: playbackUrl,
+    );
     if (video != null) {
       await vodReplayController.start(
         videoId: video.id,
@@ -632,10 +786,14 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final preparedUri = await watchPorts.player.runtime
         .prepareLowLatencyLiveFromWarmUpstream();
     if (preparedUri != null) {
-      await playerSession.openOrResume(
+      await playbackController.openMedia(
         uri: preparedUri.toString(),
         play: true,
         forceOpen: true,
+      );
+      markOwnedPlayback(
+        kind: TwitchWatchPlaybackKind.live,
+        mediaUri: preparedUri.toString(),
       );
     } else {
       await loadPlayer(channelLogin, forceOpen: true);
@@ -649,6 +807,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required TwitchChannelVideo video,
     double? initialRatio,
     Duration? initialLiveBackoff,
+    bool reuseCurrentPlayback = false,
   }) async {
     if (video.isLikelyGrowingArchive) {
       activeGrowingVodVideo = video;
@@ -675,7 +834,6 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     );
     if (!isCurrentWatchTask(generation, channel)) return false;
 
-    await playerSession.ensureReady();
     final playbackUri = playlist.playlistUri;
     debugPrint(
       '[WatchVodOnly] playbackUri=$playbackUri '
@@ -688,36 +846,44 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       initialRatio: initialRatio,
       initialLiveBackoff: initialLiveBackoff,
     );
-    await playerSession.openOrResume(
-      uri: playbackUri.toString(),
-      play: true,
-      forceOpen: true,
-      startPosition: initialStartPosition,
-    );
-    await preferencesController.applyPlayerVolume();
-    await waitForInitialPlaybackSettle();
-    final duration = playerSession.player.state.duration;
-    if (duration.inMilliseconds > 500) {
-      final liveBackoff = initialLiveBackoff;
-      if (liveBackoff != null) {
-        final target = duration > liveBackoff
-            ? duration - liveBackoff
-            : Duration.zero;
-        await playerSession.player.seek(target);
-      } else {
-        final ratio = initialRatio;
-        if (ratio != null) {
-          final target = Duration(
-            milliseconds: (duration.inMilliseconds * ratio.clamp(0.0, 0.98))
-                .round(),
-          );
+    if (reuseCurrentPlayback) {
+      await playerSession.ensureReady();
+      await preferencesController.applyPlayerVolume();
+    } else {
+      await playbackController.openMedia(
+        uri: playbackUri.toString(),
+        play: true,
+        forceOpen: true,
+        startPosition: initialStartPosition,
+        waitForSettle: true,
+      );
+      final duration = playerSession.player.state.duration;
+      if (duration.inMilliseconds > 500) {
+        final liveBackoff = initialLiveBackoff;
+        if (liveBackoff != null) {
+          final target = duration > liveBackoff
+              ? duration - liveBackoff
+              : Duration.zero;
           await playerSession.player.seek(target);
+        } else {
+          final ratio = initialRatio;
+          if (ratio != null) {
+            final target = Duration(
+              milliseconds: (duration.inMilliseconds * ratio.clamp(0.0, 0.98))
+                  .round(),
+            );
+            await playerSession.player.seek(target);
+          }
         }
       }
     }
 
     if (!isCurrentWatchTask(generation, channel)) return false;
     watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
+    markOwnedPlayback(
+      kind: TwitchWatchPlaybackKind.vod,
+      mediaUri: playbackUri.toString(),
+    );
     offlineVodFallbackVideo = video;
     preferVodReplayChat = true;
     playbackController.setError(null);
@@ -739,14 +905,17 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       playbackController.setError(null);
       if (clip != null && video == null) {
         final position = playerSession.player.state.position;
-        await playerSession.openOrResume(
+        await playbackController.openMedia(
           uri: variant.url,
           play: true,
           forceOpen: true,
           startPosition: position,
         );
         currentVodQualityVariant = variant;
-        await preferencesController.applyPlayerVolume();
+        markOwnedPlayback(
+          kind: TwitchWatchPlaybackKind.clip,
+          mediaUri: variant.url,
+        );
         if (mounted) setState(() {});
         return;
       }
@@ -781,7 +950,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
               ),
             )
           : Duration.zero;
-      await playerSession.openOrResume(
+      await playbackController.openMedia(
         uri: variant.url,
         play: true,
         forceOpen: true,
@@ -789,7 +958,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       );
       currentVodQualityVariant = variant;
       currentVodQualityVideo = video;
-      await preferencesController.applyPlayerVolume();
+      markOwnedPlayback(
+        kind: TwitchWatchPlaybackKind.vod,
+        mediaUri: variant.url,
+      );
     } catch (error) {
       playbackController.setError(error.toString());
       showSnack('VOD 畫質切換失敗：$error');

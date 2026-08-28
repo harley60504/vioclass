@@ -4,20 +4,41 @@ import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
 import 'features/twitch/presentation/widgets/notifications/twitch_app_notification_overlay.dart';
 
+const List<String> _vioClassFontFallback = <String>[
+  'Noto Sans CJK TC',
+  'Noto Sans TC',
+  'Microsoft JhengHei UI',
+  'Microsoft JhengHei',
+  'PingFang TC',
+  'Heiti TC',
+  'Roboto',
+  'Arial',
+  'sans-serif',
+];
+
 class VioClassApp extends StatelessWidget {
   const VioClassApp({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final baseTheme = ThemeData(
+      brightness: Brightness.dark,
+      colorSchemeSeed: const Color(0xFF9146FF),
+      scaffoldBackgroundColor: const Color(0xFF0E0E10),
+      useMaterial3: true,
+    );
+
     return MaterialApp(
       title: 'VioClass',
       debugShowCheckedModeBanner: false,
       navigatorObservers: <NavigatorObserver>[twitchRouteObserver],
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        colorSchemeSeed: const Color(0xFF9146FF),
-        scaffoldBackgroundColor: const Color(0xFF0E0E10),
-        useMaterial3: true,
+      theme: baseTheme.copyWith(
+        textTheme: baseTheme.textTheme.apply(
+          fontFamilyFallback: _vioClassFontFallback,
+        ),
+        primaryTextTheme: baseTheme.primaryTextTheme.apply(
+          fontFamilyFallback: _vioClassFontFallback,
+        ),
       ),
       builder: (context, child) {
         return TwitchAppNotificationOverlay(

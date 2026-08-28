@@ -12,6 +12,7 @@ class TwitchPipBridge(
 ) {
     private var channel: MethodChannel? = null
     private var sourceRectHint: Rect? = null
+    private var autoPipEnabled: Boolean = false
 
     fun attach(methodChannel: MethodChannel) {
         channel = methodChannel
@@ -31,6 +32,11 @@ class TwitchPipBridge(
                     val height = call.argument<Int>("aspectRatioHeight") ?: 9
                     result.success(enterPip(width, height))
                 }
+                "setAutoPipEnabled" -> {
+                    autoPipEnabled = call.argument<Boolean>("enabled") ?: false
+                    updatePictureInPictureParams(16, 9)
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -44,6 +50,7 @@ class TwitchPipBridge(
     }
 
     fun enterPipFromUserLeaveHint(): Boolean {
+        if (!autoPipEnabled) return false
         channel?.invokeMethod("onAutoPipRequested", null)
         return enterPip(16, 9)
     }
@@ -92,7 +99,7 @@ class TwitchPipBridge(
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(true)
+            builder.setAutoEnterEnabled(autoPipEnabled)
         }
 
         return builder.build()

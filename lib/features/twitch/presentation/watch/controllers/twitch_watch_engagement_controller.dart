@@ -32,6 +32,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   TwitchChannelPointsRuntimeSnapshot? channelPointsSnapshot;
   TwitchPredictionSnapshot? prediction;
   List<dynamic> pinnedMessages = const <dynamic>[];
+  bool _disposed = false;
 
   TwitchWatchEngagementController({
     required this.emotesPort,
@@ -75,18 +76,19 @@ class TwitchWatchEngagementController extends ChangeNotifier {
           return;
         }
 
-        if (loadingEngagement || engagementBootstrapping()) return;
+        if (_disposed || loadingEngagement || engagementBootstrapping()) return;
         unawaited(refreshEngagement(showSnackOnError: false));
       },
     );
   }
 
   Future<void> loadThirdPartyEmotes({bool forceRefresh = false}) async {
+    if (_disposed) return;
     final currentChannelId = channelId();
     if (currentChannelId == null || currentChannelId.isEmpty) return;
 
     loadingEmotes = true;
-    notifyListeners();
+    _notifyListenersIfAlive();
     try {
       await emotesPort.loadForChannel(
         channelId: currentChannelId,
@@ -95,8 +97,10 @@ class TwitchWatchEngagementController extends ChangeNotifier {
         forceRefresh: forceRefresh,
       );
     } finally {
-      loadingEmotes = false;
-      notifyListeners();
+      if (!_disposed) {
+        loadingEmotes = false;
+        _notifyListenersIfAlive();
+      }
     }
   }
 
@@ -104,17 +108,19 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     bool showSnackOnError = true,
     bool notifyBalanceDelta = true,
   }) async {
+    if (_disposed) return;
     final login = channelLogin();
     final currentChannelId = channelId();
 
     loadingEngagement = true;
     engagementError = null;
-    notifyListeners();
+    _notifyListenersIfAlive();
 
     final snapshot = await engagementPort.refresh(
       channelLogin: login,
       channelId: currentChannelId,
     );
+    if (_disposed) return;
     if (login != channelLogin()) return;
     unawaited(
       hypeTrainController.refresh(
@@ -130,7 +136,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     pinnedMessages = snapshot.pinnedMessages;
     engagementError = lastError?.toString();
     loadingEngagement = false;
-    notifyListeners();
+    _notifyListenersIfAlive();
 
     _handleAvailableChannelPointBonus(snapshot.channelPoints);
     _notifyChannelPointBalanceIncrease(
@@ -197,6 +203,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     required String claimId,
     required TwitchChannelPointsRuntimeSnapshot channelPoints,
   }) async {
+    if (_disposed) return;
     final fallbackPoints = channelPoints.availableClaimPoints;
     final name = channelPoints.pointsName?.trim();
     final pointName = name == null || name.isEmpty ? 'Channel Points' : name;
@@ -206,6 +213,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
         channelId: channelId,
         claimId: claimId,
       );
+      if (_disposed) return;
 
       _doneChannelPointBonusByState
           .putIfAbsent(stateKey, () => <String>{})
@@ -222,6 +230,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
 
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
+      if (_disposed) return;
       twitchAppNotificationCenter.showWarning(
         title: '$pointName 領取失敗',
         message: '${channelLogin()}：$error',
@@ -288,6 +297,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   }
 
   void reset() {
+    if (_disposed) return;
     channelPointsSnapshot = null;
     prediction = null;
     pinnedMessages = const <dynamic>[];
@@ -295,11 +305,17 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     engagementError = null;
     loadingEngagement = false;
     loadingEmotes = false;
+    _notifyListenersIfAlive();
+  }
+
+  void _notifyListenersIfAlive() {
+    if (_disposed) return;
     notifyListeners();
   }
 
   @override
   void dispose() {
+    _disposed = true;
     for (final timer in _channelPointPollingTimerByState.values) {
       timer.cancel();
     }

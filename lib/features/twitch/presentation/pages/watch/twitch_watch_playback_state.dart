@@ -1,0 +1,85 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../services/playback/twitch_media_kit_player_host.dart';
+import '../../watch/twitch_playback_session_controller.dart';
+import '../../watch/twitch_watch_playback_kind.dart';
+import '../twitch_watch_page.dart';
+
+// ignore_for_file: invalid_use_of_protected_member
+
+extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
+  void markOwnedPlayback({
+    required TwitchWatchPlaybackKind kind,
+    required String? mediaUri,
+  }) {
+    final safeUri = mediaUri?.trim();
+    final title = currentClipQualityClip?.title.trim().isNotEmpty == true
+        ? currentClipQualityClip!.title
+        : (currentVodQualityVideo ??
+                  activeGrowingVodVideo ??
+                  offlineVodFallbackVideo)
+              ?.title;
+    final resumeVodVideo = switch (kind) {
+      TwitchWatchPlaybackKind.liveDvr || TwitchWatchPlaybackKind.vod =>
+        currentVodQualityVideo ??
+            activeGrowingVodVideo ??
+            offlineVodFallbackVideo,
+      TwitchWatchPlaybackKind.live => activeGrowingVodVideo,
+      _ => null,
+    };
+    TwitchPlaybackSessionController.instance.setPlayback(
+      kind: safeUri == null || safeUri.isEmpty
+          ? TwitchWatchPlaybackKind.none
+          : kind,
+      mediaUri: safeUri,
+      metadata: widget.resolvedInitialMetadata.copyWith(
+        channelLogin: channelLogin,
+        streamTitle: title,
+      ),
+      activeDvrVideo: activeGrowingVodVideo,
+      vodVideo: resumeVodVideo,
+      clip: kind == TwitchWatchPlaybackKind.clip
+          ? currentClipQualityClip
+          : null,
+      vodRatio: kind == TwitchWatchPlaybackKind.liveDvr
+          ? watchPorts.player.runtime.liveDvrBridgeTimelineRatio
+          : activeGrowingVodVideo != null
+          ? 1.0
+          : null,
+      preferVodReplayChat: preferVodReplayChat,
+    );
+  }
+
+  void clearOwnedPlayback() {
+    TwitchPlaybackSessionController.instance.clear();
+  }
+
+  TwitchPlaybackSessionState? buildPlaybackSnapshot() {
+    final state = TwitchPlaybackSessionController.instance.playableState;
+    if (state == null) return null;
+    final mediaUri = state.mediaUri.trim();
+    final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+    if (currentUri != mediaUri) {
+      debugPrint(
+        '[WatchPlaybackState] skip mini snapshot because owner uri is stale: '
+        'owned=$mediaUri current=$currentUri',
+      );
+      return null;
+    }
+
+    return state;
+  }
+
+  TwitchWatchPlaybackKind get currentPlaybackKind {
+    if (currentClipQualityClip != null) return TwitchWatchPlaybackKind.clip;
+    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+      return TwitchWatchPlaybackKind.liveDvr;
+    }
+    if (watchPorts.player.runtime.usingExternalVodPlayback ||
+        offlineVodFallbackVideo != null ||
+        preferVodReplayChat) {
+      return TwitchWatchPlaybackKind.vod;
+    }
+    return TwitchWatchPlaybackKind.live;
+  }
+}

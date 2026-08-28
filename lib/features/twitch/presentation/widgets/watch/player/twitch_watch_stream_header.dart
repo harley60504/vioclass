@@ -213,21 +213,25 @@ class _WatchStreamHeaderMainRow extends StatelessWidget {
         ],
         if (data.gameName.isNotEmpty) ...[
           SizedBox(width: compact ? 5 : 7),
-          _WatchInfoPill(
-            icon: Icons.sports_esports_rounded,
-            label: data.gameName,
-            copyText: data.gameName,
-            compact: compact,
+          Flexible(
+            child: _WatchInfoPill(
+              icon: Icons.sports_esports_rounded,
+              label: data.gameName,
+              copyText: data.gameName,
+              compact: compact,
+            ),
           ),
         ],
         if (data.languageLabel.isNotEmpty) ...[
           SizedBox(width: compact ? 5 : 7),
-          _WatchInfoPill(
-            icon: Icons.translate_rounded,
-            label: data.languageLabel,
-            copyText: data.language,
-            compact: compact,
-            maxWidth: compact ? 62 : 72,
+          Flexible(
+            child: _WatchInfoPill(
+              icon: Icons.translate_rounded,
+              label: data.languageLabel,
+              copyText: data.language,
+              compact: compact,
+              maxWidth: compact ? 62 : 72,
+            ),
           ),
         ],
       ],

@@ -1,7 +1,4 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:media_kit/media_kit.dart';
 
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
 import 'twitch_player_common_buttons.dart';
@@ -12,38 +9,27 @@ class WatchTopActionBar extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool isFollowing;
   final bool followBusy;
-  final Player player;
   final VoidCallback onBack;
+  final VoidCallback? onHome;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
-  final VoidCallback? onReload;
   final VoidCallback? onOpenChannel;
   final VoidCallback? onCreateClip;
   final bool creatingClip;
-  final VoidCallback onStop;
 
   const WatchTopActionBar({
     super.key,
     required this.metadata,
     required this.isFollowing,
     required this.followBusy,
-    required this.player,
     required this.onBack,
+    this.onHome,
     required this.onToggleFollow,
     required this.onSubscribe,
-    required this.onReload,
     this.onOpenChannel,
     this.onCreateClip,
     this.creatingClip = false,
-    required this.onStop,
   });
-
-  Future<void> _pauseThenBack() async {
-    try {
-      await player.pause();
-    } catch (_) {}
-    onBack();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +43,8 @@ class WatchTopActionBar extends StatelessWidget {
           isFollowing: isFollowing,
           followBusy: followBusy,
           metrics: metrics,
-          onBack: () => unawaited(_pauseThenBack()),
+          onBack: onBack,
+          onHome: onHome,
           onToggleFollow: onToggleFollow,
           onSubscribe: onSubscribe,
           onOpenChannel: onOpenChannel,
@@ -127,6 +114,7 @@ class _WatchTopActionButtons {
   final bool followBusy;
   final _WatchTopActionBarMetrics metrics;
   final VoidCallback onBack;
+  final VoidCallback? onHome;
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
   final VoidCallback? onOpenChannel;
@@ -139,6 +127,7 @@ class _WatchTopActionButtons {
     required this.followBusy,
     required this.metrics,
     required this.onBack,
+    required this.onHome,
     required this.onToggleFollow,
     required this.onSubscribe,
     required this.onOpenChannel,
@@ -158,6 +147,21 @@ class _WatchTopActionButtons {
       tiny: metrics.tiny,
       height: metrics.controlHeight,
       onPressed: onBack,
+    );
+  }
+
+  Widget buildHomeButton() {
+    return RoundIconButton(
+      tooltip: '回主畫面',
+      icon: Icons.home_rounded,
+      iconColor: const Color(0xFFE9D5FF),
+      backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.22),
+      borderColor: const Color(0xFFBF94FF).withValues(alpha: 0.22),
+      glowOpacity: 0.14,
+      compact: metrics.compact,
+      tiny: metrics.tiny,
+      height: metrics.controlHeight,
+      onPressed: onHome,
     );
   }
 
@@ -217,6 +221,8 @@ class _CompactWatchTopActionContent extends StatelessWidget {
       children: [
         actions.buildBackButton(),
         SizedBox(width: metrics.actionGap),
+        actions.buildHomeButton(),
+        SizedBox(width: metrics.actionGap),
         WatchCompactAvatarTile(
           metadata: metadata,
           tiny: metrics.tiny,
@@ -250,6 +256,8 @@ class _WideWatchTopActionContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         actions.buildBackButton(),
+        const SizedBox(width: 10),
+        actions.buildHomeButton(),
         const SizedBox(width: 10),
         Expanded(
           child: WatchStreamHeaderCard(

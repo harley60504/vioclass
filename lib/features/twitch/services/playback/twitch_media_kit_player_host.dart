@@ -17,32 +17,33 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 /// - Replacing only the Video widget with a placeholder restored stable 90 FPS.
 /// - Therefore the expensive / sticky part is the Flutter video surface.
 ///
-/// This host now persists:
-/// - Player
-/// - currently opened media URI
-///
-/// Each WatchPage session owns:
-/// - VideoController attached to the shared Player
-///
-/// When the WatchPage leaves, the session drops its VideoController reference so
-/// the Flutter video widget / texture surface can be detached while the Player
-/// and proxy stay warm.
-const bool _recreateVideoControllerPerWatchSession = bool.fromEnvironment(
-  'TWITCH_RECREATE_VIDEO_CONTROLLER_PER_WATCH_SESSION',
-  defaultValue: true,
-);
-
+/// This host persists the native Player and currently opened media URI.
+/// Each visible owner gets its own VideoController / texture surface so DVR,
+/// VOD, clip, and live proxy reopens do not fight over a stale surface.
 class TwitchMediaKitPlayerHost {
   static Player? _player;
   static int _refCount = 0;
   static int _generation = 0;
   static String? _currentMediaUri;
+  static String? _keepPlayingWithoutSessionUri;
   static Future<void>? _creatingPlayer;
 
   TwitchMediaKitPlayerHost._();
 
   static String? get currentMediaUri => _currentMediaUri;
   static Player? get playerOrNull => _player;
+
+  static bool get hasKeepAlivePlayback {
+    final keepUri = _keepPlayingWithoutSessionUri;
+    return keepUri != null && keepUri.isNotEmpty && keepUri == _currentMediaUri;
+  }
+
+  static void keepPlayingWithoutSession(String? uri) {
+    final safeUri = uri?.trim();
+    _keepPlayingWithoutSessionUri = safeUri == null || safeUri.isEmpty
+        ? null
+        : safeUri;
+  }
 
   static TwitchMediaKitPlayerSession acquire({
     String title = 'Twitch Raw Proxy',
@@ -157,6 +158,9 @@ class TwitchMediaKitPlayerHost {
     }
 
     if (!forceOpen && _currentMediaUri == safeUri) {
+      if (startPosition != null && !session._released) {
+        await session.player.seek(startPosition);
+      }
       if (play && !session.player.state.playing && !session._released) {
         await session.player.play();
       }
@@ -182,6 +186,13 @@ class TwitchMediaKitPlayerHost {
     final safeUri = uri.trim();
     if (safeUri.isEmpty) return;
 
+    if (_currentMediaUri == safeUri) {
+      if (play && !player.state.playing) {
+        await player.play();
+      }
+      return;
+    }
+
     await player.open(Media(safeUri), play: play);
     _currentMediaUri = safeUri;
   }
@@ -203,6 +214,7 @@ class TwitchMediaKitPlayerHost {
     if (session.generation != _generation) return;
     await session.player.stop();
     _currentMediaUri = null;
+    _keepPlayingWithoutSessionUri = null;
   }
 
   static void _release(TwitchMediaKitPlayerSession session) {
@@ -216,6 +228,8 @@ class TwitchMediaKitPlayerHost {
     // Keep the native player and current media attached after the last
     // WatchPage leaves. Re-entering a stream can resume the same local source
     // without rebuilding media_kit, but audio stays paused while off-page.
+    if (hasKeepAlivePlayback) return;
+
     final player = _player;
     if (player != null) {
       unawaited(player.pause().catchError((_) {}));
@@ -231,6 +245,7 @@ class TwitchMediaKitPlayerHost {
     final player = _player;
     _player = null;
     _currentMediaUri = null;
+    _keepPlayingWithoutSessionUri = null;
     _generation++;
 
     if (player == null) return;
@@ -296,6 +311,23 @@ class TwitchMediaKitPlayerSession {
 
   String? get currentMediaUri => TwitchMediaKitPlayerHost.currentMediaUri;
 
+  bool moveSurfaceFrom(TwitchMediaKitPlayerSession other) {
+    if (_released || other._released) return false;
+    if (other.generation != TwitchMediaKitPlayerHost._generation) {
+      return false;
+    }
+
+    final otherPlayer = other.playerOrNull;
+    final otherController = other.videoControllerOrNull;
+    if (otherPlayer == null || otherController == null) return false;
+
+    _player = otherPlayer;
+    _videoController = otherController;
+    _generation = other.generation;
+    other._detachVideoSurface();
+    return true;
+  }
+
   Future<void> ensureReady() async {
     final hostPlayer = await TwitchMediaKitPlayerHost._ensurePlayerCreated(
       _title,
@@ -304,12 +336,6 @@ class TwitchMediaKitPlayerSession {
 
     _player = hostPlayer;
     _generation = TwitchMediaKitPlayerHost._generation;
-
-    if (!_recreateVideoControllerPerWatchSession) {
-      _videoController ??=
-          await TwitchMediaKitPlayerHost._createVideoController(hostPlayer);
-      return;
-    }
 
     if (_videoController != null) return;
     if (_creatingVideoController != null) {

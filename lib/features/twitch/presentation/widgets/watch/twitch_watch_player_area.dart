@@ -38,11 +38,10 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final bool loading;
   final String? error;
   final VoidCallback onBack;
-  final VoidCallback? onReload;
+  final VoidCallback? onHome;
   final VoidCallback? onOpenChannel;
   final VoidCallback? onCreateClip;
   final bool creatingClip;
-  final VoidCallback onStop;
 
   final List<TwitchM3u8Variant>? qualityVariants;
   final TwitchM3u8Variant? currentVariant;
@@ -84,11 +83,10 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     required this.loading,
     required this.error,
     required this.onBack,
-    required this.onReload,
+    this.onHome,
     this.onOpenChannel,
     this.onCreateClip,
     this.creatingClip = false,
-    required this.onStop,
     this.qualityVariants,
     this.currentVariant,
     this.qualityBusy = false,
@@ -145,13 +143,12 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     isFollowing: isFollowing,
                     followBusy: state.effectiveFollowBusy,
                     onBack: onBack,
+                    onHome: onHome,
                     onToggleFollow: onToggleFollow,
                     onSubscribe: onSubscribe,
-                    onReload: onReload,
                     onOpenChannel: onOpenChannel,
                     onCreateClip: onCreateClip,
                     creatingClip: creatingClip,
-                    onStop: onStop,
                     player: state.player!,
                     playerRuntime: playerRuntime,
                     muted: muted,
@@ -237,9 +234,10 @@ class _WatchPlayerAreaState {
           : widget.chatVisible,
       effectiveFollowBusy: widget.followBusy || widget.relationshipBusy,
       overlayLoading:
-          widget.loading ||
-          widget.playerRuntime.loading ||
-          widget.playerRuntime.switchingQuality,
+          !playerReady &&
+          (widget.loading ||
+              widget.playerRuntime.loading ||
+              widget.playerRuntime.switchingQuality),
       effectiveQualityVariants:
           widget.qualityVariants ?? widget.playerRuntime.variants,
       effectiveCurrentVariant:

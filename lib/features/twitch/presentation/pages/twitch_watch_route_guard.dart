@@ -4,8 +4,7 @@
 //
 // Stage 139:
 // - Use Flutter's internal route visibility via RouteObserver / RouteAware.
-// - Pause only when the WatchPage route is no longer the visible route inside
-//   the app navigator: route popped or another PageRoute pushed on top.
+// - Pause only when the WatchPage route itself is popped.
 // - Do not pause on desktop window focus changes.
 // - Avoid deactivate-based guessing because deactivate can be too broad.
 
@@ -17,7 +16,9 @@ import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../navigation/twitch_route_observer.dart';
+import '../mini_player/twitch_mini_player_controller.dart';
 import 'twitch_watch_page.dart';
 
 class TwitchWatchRouteGuard extends StatefulWidget {
@@ -32,6 +33,13 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   final String? initialProfileImageUrl;
   final TwitchFollowedChannel? initialOfflineChannel;
   final TwitchDiscoveryService? initialDiscoveryService;
+  final TwitchChannelVideo? initialActiveDvrVideo;
+  final TwitchChannelVideo? initialVodVideo;
+  final TwitchChannelClip? initialClip;
+  final double? initialVodReplayRatio;
+  final bool initialPreferVodReplayChat;
+  final bool initialReuseCurrentPlayback;
+  final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
 
   const TwitchWatchRouteGuard({
     super.key,
@@ -46,6 +54,13 @@ class TwitchWatchRouteGuard extends StatefulWidget {
     this.initialProfileImageUrl,
     this.initialOfflineChannel,
     this.initialDiscoveryService,
+    this.initialActiveDvrVideo,
+    this.initialVodVideo,
+    this.initialClip,
+    this.initialVodReplayRatio,
+    this.initialPreferVodReplayChat = false,
+    this.initialReuseCurrentPlayback = false,
+    this.initialPlayerRuntime,
   });
 
   @override
@@ -94,9 +109,9 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
 
   @override
   void didPushNext() {
-    // Another full PageRoute is now above WatchPage, so the player is no longer
-    // visible in the app. Dialogs/sheets are not PageRoutes observed here.
-    _pauseBecausePlayerRouteHidden();
+    // Another PageRoute can be a VOD/Clip WatchPage using the same shared
+    // player. Keep the player alive and let the top route decide playback.
+    _pauseIssuedForCurrentLeave = false;
   }
 
   @override
@@ -107,6 +122,11 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
 
   void _pauseBecausePlayerRouteHidden() {
     if (_pauseIssuedForCurrentLeave) return;
+    if (TwitchMiniPlayerController.instance.isActiveMediaUri(
+      TwitchMediaKitPlayerHost.currentMediaUri,
+    )) {
+      return;
+    }
     _pauseIssuedForCurrentLeave = true;
     unawaited(_pauseSharedPlayer());
   }
@@ -138,6 +158,13 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         initialProfileImageUrl: widget.initialProfileImageUrl,
         initialOfflineChannel: widget.initialOfflineChannel,
         initialDiscoveryService: widget.initialDiscoveryService,
+        initialActiveDvrVideo: widget.initialActiveDvrVideo,
+        initialVodVideo: widget.initialVodVideo,
+        initialClip: widget.initialClip,
+        initialVodReplayRatio: widget.initialVodReplayRatio,
+        initialPreferVodReplayChat: widget.initialPreferVodReplayChat,
+        initialReuseCurrentPlayback: widget.initialReuseCurrentPlayback,
+        initialPlayerRuntime: widget.initialPlayerRuntime,
       ),
     );
   }

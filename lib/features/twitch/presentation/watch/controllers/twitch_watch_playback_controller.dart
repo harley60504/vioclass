@@ -49,6 +49,51 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     }
   }
 
+  Future<void> openMedia({
+    required String uri,
+    bool play = true,
+    bool forceOpen = true,
+    Duration? startPosition,
+    bool waitForSettle = false,
+    bool showLoading = false,
+  }) async {
+    if (showLoading) {
+      loadingPlayer = true;
+      notifyListeners();
+    }
+    playerError = null;
+
+    try {
+      final nextUri = uri.trim();
+      await playerPort.services.playerSession.openOrResume(
+        uri: nextUri,
+        play: play,
+        forceOpen: forceOpen,
+        startPosition: startPosition,
+      );
+      await applyPlayerVolume();
+      if (waitForSettle) {
+        await waitForInitialPlaybackSettle();
+      }
+    } catch (error) {
+      playerError = error.toString();
+      notifyListeners();
+      rethrow;
+    } finally {
+      if (showLoading) {
+        loadingPlayer = false;
+      }
+      notifyListeners();
+    }
+  }
+
+  bool isCurrentPlaybackSource(String uri) {
+    final currentUri = playerPort.services.playerSession.currentMediaUri
+        ?.trim();
+    final nextUri = uri.trim();
+    return currentUri != null && currentUri.isNotEmpty && currentUri == nextUri;
+  }
+
   void setError(String? message) {
     playerError = message;
     notifyListeners();

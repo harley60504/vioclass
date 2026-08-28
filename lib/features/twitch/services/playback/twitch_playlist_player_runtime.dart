@@ -113,7 +113,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       (_bridgeProxy ?? _sharedBridgeProxy)?.isLiveMode ?? false;
   double? get liveDvrBridgeTimelineRatio =>
       (_bridgeProxy ?? _sharedBridgeProxy)?.timelineRatio;
-  Duration? get liveDvrBridgeDuration => _bridgeProxy?.latestDuration;
+  Duration? get liveDvrBridgeDuration =>
+      (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration;
   bool get usingExternalVodPlayback => _usingExternalVodPlayback;
   bool get hasWarmLiveDvrBridge => _sharedBridgeProxy?.isRunning ?? false;
 

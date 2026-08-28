@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../../settings/twitch_player_settings_controller.dart';
 import 'twitch_player_common_buttons.dart';
 
 class AndroidPipButton extends StatefulWidget {
@@ -19,6 +21,7 @@ class AndroidPipButton extends StatefulWidget {
 class _AndroidPipButtonState extends State<AndroidPipButton> {
   final TwitchAndroidPipController _pip = TwitchAndroidPipController.instance;
   bool _available = Platform.isAndroid;
+  bool _enabled = true;
   bool _checking = false;
 
   @override
@@ -30,14 +33,22 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
   Future<void> _refreshAvailability() async {
     if (!Platform.isAndroid || _checking) return;
     _checking = true;
+    final prefs = await SharedPreferences.getInstance();
     final available = await _pip.isPictureInPictureAvailable();
     _checking = false;
     if (!mounted) return;
-    setState(() => _available = available);
+    setState(() {
+      _available = available;
+      _enabled =
+          prefs.getBool(
+            TwitchPlayerSettingsController.androidPipEnabledPreferenceKey,
+          ) ??
+          true;
+    });
   }
 
   Future<void> _enterPip() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid || !_enabled) return;
     final entered = await _pip.enterPictureInPicture(
       aspectRatioWidth: 16,
       aspectRatioHeight: 9,
@@ -51,7 +62,9 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
 
   @override
   Widget build(BuildContext context) {
-    if (!Platform.isAndroid || !_available) return const SizedBox.shrink();
+    if (!Platform.isAndroid || !_available || !_enabled) {
+      return const SizedBox.shrink();
+    }
 
     return PlainIconButton(
       tooltip: '子母畫面',

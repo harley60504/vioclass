@@ -103,6 +103,7 @@ class TwitchWatchServices {
 
   factory TwitchWatchServices.create({
     String playerTitle = 'Twitch Raw Proxy',
+    TwitchPlaylistPlayerRuntime? playerRuntime,
   }) {
     final apiClient = TwitchApiClient();
     final authService = TwitchAuthService(apiClient: apiClient);
@@ -138,7 +139,8 @@ class TwitchWatchServices {
       rawMediaAccessTokenProvider: dropsAuthService.getToken,
       rawMediaClientIdProvider: () async => dropsAuthService.dropsClientId,
     );
-    final playerRuntime = TwitchPlaylistPlayerRuntime(playbackApi: playbackApi);
+    final effectivePlayerRuntime =
+        playerRuntime ?? TwitchPlaylistPlayerRuntime(playbackApi: playbackApi);
     final chatStartupApi = TwitchChatStartupApiService(gql: publicWebGqlApi);
     final recentMessagesApi = TwitchRecentMessagesApiService(client: apiClient);
     final thirdPartyEmotes = TwitchThirdPartyEmoteCacheService(
@@ -240,7 +242,7 @@ class TwitchWatchServices {
     );
     final player = TwitchWatchPlayerServices(
       playbackApi: playbackApi,
-      playerRuntime: playerRuntime,
+      playerRuntime: effectivePlayerRuntime,
       playerSession: playerSession,
     );
     final chat = TwitchWatchChatServices(
@@ -279,7 +281,7 @@ class TwitchWatchServices {
       specialAndroidGqlApi: specialAndroidGqlApi,
       playbackApi: playbackApi,
       clipApi: clipApi,
-      playerRuntime: playerRuntime,
+      playerRuntime: effectivePlayerRuntime,
       chatStartupApi: chatStartupApi,
       recentMessagesApi: recentMessagesApi,
       thirdPartyEmotes: thirdPartyEmotes,
