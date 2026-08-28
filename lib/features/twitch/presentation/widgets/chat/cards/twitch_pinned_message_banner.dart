@@ -182,7 +182,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                                   fontSize: metaFontSize,
                                   height: 1.1,
                                   fontWeight: TwitchUiFontWeight.heavy,
-                                  letterSpacing: 0.35,
+                                  letterSpacing: 0,
                                 ),
                               ),
                             ),

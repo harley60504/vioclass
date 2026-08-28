@@ -498,7 +498,7 @@ class _TwitchDropsDeviceLoginPageState
               color: Color(0xFF5CFFB1),
               fontSize: 22,
               fontWeight: FontWeight.w900,
-              letterSpacing: 1.8,
+              letterSpacing: 0,
             ),
           ),
           const SizedBox(width: 12),

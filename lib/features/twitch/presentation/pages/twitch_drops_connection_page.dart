@@ -1677,13 +1677,13 @@ class _CurrentDropStatusCard extends StatelessWidget {
               const SizedBox(width: 9),
               const Expanded(
                 child: Text(
-                  'Currently Collecting',
+                  '正在累積',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: _kGreen,
                     fontSize: 12,
-                    letterSpacing: 1.1,
+                    letterSpacing: 0,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -1691,8 +1691,8 @@ class _CurrentDropStatusCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          _StatusDetailRow(label: 'Game', value: drop.gameName),
-          _StatusDetailRow(label: 'Campaign', value: drop.campaignName),
+          _StatusDetailRow(label: '遊戲', value: drop.gameName),
+          _StatusDetailRow(label: '活動', value: drop.campaignName),
           _StatusDetailRow(
             label: 'Current Drop',
             value: drop.displayRewardName,

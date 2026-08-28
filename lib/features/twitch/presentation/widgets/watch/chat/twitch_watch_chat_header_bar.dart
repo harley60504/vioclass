@@ -121,7 +121,7 @@ class _ConnectionBadge extends StatelessWidget {
                 color: color,
                 fontSize: 10.5,
                 fontWeight: TwitchUiFontWeight.heavy,
-                letterSpacing: 0.2,
+                letterSpacing: 0,
               ),
             ),
           ],

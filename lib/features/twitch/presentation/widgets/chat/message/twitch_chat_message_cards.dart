@@ -166,7 +166,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                                 color: style.accentColor,
                                 fontSize: 11 * metrics.scale,
                                 fontWeight: FontWeight.w900,
-                                letterSpacing: 0.2,
+                                letterSpacing: 0,
                               ),
                             ),
                           ),

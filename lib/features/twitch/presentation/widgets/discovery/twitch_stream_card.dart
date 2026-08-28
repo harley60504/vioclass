@@ -252,12 +252,12 @@ class _LiveBadge extends StatelessWidget {
         ],
       ),
       child: const Text(
-        'LIVE',
+        '直播',
         style: TextStyle(
           color: Colors.white,
           fontSize: 10.5,
           fontWeight: FontWeight.w900,
-          letterSpacing: 0.3,
+          letterSpacing: 0,
         ),
       ),
     );

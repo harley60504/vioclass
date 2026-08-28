@@ -349,7 +349,7 @@ class _LiveEdgeButton extends StatelessWidget {
                     color: enabled ? foreground : Colors.white24,
                     fontSize: compact ? 10 : 11,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 0.2,
+                    letterSpacing: 0,
                   ),
                 ),
               ],
