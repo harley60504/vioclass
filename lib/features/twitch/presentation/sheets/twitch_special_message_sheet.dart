@@ -490,7 +490,10 @@ class _BadgeChoice extends StatelessWidget {
               width: 28,
               height: 28,
               child: busy
-                  ? const CircularProgressIndicator(strokeWidth: 2)
+                  ? const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: TwitchUiColors.primarySoft,
+                    )
                   : imageUrl == null || imageUrl.isEmpty
                   ? const Icon(
                       Icons.workspace_premium_rounded,

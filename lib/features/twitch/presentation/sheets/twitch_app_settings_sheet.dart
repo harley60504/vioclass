@@ -5,6 +5,7 @@ import '../design/twitch_typography.dart';
 import '../settings/twitch_app_font_controller.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
@@ -374,7 +375,10 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: TwitchUiColors.primarySoft,
+                              ),
                             )
                           : const Icon(
                               Icons.person_rounded,
@@ -719,7 +723,10 @@ class _AppearanceSettingsPane extends StatelessWidget {
                     ? const SizedBox(
                         width: 15,
                         height: 15,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: TwitchUiColors.primarySoft,
+                        ),
                       )
                     : const Icon(Icons.upload_file_rounded, size: 17),
                 label: Text(controller.picking ? '匯入中' : '匯入字體'),
