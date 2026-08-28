@@ -50,7 +50,7 @@ class _TwitchDropsWebViewLoginPageState
   late final TextEditingController _manualTextController;
 
   String _state = '';
-  String _statusText = '準備開啟 Drops / Android WebView OAuth...';
+  String _statusText = '準備開啟 Drops / Android 授權頁...';
   String? _errorText;
   String _currentUrlText = '';
   double _progress = 0.0;
@@ -167,7 +167,7 @@ class _TwitchDropsWebViewLoginPageState
         _errorText = errorDescription?.isNotEmpty == true
             ? '$error：$errorDescription'
             : error;
-        _statusText = 'Drops WebView OAuth 授權失敗。';
+        _statusText = 'Drops / Android 授權失敗。';
         _isLoading = false;
       });
       return;
@@ -179,8 +179,8 @@ class _TwitchDropsWebViewLoginPageState
         returnedState != _state) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'OAuth state 不一致，已阻擋這次回傳。';
-        _statusText = 'Drops WebView OAuth 回傳驗證失敗。';
+        _errorText = 'OAuth 回傳狀態不一致，已阻擋這次授權。';
+        _statusText = 'Drops / Android 授權驗證失敗。';
         _isLoading = false;
       });
       return;
@@ -190,8 +190,8 @@ class _TwitchDropsWebViewLoginPageState
     if (accessToken == null || accessToken.trim().isEmpty) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'OAuth 回傳沒有 access_token。';
-        _statusText = '尚未取得 Drops / Android token。';
+        _errorText = 'OAuth 回傳沒有可用授權。';
+        _statusText = '尚未取得 Drops / Android 授權。';
         _isLoading = false;
       });
       return;
@@ -204,7 +204,7 @@ class _TwitchDropsWebViewLoginPageState
     if (mounted) {
       setState(() {
         _errorText = null;
-        _statusText = '已取得 token，正在驗證 Android/Drops Client-ID...';
+        _statusText = '已取得授權，正在驗證 Drops / Android app...';
         _isLoading = false;
       });
     }
@@ -237,8 +237,8 @@ class _TwitchDropsWebViewLoginPageState
           expectedClientId.isNotEmpty &&
           validatedClientId != expectedClientId) {
         throw StateError(
-          '取得的 token client_id=$validatedClientId，'
-          '不是 Drops / Android client_id=$expectedClientId。',
+          '取得的授權屬於 client_id=$validatedClientId，'
+          '不是 Drops / Android app：$expectedClientId。',
         );
       }
 
@@ -254,7 +254,7 @@ class _TwitchDropsWebViewLoginPageState
       await widget.dropsAuthService.saveSession(token);
       final valid = await widget.dropsAuthService.validateToken();
       if (!valid) {
-        throw StateError('Drops token 已保存，但 validateToken() 未通過。');
+        throw StateError('Drops 授權已儲存，但驗證未通過。');
       }
 
       if (!mounted) return;
@@ -263,7 +263,7 @@ class _TwitchDropsWebViewLoginPageState
       _isCompleting = false;
       if (!mounted) return;
       setState(() {
-        _errorText = 'Drops WebView token 驗證或保存失敗：$e';
+        _errorText = 'Drops / Android 授權驗證或儲存失敗：$e';
         _statusText = '請確認這次 OAuth 使用的是 Android/Drops Client-ID。';
       });
     }
@@ -294,7 +294,7 @@ class _TwitchDropsWebViewLoginPageState
     if (mounted) {
       setState(() {
         _errorText = null;
-        _statusText = '正在重新載入 Drops WebView OAuth...';
+        _statusText = '正在重新載入 Drops / Android 授權頁...';
         _isLoading = true;
         _progress = 0.0;
         _currentUrlText = uri.toString();
@@ -404,7 +404,7 @@ class _TwitchDropsWebViewLoginPageState
                     if (!mounted) return;
                     setState(() {
                       _isLoading = true;
-                      _statusText = '正在載入 Drops WebView OAuth...';
+                      _statusText = '正在載入 Drops / Android 授權頁...';
                     });
                   },
                   onLoadStop: (controller, url) async {
@@ -414,8 +414,8 @@ class _TwitchDropsWebViewLoginPageState
                       _isLoading = false;
                       _progress = 1.0;
                       _statusText = _isCompleting
-                          ? '正在完成 Drops token 保存...'
-                          : '請在 WebView 完成 Drops / Android OAuth。';
+                          ? '正在儲存 Drops / Android 授權...'
+                          : '請在 WebView 完成 Drops / Android 授權。';
                     });
                   },
                   onUpdateVisitedHistory: (controller, url, androidIsReload) {
@@ -630,7 +630,7 @@ class _TwitchDropsWebViewLoginPageState
           ),
           const SizedBox(height: 2),
           const Text(
-            '這頁不使用 Drops device flow；會用 WebView OAuth 回傳的 token 驗證 Android/Drops Client-ID。',
+            '這頁會用 WebView OAuth 回傳的授權驗證 Android/Drops Client-ID。',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(color: Colors.white38, fontSize: 11),
