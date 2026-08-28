@@ -127,7 +127,11 @@ class _InfoCard extends StatelessWidget {
                   ),
                 )
               else
-                const Icon(Icons.live_tv, size: 16, color: Color(0xFF9146FF)),
+                const Icon(
+                  Icons.live_tv,
+                  size: 16,
+                  color: TwitchUiColors.primary,
+                ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

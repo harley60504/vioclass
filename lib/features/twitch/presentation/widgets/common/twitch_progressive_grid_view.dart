@@ -7,6 +7,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 typedef TwitchProgressiveGridItemBuilder<T> =
     Widget Function(BuildContext context, T item, int index);
 
@@ -170,7 +172,7 @@ class TwitchProgressiveGridLoadMoreTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: const Color(0xFF9146FF).withValues(alpha: 0.34),
+              color: TwitchUiColors.primary.withValues(alpha: 0.34),
             ),
           ),
           child: Column(
@@ -178,7 +180,7 @@ class TwitchProgressiveGridLoadMoreTile extends StatelessWidget {
             children: [
               const Icon(
                 Icons.expand_more_rounded,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
                 size: 22,
               ),
               const SizedBox(height: 6),
@@ -186,7 +188,7 @@ class TwitchProgressiveGridLoadMoreTile extends StatelessWidget {
                 label,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: Color(0xFFBF94FF),
+                  color: TwitchUiColors.primarySoft,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w900,
                 ),

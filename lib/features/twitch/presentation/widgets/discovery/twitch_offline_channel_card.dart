@@ -5,6 +5,7 @@ import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
 import '../../pages/twitch_channel_page.dart';
 import '../../pages/twitch_watch_page.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
 class TwitchOfflineChannelCard extends StatelessWidget {
@@ -199,9 +200,9 @@ class _OfflineActionButton extends StatelessWidget {
         icon: Icon(icon, size: 15),
         label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFFBF94FF),
+          foregroundColor: TwitchUiColors.primarySoft,
           side: BorderSide(
-            color: const Color(0xFF9146FF).withValues(alpha: 0.55),
+            color: TwitchUiColors.primary.withValues(alpha: 0.55),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 8),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
