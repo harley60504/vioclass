@@ -181,11 +181,13 @@ class _ChatModeBadge extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 10.5,
-                  fontWeight: TwitchUiFontWeight.heavy,
-                  letterSpacing: 0,
+                style: twitchChatTextStyle(
+                  TextStyle(
+                    color: color,
+                    fontSize: 10.5,
+                    fontWeight: TwitchUiFontWeight.heavy,
+                    letterSpacing: 0,
+                  ),
                 ),
               ),
             ],
@@ -276,11 +278,14 @@ class _VodReplayEmptyState extends StatelessWidget {
                     : '等待影片時間軸上的聊天...'
               : 'VOD 聊天讀取失敗：$error',
           textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Colors.white54,
-            fontWeight: FontWeight.w800,
-            height: 1.35,
-          ).copyWith(fontSize: emptyFontSize),
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: Colors.white54,
+              fontSize: emptyFontSize,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+            ),
+          ),
         ),
       ),
     );
