@@ -4,6 +4,7 @@ import '../../../../services/chat/twitch_vod_chat_replay_runtime.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../../settings/twitch_chat_appearance_controller.dart';
+import '../../../sheets/twitch_chat_message_context_sheet.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../chat/twitch_chat_text_style.dart';
 import '../../chat/twitch_chat_message_list.dart';
@@ -229,6 +230,14 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
             showTimestamp: true,
             fontScale: widget.fontScale,
             compact: true,
+            onOpenMessageContext: (message) =>
+                showTwitchChatMessageContextSheet(
+                  context: context,
+                  selectedMessage: message,
+                  messages: messages,
+                  thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                  fontScale: widget.fontScale,
+                ),
             emptyBuilder: (_) => _VodReplayEmptyState(
               error: error,
               fetching: widget.runtime.fetching,
