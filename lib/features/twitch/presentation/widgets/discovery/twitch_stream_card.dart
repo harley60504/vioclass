@@ -538,7 +538,7 @@ class _StreamerFooter extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                displayName.isEmpty ? 'Unknown streamer' : displayName,
+                displayName.isEmpty ? '未知實況主' : displayName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

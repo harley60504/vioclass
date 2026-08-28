@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/bootstrap/twitch_api_bootstrap.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchRuntimePlayerPreview extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -120,20 +121,23 @@ class _InfoCard extends StatelessWidget {
                 const SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: TwitchUiColors.primarySoft,
+                  ),
                 )
               else
                 const Icon(Icons.live_tv, size: 16, color: Color(0xFF9146FF)),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  displayName.isEmpty ? 'Runtime Player Preview' : displayName,
+                  displayName.isEmpty ? '播放器預覽' : displayName,
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
               if (viewerCount.isNotEmpty)
                 Text(
-                  '$viewerCount viewers',
+                  '$viewerCount 位觀眾',
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
             ],
