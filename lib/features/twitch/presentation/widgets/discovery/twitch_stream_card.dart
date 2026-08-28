@@ -287,7 +287,7 @@ class _ViewerBadge extends StatelessWidget {
         ],
       ),
       child: Text(
-        '${_formatViewerCount(viewerCount)} viewers',
+        '${_formatViewerCount(viewerCount)} 位觀眾',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 11,

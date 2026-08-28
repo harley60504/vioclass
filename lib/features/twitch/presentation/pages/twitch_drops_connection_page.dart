@@ -473,13 +473,13 @@ class _DropsCampaignsPage extends StatelessWidget {
       children: <Widget>[
         _SectionHeader(
           icon: Icons.desktop_windows_rounded,
-          title: 'Campaigns',
-          subtitle: '${groups.length} games・$campaignCount campaigns',
+          title: '活動',
+          subtitle: '${groups.length} 個遊戲・$campaignCount 個活動',
           color: _kPurpleLight,
         ),
         const SizedBox(height: 10),
         if (groups.isEmpty)
-          const _SimpleInfoCard(text: '目前沒有可顯示的 Drops campaign。')
+          const _SimpleInfoCard(text: '目前沒有可顯示的 Drops 活動。')
         else
           _CampaignGamesTable(
             groups: groups,
@@ -661,8 +661,8 @@ class _CampaignGameGridCard extends StatelessWidget {
     );
     final color = active ? _kGreen : _kPurpleLight;
     final badgeText = group.readyDrops > 0
-        ? '${group.readyDrops} ready'
-        : '${group.campaigns.length} campaigns';
+        ? '${group.readyDrops} 個可領取'
+        : '${group.campaigns.length} 個活動';
     return Material(
       color: _kPanel,
       borderRadius: BorderRadius.circular(12),
@@ -721,7 +721,7 @@ class _CampaignGameGridCard extends StatelessWidget {
                         Expanded(
                           child: _CampaignGridMetric(
                             value: group.campaigns.length.toString(),
-                            label: 'Campaigns',
+                            label: '活動',
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -735,7 +735,7 @@ class _CampaignGameGridCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      active ? 'Active' : 'Upcoming',
+                      active ? '進行中' : '即將開始',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -878,7 +878,7 @@ class _CampaignGameDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${group.campaigns.length} campaigns・${group.totalDrops} drops',
+                        '${group.campaigns.length} 個活動・${group.totalDrops} 個 Drops',
                         style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 12,
@@ -1023,7 +1023,7 @@ class _CampaignDetailBody extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: Text(
-                campaign.name.isEmpty ? 'Untitled campaign' : campaign.name,
+                campaign.name.isEmpty ? '未命名活動' : campaign.name,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -1035,7 +1035,7 @@ class _CampaignDetailBody extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _MiniBadge(
-              text: campaign.status.isEmpty ? 'UNKNOWN' : campaign.status,
+              text: _formatCampaignStatus(campaign.status),
               color: accent,
             ),
             const SizedBox(width: 6),
@@ -1053,10 +1053,10 @@ class _CampaignDetailBody extends StatelessWidget {
           runSpacing: 8,
           children: <Widget>[
             _MiniBadge(text: campaign.gameName, color: _kPurpleLight),
-            _MiniBadge(text: '${sortedDrops.length} drops', color: _kGold),
+            _MiniBadge(text: '${sortedDrops.length} 個 Drops', color: _kGold),
             if (campaign.allowedChannels.isNotEmpty)
               _MiniBadge(
-                text: '${campaign.allowedChannels.length} channels',
+                text: '${campaign.allowedChannels.length} 個頻道',
                 color: Colors.lightBlueAccent,
               ),
             if (campaign.startAt != null)
@@ -1115,7 +1115,7 @@ class _CampaignDetailBody extends StatelessWidget {
         const SizedBox(height: 14),
         if (sortedDrops.isEmpty)
           const Text(
-            '這個 campaign 沒有可顯示的 Drops。',
+            '這個活動沒有可顯示的 Drops。',
             style: TextStyle(color: Colors.white54),
           )
         else
@@ -1425,10 +1425,10 @@ class _InventoryGameRow extends StatelessWidget {
         ? _kGreen
         : _kPurpleLight;
     final badgeText = group.readyDrops > 0
-        ? '${group.readyDrops} ready'
+        ? '${group.readyDrops} 個可領取'
         : complete
-        ? 'completed'
-        : '${group.inProgressDrops} in progress';
+        ? '已完成'
+        : '${group.inProgressDrops} 個進行中';
 
     return Material(
       color: _kPanel,
@@ -1466,7 +1466,7 @@ class _InventoryGameRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${group.campaignCount} campaign・${group.claimedDrops}/${group.totalDrops} drops claimed',
+                      '${group.campaignCount} 個活動・已領取 ${group.claimedDrops}/${group.totalDrops} 個 Drops',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -2015,7 +2015,7 @@ class _StatusDetailRow extends StatelessWidget {
           ),
           Expanded(
             child: Text(
-              value.isEmpty ? 'Unknown' : value,
+              value.isEmpty ? '未知' : value,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.right,
@@ -2052,7 +2052,7 @@ class _IdleStatusCard extends StatelessWidget {
           Icon(Icons.extension_rounded, color: Colors.white38, size: 34),
           SizedBox(height: 12),
           Text(
-            'Not currently earning any drops.',
+            '目前沒有正在累積的 Drops。',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white70,
@@ -2259,10 +2259,23 @@ String _formatNumber(int? value) {
 }
 
 String _formatDateTime(DateTime? value) {
-  if (value == null) return 'Unknown';
+  if (value == null) return '未知';
   final local = value.toLocal();
   String two(int number) => number.toString().padLeft(2, '0');
   return '${local.year}/${two(local.month)}/${two(local.day)} ${two(local.hour)}:${two(local.minute)}';
+}
+
+String _formatCampaignStatus(String status) {
+  switch (status.trim().toUpperCase()) {
+    case 'ACTIVE':
+      return '進行中';
+    case 'UPCOMING':
+      return '即將開始';
+    case 'EXPIRED':
+      return '已結束';
+    default:
+      return '未知狀態';
+  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -2438,7 +2451,7 @@ class _CampaignDropsContent extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${campaign.gameName}｜${sortedDrops.length} drops',
+                    '${campaign.gameName}｜${sortedDrops.length} 個 Drops',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2452,7 +2465,7 @@ class _CampaignDropsContent extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             _MiniBadge(
-              text: campaign.status.isEmpty ? 'UNKNOWN' : campaign.status,
+              text: _formatCampaignStatus(campaign.status),
               color: campaign.status.toUpperCase() == 'ACTIVE'
                   ? _kGreen
                   : _kGold,
@@ -2469,7 +2482,7 @@ class _CampaignDropsContent extends StatelessWidget {
         const SizedBox(height: 12),
         if (sortedDrops.isEmpty)
           const Text(
-            '這個 campaign 沒有 time based drops。',
+            '這個活動沒有可顯示的累積型 Drops。',
             style: TextStyle(color: Colors.white54),
           )
         else
