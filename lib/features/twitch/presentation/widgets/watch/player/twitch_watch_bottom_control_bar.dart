@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
 import 'twitch_live_playback_strip.dart';
 import 'twitch_player_common_buttons.dart';
@@ -668,7 +669,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                         children: [
                           const Icon(
                             Icons.timeline_rounded,
-                            color: Color(0xFFBF94FF),
+                            color: TwitchUiColors.primarySoft,
                             size: 17,
                           ),
                           const SizedBox(width: 7),

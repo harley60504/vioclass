@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
 
 class WatchCompactAvatarTile extends StatelessWidget {
@@ -468,7 +469,7 @@ class _WatchInfoPill extends StatelessWidget {
                 Icon(
                   icon,
                   size: compact ? 13 : 15,
-                  color: const Color(0xFFBF94FF),
+                  color: TwitchUiColors.primarySoft,
                 ),
                 SizedBox(width: compact ? 4 : 5),
                 Flexible(

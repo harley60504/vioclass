@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 import 'twitch_player_common_buttons.dart';
 import 'twitch_watch_stream_header.dart';
 import 'twitch_watch_top_buttons.dart';
@@ -156,7 +157,7 @@ class _WatchTopActionButtons {
       icon: Icons.home_rounded,
       iconColor: const Color(0xFFE9D5FF),
       backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.22),
-      borderColor: const Color(0xFFBF94FF).withValues(alpha: 0.22),
+      borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.22),
       glowOpacity: 0.14,
       compact: metrics.compact,
       tiny: metrics.tiny,
