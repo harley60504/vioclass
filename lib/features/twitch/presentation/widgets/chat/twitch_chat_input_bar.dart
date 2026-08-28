@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../theme/twitch_ui_tokens.dart';
+import 'twitch_chat_text_style.dart';
 
 class TwitchChatInputBar extends StatelessWidget {
   final TextEditingController controller;
@@ -128,11 +129,13 @@ class _SelfDrawnInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textStyle = TextStyle(
-      color: enabled ? Colors.white : Colors.white38,
-      fontSize: fontSize,
-      height: lineHeight,
-      fontWeight: FontWeight.w700,
+    final textStyle = twitchChatTextStyle(
+      TextStyle(
+        color: enabled ? Colors.white : Colors.white38,
+        fontSize: fontSize,
+        height: lineHeight,
+        fontWeight: FontWeight.w700,
+      ),
     );
 
     return GestureDetector(
@@ -267,11 +270,13 @@ class _SelfDrawnSendButton extends StatelessWidget {
                       Text(
                         '送出',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: foreground,
-                          fontSize: 14,
-                          height: 1.0,
-                          fontWeight: FontWeight.w900,
+                        style: twitchChatTextStyle(
+                          TextStyle(
+                            color: foreground,
+                            fontSize: 14,
+                            height: 1.0,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ],
