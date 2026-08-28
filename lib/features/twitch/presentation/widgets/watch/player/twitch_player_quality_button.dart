@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 
 class QualityButton extends StatelessWidget {
   final List<TwitchM3u8Variant> variants;
@@ -45,7 +46,7 @@ class QualityButton extends StatelessWidget {
                   child: selected
                       ? const Icon(
                           Icons.check,
-                          color: Color(0xFF9146FF),
+                          color: TwitchUiColors.primary,
                           size: 18,
                         )
                       : null,

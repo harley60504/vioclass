@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
 
 class RoundIconButton extends StatelessWidget {
@@ -108,7 +109,7 @@ class PlainIconButton extends StatelessWidget {
         onPressed: onPressed,
         icon: Icon(
           icon,
-          color: active ? const Color(0xFFBF94FF) : Colors.white,
+          color: active ? TwitchUiColors.primarySoft : Colors.white,
           size: size,
         ),
       );
@@ -125,7 +126,7 @@ class PlainIconButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(
         icon,
-        color: active ? const Color(0xFFBF94FF) : Colors.white,
+        color: active ? TwitchUiColors.primarySoft : Colors.white,
         size: size,
       ),
     );

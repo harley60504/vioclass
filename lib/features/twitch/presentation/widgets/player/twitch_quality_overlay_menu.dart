@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/playback/twitch_m3u8_variant.dart';
+import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchQualityOverlayMenu extends StatelessWidget {
   final List<TwitchM3u8Variant> variants;
@@ -54,7 +55,7 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
                   const Icon(
                     Icons.high_quality_rounded,
                     size: 19,
-                    color: Color(0xFFBF94FF),
+                    color: TwitchUiColors.primarySoft,
                   ),
                   const SizedBox(width: 8),
                   const Expanded(
@@ -98,7 +99,7 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
                               child: Text(
                                 group.title,
                                 style: const TextStyle(
-                                  color: Color(0xFFBF94FF),
+                                  color: TwitchUiColors.primarySoft,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w900,
                                 ),
@@ -198,7 +199,7 @@ class _QualityRow extends StatelessWidget {
       if (variant.resolution != null) variant.resolution!,
       if (variant.frameRate != null) '${variant.frameRate!.round()} fps',
       if (variant.bandwidth != null) _formatBitrate(variant.bandwidth!),
-      if (variant.isAudioOnly) 'audio only',
+      if (variant.isAudioOnly) '純音訊',
     ].join(' · ');
 
     return InkWell(
@@ -211,7 +212,7 @@ class _QualityRow extends StatelessWidget {
               selected
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_unchecked_rounded,
-              color: selected ? const Color(0xFFBF94FF) : Colors.white38,
+              color: selected ? TwitchUiColors.primarySoft : Colors.white38,
               size: 18,
             ),
             const SizedBox(width: 10),
