@@ -534,7 +534,7 @@ query ChannelPointsContext($channelLogin: String!) {
     final busy = _loadingStored || _runningUnifiedLogin || _loggingOut;
     final iconColor = _completeLogin
         ? Colors.greenAccent
-        : (_webGqlTokenReady ? Colors.orangeAccent : const Color(0xFF9146FF));
+        : (_webGqlTokenReady ? Colors.orangeAccent : TwitchUiColors.primary);
 
     final titleText = _completeLogin ? 'Twitch 完整登入完成' : 'Twitch 統一登入 v32';
 
@@ -752,7 +752,7 @@ class _LoginActionButtons extends StatelessWidget {
             : const Icon(Icons.auto_awesome_rounded),
         label: const Text('一鍵完成 Twitch 登入'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF9146FF),
+          backgroundColor: TwitchUiColors.primary,
           foregroundColor: Colors.white,
         ),
       ),
