@@ -872,7 +872,7 @@ class _ClipTab extends StatelessWidget {
       return _CenteredAction(
         icon: Icons.error_outline_rounded,
         title: '片段讀取失敗',
-        message: error,
+        message: '片段暫時讀取失敗，稍後再試或重新整理。',
         actionLabel: '重試',
         onPressed: onRetry,
       );
@@ -1160,7 +1160,7 @@ class _VodTab extends StatelessWidget {
       return _CenteredAction(
         icon: Icons.error_outline_rounded,
         title: 'VOD 讀取失敗',
-        message: error,
+        message: 'VOD 暫時讀取失敗，稍後再試或重新整理。',
         actionLabel: '重試',
         onPressed: onRetry,
       );
