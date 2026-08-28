@@ -8,6 +8,7 @@ import '../../../../models/discovery/twitch_live_stream.dart';
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../pages/twitch_watch_page.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../twitch_chat_text_style.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import 'twitch_chat_link_preview_models.dart';
 import 'twitch_chat_link_preview_policy.dart';
@@ -891,90 +892,94 @@ Future<void> showTwitchChatLinkPreviewSheet(
     showDragHandle: true,
     backgroundColor: const Color(0xFF141218),
     builder: (sheetContext) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: TwitchUiColors.primary.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: TwitchUiColors.primarySoft.withValues(alpha: 0.3),
+      return TwitchChatTextScope(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 6, 18, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: TwitchUiColors.primary.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: TwitchUiColors.primarySoft.withValues(
+                          alpha: 0.3,
+                        ),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.link_rounded,
+                      color: TwitchUiColors.primarySoft,
+                      size: 21,
                     ),
                   ),
-                  child: const Icon(
-                    Icons.link_rounded,
-                    color: TwitchUiColors.primarySoft,
-                    size: 21,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        uri.host.isEmpty ? 'Link preview' : uri.host,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          uri.host.isEmpty ? 'Link preview' : uri.host,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        displayUrl,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: TwitchUiColors.textMuted,
-                          fontSize: 12,
-                          height: 1.25,
-                          fontWeight: FontWeight.w700,
+                        const SizedBox(height: 3),
+                        Text(
+                          displayUrl,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: TwitchUiColors.textMuted,
+                            fontSize: 12,
+                            height: 1.25,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      Navigator.of(sheetContext).pop();
-                      await copyTwitchChatLink(context, displayUrl);
-                    },
-                    icon: const Icon(Icons.copy_rounded),
-                    label: const Text('複製'),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        await copyTwitchChatLink(context, displayUrl);
+                      },
+                      icon: const Icon(Icons.copy_rounded),
+                      label: const Text('複製'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      Navigator.of(sheetContext).pop();
-                      await openTwitchChatLink(context, displayUrl);
-                    },
-                    icon: const Icon(Icons.open_in_new_rounded),
-                    label: const Text('開啟'),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        await openTwitchChatLink(context, displayUrl);
+                      },
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('開啟'),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       );
     },

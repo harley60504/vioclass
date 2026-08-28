@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../design/twitch_breakpoints.dart';
 import '../design/twitch_typography.dart';
+import '../settings/twitch_app_font_controller.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
-enum _TwitchSettingsTab { account, chat, player }
+enum _TwitchSettingsTab { account, chat, player, appearance }
 
 Future<void> showTwitchAppSettingsSheet({
   required BuildContext context,
@@ -94,6 +95,7 @@ class _TwitchAppSettingsSheetState extends State<TwitchAppSettingsSheet> {
           _TwitchSettingsTab.player => _PlayerSettingsPane(
             controller: widget.playerSettingsController,
           ),
+          _TwitchSettingsTab.appearance => const _AppearanceSettingsPane(),
         };
 
         if (compact) {
@@ -152,6 +154,12 @@ class _SettingsTabSelector extends StatelessWidget {
         icon: Icons.play_circle_rounded,
         label: 'Player',
         description: '播放預設',
+      ),
+      const _SettingsTabMeta(
+        tab: _TwitchSettingsTab.appearance,
+        icon: Icons.palette_rounded,
+        label: 'Appearance',
+        description: '字體與外觀',
       ),
     ];
 
@@ -682,6 +690,165 @@ class _PlayerSettingsPane extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _AppearanceSettingsPane extends StatelessWidget {
+  const _AppearanceSettingsPane();
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: twitchAppFontController,
+      builder: (context, _) {
+        final controller = twitchAppFontController;
+        final choices = controller.choices;
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+          children: [
+            _SettingsSection(
+              title: 'App 字體',
+              subtitle: 'Windows 和 Android 會套用同一個選擇',
+              trailing: TextButton.icon(
+                onPressed: controller.picking
+                    ? null
+                    : controller.pickAndSelectFont,
+                icon: controller.picking
+                    ? const SizedBox(
+                        width: 15,
+                        height: 15,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file_rounded, size: 17),
+                label: Text(controller.picking ? '匯入中' : '匯入字體'),
+              ),
+              child: Column(
+                children: [
+                  for (final choice in choices) ...[
+                    _SettingsFontChoiceRow(
+                      choice: choice,
+                      selected: choice.id == controller.selectedId,
+                      onTap: () => controller.select(choice),
+                      onDelete: choice.kind == TwitchAppFontKind.custom
+                          ? () => controller.removeCustomFont(choice.family!)
+                          : null,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.08),
+                      ),
+                    ),
+                    child: Text(
+                      '預覽：聊天室中文字體、標題和按鈕會一起套用。',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.82),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SettingsFontChoiceRow extends StatelessWidget {
+  final TwitchAppFontChoice choice;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback? onDelete;
+
+  const _SettingsFontChoiceRow({
+    required this.choice,
+    required this.selected,
+    required this.onTap,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = selected ? const Color(0xFFBF94FF) : Colors.white38;
+    final subtitle = switch (choice.kind) {
+      TwitchAppFontKind.vioClass => '內建 Noto Sans TC，跨平台一致',
+      TwitchAppFontKind.system => '使用裝置預設字體',
+      TwitchAppFontKind.custom => '自訂匯入字體',
+    };
+
+    return Material(
+      color: selected
+          ? const Color(0xFF9146FF).withValues(alpha: 0.16)
+          : Colors.white.withValues(alpha: 0.04),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accent.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      choice.label,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        fontFamily: choice.kind == TwitchAppFontKind.system
+                            ? null
+                            : choice.family,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onDelete != null)
+                IconButton(
+                  tooltip: '移除字體',
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline_rounded, size: 19),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

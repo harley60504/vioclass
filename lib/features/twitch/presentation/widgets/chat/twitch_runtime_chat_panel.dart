@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../services/chat/twitch_chat_runtime.dart';
+import 'twitch_chat_text_style.dart';
 import 'twitch_runtime_message_tile.dart';
 
 class TwitchRuntimeChatPanel extends StatefulWidget {
@@ -108,93 +109,99 @@ class _TwitchRuntimeChatPanelState extends State<TwitchRuntimeChatPanel> {
         final messages = runtime.messages;
         _scheduleAutoScroll(messageCount: messages.length);
 
-        return Container(
-          color: const Color(0xFF0E0E10),
-          child: Column(
-            children: [
-              _RuntimeChatHeader(
-                runtime: runtime,
-                onReconnect: widget.onReconnect,
-              ),
-              if (runtime.error != null)
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(10),
-                  color: Colors.redAccent.withValues(alpha: 0.14),
-                  child: Text(
-                    runtime.error.toString(),
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.redAccent,
-                      fontSize: 12,
+        return TwitchChatTextScope(
+          child: Container(
+            color: const Color(0xFF0E0E10),
+            child: Column(
+              children: [
+                _RuntimeChatHeader(
+                  runtime: runtime,
+                  onReconnect: widget.onReconnect,
+                ),
+                if (runtime.error != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    color: Colors.redAccent.withValues(alpha: 0.14),
+                    child: Text(
+                      runtime.error.toString(),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-              Expanded(
-                child: Stack(
-                  children: [
-                    if (messages.isEmpty)
-                      const Center(
-                        child: Text(
-                          '等待聊天室訊息...',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        itemCount: messages.length,
-                        cacheExtent: 900,
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: true,
-                        itemBuilder: (context, index) {
-                          final message = messages[index];
+                Expanded(
+                  child: Stack(
+                    children: [
+                      if (messages.isEmpty)
+                        const Center(
+                          child: Text(
+                            '等待聊天室訊息...',
+                            style: TextStyle(color: Colors.white54),
+                          ),
+                        )
+                      else
+                        ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          itemCount: messages.length,
+                          cacheExtent: 900,
+                          addAutomaticKeepAlives: false,
+                          addRepaintBoundaries: true,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
 
-                          return RepaintBoundary(
-                            key: ValueKey<String>(
-                              message.id.isEmpty
-                                  ? '${message.receivedAt.microsecondsSinceEpoch}-$index'
-                                  : message.id,
-                            ),
-                            child: TwitchRuntimeMessageTile(message: message),
-                          );
-                        },
-                      ),
-                    Positioned(
-                      right: 12,
-                      bottom: 12,
-                      child: IgnorePointer(
-                        ignoring: _nearBottom || messages.isEmpty,
-                        child: AnimatedOpacity(
-                          opacity: !_nearBottom && messages.isNotEmpty ? 1 : 0,
-                          duration: const Duration(milliseconds: 120),
-                          child: ElevatedButton.icon(
-                            onPressed: _jumpToBottom,
-                            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                            label: const Text('最新'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF9146FF),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
+                            return RepaintBoundary(
+                              key: ValueKey<String>(
+                                message.id.isEmpty
+                                    ? '${message.receivedAt.microsecondsSinceEpoch}-$index'
+                                    : message.id,
                               ),
-                              textStyle: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w900,
+                              child: TwitchRuntimeMessageTile(message: message),
+                            );
+                          },
+                        ),
+                      Positioned(
+                        right: 12,
+                        bottom: 12,
+                        child: IgnorePointer(
+                          ignoring: _nearBottom || messages.isEmpty,
+                          child: AnimatedOpacity(
+                            opacity: !_nearBottom && messages.isNotEmpty
+                                ? 1
+                                : 0,
+                            duration: const Duration(milliseconds: 120),
+                            child: ElevatedButton.icon(
+                              onPressed: _jumpToBottom,
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                              ),
+                              label: const Text('最新'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF9146FF),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

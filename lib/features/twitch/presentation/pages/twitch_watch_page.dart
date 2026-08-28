@@ -24,6 +24,7 @@ import '../../services/chat/twitch_vod_chat_replay_runtime.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/engagement/twitch_hype_train_controller.dart';
+import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_services.dart';
@@ -164,7 +165,8 @@ class TwitchWatchPage extends StatefulWidget {
   State<TwitchWatchPage> createState() => TwitchWatchPageState();
 }
 
-class TwitchWatchPageState extends State<TwitchWatchPage> {
+class TwitchWatchPageState extends State<TwitchWatchPage>
+    with WidgetsBindingObserver {
   late final TextEditingController channelController;
   late final TextEditingController messageController;
   late final TwitchWatchSessionHandles session;
@@ -419,6 +421,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     reuseCurrentPlaybackOnNextLiveLoad = widget.initialReuseCurrentPlayback;
 
     channelController = TextEditingController(
@@ -512,6 +515,68 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(recoverWatchAfterForeground());
+    }
+  }
+
+  Future<void> recoverWatchAfterForeground() async {
+    if (!mounted) return;
+    final channel = channelLogin;
+
+    try {
+      final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+      if (currentUri != null && currentUri.isNotEmpty) {
+        await playerSession.ensureReady();
+        if (!mounted) return;
+        await preferencesController.applyPlayerVolume();
+        final isLowLatencyLive =
+            !watchPorts.player.runtime.usingLiveDvrBridge &&
+            !watchPorts.player.runtime.usingExternalVodPlayback &&
+            offlineVodFallbackVideo == null &&
+            currentClipQualityClip == null &&
+            !preferVodReplayChat;
+        if (isLowLatencyLive) {
+          await playerSession.openOrResume(
+            uri: currentUri,
+            play: true,
+            forceOpen: true,
+          );
+        }
+        final player = playerSession.playerOrNull;
+        if (player != null && !player.state.playing) {
+          await player.play();
+        }
+      } else if (!loadingPlayer && !widget.initialVodPlaybackOnly) {
+        await loadPlayer(channel, forceOpen: true);
+      }
+    } catch (error) {
+      if (mounted) {
+        debugPrint('foreground playback recovery failed: $error');
+      }
+    }
+
+    if (!mounted) return;
+    final runtime = chatController.runtime;
+    if ((runtime == null || (!runtime.connected && !runtime.connecting)) &&
+        !connectingChat) {
+      unawaited(runDeferredChatStartup(channel, watchLoadGeneration));
+    }
+
+    if (channelId != null && channelId!.trim().isNotEmpty) {
+      unawaited(
+        TwitchPredictionHermesGlobalRuntime.ensureConnected(
+          channelId: channelId,
+          viewerUserId: viewerId,
+          previousPrediction: prediction,
+        ),
+      );
+    }
+  }
+
   Future<void> primeReusedPlaybackSurface() async {
     try {
       final moved = TwitchMiniPlayerController.instance.moveActiveSurfaceInto(
@@ -537,6 +602,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage> {
   @override
   void dispose() {
     watchLoadGeneration++;
+    WidgetsBinding.instance.removeObserver(this);
     if (!handedOffToMiniPlayer) {
       unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
     }

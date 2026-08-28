@@ -6,6 +6,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
@@ -37,22 +38,26 @@ class TwitchChatMessageAuthor extends StatelessWidget {
       children: [
         Text(
           displayNameText,
-          style: TextStyle(
-            color: displayColor,
-            fontWeight: FontWeight.w900,
-            fontSize: compact
-                ? metrics.compactNameFontSize
-                : metrics.nameFontSize,
-            fontStyle: isAction ? FontStyle.italic : FontStyle.normal,
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: displayColor,
+              fontWeight: FontWeight.w900,
+              fontSize: compact
+                  ? metrics.compactNameFontSize
+                  : metrics.nameFontSize,
+              fontStyle: isAction ? FontStyle.italic : FontStyle.normal,
+            ),
           ),
         ),
         if (isFirstMessage) TwitchChatFirstMessageChip(metrics: metrics),
         Text(
           ':',
-          style: TextStyle(
-            color: Colors.white54,
-            fontWeight: FontWeight.w700,
-            fontSize: metrics.messageFontSize,
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: Colors.white54,
+              fontWeight: FontWeight.w700,
+              fontSize: metrics.messageFontSize,
+            ),
           ),
         ),
       ],

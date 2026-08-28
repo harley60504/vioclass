@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
+import 'twitch_chat_text_style.dart';
 
 class TwitchPinnedChatBar extends StatelessWidget {
   final TwitchPinnedChatMessage message;
@@ -33,10 +34,12 @@ class TwitchPinnedChatBar extends StatelessWidget {
               '$name：${message.text}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFFFFE3A3),
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+              style: twitchChatTextStyle(
+                const TextStyle(
+                  color: Color(0xFFFFE3A3),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../services/chat/twitch_vod_chat_replay_runtime.dart';
 import '../../../settings/twitch_chat_appearance_controller.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../../chat/twitch_chat_text_style.dart';
 import '../../chat/twitch_runtime_message_tile.dart';
 
 class TwitchVodReplayChatPanel extends StatefulWidget {
@@ -223,49 +224,68 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
           _scrollController.jumpTo(0);
         });
 
-        if (messages.isEmpty) {
-          final emptyFontSize = (13 * widget.fontScale)
-              .clamp(10.5, 19.0)
-              .toDouble();
-
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                error == null
-                    ? widget.runtime.fetching
-                          ? '正在讀取 VOD 聊天...'
-                          : '等待影片時間軸上的聊天...'
-                    : 'VOD 聊天讀取失敗：$error',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontWeight: FontWeight.w800,
-                  height: 1.35,
-                ).copyWith(fontSize: emptyFontSize),
-              ),
-            ),
-          );
-        }
-
-        return ListView.builder(
-          controller: _scrollController,
-          reverse: true,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: messages.length,
-          itemBuilder: (context, index) {
-            final chronologicalIndex = messages.length - 1 - index;
-            final message = messages[chronologicalIndex];
-            return TwitchRuntimeMessageTile(
-              key: ValueKey<String>(message.id),
-              message: message,
-              showTimestamp: true,
-              fontScale: widget.fontScale,
-              compact: true,
-            );
-          },
+        return TwitchChatTextScope(
+          child: messages.isEmpty
+              ? _VodReplayEmptyState(
+                  error: error,
+                  fetching: widget.runtime.fetching,
+                  fontScale: widget.fontScale,
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final chronologicalIndex = messages.length - 1 - index;
+                    final message = messages[chronologicalIndex];
+                    return TwitchRuntimeMessageTile(
+                      key: ValueKey<String>(message.id),
+                      message: message,
+                      showTimestamp: true,
+                      fontScale: widget.fontScale,
+                      compact: true,
+                    );
+                  },
+                ),
         );
       },
+    );
+  }
+}
+
+class _VodReplayEmptyState extends StatelessWidget {
+  final Object? error;
+  final bool fetching;
+  final double fontScale;
+
+  const _VodReplayEmptyState({
+    required this.error,
+    required this.fetching,
+    required this.fontScale,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final emptyFontSize = (13 * fontScale).clamp(10.5, 19.0).toDouble();
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          error == null
+              ? fetching
+                    ? '正在讀取 VOD 聊天...'
+                    : '等待影片時間軸上的聊天...'
+              : 'VOD 聊天讀取失敗：$error',
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Colors.white54,
+            fontWeight: FontWeight.w800,
+            height: 1.35,
+          ).copyWith(fontSize: emptyFontSize),
+        ),
+      ),
     );
   }
 }

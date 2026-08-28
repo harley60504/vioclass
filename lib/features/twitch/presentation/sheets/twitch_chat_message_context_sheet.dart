@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../widgets/chat/twitch_chat_text_style.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'chat_message_context/twitch_reply_thread_builder.dart';
 import 'chat_message_context/twitch_reply_thread_card.dart';
@@ -55,19 +56,21 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-      itemCount: entries.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        return TwitchReplyThreadMessageCard(
-          entry: entry,
-          selected: _isSelectedEntry(entry.message),
-          thirdPartyEmotes: thirdPartyEmotes,
-          fontScale: fontScale,
-        );
-      },
+    return TwitchChatTextScope(
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+        itemCount: entries.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+          return TwitchReplyThreadMessageCard(
+            entry: entry,
+            selected: _isSelectedEntry(entry.message),
+            thirdPartyEmotes: thirdPartyEmotes,
+            fontScale: fontScale,
+          );
+        },
+      ),
     );
   }
 

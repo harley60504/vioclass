@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
 class TwitchChatTimestampText extends StatelessWidget {
@@ -20,10 +21,12 @@ class TwitchChatTimestampText extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       formatTwitchChatMessageTime(time),
-      style: TextStyle(
-        color: Colors.white38,
-        fontSize: metrics.metaFontSize,
-        fontWeight: FontWeight.w700,
+      style: twitchChatTextStyle(
+        TextStyle(
+          color: Colors.white38,
+          fontSize: metrics.metaFontSize,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -49,10 +52,12 @@ class TwitchChatTimestampChip extends StatelessWidget {
       ),
       child: Text(
         formatTwitchChatMessageTime(time),
-        style: TextStyle(
-          color: Colors.white60,
-          fontSize: metrics.chipFontSize,
-          fontWeight: FontWeight.w800,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: Colors.white60,
+            fontSize: metrics.chipFontSize,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );

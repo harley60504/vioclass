@@ -12,6 +12,7 @@ import '../../../services/auth/twitch_drops_auth_service.dart';
 import '../../../services/chat/twitch_badge_cache_service.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../../services/special_actions/twitch_viewer_special_message_runtime.dart';
 import '../twitch_watch_feature_ports.dart';
 
@@ -41,6 +42,7 @@ class TwitchWatchChatController extends ChangeNotifier {
   TwitchPendingSpecialMessage? pendingSpecialMessage;
   TwitchViewerSpecialMessagesSnapshotStage251? specialMessagesSnapshot;
   bool loadingSpecialMessages = false;
+  StreamSubscription<TwitchCommunityRedemptionEvent>? _redemptionSubscription;
 
   TwitchWatchChatController({
     required this.authService,
@@ -85,6 +87,7 @@ class TwitchWatchChatController extends ChangeNotifier {
       );
 
       runtime = nextRuntime;
+      _ensureRedemptionSubscription();
       viewerLogin = validation.login;
       resolvedViewerId = validation.userId;
       onViewerResolved(viewerLogin, resolvedViewerId);
@@ -106,6 +109,33 @@ class TwitchWatchChatController extends ChangeNotifier {
       connectingChat = false;
       notifyListeners();
     }
+  }
+
+  void _ensureRedemptionSubscription() {
+    _redemptionSubscription ??= TwitchPredictionHermesRealtimeBus
+        .redemptionStream
+        .listen(_handleCommunityRedemption);
+  }
+
+  void _handleCommunityRedemption(TwitchCommunityRedemptionEvent redemption) {
+    final activeRuntime = runtime;
+    if (activeRuntime == null) return;
+
+    final activeChannelId = channelId()?.trim();
+    final eventChannelId = redemption.channelId?.trim();
+    if (activeChannelId != null &&
+        activeChannelId.isNotEmpty &&
+        eventChannelId != null &&
+        eventChannelId.isNotEmpty &&
+        activeChannelId != eventChannelId) {
+      return;
+    }
+
+    if (redemption.isInputRequired && redemption.userInput.trim().isNotEmpty) {
+      return;
+    }
+
+    activeRuntime.injectRedemptionMessage(redemption);
   }
 
   Future<void> sendMessage(String message) async {
@@ -365,6 +395,7 @@ class TwitchWatchChatController extends ChangeNotifier {
   @override
   void dispose() {
     unawaited(disposeRuntime());
+    unawaited(_redemptionSubscription?.cancel());
     super.dispose();
   }
 }

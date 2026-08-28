@@ -12,7 +12,43 @@ typedef TwitchHermesPredictionHandler =
     void Function(TwitchPredictionSnapshot prediction);
 
 typedef TwitchHermesBalanceHandler = void Function(int balance);
+typedef TwitchHermesRedemptionHandler =
+    void Function(TwitchCommunityRedemptionEvent redemption);
 typedef TwitchHermesStatusHandler = void Function(String status);
+
+class TwitchCommunityRedemptionEvent {
+  final String? channelId;
+  final String redemptionId;
+  final String userId;
+  final String userLogin;
+  final String userName;
+  final String rewardId;
+  final String rewardTitle;
+  final int rewardCost;
+  final String rewardPrompt;
+  final bool isInputRequired;
+  final String userInput;
+  final String backgroundColor;
+  final String imageUrl;
+
+  const TwitchCommunityRedemptionEvent({
+    required this.channelId,
+    required this.redemptionId,
+    required this.userId,
+    required this.userLogin,
+    required this.userName,
+    required this.rewardId,
+    required this.rewardTitle,
+    required this.rewardCost,
+    required this.rewardPrompt,
+    required this.isInputRequired,
+    required this.userInput,
+    required this.backgroundColor,
+    required this.imageUrl,
+  });
+
+  bool get hasVisibleReward => rewardTitle.trim().isNotEmpty;
+}
 
 class TwitchPredictionHermesRealtimeBus {
   TwitchPredictionHermesRealtimeBus._();
@@ -20,6 +56,9 @@ class TwitchPredictionHermesRealtimeBus {
   static final StreamController<TwitchPredictionSnapshot?>
   _predictionController =
       StreamController<TwitchPredictionSnapshot?>.broadcast();
+  static final StreamController<TwitchCommunityRedemptionEvent>
+  _redemptionController =
+      StreamController<TwitchCommunityRedemptionEvent>.broadcast();
 
   static TwitchPredictionSnapshot? _latestPrediction;
 
@@ -29,10 +68,20 @@ class TwitchPredictionHermesRealtimeBus {
     return _predictionController.stream;
   }
 
+  static Stream<TwitchCommunityRedemptionEvent> get redemptionStream {
+    return _redemptionController.stream;
+  }
+
   static void publishPrediction(TwitchPredictionSnapshot? prediction) {
     _latestPrediction = prediction;
     if (!_predictionController.isClosed) {
       _predictionController.add(prediction);
+    }
+  }
+
+  static void publishRedemption(TwitchCommunityRedemptionEvent redemption) {
+    if (!_redemptionController.isClosed) {
+      _redemptionController.add(redemption);
     }
   }
 }
@@ -83,6 +132,7 @@ class TwitchPredictionHermesGlobalRuntime {
       viewerUserId: _viewerUserId,
       previousPrediction: previousPrediction,
       onPrediction: TwitchPredictionHermesRealtimeBus.publishPrediction,
+      onRedemption: TwitchPredictionHermesRealtimeBus.publishRedemption,
       onStatus: (status) {},
     );
   }
@@ -105,6 +155,7 @@ class TwitchPredictionHermesRuntimeService {
   TwitchPredictionSnapshot? _lastPrediction;
   TwitchHermesPredictionHandler? _onPrediction;
   TwitchHermesBalanceHandler? _onBalance;
+  TwitchHermesRedemptionHandler? _onRedemption;
   TwitchHermesStatusHandler? _onStatus;
 
   bool get connected => _connected;
@@ -115,6 +166,7 @@ class TwitchPredictionHermesRuntimeService {
     TwitchPredictionSnapshot? previousPrediction,
     TwitchHermesPredictionHandler? onPrediction,
     TwitchHermesBalanceHandler? onBalance,
+    TwitchHermesRedemptionHandler? onRedemption,
     TwitchHermesStatusHandler? onStatus,
     String clientId = TwitchApiConstants.twitchWebClientId,
   }) async {
@@ -138,6 +190,7 @@ class TwitchPredictionHermesRuntimeService {
     }
     _onPrediction = onPrediction;
     _onBalance = onBalance;
+    _onRedemption = onRedemption;
     _onStatus = onStatus;
 
     try {
@@ -171,6 +224,7 @@ class TwitchPredictionHermesRuntimeService {
       if (generation != _generation) return;
 
       _subscribe('predictions-channel-v1.$safeChannelId');
+      _subscribe('community-points-channel-v1.$safeChannelId');
       if (_viewerUserId != null) {
         _subscribe('predictions-user-v1.$_viewerUserId');
         _subscribe('community-points-user-v1.$_viewerUserId');
@@ -188,6 +242,10 @@ class TwitchPredictionHermesRuntimeService {
     _generation++;
     _connected = false;
     _subscriptionTopics.clear();
+    _onPrediction = null;
+    _onBalance = null;
+    _onRedemption = null;
+    _onStatus = null;
 
     final subscription = _subscription;
     _subscription = null;
@@ -300,11 +358,24 @@ class TwitchPredictionHermesRuntimeService {
     final lowerTopic = topic?.toLowerCase() ?? '';
 
     if (lowerTopic.contains('community-points-user-v1') ||
+        lowerTopic.contains('community-points-channel-v1') ||
         eventType == 'points-spent' ||
+        eventType == 'reward-redeemed' ||
         eventType == 'balance-updated') {
       final balance = _readBalance(payload);
       if (balance != null) {
         _onBalance?.call(balance);
+      }
+    }
+
+    if (lowerTopic.contains('community-points-channel-v1') ||
+        eventType == 'reward-redeemed') {
+      final redemption = _readCommunityRedemption(
+        payload,
+        channelId: _readTopicChannelId(topic),
+      );
+      if (redemption != null && redemption.hasVisibleReward) {
+        _onRedemption?.call(redemption);
       }
     }
 
@@ -655,6 +726,88 @@ class TwitchPredictionHermesRuntimeService {
     return _readInt(
       payload['balance'] ?? payload['points'] ?? payload['value'],
     );
+  }
+
+  TwitchCommunityRedemptionEvent? _readCommunityRedemption(
+    Map<dynamic, dynamic> payload, {
+    required String? channelId,
+  }) {
+    final data = payload['data'];
+    final redemption = data is Map ? data['redemption'] : payload['redemption'];
+    if (redemption is! Map) return null;
+
+    final user = redemption['user'];
+    final reward = redemption['reward'];
+    final rewardTitle = _readString(_readNested(reward, 'title')) ?? '';
+    if (rewardTitle.isEmpty) return null;
+
+    return TwitchCommunityRedemptionEvent(
+      channelId: channelId ?? _readString(_readNested(redemption, 'channel_id')),
+      redemptionId:
+          _readString(redemption['id'] ?? redemption['redemption_id']) ?? '',
+      userId: _readString(_readNested(user, 'id')) ?? '',
+      userLogin: _readString(_readNested(user, 'login')) ?? '',
+      userName:
+          _readString(
+            _readNested(user, 'display_name') ??
+                _readNested(user, 'displayName'),
+          ) ??
+          _readString(_readNested(user, 'login')) ??
+          '',
+      rewardId: _readString(_readNested(reward, 'id')) ?? '',
+      rewardTitle: rewardTitle,
+      rewardCost: _readInt(_readNested(reward, 'cost')) ?? 0,
+      rewardPrompt: _readString(_readNested(reward, 'prompt')) ?? '',
+      isInputRequired:
+          _readBool(
+            _readNested(reward, 'is_user_input_required') ??
+                _readNested(reward, 'isUserInputRequired'),
+          ) ??
+          false,
+      userInput:
+          _readString(redemption['user_input'] ?? redemption['userInput']) ??
+          '',
+      backgroundColor:
+          _readString(
+            _readNested(reward, 'background_color') ??
+                _readNested(reward, 'backgroundColor'),
+          ) ??
+          '',
+      imageUrl: _readRewardImageUrl(reward),
+    );
+  }
+
+  String? _readTopicChannelId(String? topic) {
+    final clean = topic?.trim();
+    if (clean == null || clean.isEmpty) return null;
+    const prefix = 'community-points-channel-v1.';
+    final index = clean.indexOf(prefix);
+    if (index < 0) return null;
+    final value = clean.substring(index + prefix.length).trim();
+    return value.isEmpty ? null : value;
+  }
+
+  String _readRewardImageUrl(Object? reward) {
+    final image =
+        _readNested(reward, 'image') ?? _readNested(reward, 'default_image');
+    return _readString(
+          _readNested(image, 'url_4x') ??
+              _readNested(image, 'url4x') ??
+              _readNested(image, 'url_2x') ??
+              _readNested(image, 'url2x') ??
+              _readNested(image, 'url_1x') ??
+              _readNested(image, 'url1x') ??
+              _readNested(image, 'url'),
+        ) ??
+        '';
+  }
+
+  bool? _readBool(Object? value) {
+    if (value is bool) return value;
+    final text = value?.toString().trim().toLowerCase();
+    if (text == 'true' || text == '1') return true;
+    if (text == 'false' || text == '0') return false;
+    return null;
   }
 
   String? _readString(Object? value) {

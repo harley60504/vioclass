@@ -8,6 +8,7 @@ import '../../../../models/emotes/twitch_third_party_emote.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../links/twitch_chat_link_preview.dart';
+import '../twitch_chat_text_style.dart';
 import '../../shared/twitch_emote_image.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
@@ -636,37 +637,45 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
 }
 
 TextStyle _normalTextStyle(TwitchChatMessageVisualMetrics metrics) {
-  return TextStyle(
-    color: Colors.white,
-    fontSize: metrics.messageFontSize,
-    height: metrics.lineHeight,
+  return twitchChatTextStyle(
+    TextStyle(
+      color: Colors.white,
+      fontSize: metrics.messageFontSize,
+      height: metrics.lineHeight,
+    ),
   );
 }
 
 TextStyle _mentionTextStyle(TwitchChatMessageVisualMetrics metrics) {
-  return TextStyle(
-    color: const Color(0xFFD6CCEA),
-    fontSize: metrics.messageFontSize,
-    height: metrics.lineHeight,
-    fontWeight: FontWeight.w800,
+  return twitchChatTextStyle(
+    TextStyle(
+      color: const Color(0xFFD6CCEA),
+      fontSize: metrics.messageFontSize,
+      height: metrics.lineHeight,
+      fontWeight: FontWeight.w800,
+    ),
   );
 }
 
 TextStyle _linkTextStyle(TwitchChatMessageVisualMetrics metrics) {
-  return TextStyle(
-    color: const Color(0xFF8AB4F8),
-    fontSize: metrics.messageFontSize,
-    height: metrics.lineHeight,
-    decoration: TextDecoration.underline,
+  return twitchChatTextStyle(
+    TextStyle(
+      color: const Color(0xFF8AB4F8),
+      fontSize: metrics.messageFontSize,
+      height: metrics.lineHeight,
+      decoration: TextDecoration.underline,
+    ),
   );
 }
 
 TextStyle _cheermoteTextStyle(TwitchChatMessageVisualMetrics metrics) {
-  return TextStyle(
-    color: const Color(0xFFFFC857),
-    fontWeight: FontWeight.w900,
-    fontSize: metrics.messageFontSize,
-    height: metrics.lineHeight,
+  return twitchChatTextStyle(
+    TextStyle(
+      color: const Color(0xFFFFC857),
+      fontWeight: FontWeight.w900,
+      fontSize: metrics.messageFontSize,
+      height: metrics.lineHeight,
+    ),
   );
 }
 

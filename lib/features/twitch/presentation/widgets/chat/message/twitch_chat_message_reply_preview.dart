@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
+import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
 class TwitchChatMessageReplyPreview extends StatelessWidget {
@@ -95,29 +96,35 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
   }
 
   TextStyle _nameStyle() {
-    return TextStyle(
-      color: Colors.white60,
-      fontSize: metrics.metaFontSize,
-      fontWeight: FontWeight.w800,
-      height: 1.15,
+    return twitchChatTextStyle(
+      TextStyle(
+        color: Colors.white60,
+        fontSize: metrics.metaFontSize,
+        fontWeight: FontWeight.w800,
+        height: 1.15,
+      ),
     );
   }
 
   TextStyle _baseStyle() {
-    return TextStyle(
-      color: Colors.white54,
-      fontSize: metrics.metaFontSize,
-      fontWeight: FontWeight.w700,
-      height: 1.15,
+    return twitchChatTextStyle(
+      TextStyle(
+        color: Colors.white54,
+        fontSize: metrics.metaFontSize,
+        fontWeight: FontWeight.w700,
+        height: 1.15,
+      ),
     );
   }
 
   TextStyle _mentionStyle() {
-    return TextStyle(
-      color: const Color(0xFFD6CCEA),
-      fontSize: metrics.metaFontSize,
-      fontWeight: FontWeight.w900,
-      height: 1.15,
+    return twitchChatTextStyle(
+      TextStyle(
+        color: const Color(0xFFD6CCEA),
+        fontSize: metrics.metaFontSize,
+        fontWeight: FontWeight.w900,
+        height: 1.15,
+      ),
     );
   }
 }

@@ -6,6 +6,7 @@ import '../../../api/engagement/twitch_hype_train_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../../services/engagement/twitch_hype_train_controller.dart';
+import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../../services/notifications/twitch_app_notification_service.dart';
 
 class TwitchWatchEngagementController extends ChangeNotifier {
@@ -133,6 +134,17 @@ class TwitchWatchEngagementController extends ChangeNotifier {
       channelPointsSnapshot = snapshot.channelPoints;
     }
     if (snapshot.prediction != null) prediction = snapshot.prediction;
+    final realtimeChannelId =
+        snapshot.channelPoints?.channelId ?? currentChannelId;
+    if (realtimeChannelId != null && realtimeChannelId.trim().isNotEmpty) {
+      unawaited(
+        TwitchPredictionHermesGlobalRuntime.ensureConnected(
+          channelId: realtimeChannelId,
+          viewerUserId: viewerId(),
+          previousPrediction: prediction,
+        ),
+      );
+    }
     pinnedMessages = snapshot.pinnedMessages;
     engagementError = lastError?.toString();
     loadingEngagement = false;

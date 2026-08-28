@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_badges.dart';
 import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_reply_preview.dart';
@@ -51,10 +52,12 @@ class TwitchChatMessageContent extends StatelessWidget {
             child: Text(
               metadata.systemMessage!,
               textAlign: TextAlign.left,
-              style: TextStyle(
-                color: const Color(0xFFFFC857),
-                fontSize: metrics.compactMessageFontSize,
-                fontWeight: FontWeight.w700,
+              style: twitchChatTextStyle(
+                TextStyle(
+                  color: const Color(0xFFFFC857),
+                  fontSize: metrics.compactMessageFontSize,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -76,11 +79,13 @@ class TwitchChatMessageContent extends StatelessWidget {
       spans.add(
         TextSpan(
           text: '${formatTwitchChatMessageTime(message.receivedAt)} ',
-          style: TextStyle(
-            color: Colors.white38,
-            fontSize: metrics.metaFontSize,
-            fontWeight: FontWeight.w700,
-            height: metrics.lineHeight,
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: Colors.white38,
+              fontSize: metrics.metaFontSize,
+              fontWeight: FontWeight.w700,
+              height: metrics.lineHeight,
+            ),
           ),
         ),
       );
@@ -106,16 +111,18 @@ class TwitchChatMessageContent extends StatelessWidget {
     spans.add(
       TextSpan(
         text: displayNameText,
-        style: TextStyle(
-          color: displayColor,
-          fontWeight: FontWeight.w900,
-          fontSize: compact
-              ? metrics.compactNameFontSize
-              : metrics.nameFontSize,
-          fontStyle: message.metadata.isAction
-              ? FontStyle.italic
-              : FontStyle.normal,
-          height: metrics.lineHeight,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: displayColor,
+            fontWeight: FontWeight.w900,
+            fontSize: compact
+                ? metrics.compactNameFontSize
+                : metrics.nameFontSize,
+            fontStyle: message.metadata.isAction
+                ? FontStyle.italic
+                : FontStyle.normal,
+            height: metrics.lineHeight,
+          ),
         ),
       ),
     );
@@ -135,11 +142,13 @@ class TwitchChatMessageContent extends StatelessWidget {
     spans.add(
       TextSpan(
         text: ': ',
-        style: TextStyle(
-          color: Colors.white54,
-          fontWeight: FontWeight.w700,
-          fontSize: metrics.messageFontSize,
-          height: metrics.lineHeight,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: Colors.white54,
+            fontWeight: FontWeight.w700,
+            fontSize: metrics.messageFontSize,
+            height: metrics.lineHeight,
+          ),
         ),
       ),
     );
@@ -149,11 +158,13 @@ class TwitchChatMessageContent extends StatelessWidget {
       spans.add(
         TextSpan(
           text: '〔空訊息〕',
-          style: TextStyle(
-            color: Colors.white38,
-            fontSize: metrics.compactMessageFontSize,
-            fontStyle: FontStyle.italic,
-            height: metrics.lineHeight,
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: Colors.white38,
+              fontSize: metrics.compactMessageFontSize,
+              fontStyle: FontStyle.italic,
+              height: metrics.lineHeight,
+            ),
           ),
         ),
       );

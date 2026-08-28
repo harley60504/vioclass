@@ -7,6 +7,7 @@ import '../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../models/chat/twitch_chat_badge.dart';
 import '../../models/chat/twitch_chat_message.dart';
 import '../../models/chat/twitch_chat_runtime_message.dart';
+import '../engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../parsers/chat/twitch_chat_message_normalizer.dart';
 import './twitch_badge_cache_service.dart';
 import './twitch_chat_runtime_notify_batcher.dart';
@@ -157,6 +158,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       _handleReadConnectionMessage,
       onError: (Object error, StackTrace stackTrace) {
         _error = error;
+        _connected = false;
         notifyListeners();
       },
     );
@@ -166,13 +168,19 @@ class TwitchChatRuntime extends ChangeNotifier {
         _handleWriteConnectionMessage,
         onError: (Object error, StackTrace stackTrace) {
           _error = error;
+          _connected = false;
           notifyListeners();
         },
       );
     }
 
-    _rawSubscription = ircApi.rawLines.listen((_) {
+    _rawSubscription = ircApi.rawLines.listen((line) {
       _rawEventCount += 1;
+      if (line == 'DISCONNECTED' || line.startsWith('ERROR ')) {
+        _connected = false;
+        _error ??= line;
+        notifyListeners();
+      }
     });
 
     try {
@@ -606,6 +614,51 @@ class TwitchChatRuntime extends ChangeNotifier {
       notifyListeners();
       rethrow;
     }
+  }
+
+  void injectRedemptionMessage(TwitchCommunityRedemptionEvent redemption) {
+    final title = redemption.rewardTitle.trim();
+    if (title.isEmpty) return;
+
+    final userLogin = redemption.userLogin.trim().isNotEmpty
+        ? redemption.userLogin.trim().toLowerCase()
+        : redemption.userName.trim().toLowerCase();
+    final displayName = redemption.userName.trim().isNotEmpty
+        ? redemption.userName.trim()
+        : userLogin;
+    if (userLogin.isEmpty && displayName.isEmpty) return;
+
+    final id = redemption.redemptionId.trim().isNotEmpty
+        ? 'redeem-${redemption.redemptionId.trim()}'
+        : 'redeem-${redemption.rewardId.trim()}-${DateTime.now().microsecondsSinceEpoch}';
+    final rewardId = redemption.rewardId.trim().isNotEmpty
+        ? redemption.rewardId.trim()
+        : 'community-redemption';
+    final now = DateTime.now();
+
+    final source = TwitchChatMessage.synthetic(
+      channelLogin: _channelLogin,
+      userLogin: userLogin.isEmpty ? 'viewer' : userLogin,
+      displayName: displayName.isEmpty ? userLogin : displayName,
+      message: title,
+      source: TwitchChatMessageSource.synthetic,
+      tags: <String, String>{
+        'id': id,
+        'user-id': redemption.userId,
+        'display-name': displayName.isEmpty ? userLogin : displayName,
+        'color': redemption.backgroundColor.trim().isNotEmpty
+            ? redemption.backgroundColor.trim()
+            : '#9146FF',
+        'custom-reward-id': rewardId,
+        'tmi-sent-ts': now.millisecondsSinceEpoch.toString(),
+        if (redemption.rewardCost > 0)
+          'sn-reward-cost': redemption.rewardCost.toString(),
+        if (redemption.imageUrl.trim().isNotEmpty)
+          'sn-reward-image': redemption.imageUrl.trim(),
+      },
+    );
+
+    _appendRuntimeMessage(normalizer.normalize(source, receivedAt: now));
   }
 
   void _schedulePendingCleanup(_PendingOutgoingChatMessage pending) {

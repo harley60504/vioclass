@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
 class TwitchChatSmallChip extends StatelessWidget {
@@ -29,10 +30,12 @@ class TwitchChatSmallChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: const Color(0xFFBF94FF),
-          fontSize: metrics.chipFontSize,
-          fontWeight: FontWeight.w800,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: const Color(0xFFBF94FF),
+            fontSize: metrics.chipFontSize,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
@@ -57,11 +60,13 @@ class TwitchChatFirstMessageChip extends StatelessWidget {
       ),
       child: Text(
         '首聊',
-        style: TextStyle(
-          color: const Color(0xFFCBB2FF),
-          fontSize: (metrics.chipFontSize - 0.5).clamp(8.0, 12.0),
-          fontWeight: FontWeight.w800,
-          height: 1.1,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: const Color(0xFFCBB2FF),
+            fontSize: (metrics.chipFontSize - 0.5).clamp(8.0, 12.0),
+            fontWeight: FontWeight.w800,
+            height: 1.1,
+          ),
         ),
       ),
     );

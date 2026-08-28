@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../links/twitch_chat_link_preview.dart';
+import '../twitch_chat_text_style.dart';
 import '../../shared/twitch_ui_avatar.dart';
 
 class TwitchPinnedMessageBanner extends StatefulWidget {
@@ -158,11 +159,13 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                               sender,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: senderColor,
-                                fontSize: nameFontSize,
-                                height: 1.1,
-                                fontWeight: TwitchUiFontWeight.heavy,
+                              style: twitchChatTextStyle(
+                                TextStyle(
+                                  color: senderColor,
+                                  fontSize: nameFontSize,
+                                  height: 1.1,
+                                  fontWeight: TwitchUiFontWeight.heavy,
+                                ),
                               ),
                             ),
                           ),
@@ -172,12 +175,14 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                               metaText,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: TwitchUiColors.textMuted,
-                                fontSize: metaFontSize,
-                                height: 1.1,
-                                fontWeight: TwitchUiFontWeight.heavy,
-                                letterSpacing: 0.35,
+                              style: twitchChatTextStyle(
+                                TextStyle(
+                                  color: TwitchUiColors.textMuted,
+                                  fontSize: metaFontSize,
+                                  height: 1.1,
+                                  fontWeight: TwitchUiFontWeight.heavy,
+                                  letterSpacing: 0.35,
+                                ),
                               ),
                             ),
                           ),
@@ -205,18 +210,22 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                             children: buildTwitchChatLinkifiedSpans(
                               context: context,
                               text: cleanText,
-                              textStyle: TextStyle(
-                                color: const Color(0xFFF5F0FF),
-                                fontSize: bodyFontSize,
-                                height: 1.24,
-                                fontWeight: TwitchUiFontWeight.body,
+                              textStyle: twitchChatTextStyle(
+                                TextStyle(
+                                  color: const Color(0xFFF5F0FF),
+                                  fontSize: bodyFontSize,
+                                  height: 1.24,
+                                  fontWeight: TwitchUiFontWeight.body,
+                                ),
                               ),
-                              linkStyle: TextStyle(
-                                color: const Color(0xFF8AB4F8),
-                                fontSize: bodyFontSize,
-                                height: 1.24,
-                                fontWeight: FontWeight.w800,
-                                decoration: TextDecoration.underline,
+                              linkStyle: twitchChatTextStyle(
+                                TextStyle(
+                                  color: const Color(0xFF8AB4F8),
+                                  fontSize: bodyFontSize,
+                                  height: 1.24,
+                                  fontWeight: FontWeight.w800,
+                                  decoration: TextDecoration.underline,
+                                ),
                               ),
                             ),
                           ),
@@ -235,11 +244,13 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                           '點一下收合 · 長按複製',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white38,
-                            fontSize: hintFontSize,
-                            height: 1.1,
-                            fontWeight: FontWeight.w800,
+                          style: twitchChatTextStyle(
+                            TextStyle(
+                              color: Colors.white38,
+                              fontSize: hintFontSize,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],

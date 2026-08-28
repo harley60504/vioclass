@@ -2,29 +2,43 @@ import 'package:flutter/material.dart';
 
 import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
+import 'features/twitch/presentation/settings/twitch_app_font_controller.dart';
 import 'features/twitch/presentation/widgets/notifications/twitch_app_notification_overlay.dart';
 
-const List<String> _vioClassFontFallback = <String>[
-  'Noto Sans CJK TC',
-  'Noto Sans TC',
-  'Microsoft JhengHei UI',
-  'Microsoft JhengHei',
-  'PingFang TC',
-  'Heiti TC',
-  'Roboto',
-  'Arial',
-  'sans-serif',
-];
-
-class VioClassApp extends StatelessWidget {
+class VioClassApp extends StatefulWidget {
   const VioClassApp({super.key});
 
   @override
+  State<VioClassApp> createState() => _VioClassAppState();
+}
+
+class _VioClassAppState extends State<VioClassApp> {
+  @override
+  void initState() {
+    super.initState();
+    twitchAppFontController.addListener(_handleFontChanged);
+    twitchAppFontController.load();
+  }
+
+  @override
+  void dispose() {
+    twitchAppFontController.removeListener(_handleFontChanged);
+    super.dispose();
+  }
+
+  void _handleFontChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final appFontFamily = twitchAppFontController.fontFamily;
     final baseTheme = ThemeData(
       brightness: Brightness.dark,
       colorSchemeSeed: const Color(0xFF9146FF),
       scaffoldBackgroundColor: const Color(0xFF0E0E10),
+      fontFamily: appFontFamily,
+      fontFamilyFallback: TwitchAppFontController.fontFallback,
       useMaterial3: true,
     );
 
@@ -34,10 +48,12 @@ class VioClassApp extends StatelessWidget {
       navigatorObservers: <NavigatorObserver>[twitchRouteObserver],
       theme: baseTheme.copyWith(
         textTheme: baseTheme.textTheme.apply(
-          fontFamilyFallback: _vioClassFontFallback,
+          fontFamily: appFontFamily,
+          fontFamilyFallback: TwitchAppFontController.fontFallback,
         ),
         primaryTextTheme: baseTheme.primaryTextTheme.apply(
-          fontFamilyFallback: _vioClassFontFallback,
+          fontFamily: appFontFamily,
+          fontFamilyFallback: TwitchAppFontController.fontFallback,
         ),
       ),
       builder: (context, child) {
