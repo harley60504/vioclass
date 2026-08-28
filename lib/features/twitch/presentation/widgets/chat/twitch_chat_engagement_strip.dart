@@ -79,6 +79,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
             TwitchPredictionBanner(
               prediction: currentPrediction,
               onOpen: onOpenPrediction,
+              fontScale: fontScale,
             ),
           if (error != null && error!.isNotEmpty) ...[
             const SizedBox(height: 8),

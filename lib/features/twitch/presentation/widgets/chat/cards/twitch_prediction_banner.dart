@@ -9,19 +9,23 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/engagement/twitch_prediction.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../twitch_chat_text_style.dart';
 
 class TwitchPredictionBanner extends StatelessWidget {
   final TwitchPredictionSnapshot prediction;
   final VoidCallback onOpen;
+  final double fontScale;
 
   const TwitchPredictionBanner({
     super.key,
     required this.prediction,
     required this.onOpen,
+    this.fontScale = 1.0,
   });
 
   @override
   Widget build(BuildContext context) {
+    final scale = fontScale.clamp(0.82, 1.36).toDouble();
     final status = prediction.normalizedStatus.isEmpty
         ? 'ACTIVE'
         : prediction.normalizedStatus;
@@ -106,11 +110,15 @@ class TwitchPredictionBanner extends StatelessWidget {
                       prediction.title.isEmpty ? '賭盤預測' : prediction.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFFF3EAFE),
-                        fontSize: TwitchUiFontSize.cardTitle,
-                        height: 1.16,
-                        fontWeight: TwitchUiFontWeight.heavy,
+                      style: twitchChatTextStyle(
+                        TextStyle(
+                          color: const Color(0xFFF3EAFE),
+                          fontSize: (TwitchUiFontSize.cardTitle * scale)
+                              .clamp(12.5, 19.0)
+                              .toDouble(),
+                          height: 1.16,
+                          fontWeight: TwitchUiFontWeight.heavy,
+                        ),
                       ),
                     ),
                   ),
@@ -121,6 +129,7 @@ class TwitchPredictionBanner extends StatelessWidget {
                     active: active,
                     resolved: resolved,
                     canceled: canceled,
+                    fontScale: scale,
                   ),
                   const SizedBox(width: 2),
                   const Icon(
@@ -135,6 +144,7 @@ class TwitchPredictionBanner extends StatelessWidget {
                   left: left,
                   right: right,
                   totalPoints: totalPoints,
+                  fontScale: scale,
                 ),
               ],
             ],
@@ -151,6 +161,7 @@ class _PredictionStatusPill extends StatefulWidget {
   final bool active;
   final bool resolved;
   final bool canceled;
+  final double fontScale;
 
   const _PredictionStatusPill({
     required this.label,
@@ -158,6 +169,7 @@ class _PredictionStatusPill extends StatefulWidget {
     required this.active,
     required this.resolved,
     required this.canceled,
+    required this.fontScale,
   });
 
   @override
@@ -256,10 +268,14 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
         displayLabel,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: color,
-          fontSize: TwitchUiFontSize.chip,
-          fontWeight: TwitchUiFontWeight.heavy,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: color,
+            fontSize: (TwitchUiFontSize.chip * widget.fontScale)
+                .clamp(9.5, 13.5)
+                .toDouble(),
+            fontWeight: TwitchUiFontWeight.heavy,
+          ),
         ),
       ),
     );
@@ -270,11 +286,13 @@ class _PredictionSplitBar extends StatelessWidget {
   final TwitchPredictionOutcome left;
   final TwitchPredictionOutcome right;
   final int totalPoints;
+  final double fontScale;
 
   const _PredictionSplitBar({
     required this.left,
     required this.right,
     required this.totalPoints,
+    required this.fontScale,
   });
 
   @override
@@ -307,10 +325,12 @@ class _PredictionSplitBar extends StatelessWidget {
                 padding: const EdgeInsets.only(left: 10),
                 child: Text(
                   '${(leftPercent * 100).round()}%',
-                  style: const TextStyle(
-                    color: TwitchUiColors.textPrimary,
-                    fontSize: 10,
-                    fontWeight: TwitchUiFontWeight.heavy,
+                  style: twitchChatTextStyle(
+                    TextStyle(
+                      color: TwitchUiColors.textPrimary,
+                      fontSize: (10 * fontScale).clamp(9.0, 12.0).toDouble(),
+                      fontWeight: TwitchUiFontWeight.heavy,
+                    ),
                   ),
                 ),
               ),
@@ -327,10 +347,12 @@ class _PredictionSplitBar extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 10),
                 child: Text(
                   '${(rightPercent * 100).round()}%',
-                  style: const TextStyle(
-                    color: TwitchUiColors.textPrimary,
-                    fontSize: 10,
-                    fontWeight: TwitchUiFontWeight.heavy,
+                  style: twitchChatTextStyle(
+                    TextStyle(
+                      color: TwitchUiColors.textPrimary,
+                      fontSize: (10 * fontScale).clamp(9.0, 12.0).toDouble(),
+                      fontWeight: TwitchUiFontWeight.heavy,
+                    ),
                   ),
                 ),
               ),
