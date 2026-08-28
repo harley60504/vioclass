@@ -829,7 +829,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           message.contains('授權');
       if (needsLogin) {
         return TwitchLoginRequiredView(
-          statusText: message,
+          statusText: '需要先完成 Twitch 登入授權，才能讀取探索直播。',
           loading: loadingFirstPage,
           onLoginPressed: () => unawaited(widget.onLoginPressed()),
           onRetryPressed: () => unawaited(refreshStreams(clearExisting: true)),
