@@ -822,55 +822,36 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onRetry: () => unawaited(loadChannelAboutPanels()),
     );
 
-    final liveChatPanel = TwitchWatchChatPanelPortAdapter(
-      runtime: runtime,
-      viewerLogin: viewerLogin,
-      viewerId: viewerId,
-      metadata: metadata,
-      channelPoints: channelPointsSnapshot,
-      pendingSpecialMessage: pendingSpecialMessage,
-      pinnedMessages: pinnedMessages,
-      prediction: prediction,
-      hypeTrainController: hypeTrainController,
-      loadingEmotes: loadingEmotes || emoteBootstrapping,
-      loadingEngagement: loadingEngagement || engagementBootstrapping,
-      engagementError: engagementError,
-      messageController: messageController,
-      sending: sending,
-      onSend: sendMessage,
-      onOpenEmotes: openEmotePicker,
-      onRefreshEmotes: () => loadThirdPartyEmotes(forceRefresh: true),
-      onRefreshEngagement: () => refreshEngagement(showSnackOnError: true),
-      onOpenChannelPoints: openChannelPointsSheet,
-      onOpenPrediction: openPredictionBetSheet,
-      onOpenSpecialActions: openSpecialMessagesSheet,
-      onCancelPendingSpecialMessage: clearPendingSpecialMessage,
-    );
-    final liveChatPanelWithoutHeader = TwitchWatchChatPanelPortAdapter(
-      runtime: runtime,
-      viewerLogin: viewerLogin,
-      viewerId: viewerId,
-      metadata: metadata,
-      channelPoints: channelPointsSnapshot,
-      pendingSpecialMessage: pendingSpecialMessage,
-      pinnedMessages: pinnedMessages,
-      prediction: prediction,
-      hypeTrainController: hypeTrainController,
-      loadingEmotes: loadingEmotes || emoteBootstrapping,
-      loadingEngagement: loadingEngagement || engagementBootstrapping,
-      engagementError: engagementError,
-      messageController: messageController,
-      sending: sending,
-      onSend: sendMessage,
-      onOpenEmotes: openEmotePicker,
-      onRefreshEmotes: () => loadThirdPartyEmotes(forceRefresh: true),
-      onRefreshEngagement: () => refreshEngagement(showSnackOnError: true),
-      onOpenChannelPoints: openChannelPointsSheet,
-      onOpenPrediction: openPredictionBetSheet,
-      onOpenSpecialActions: openSpecialMessagesSheet,
-      onCancelPendingSpecialMessage: clearPendingSpecialMessage,
-      showHeader: false,
-    );
+    Widget buildLiveChatPanel({bool showHeader = true}) {
+      return TwitchWatchChatPanelPortAdapter(
+        runtime: runtime,
+        viewerLogin: viewerLogin,
+        viewerId: viewerId,
+        metadata: metadata,
+        channelPoints: channelPointsSnapshot,
+        pendingSpecialMessage: pendingSpecialMessage,
+        pinnedMessages: pinnedMessages,
+        prediction: prediction,
+        hypeTrainController: hypeTrainController,
+        loadingEmotes: loadingEmotes || emoteBootstrapping,
+        loadingEngagement: loadingEngagement || engagementBootstrapping,
+        engagementError: engagementError,
+        messageController: messageController,
+        sending: sending,
+        onSend: sendMessage,
+        onOpenEmotes: openEmotePicker,
+        onRefreshEmotes: () => loadThirdPartyEmotes(forceRefresh: true),
+        onRefreshEngagement: () => refreshEngagement(showSnackOnError: true),
+        onOpenChannelPoints: openChannelPointsSheet,
+        onOpenPrediction: openPredictionBetSheet,
+        onOpenSpecialActions: openSpecialMessagesSheet,
+        onCancelPendingSpecialMessage: clearPendingSpecialMessage,
+        showHeader: showHeader,
+      );
+    }
+
+    final liveChatPanel = buildLiveChatPanel();
+    final liveChatPanelWithoutHeader = buildLiveChatPanel(showHeader: false);
     final chatPanel = !shouldShowVodReplayChat
         ? liveChatPanel
         : TwitchVodReplayChatPanel(
