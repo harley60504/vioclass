@@ -147,11 +147,11 @@ class _PanelSection extends StatelessWidget {
       return OutlinedButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.image_not_supported_outlined, size: 16),
-        label: const Text('About 圖片讀取失敗'),
+        label: const Text('關於圖片讀取失敗'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: const Color(0xFFBF94FF),
+          foregroundColor: TwitchUiColors.primarySoft,
           side: BorderSide(
-            color: const Color(0xFF9146FF).withValues(alpha: 0.45),
+            color: TwitchUiColors.primary.withValues(alpha: 0.45),
           ),
         ),
       );
@@ -159,7 +159,7 @@ class _PanelSection extends StatelessWidget {
 
     if (panels.isEmpty && socialLinks.isEmpty) {
       return const Text(
-        '這個頻道目前沒有 About 面板。',
+        '這個頻道目前沒有關於面板。',
         style: TextStyle(
           color: Colors.white38,
           fontSize: 12.5,
@@ -180,12 +180,12 @@ class _PanelSection extends StatelessWidget {
             children: <Widget>[
               const Icon(
                 Icons.dashboard_customize_rounded,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
                 size: 18,
               ),
               const SizedBox(width: 8),
               Text(
-                'About 面板',
+                '關於面板',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -231,7 +231,11 @@ class _SocialLinkSection extends StatelessWidget {
       children: <Widget>[
         const Row(
           children: <Widget>[
-            Icon(Icons.hub_outlined, color: Color(0xFFBF94FF), size: 18),
+            Icon(
+              Icons.hub_outlined,
+              color: TwitchUiColors.primarySoft,
+              size: 18,
+            ),
             SizedBox(width: 8),
             Text(
               '社群連結',
@@ -376,7 +380,7 @@ class _PanelCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         const Icon(
                           Icons.open_in_new_rounded,
-                          color: Color(0xFFBF94FF),
+                          color: TwitchUiColors.primarySoft,
                           size: 16,
                         ),
                       ],
