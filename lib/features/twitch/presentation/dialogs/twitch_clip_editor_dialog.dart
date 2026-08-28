@@ -299,7 +299,7 @@ class _TwitchClipEditorDialogBodyState
             children: [
               const Icon(
                 Icons.movie_creation_outlined,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -456,7 +456,7 @@ class _TwitchClipEditorDialogBodyState
                                 _length < _minClipLength ||
                                     _length > _maxClipLength
                                 ? Colors.redAccent
-                                : const Color(0xFFBF94FF),
+                                : TwitchUiColors.primarySoft,
                             fontSize: 12,
                             fontWeight: FontWeight.w900,
                           ),
@@ -490,7 +490,7 @@ class _TwitchClipEditorDialogBodyState
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderSide: BorderSide(
-                                  color: Color(0xFF9146FF),
+                                  color: TwitchUiColors.primary,
                                 ),
                               ),
                               isDense: true,
