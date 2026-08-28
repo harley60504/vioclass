@@ -276,7 +276,7 @@ class _VodReplayEmptyState extends StatelessWidget {
               ? fetching
                     ? '正在讀取 VOD 聊天...'
                     : '等待影片時間軸上的聊天...'
-              : 'VOD 聊天讀取失敗：$error',
+              : 'VOD 聊天暫時讀取失敗，稍後再試。',
           textAlign: TextAlign.center,
           style: twitchChatTextStyle(
             TextStyle(
