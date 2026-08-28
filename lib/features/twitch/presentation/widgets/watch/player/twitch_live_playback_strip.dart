@@ -216,14 +216,14 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
         ? _formatDuration(duration)
         : '--:--';
     final state = buffering
-        ? 'buffering'
+        ? '緩衝中'
         : livePinned
-        ? 'live edge'
+        ? '直播最新'
         : playing
-        ? 'playing'
-        : 'paused';
+        ? '播放中'
+        : '已暫停';
 
-    return 'media_kit $state · $pos / $dur';
+    return '$state · $pos / $dur';
   }
 
   static String _formatDuration(Duration value) {
