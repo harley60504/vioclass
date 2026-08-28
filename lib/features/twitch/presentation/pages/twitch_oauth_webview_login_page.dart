@@ -884,7 +884,7 @@ query ChannelPointsContext($channelLogin: String!) {
           OutlinedButton.icon(
             onPressed: _copyAuthorizationUrl,
             icon: const Icon(Icons.copy_rounded, size: 18),
-            label: const Text('複製 OAuth URL'),
+            label: const Text('複製 OAuth 連結'),
           ),
           const Spacer(),
           Flexible(
@@ -893,7 +893,7 @@ query ChannelPointsContext($channelLogin: String!) {
                   ? (_embeddedWebViewReady
                         ? 'App 內 OAuth 頁已載入'
                         : '等待 App 內 OAuth 頁...')
-                  : (_windowOpen ? 'desktop_webview_window 已開啟' : '等待授權視窗...'),
+                  : (_windowOpen ? '桌面授權視窗已開啟' : '等待授權視窗...'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(color: Colors.white54, fontSize: 12),

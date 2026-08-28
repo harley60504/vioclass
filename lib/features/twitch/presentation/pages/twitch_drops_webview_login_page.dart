@@ -311,7 +311,7 @@ class _TwitchDropsWebViewLoginPageState
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已複製 Drops OAuth URL')));
+    ).showSnackBar(const SnackBar(content: Text('已複製 Drops OAuth 連結')));
   }
 
   Future<void> _tryManualInput() async {
@@ -610,7 +610,7 @@ class _TwitchDropsWebViewLoginPageState
               ),
               TextButton(
                 onPressed: _copyAuthorizationUrl,
-                child: const Text('複製 OAuth URL'),
+                child: const Text('複製 OAuth 連結'),
               ),
             ],
           ),

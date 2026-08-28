@@ -108,7 +108,7 @@ class _TwitchInteractionWebLoginPageState
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已複製目前 URL')));
+    ).showSnackBar(const SnackBar(content: Text('已複製目前連結')));
   }
 
   void _startProbeTimer() {
@@ -679,7 +679,7 @@ query ChannelPointsContext($channelLogin: String!) {
           OutlinedButton.icon(
             onPressed: _copyLastUrl,
             icon: const Icon(Icons.copy_rounded, size: 18),
-            label: const Text('複製 URL'),
+            label: const Text('複製連結'),
           ),
           const Spacer(),
           Flexible(
