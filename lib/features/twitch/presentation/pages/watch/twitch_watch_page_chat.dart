@@ -127,7 +127,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
               badge: badge,
             );
         if (!result.ok) {
-          showSnack('更新聊天身分失敗：${result.error}');
+          showSnack('聊天身分暫時無法更新，請稍後再試。');
           return false;
         }
         showSnack('已套用徽章 ${badge.title}');
