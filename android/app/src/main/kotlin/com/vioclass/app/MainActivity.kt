@@ -1,4 +1,4 @@
-package com.example.new_twitch_app
+package com.vioclass.app
 
 import android.content.res.Configuration
 import android.os.Build
