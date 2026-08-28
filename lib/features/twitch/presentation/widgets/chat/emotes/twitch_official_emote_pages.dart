@@ -35,11 +35,11 @@ List<TwitchOfficialEmotePage> buildTwitchOfficialEmotePages(
   final subscriptionGroups = groupTwitchOfficialEmotesByOwner(subscriptions);
 
   return <TwitchOfficialEmotePage>[
-    TwitchOfficialEmotePage(label: 'Channel', emotes: channel),
-    TwitchOfficialEmotePage(label: 'Global', emotes: global),
+    TwitchOfficialEmotePage(label: '頻道', emotes: channel),
+    TwitchOfficialEmotePage(label: '全域', emotes: global),
     for (final group in subscriptionGroups.entries)
       TwitchOfficialEmotePage(label: group.key, emotes: group.value),
-    TwitchOfficialEmotePage(label: 'Unlocked', emotes: unlocked),
+    TwitchOfficialEmotePage(label: '已解鎖', emotes: unlocked),
   ];
 }
 
@@ -82,12 +82,12 @@ String twitchOfficialEmoteOwnerLabel(TwitchOfficialEmote emote) {
   if (display.isNotEmpty) return display;
 
   final ownerId = emote.ownerId.trim();
-  if (ownerId.isNotEmpty) return 'Sub $ownerId';
+  if (ownerId.isNotEmpty) return '訂閱 $ownerId';
 
   final setId = emote.emoteSetId.trim();
-  if (setId.isNotEmpty) return 'Sub $setId';
+  if (setId.isNotEmpty) return '訂閱 $setId';
 
-  return 'Sub';
+  return '訂閱';
 }
 
 bool isStandaloneUnlockedTwitchOfficialEmote(TwitchOfficialEmote emote) {
