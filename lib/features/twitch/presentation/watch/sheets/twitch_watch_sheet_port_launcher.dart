@@ -90,7 +90,7 @@ class TwitchWatchSheetPortLauncher {
         channelId: channelPointsSnapshot()?.channelId ?? channelId(),
       );
     } catch (error) {
-      showMessage('載入忠誠點數 emote 失敗：$error');
+      showMessage('忠誠點數貼圖暫時載入失敗，稍後再試。');
       return const <TwitchChannelPointEmoteOption>[];
     }
   }
@@ -128,7 +128,7 @@ class TwitchWatchSheetPortLauncher {
   Future<void> claimCommunityPoints(String claimId) async {
     final resolvedChannelId = channelPointsSnapshot()?.channelId ?? channelId();
     if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
-      showMessage('沒有 channelId，不能領取忠誠點數。');
+      showMessage('找不到頻道資訊，暫時不能領取忠誠點數。');
       return;
     }
 
@@ -140,7 +140,7 @@ class TwitchWatchSheetPortLauncher {
       showMessage('已送出領取忠誠點數：+${result.pointsEarned}');
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
-      showMessage('領取失敗：$error');
+      showMessage('忠誠點數領取失敗，稍後再試。');
     }
   }
 
@@ -150,7 +150,7 @@ class TwitchWatchSheetPortLauncher {
   ) async {
     final resolvedChannelId = channelPointsSnapshot()?.channelId ?? channelId();
     if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
-      showMessage('沒有 channelId，不能兌換忠誠點數獎勵。');
+      showMessage('找不到頻道資訊，暫時不能兌換忠誠點數獎勵。');
       return;
     }
 
@@ -163,7 +163,7 @@ class TwitchWatchSheetPortLauncher {
       showMessage('已兌換：${result.title}');
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
-      showMessage('兌換失敗：$error');
+      showMessage('忠誠點數兌換失敗，稍後再試。');
     }
   }
 
@@ -202,7 +202,7 @@ class TwitchWatchSheetPortLauncher {
       showMessage('已送出下注：${result.outcomeTitle} · ${result.points} 點');
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
-      showMessage('下注失敗：$error');
+      showMessage('下注失敗，稍後再試。');
     }
   }
 }

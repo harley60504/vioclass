@@ -117,7 +117,7 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       showMessage(isFollowing ? '已追隨 $login' : '已取消追隨 $login');
     } catch (error) {
       relationshipError = error.toString();
-      showMessage('追隨狀態更新失敗：$error');
+      showMessage('追隨狀態更新失敗，請稍後再試。');
     } finally {
       followBusy = false;
       notifyListeners();

@@ -245,7 +245,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
       if (_disposed) return;
       twitchAppNotificationCenter.showWarning(
         title: '$pointName 領取失敗',
-        message: '${channelLogin()}：$error',
+        message: '請稍後再試，或重新整理聊天室活動。',
         duration: const Duration(seconds: 8),
       );
     } finally {

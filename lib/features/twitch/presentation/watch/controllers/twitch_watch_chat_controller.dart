@@ -158,7 +158,7 @@ class TwitchWatchChatController extends ChangeNotifier {
     try {
       await activeRuntime.sendMessage(message);
     } catch (error) {
-      showMessage('送出失敗：$error');
+      showMessage('聊天室訊息送出失敗，請稍後再試。');
       rethrow;
     } finally {
       sending = false;
