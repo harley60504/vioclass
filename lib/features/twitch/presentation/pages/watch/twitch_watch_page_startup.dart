@@ -41,7 +41,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     } catch (error) {
       if (!mounted) return;
       setState(() => loadingAuth = false);
-      showSnack('OAuth 載入失敗：$error');
+      showSnack('OAuth 暫時載入失敗，請稍後再試。');
     }
   }
 
@@ -88,7 +88,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         ),
       );
     } catch (error) {
-      if (mounted) showSnack('載入 Watch Page 失敗：$error');
+      if (mounted) showSnack('觀看頁暫時載入失敗，請稍後再試。');
     } finally {
       if (mounted && generation == watchLoadGeneration && loadingWatch) {
         setState(() => loadingWatch = false);
@@ -278,7 +278,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       } catch (error) {
         if (!isCurrentWatchTask(generation, channel)) return;
         if (widget.initialVodPlaybackOnly) {
-          showSnack('VOD 載入失敗：$error');
+          showSnack('VOD 暫時載入失敗，請稍後再試。');
           return;
         }
         final loadedVod = await loadOfflineVodFallback(
@@ -286,7 +286,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           generation: generation,
         );
         if (!loadedVod) {
-          showSnack('播放器載入失敗：$error');
+          showSnack('播放器暫時載入失敗，請稍後再試。');
         }
       }
     }

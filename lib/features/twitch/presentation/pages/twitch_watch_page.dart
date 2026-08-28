@@ -358,11 +358,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     } catch (error) {
       final message = error.toString();
       if (message.contains('Drops / Android token')) {
-        showSnack('片段剪輯失敗：請先補 Drops / Android token。');
+        showSnack('片段剪輯失敗，請先補 Drops / Android 授權。');
       } else if (_looksLikeClipDisabledError(message)) {
         showSnack('這個實況主可能沒有開放片段。');
       } else {
-        showSnack('片段剪輯失敗：$error');
+        showSnack('片段剪輯暫時失敗，稍後再試。');
       }
     } finally {
       if (mounted) setState(() => creatingClip = false);
@@ -744,7 +744,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       );
     } catch (error) {
       if (!mounted) return;
-      showSnack('頻道資訊讀取失敗：$error');
+      showSnack('頻道資訊暫時讀取失敗，稍後再試。');
     }
   }
 
@@ -809,7 +809,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onError: (message) {
         if (!mounted) return;
         playbackController.setError(message);
-        showSnack('播放器操作失敗：$message');
+        showSnack('播放器操作失敗，請稍後再試。');
       },
     );
     final belowPlayer = TwitchChannelAboutSection(
