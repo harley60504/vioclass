@@ -47,12 +47,6 @@ class TwitchRuntimePlayerPreview extends StatelessWidget {
                   gameName: gameName,
                   viewerCount: viewerCount,
                   loading: playerRuntime.loading,
-                  playlistPreview:
-                      playerRuntime.playlistUri?.toString().replaceFirst(
-                        RegExp(r'token=[^&]+'),
-                        'token=<hidden>',
-                      ) ??
-                      '',
                 ),
               ),
               if (playerRuntime.error != null)
@@ -69,12 +63,9 @@ class TwitchRuntimePlayerPreview extends StatelessWidget {
                         color: Colors.redAccent.withValues(alpha: 0.35),
                       ),
                     ),
-                    child: SelectableText(
-                      playerRuntime.error.toString(),
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 12,
-                      ),
+                    child: const Text(
+                      '播放器暫時無法載入，請稍後再試。',
+                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
                     ),
                   ),
                 ),
@@ -92,7 +83,6 @@ class _InfoCard extends StatelessWidget {
   final String gameName;
   final String viewerCount;
   final bool loading;
-  final String playlistPreview;
 
   const _InfoCard({
     required this.displayName,
@@ -100,7 +90,6 @@ class _InfoCard extends StatelessWidget {
     required this.gameName,
     required this.viewerCount,
     required this.loading,
-    required this.playlistPreview,
   });
 
   @override
@@ -158,18 +147,6 @@ class _InfoCard extends StatelessWidget {
             Text(
               gameName,
               style: const TextStyle(color: Colors.white54, fontSize: 12),
-            ),
-          ],
-          if (playlistPreview.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            SelectableText(
-              playlistPreview,
-              maxLines: 2,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontSize: 11,
-                fontFamily: 'monospace',
-              ),
             ),
           ],
         ],
