@@ -336,12 +336,12 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
         ],
         bottom: TabBar(
           controller: tabController,
-          indicatorColor: const Color(0xFF9146FF),
+          indicatorColor: TwitchUiColors.primary,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white54,
           tabs: const [
-            Tab(icon: Icon(Icons.info_outline_rounded), text: 'About'),
-            Tab(icon: Icon(Icons.movie_filter_rounded), text: 'Clips'),
+            Tab(icon: Icon(Icons.info_outline_rounded), text: '關於'),
+            Tab(icon: Icon(Icons.movie_filter_rounded), text: '片段'),
             Tab(icon: Icon(Icons.video_library_rounded), text: 'VOD'),
           ],
         ),
@@ -499,14 +499,14 @@ class _PanelSection extends StatelessWidget {
     if (panels.isEmpty && error != null && error.isNotEmpty) {
       return _InlineRetry(
         icon: Icons.image_not_supported_outlined,
-        text: 'About 圖片讀取失敗',
+        text: '關於圖片讀取失敗',
         onRetry: onRetry,
       );
     }
 
     if (panels.isEmpty) {
       return const Text(
-        '這個頻道目前沒有 About 圖片面板。',
+        '這個頻道目前沒有關於圖片面板。',
         style: TextStyle(
           color: Colors.white38,
           fontSize: 12.5,
@@ -526,12 +526,12 @@ class _PanelSection extends StatelessWidget {
           children: [
             const Icon(
               Icons.dashboard_customize_rounded,
-              color: Color(0xFFBF94FF),
+              color: TwitchUiColors.primarySoft,
               size: 18,
             ),
             const SizedBox(width: 8),
             Text(
-              'About 面板',
+              '關於面板',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -578,7 +578,11 @@ class _SocialLinkSection extends StatelessWidget {
       children: [
         const Row(
           children: [
-            Icon(Icons.hub_outlined, color: Color(0xFFBF94FF), size: 18),
+            Icon(
+              Icons.hub_outlined,
+              color: TwitchUiColors.primarySoft,
+              size: 18,
+            ),
             SizedBox(width: 8),
             Text(
               '社群連結',
@@ -723,7 +727,7 @@ class _PanelCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         const Icon(
                           Icons.open_in_new_rounded,
-                          color: Color(0xFFBF94FF),
+                          color: TwitchUiColors.primarySoft,
                           size: 16,
                         ),
                       ],
@@ -769,10 +773,8 @@ class _InlineRetry extends StatelessWidget {
       icon: Icon(icon, size: 16),
       label: Text(text),
       style: OutlinedButton.styleFrom(
-        foregroundColor: const Color(0xFFBF94FF),
-        side: BorderSide(
-          color: const Color(0xFF9146FF).withValues(alpha: 0.45),
-        ),
+        foregroundColor: TwitchUiColors.primarySoft,
+        side: BorderSide(color: TwitchUiColors.primary.withValues(alpha: 0.45)),
       ),
     );
   }
@@ -869,7 +871,7 @@ class _ClipTab extends StatelessWidget {
     if (clips.isEmpty && error != null && error.isNotEmpty) {
       return _CenteredAction(
         icon: Icons.error_outline_rounded,
-        title: 'Clips 讀取失敗',
+        title: '片段讀取失敗',
         message: error,
         actionLabel: '重試',
         onPressed: onRetry,
@@ -879,7 +881,7 @@ class _ClipTab extends StatelessWidget {
     if (clips.isEmpty) {
       return _CenteredAction(
         icon: Icons.movie_filter_outlined,
-        title: '目前沒有 Clips',
+        title: '目前沒有片段',
         message: '這個頻道沒有可顯示的精華片段。',
         actionLabel: '重新整理',
         onPressed: onRetry,
@@ -917,13 +919,16 @@ class _ClipTab extends StatelessWidget {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: TwitchUiColors.primarySoft,
+                              ),
                             )
                           : const Icon(Icons.expand_more_rounded),
                       label: Text(loadingMore ? '載入中' : '載入更多'),
                     )
                   : const Text(
-                      '已顯示目前可讀取的 Clips',
+                      '已顯示目前可讀取的片段',
                       style: TextStyle(
                         color: Colors.white38,
                         fontSize: 12,
@@ -1010,9 +1015,7 @@ class _ClipCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            clip.title.trim().isEmpty
-                                ? 'Untitled Clip'
-                                : clip.title,
+                            clip.title.trim().isEmpty ? '未命名片段' : clip.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1028,7 +1031,7 @@ class _ClipCard extends StatelessWidget {
                               Expanded(child: _ClipMetaText(clip: clip)),
                               const Icon(
                                 Icons.play_circle_outline_rounded,
-                                color: Color(0xFFBF94FF),
+                                color: TwitchUiColors.primarySoft,
                                 size: 18,
                               ),
                             ],
@@ -1101,7 +1104,7 @@ class _ClipMetaText extends StatelessWidget {
     final date = _formatDate(clip.createdAt);
     final creator = clip.creatorName.trim();
     return Text(
-      '${creator.isEmpty ? 'Clipped' : 'Clipped by $creator'}'
+      '${creator.isEmpty ? '已建立片段' : '由 $creator 建立片段'}'
       '${date.isEmpty ? '' : ' · $date'}',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -1204,7 +1207,10 @@ class _VodTab extends StatelessWidget {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: TwitchUiColors.primarySoft,
+                              ),
                             )
                           : const Icon(Icons.expand_more_rounded),
                       label: Text(loadingMore ? '載入中' : '載入更多'),
@@ -1329,7 +1335,7 @@ class _VodCard extends StatelessWidget {
                                 isGrowingArchive
                                     ? Icons.sensors_rounded
                                     : Icons.play_circle_outline_rounded,
-                                color: const Color(0xFFBF94FF),
+                                color: TwitchUiColors.primarySoft,
                                 size: 20,
                               ),
                             ],

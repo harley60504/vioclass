@@ -459,7 +459,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                               ? Icons.check_circle_rounded
                               : Icons.language_rounded,
                           color: selected
-                              ? const Color(0xFF9146FF)
+                              ? TwitchUiColors.primary
                               : Colors.white54,
                         ),
                         title: Text(label),
@@ -568,7 +568,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF9146FF),
+      color: TwitchUiColors.primary,
       onRefresh: refreshStreams,
       child: TwitchDiscoveryStreamGrid(
         controller: scrollController,
@@ -601,7 +601,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
-                    color: Color(0xFF9146FF),
+                    color: TwitchUiColors.primary,
                     strokeWidth: 2.4,
                   ),
                 ),
