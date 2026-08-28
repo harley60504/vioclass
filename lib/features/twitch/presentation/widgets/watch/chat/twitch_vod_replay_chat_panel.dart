@@ -146,10 +146,10 @@ class _ChatModeBadge extends StatelessWidget {
         : live
         ? TwitchUiColors.green
         : const Color(0xFFC084FC);
-    final label = live ? 'LIVE' : 'VOD';
+    final label = live ? '直播' : 'VOD';
 
     return Tooltip(
-      message: live ? '切換到 VOD 聊天回放' : '切換到 Live 聊天室',
+      message: live ? '切換到 VOD 聊天回放' : '切換到直播聊天室',
       child: InkWell(
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
         onTap: onTap,
@@ -185,7 +185,7 @@ class _ChatModeBadge extends StatelessWidget {
                   color: color,
                   fontSize: 10.5,
                   fontWeight: TwitchUiFontWeight.heavy,
-                  letterSpacing: 0.2,
+                  letterSpacing: 0,
                 ),
               ),
             ],
