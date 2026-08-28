@@ -158,11 +158,11 @@ class TwitchChatLinkPreviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uri = normalizeTwitchChatUri(item.url);
-    final host = uri?.host.replaceFirst(RegExp(r'^www\.'), '') ?? 'link';
+    final host = uri?.host.replaceFirst(RegExp(r'^www\.'), '') ?? '連結';
     final iconColor = item.trusted
         ? TwitchUiColors.primarySoft
         : const Color(0xFFFFC857);
-    final label = item.trusted ? 'Link preview' : '不自動載入的連結';
+    final label = item.trusted ? '連結預覽' : '不自動載入的連結';
 
     if (item.trusted) {
       return _TrustedLinkPreviewCard(item: item, fontScale: fontScale);
@@ -222,7 +222,7 @@ class _TrustedLinkPreviewCardState extends State<_TrustedLinkPreviewCard> {
   @override
   Widget build(BuildContext context) {
     final uri = normalizeTwitchChatUri(widget.item.url);
-    final host = uri?.host.replaceFirst(RegExp(r'^www\.'), '') ?? 'link';
+    final host = uri?.host.replaceFirst(RegExp(r'^www\.'), '') ?? '連結';
     final preview = _preview;
     if (_loading) {
       return _LinkPreviewShell(
@@ -243,7 +243,7 @@ class _TrustedLinkPreviewCardState extends State<_TrustedLinkPreviewCard> {
         icon: Icons.link_rounded,
         iconColor: TwitchUiColors.primarySoft,
         title: host,
-        subtitle: 'Link preview · ${prettyTwitchChatUrlLabel(widget.item.url)}',
+        subtitle: '連結預覽 · ${prettyTwitchChatUrlLabel(widget.item.url)}',
       );
     }
 
@@ -705,7 +705,7 @@ Future<TwitchChatLinkPreviewData> _fetchYouTubePreview(
     url: uri.toString(),
     kind: 'youtube',
     host: uri.host.replaceFirst(RegExp(r'^www\.'), ''),
-    title: _cleanPreviewText(title) ?? 'YouTube video',
+    title: _cleanPreviewText(title) ?? 'YouTube 影片',
     description: prettyTwitchChatUrlLabel(uri.toString()),
     imageUrl: 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg',
     siteName: 'YouTube',
@@ -761,7 +761,7 @@ Future<TwitchChatLinkPreviewData?> _fetchTwitchClipPreview(
   final descriptionParts = <String>[
     ?broadcasterName,
     ?gameName,
-    if (curatorName != null) 'Clipped by $curatorName',
+    if (curatorName != null) '$curatorName 建立的 Clip',
   ];
 
   return TwitchChatLinkPreviewData(
@@ -926,7 +926,7 @@ Future<void> showTwitchChatLinkPreviewSheet(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          uri.host.isEmpty ? 'Link preview' : uri.host,
+                          uri.host.isEmpty ? '連結預覽' : uri.host,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
