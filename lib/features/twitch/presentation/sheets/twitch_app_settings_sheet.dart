@@ -818,6 +818,8 @@ class _SettingsFontChoiceRow extends StatelessWidget {
                   children: [
                     Text(
                       choice.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 13,
@@ -830,6 +832,8 @@ class _SettingsFontChoiceRow extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.45),
                         fontSize: 11,
@@ -896,6 +900,8 @@ class _SettingsSection extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         subtitleText,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 11.5,
@@ -999,6 +1005,8 @@ class _SettingsSwitchRow extends StatelessWidget {
               children: [
                 Text(
                   title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 12.5,
@@ -1008,6 +1016,8 @@ class _SettingsSwitchRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.45),
                     fontSize: 11,
