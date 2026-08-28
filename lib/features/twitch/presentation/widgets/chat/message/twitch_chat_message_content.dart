@@ -169,7 +169,7 @@ class TwitchChatMessageContent extends StatelessWidget {
           alignment: PlaceholderAlignment.middle,
           child: Padding(
             padding: const EdgeInsets.only(left: 4),
-            child: TwitchChatSmallChip(label: 'reward', metrics: metrics),
+            child: TwitchChatSmallChip(label: '獎勵', metrics: metrics),
           ),
         ),
       );

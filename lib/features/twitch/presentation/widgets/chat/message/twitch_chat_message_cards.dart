@@ -4,6 +4,7 @@ import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../links/twitch_chat_link_preview.dart';
+import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_content.dart';
 import 'twitch_chat_message_special_style.dart';
 import 'twitch_chat_message_timestamp.dart';
@@ -162,11 +163,13 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                               metadata.specialLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: style.accentColor,
-                                fontSize: 11 * metrics.scale,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0,
+                              style: twitchChatTextStyle(
+                                TextStyle(
+                                  color: style.accentColor,
+                                  fontSize: 11 * metrics.scale,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0,
+                                ),
                               ),
                             ),
                           ),
@@ -184,11 +187,13 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                         Text(
                           bannerText,
                           textAlign: TextAlign.left,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: metrics.compactMessageFontSize,
-                            height: metrics.lineHeight,
-                            fontWeight: FontWeight.w800,
+                          style: twitchChatTextStyle(
+                            TextStyle(
+                              color: Colors.white,
+                              fontSize: metrics.compactMessageFontSize,
+                              height: metrics.lineHeight,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
