@@ -75,7 +75,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           cancelDeferredTasks: false,
         );
         if (!isCurrentWatchTask(generation, channel)) return;
-        restoreActiveDvrAvailabilityAfterMiniResume(channel, generation);
+        primeInitialActiveDvrAvailability(channel, generation);
       }
 
       setState(() => loadingWatch = false);
@@ -164,11 +164,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     );
   }
 
-  void restoreActiveDvrAvailabilityAfterMiniResume(
-    String channel,
-    int generation,
-  ) {
-    if (!widget.initialReuseCurrentPlayback) return;
+  void primeInitialActiveDvrAvailability(String channel, int generation) {
     final video = widget.initialActiveDvrVideo;
     if (video == null || !video.isLikelyGrowingArchive) return;
 

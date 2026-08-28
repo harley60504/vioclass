@@ -1256,6 +1256,7 @@ class _VodCard extends StatelessWidget {
                 ),
                 initialOfflineChannel: channel,
                 initialDiscoveryService: discoveryService,
+                initialActiveDvrVideo: isGrowingArchive ? video : null,
                 initialVodVideo: isGrowingArchive ? null : video,
                 initialVodPlaybackOnly: !isGrowingArchive,
               ),
