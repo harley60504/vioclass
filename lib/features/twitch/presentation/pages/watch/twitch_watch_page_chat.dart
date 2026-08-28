@@ -13,7 +13,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
       await connectChat(channel);
     } catch (error) {
       if (isCurrentWatchTask(generation, channel)) {
-        showSnack('聊天室連線失敗：$error');
+        showSnack('聊天室暫時連線失敗，稍後再試。');
       }
     } finally {
       if (isCurrentWatchTask(generation, channel)) {
@@ -72,7 +72,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
       }
       return snapshot;
     } catch (error) {
-      if (showSnackOnError) showSnack('特殊訊息載入失敗：$error');
+      if (showSnackOnError) showSnack('特殊訊息暫時載入失敗，稍後再試。');
       return null;
     }
   }

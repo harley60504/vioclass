@@ -21,7 +21,7 @@ extension TwitchWatchPageUiMethods on TwitchWatchPageState {
       if (!mounted) return;
       setState(() => fullscreenMode = next);
     } catch (error) {
-      showSnack('切換全螢幕失敗：$error');
+      showSnack('切換全螢幕失敗，請稍後再試。');
     }
   }
 

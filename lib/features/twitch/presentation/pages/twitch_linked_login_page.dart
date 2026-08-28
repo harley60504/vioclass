@@ -89,7 +89,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         _mainLoggedIn = false;
         _dropsTokenReady = false;
         _loadingStored = false;
-        _errorText = '讀取登入狀態失敗：$e';
+        _errorText = '讀取登入狀態失敗，請重新登入或使用自動修復。';
         _statusText = '請重新登入或使用自動修復。';
       });
     }
@@ -183,7 +183,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorText = '一鍵登入流程失敗：$e';
+        _errorText = '一鍵登入流程失敗，請單獨補失敗項目。';
         _statusText = '登入流程中斷，請單獨補失敗項目。';
       });
     } finally {
@@ -443,7 +443,7 @@ query ChannelPointsContext($channelLogin: String!) {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorText = '登出失敗：$e';
+        _errorText = '登出失敗，請稍後再試。';
         _statusText = '登出失敗。';
       });
     } finally {

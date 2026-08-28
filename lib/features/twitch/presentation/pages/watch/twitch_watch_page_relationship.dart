@@ -35,7 +35,7 @@ extension TwitchWatchPageRelationshipMethods on TwitchWatchPageState {
         channelLogin: channelLogin,
       );
     } catch (error) {
-      showSnack('開啟訂閱頁失敗：$error');
+      showSnack('訂閱頁暫時無法開啟，請稍後再試。');
     }
   }
 }
