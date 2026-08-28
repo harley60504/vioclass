@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/twitch_ui_tokens.dart';
+import '../twitch_chat_text_style.dart';
 
 class TwitchChatAppearanceSizeControl extends StatelessWidget {
   final double scale;
@@ -86,12 +87,14 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '預覽',
-            style: TextStyle(
-              color: Colors.white54,
-              fontSize: 10,
-              fontWeight: FontWeight.w900,
+            style: twitchChatTextStyle(
+              TextStyle(
+                color: Colors.white54,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
           const SizedBox(height: 7),
@@ -102,18 +105,22 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
             children: [
               Text(
                 'viewer123',
-                style: TextStyle(
-                  color: TwitchUiColors.sheet.backplate.foreground,
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w900,
+                style: twitchChatTextStyle(
+                  TextStyle(
+                    color: TwitchUiColors.sheet.backplate.foreground,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               Text(
                 '這是聊天室訊息預覽',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w700,
+                style: twitchChatTextStyle(
+                  TextStyle(
+                    color: Colors.white,
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               Container(
@@ -124,7 +131,12 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
                   color: TwitchUiColors.sheet.backplate.fillActive,
                   borderRadius: BorderRadius.circular(5),
                 ),
-                child: Text('😄', style: TextStyle(fontSize: emoteSize * 0.72)),
+                child: Text(
+                  '😄',
+                  style: twitchChatTextStyle(
+                    TextStyle(fontSize: emoteSize * 0.72),
+                  ),
+                ),
               ),
             ],
           ),
