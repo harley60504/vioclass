@@ -9,6 +9,7 @@ import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../../widgets/chat/twitch_chat_text_style.dart';
 import '../../widgets/chat/twitch_runtime_message_tile.dart';
 import 'twitch_reply_thread_builder.dart';
 
@@ -140,22 +141,26 @@ class _ReplyThreadCardHeader extends StatelessWidget {
             formatContextMessageDisplayName(message),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: selected
-                  ? TwitchUiColors.textPrimary
-                  : TwitchUiColors.sheet.backplate.foreground,
-              fontSize: 12.5 * safeFontScale,
-              fontWeight: FontWeight.w900,
+            style: twitchChatTextStyle(
+              TextStyle(
+                color: selected
+                    ? TwitchUiColors.textPrimary
+                    : TwitchUiColors.sheet.backplate.foreground,
+                fontSize: 12.5 * safeFontScale,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           formatContextMessageTime(message.receivedAt),
-          style: TextStyle(
-            color: Colors.white54,
-            fontSize: 10.5 * safeFontScale,
-            fontWeight: FontWeight.w800,
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: Colors.white54,
+              fontSize: 10.5 * safeFontScale,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ],
@@ -194,10 +199,12 @@ class _EntryKindChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10.5 * safeFontScale,
-          fontWeight: FontWeight.w900,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: color,
+            fontSize: 10.5 * safeFontScale,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );
@@ -283,10 +290,12 @@ class _RelationChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11 * safeFontScale,
-          fontWeight: FontWeight.w900,
+        style: twitchChatTextStyle(
+          TextStyle(
+            color: color,
+            fontSize: 11 * safeFontScale,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );
