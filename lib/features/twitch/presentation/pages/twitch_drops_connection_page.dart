@@ -706,7 +706,7 @@ class _CampaignGameGridCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      group.gameName.isEmpty ? 'Unknown Game' : group.gameName,
+                      group.gameName.isEmpty ? '未知遊戲' : group.gameName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1284,7 +1284,7 @@ class _InventoryGameGroup {
     final grouped = <String, List<TwitchDropCampaign>>{};
     for (final campaign in campaigns) {
       final key = campaign.gameName.trim().isEmpty
-          ? 'Unknown Game'
+          ? '未知遊戲'
           : campaign.gameName.trim();
       grouped.putIfAbsent(key, () => <TwitchDropCampaign>[]).add(campaign);
     }
@@ -1775,7 +1775,7 @@ class _ChannelPointsLeaderboardCard extends StatelessWidget {
               const SizedBox(width: 9),
               const Expanded(
                 child: Text(
-                  'Channel Points Leaderboard',
+                  'Channel Points 排行榜',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -1807,7 +1807,7 @@ class _ChannelPointsLeaderboardCard extends StatelessWidget {
                   ? '正在讀取你追隨頻道的 Channel Points...'
                   : (errorText?.trim().isNotEmpty ?? false)
                   ? 'Channel Points 讀取失敗：$errorText'
-                  : '目前沒有可顯示的 Channel Points balance。',
+                  : '目前沒有可顯示的 Channel Points 點數。',
               style: const TextStyle(
                 color: Colors.white54,
                 fontSize: 12,
@@ -1821,12 +1821,12 @@ class _ChannelPointsLeaderboardCard extends StatelessWidget {
             ],
             const Divider(color: Colors.white10, height: 18),
             _LeaderboardTotalRow(
-              label: 'Total Streamers',
+              label: '頻道總數',
               value: entries.length.toString(),
             ),
             const SizedBox(height: 5),
             _LeaderboardTotalRow(
-              label: 'Total Points',
+              label: '點數總計',
               value: _formatNumber(totalPoints),
             ),
           ],
