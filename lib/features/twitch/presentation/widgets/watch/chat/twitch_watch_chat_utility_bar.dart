@@ -43,7 +43,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
           ),
           if (!compact) const Spacer() else const SizedBox(width: 6),
           _UtilityButton(
-            tooltip: '特殊動作測試',
+            tooltip: '特殊訊息',
             icon: Icons.auto_awesome_rounded,
             active: false,
             compact: compact,

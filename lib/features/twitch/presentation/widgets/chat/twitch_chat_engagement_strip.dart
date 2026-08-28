@@ -4,6 +4,7 @@ import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import 'cards/twitch_pinned_message_banner.dart';
 import 'cards/twitch_prediction_banner.dart';
+import 'twitch_chat_text_style.dart';
 
 class TwitchChatEngagementStrip extends StatelessWidget {
   final List<TwitchPinnedChatMessage> pinnedMessages;
@@ -95,10 +96,12 @@ class TwitchChatEngagementStrip extends StatelessWidget {
                 error!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.orangeAccent,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                style: twitchChatTextStyle(
+                  const TextStyle(
+                    color: Colors.orangeAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ),
