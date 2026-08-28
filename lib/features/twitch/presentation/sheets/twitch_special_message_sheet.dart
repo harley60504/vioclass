@@ -144,7 +144,7 @@ class _TwitchSpecialMessageSheetStage251State
       setState(() => _snapshot = snapshot);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = error.toString());
+      setState(() => _errorText = '特殊訊息暫時載入失敗，稍後再試。');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -165,7 +165,7 @@ class _TwitchSpecialMessageSheetStage251State
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = error.toString());
+      setState(() => _errorText = '聊天室身分更新失敗，稍後再試。');
     } finally {
       if (mounted) setState(() => _selectingBadgeId = null);
     }
