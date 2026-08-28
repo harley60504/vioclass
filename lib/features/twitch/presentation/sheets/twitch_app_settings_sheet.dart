@@ -237,7 +237,7 @@ class _SettingsTabChip extends StatelessWidget {
 
     return Material(
       color: selected
-          ? const Color(0xFF9146FF).withValues(alpha: 0.22)
+          ? TwitchUiColors.primary.withValues(alpha: 0.22)
           : Colors.white.withValues(alpha: 0.045),
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
@@ -253,7 +253,7 @@ class _SettingsTabChip extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: selected
-                  ? const Color(0xFFBF94FF).withValues(alpha: 0.34)
+                  ? TwitchUiColors.primarySoft.withValues(alpha: 0.34)
                   : Colors.white.withValues(alpha: 0.08),
             ),
           ),
@@ -363,12 +363,12 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
                       height: 34,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF9146FF).withValues(alpha: 0.18),
+                        color: TwitchUiColors.primary.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: const Color(
-                            0xFFBF94FF,
-                          ).withValues(alpha: 0.28),
+                          color: TwitchUiColors.primarySoft.withValues(
+                            alpha: 0.28,
+                          ),
                         ),
                       ),
                       child: loading
@@ -382,7 +382,7 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
                             )
                           : const Icon(
                               Icons.person_rounded,
-                              color: Color(0xFFBF94FF),
+                              color: TwitchUiColors.primarySoft,
                               size: 20,
                             ),
                     ),
@@ -581,7 +581,9 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(11),
-                    borderSide: const BorderSide(color: Color(0xFFBF94FF)),
+                    borderSide: const BorderSide(
+                      color: TwitchUiColors.primarySoft,
+                    ),
                   ),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 11,
@@ -613,11 +615,11 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
                   deleteIcon: const Icon(Icons.close_rounded, size: 16),
                   visualDensity: VisualDensity.compact,
                   side: BorderSide(
-                    color: const Color(0xFFBF94FF).withValues(alpha: 0.24),
+                    color: TwitchUiColors.primarySoft.withValues(alpha: 0.24),
                   ),
-                  backgroundColor: const Color(
-                    0xFF9146FF,
-                  ).withValues(alpha: 0.13),
+                  backgroundColor: TwitchUiColors.primary.withValues(
+                    alpha: 0.13,
+                  ),
                   labelStyle: const TextStyle(
                     color: Colors.white70,
                     fontSize: 11.5,
@@ -788,7 +790,7 @@ class _SettingsFontChoiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = selected ? const Color(0xFFBF94FF) : Colors.white38;
+    final accent = selected ? TwitchUiColors.primarySoft : Colors.white38;
     final subtitle = switch (choice.kind) {
       TwitchAppFontKind.vioClass => '內建 Noto Sans TC，跨平台一致',
       TwitchAppFontKind.system => '使用裝置預設字體',
@@ -797,7 +799,7 @@ class _SettingsFontChoiceRow extends StatelessWidget {
 
     return Material(
       color: selected
-          ? const Color(0xFF9146FF).withValues(alpha: 0.16)
+          ? TwitchUiColors.primary.withValues(alpha: 0.16)
           : Colors.white.withValues(alpha: 0.04),
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
