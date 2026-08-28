@@ -140,10 +140,10 @@ class _TwitchUnifiedEmotePickerSheetState
   _OuterTab _recentTab() {
     final official = _official;
     return _OuterTab(
-      label: 'Recent',
+      label: '最近',
       pages: [
         _InnerPage(
-          label: 'Recent',
+          label: '最近',
           entries: <_EmoteEntry>[
             ...widget.cache.recentEmotes.map(_thirdPartyEntry),
             ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[]).map(
@@ -158,10 +158,10 @@ class _TwitchUnifiedEmotePickerSheetState
   _OuterTab _favoriteTab() {
     final official = _official;
     return _OuterTab(
-      label: 'Favorite',
+      label: '最愛',
       pages: [
         _InnerPage(
-          label: 'Favorite',
+          label: '最愛',
           entries: <_EmoteEntry>[
             ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
             ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[]).map(
