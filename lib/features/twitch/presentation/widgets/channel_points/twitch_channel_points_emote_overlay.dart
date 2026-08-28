@@ -119,7 +119,10 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: TwitchUiColors.primarySoft,
+                              ),
                             )
                           : const Icon(
                               Icons.refresh_rounded,
@@ -209,11 +212,11 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
             ),
             Expanded(
               child: loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const _OverlayLoadingMessage(message: '正在讀取貼圖清單...')
                   : error != null
                   ? _OverlayMessage(
                       icon: Icons.error_outline_rounded,
-                      message: '載入貼圖清單失敗：',
+                      message: '載入貼圖清單失敗：$error',
                     )
                   : choosingModifier
                   ? _ModifierGrid(
@@ -874,9 +877,51 @@ class _OverlayMessage extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               message,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white60,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OverlayLoadingMessage extends StatelessWidget {
+  final String message;
+
+  const _OverlayLoadingMessage({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: TwitchUiColors.primarySoft,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              message,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w800,
               ),
             ),
