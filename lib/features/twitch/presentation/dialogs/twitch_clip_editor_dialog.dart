@@ -218,7 +218,7 @@ class _TwitchClipEditorDialogBodyState
   Future<void> _openCreatedClipPlayback(String playbackUrl) async {
     final url = playbackUrl.trim();
     if (url.isEmpty) {
-      throw StateError('片段播放 URL 是空的。');
+      throw StateError('片段播放連結是空的。');
     }
 
     await _positionSubscription?.cancel();
@@ -640,7 +640,7 @@ String _clipEditorErrorText(Object error) {
   final message = error.toString();
   final lower = message.toLowerCase();
   if (lower.contains('drops / android token')) {
-    return '請先補 Drops / Android token。';
+    return '請先補 Drops / Android 授權。';
   }
   if (lower.contains('disabled') ||
       lower.contains('forbidden') ||
