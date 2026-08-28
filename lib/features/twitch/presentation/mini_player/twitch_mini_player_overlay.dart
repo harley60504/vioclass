@@ -110,28 +110,10 @@ class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
           setState(() => _offset += details.delta);
         },
         onPanEnd: (details) {
-          final fling = details.velocity.pixelsPerSecond;
-          final shouldEnterPip =
-              widget.androidPipEnabled &&
-              Platform.isAndroid &&
-              (fling.dx.abs() > 720 || fling.dy.abs() > 720);
-          if (shouldEnterPip) {
-            unawaited(_enterAndroidPip());
-          }
           setState(() => _offset = Offset.zero);
         },
       ),
     );
-  }
-
-  Future<void> _enterAndroidPip() async {
-    final entered = await TwitchAndroidPipController.instance
-        .enterPictureInPicture(aspectRatioWidth: 16, aspectRatioHeight: 9);
-    if (entered) return;
-    if (!mounted) return;
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援子母畫面')));
   }
 }
 
