@@ -79,8 +79,8 @@ class _TwitchSpecialMessageSheetStage251State
     final snapshot = _snapshot;
 
     return TwitchUnifiedSheetScaffold(
-      title: 'Special Messages',
-      subtitle: 'Watch Streak / Resub / Chat Identity',
+      title: '特殊訊息',
+      subtitle: '連續觀看、續訂與聊天室身分',
       icon: Icons.auto_awesome_rounded,
       loading: _loading,
       onRefresh: _loading ? null : _refresh,
@@ -92,7 +92,11 @@ class _TwitchSpecialMessageSheetStage251State
             if (_errorText != null) _ErrorBox(text: _errorText!),
             Expanded(
               child: snapshot == null && _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: TwitchUiColors.primarySoft,
+                      ),
+                    )
                   : ListView(
                       padding: const EdgeInsets.only(bottom: 8),
                       children: <Widget>[
