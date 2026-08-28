@@ -935,10 +935,12 @@ Future<void> showTwitchChatLinkPreviewSheet(
                           uri.host.isEmpty ? '連結預覽' : uri.host,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w900,
+                          style: twitchChatTextStyle(
+                            const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 3),
@@ -946,11 +948,13 @@ Future<void> showTwitchChatLinkPreviewSheet(
                           displayUrl,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: TwitchUiColors.textMuted,
-                            fontSize: 12,
-                            height: 1.25,
-                            fontWeight: FontWeight.w700,
+                          style: twitchChatTextStyle(
+                            const TextStyle(
+                              color: TwitchUiColors.textMuted,
+                              fontSize: 12,
+                              height: 1.25,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ],
