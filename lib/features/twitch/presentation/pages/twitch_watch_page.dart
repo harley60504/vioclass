@@ -40,6 +40,7 @@ import '../watch/controllers/twitch_watch_relationship_controller.dart';
 import '../watch/sheets/twitch_watch_sheet_port_launcher.dart';
 import '../watch/twitch_watch_feature_ports.dart';
 import '../watch/twitch_watch_port_scope.dart';
+import '../watch/twitch_watch_playback_kind.dart';
 import '../watch/twitch_watch_scope.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
 import '../watch/twitch_playback_session_controller.dart';
@@ -311,10 +312,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   Future<void> createLiveClip() async {
     if (creatingClip) return;
-    if (watchPorts.player.runtime.usingExternalVodPlayback ||
-        watchPorts.player.runtime.usingLiveDvrBridge ||
-        offlineVodFallbackVideo != null ||
-        currentClipQualityClip != null) {
+    if (currentPlaybackKind != TwitchWatchPlaybackKind.live) {
       showSnack('目前在 VOD/Clip 模式，請先回直播再建立 Clip。');
       return;
     }
