@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 
 const double twitchWatchVideoAspectRatio = 16 / 9;
 
@@ -113,7 +114,10 @@ class TwitchMediaKitVideoWaitingSurface extends StatelessWidget {
         child: SizedBox(
           width: 26,
           height: 26,
-          child: CircularProgressIndicator(strokeWidth: 2.4),
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: TwitchUiColors.primarySoft,
+          ),
         ),
       ),
     );

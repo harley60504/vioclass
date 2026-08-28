@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchWatchBlockingStartupOverlay extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -40,11 +42,16 @@ class TwitchWatchBlockingStartupOverlay extends StatelessWidget {
                 const SizedBox(
                   width: 42,
                   height: 42,
-                  child: CircularProgressIndicator(strokeWidth: 3),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: TwitchUiColors.primarySoft,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 Text(
                   title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white,
@@ -55,6 +62,8 @@ class TwitchWatchBlockingStartupOverlay extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text(
                   subtitle,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Colors.white60,
