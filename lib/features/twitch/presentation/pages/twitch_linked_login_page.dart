@@ -533,7 +533,7 @@ query ChannelPointsContext($channelLogin: String!) {
         ? Colors.greenAccent
         : (_webGqlTokenReady ? Colors.orangeAccent : TwitchUiColors.primary);
 
-    final titleText = _completeLogin ? 'Twitch 完整登入完成' : 'Twitch 統一登入 v32';
+    final titleText = _completeLogin ? 'Twitch 完整登入完成' : 'Twitch 統一登入';
 
     final descriptionText = _completeLogin
         ? '官方 Twitch Web / GQL、主 OAuth、Drops / Android 授權都已通過。'
