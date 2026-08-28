@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchStreamHomeAccountMenu extends StatelessWidget {
   final Future<void> Function() onOpenSettings;
 
@@ -10,7 +12,10 @@ class TwitchStreamHomeAccountMenu extends StatelessWidget {
     return IconButton(
       tooltip: '設定',
       onPressed: () => onOpenSettings(),
-      icon: const Icon(Icons.settings_rounded, color: Color(0xFFBF94FF)),
+      icon: const Icon(
+        Icons.settings_rounded,
+        color: TwitchUiColors.primarySoft,
+      ),
     );
   }
 }

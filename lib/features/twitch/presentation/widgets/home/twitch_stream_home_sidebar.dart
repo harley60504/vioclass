@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/twitch_stream_home_models.dart';
+import '../../theme/twitch_ui_tokens.dart';
 
-const Color _kTwitchPurple = Color(0xFF9146FF);
-const Color _kTwitchPurpleLight = Color(0xFFBF94FF);
 const Color _kPanel = Color(0xCC15121F);
 
 class TwitchStreamHomeSidebar extends StatelessWidget {
@@ -29,7 +28,9 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kPanel,
         border: Border(
-          right: BorderSide(color: _kTwitchPurple.withValues(alpha: 0.24)),
+          right: BorderSide(
+            color: TwitchUiColors.primary.withValues(alpha: 0.24),
+          ),
         ),
       ),
       child: Column(
@@ -37,7 +38,7 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
         children: <Widget>[
           Container(
             padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
-            color: _kTwitchPurple,
+            color: TwitchUiColors.primary,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -135,12 +136,12 @@ class _SidebarButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
           decoration: BoxDecoration(
             color: selected
-                ? _kTwitchPurple.withValues(alpha: 0.22)
+                ? TwitchUiColors.primary.withValues(alpha: 0.22)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? _kTwitchPurpleLight.withValues(alpha: 0.38)
+                  ? TwitchUiColors.primarySoft.withValues(alpha: 0.38)
                   : Colors.transparent,
             ),
           ),
@@ -148,7 +149,7 @@ class _SidebarButton extends StatelessWidget {
             children: <Widget>[
               Icon(
                 section.icon,
-                color: selected ? _kTwitchPurpleLight : Colors.white54,
+                color: selected ? TwitchUiColors.primarySoft : Colors.white54,
                 size: 21,
               ),
               const SizedBox(width: 10),

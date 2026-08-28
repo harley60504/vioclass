@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/twitch_stream_home_models.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import 'twitch_stream_home_account_menu.dart';
 
-const Color _kTwitchPurple = Color(0xFF9146FF);
-const Color _kTwitchPurpleLight = Color(0xFFBF94FF);
 const Color _kSoftPanel = Color(0xB8221B32);
 
 class TwitchStreamHomeToolbar extends StatelessWidget {
@@ -72,7 +71,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.30),
           border: Border(
-            bottom: BorderSide(color: _kTwitchPurple.withValues(alpha: 0.22)),
+            bottom: BorderSide(
+              color: TwitchUiColors.primary.withValues(alpha: 0.22),
+            ),
           ),
         ),
         child: Column(
@@ -97,7 +98,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.30),
         border: Border(
-          bottom: BorderSide(color: _kTwitchPurple.withValues(alpha: 0.22)),
+          bottom: BorderSide(
+            color: TwitchUiColors.primary.withValues(alpha: 0.22),
+          ),
         ),
       ),
       child: Row(
@@ -196,7 +199,9 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
             ),
             child: Icon(
               icon,
-              color: onPressed == null ? Colors.white30 : _kTwitchPurpleLight,
+              color: onPressed == null
+                  ? Colors.white30
+                  : TwitchUiColors.primarySoft,
               size: 22,
             ),
           ),
