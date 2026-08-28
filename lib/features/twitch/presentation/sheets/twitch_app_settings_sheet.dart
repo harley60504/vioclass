@@ -680,13 +680,13 @@ class _PlayerSettingsPane extends StatelessWidget {
                   ),
                   _SettingsSwitchRow(
                     title: '允許 Android 子母畫面',
-                    subtitle: '小窗送到背景或手動按 PiP 時才會進入系統子母畫面',
+                    subtitle: '離開 App 或手動開啟時，才會進入系統子母畫面',
                     value: controller.androidPipEnabled,
                     onChanged: controller.setAndroidPipEnabled,
                   ),
                   _SettingsSwitchRow(
                     title: '離開觀看頁保留小窗',
-                    subtitle: '從直播、VOD 或片段回主畫面時保留 app 內小窗',
+                    subtitle: '從直播、VOD 或片段回主畫面時保留 App 內小窗',
                     value: controller.homeKeepsMiniPlayer,
                     onChanged: controller.setHomeKeepsMiniPlayer,
                   ),
