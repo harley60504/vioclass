@@ -1311,7 +1311,7 @@ class _VodCard extends StatelessWidget {
                         children: [
                           Text(
                             video.title.trim().isEmpty
-                                ? 'Untitled VOD'
+                                ? '未命名 VOD'
                                 : video.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,

@@ -356,7 +356,7 @@ class _StreamInfo extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title.isEmpty ? 'Untitled stream' : title,
+              title.isEmpty ? '未命名直播' : title,
               maxLines: titleMaxLines,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
