@@ -36,26 +36,20 @@ class TwitchHypeTrainSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 14),
-            _InfoRow(label: 'Level', value: '${snapshot.level}'),
-            _InfoRow(label: 'Total', value: '${snapshot.total}'),
+            _InfoRow(label: '等級', value: '${snapshot.level}'),
+            _InfoRow(label: '總計', value: '${snapshot.total}'),
             _InfoRow(
-              label: 'Progress',
+              label: '進度',
               value: '${snapshot.progress} / ${snapshot.goal}',
             ),
-            _InfoRow(label: 'Started', value: _formatDate(snapshot.startedAt)),
-            _InfoRow(label: 'Expires', value: _formatDate(snapshot.expiresAt)),
-            _InfoRow(label: 'Ended', value: _formatDate(snapshot.endedAt)),
-            _InfoRow(
-              label: 'Cooldown',
-              value: _formatDate(snapshot.cooldownEndsAt),
-            ),
-            _InfoRow(label: 'Type', value: snapshot.type),
-            _InfoRow(
-              label: 'Shared Train',
-              value: snapshot.isSharedTrain ? 'Yes' : 'No',
-            ),
+            _InfoRow(label: '開始', value: _formatDate(snapshot.startedAt)),
+            _InfoRow(label: '到期', value: _formatDate(snapshot.expiresAt)),
+            _InfoRow(label: '結束', value: _formatDate(snapshot.endedAt)),
+            _InfoRow(label: '冷卻', value: _formatDate(snapshot.cooldownEndsAt)),
+            _InfoRow(label: '類型', value: snapshot.type),
+            _InfoRow(label: '共享列車', value: snapshot.isSharedTrain ? '是' : '否'),
             const SizedBox(height: 16),
-            _SectionTitle('Top Contributions'),
+            _SectionTitle('主要貢獻'),
             if (snapshot.topContributions.isEmpty)
               const _EmptyText('目前沒有貢獻資料')
             else
@@ -67,7 +61,7 @@ class TwitchHypeTrainSheet extends StatelessWidget {
                   value: '${contribution.amount} ${contribution.type}',
                 ),
             const SizedBox(height: 16),
-            _SectionTitle('Shared Train Participants'),
+            _SectionTitle('共享列車參與者'),
             if (snapshot.sharedTrainParticipants.isEmpty)
               const _EmptyText('目前沒有共享列車參與者')
             else
@@ -109,6 +103,8 @@ class _InfoRow extends StatelessWidget {
             width: 96,
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.58),
                 fontSize: 12,
@@ -119,6 +115,8 @@ class _InfoRow extends StatelessWidget {
           Expanded(
             child: Text(
               value.isEmpty ? '-' : value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
