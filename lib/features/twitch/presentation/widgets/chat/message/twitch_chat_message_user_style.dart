@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 
 String formatTwitchChatDisplayName(TwitchChatRuntimeMessage message) {
   final displayName = message.displayName.trim();
@@ -53,7 +54,7 @@ Color fallbackTwitchChatUserColor(String login) {
   ];
 
   final clean = login.trim().toLowerCase();
-  if (clean.isEmpty) return const Color(0xFFBF94FF);
+  if (clean.isEmpty) return TwitchUiColors.primarySoft;
 
   var hash = 0;
   for (final codeUnit in clean.codeUnits) {

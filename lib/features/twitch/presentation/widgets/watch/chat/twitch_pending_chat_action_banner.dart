@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/special_actions/twitch_pending_special_message.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 
 class TwitchPendingChatActionBanner extends StatelessWidget {
   final TwitchPendingSpecialMessage pending;
@@ -106,7 +107,7 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
   static Color _accentForKind(TwitchPendingSpecialMessageKind kind) {
     switch (kind) {
       case TwitchPendingSpecialMessageKind.preview:
-        return const Color(0xFFBF94FF);
+        return TwitchUiColors.primarySoft;
       case TwitchPendingSpecialMessageKind.highlightedMessage:
         return const Color(0xFFFFC857);
       case TwitchPendingSpecialMessageKind.watchStreak:
@@ -114,7 +115,7 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
       case TwitchPendingSpecialMessageKind.resub:
         return const Color(0xFFFF75E6);
       case TwitchPendingSpecialMessageKind.channelPointRewardMessage:
-        return const Color(0xFFBF94FF);
+        return TwitchUiColors.primarySoft;
       case TwitchPendingSpecialMessageKind.officialSpecialMessage:
         return const Color(0xFF00A3FF);
     }
