@@ -417,7 +417,7 @@ class _TwitchDropsDeviceLoginPageState
       ),
       child: Row(
         children: [
-          const Icon(Icons.devices_rounded, color: Color(0xFFBF94FF)),
+          const Icon(Icons.devices_rounded, color: TwitchUiColors.primarySoft),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -729,7 +729,7 @@ class _TwitchDropsDeviceLoginPageState
                     icon: const Icon(Icons.open_in_new_rounded),
                     label: Text(_authWindowOpen ? '重開授權視窗' : '開啟授權視窗'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF9146FF),
+                      backgroundColor: TwitchUiColors.primary,
                       foregroundColor: Colors.white,
                     ),
                   ),

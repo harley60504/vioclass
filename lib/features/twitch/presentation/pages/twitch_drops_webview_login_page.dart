@@ -376,7 +376,7 @@ class _TwitchDropsWebViewLoginPageState
               LinearProgressIndicator(
                 minHeight: 2,
                 value: _progress <= 0.0 || _progress >= 1.0 ? null : _progress,
-                color: const Color(0xFF9146FF),
+                color: TwitchUiColors.primary,
                 backgroundColor: const Color(0xFF2A2A2E),
               ),
             if (_showAdvanced) _buildAdvancedPanel(),
@@ -458,7 +458,11 @@ class _TwitchDropsWebViewLoginPageState
       ),
       child: Row(
         children: [
-          const Icon(Icons.vpn_key_rounded, color: Color(0xFF9146FF), size: 20),
+          const Icon(
+            Icons.vpn_key_rounded,
+            color: TwitchUiColors.primary,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
@@ -592,7 +596,7 @@ class _TwitchDropsWebViewLoginPageState
               ] else ...[
                 const Icon(
                   Icons.info_outline,
-                  color: Color(0xFFBF94FF),
+                  color: TwitchUiColors.primarySoft,
                   size: 16,
                 ),
                 const SizedBox(width: 8),
