@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 import 'twitch_player_error_card.dart';
 import 'twitch_watch_bottom_control_bar.dart';
 import 'twitch_watch_top_action_bar.dart';
@@ -331,7 +332,9 @@ class _PlayerDimOverlay extends StatelessWidget {
 
     return const ColoredBox(
       color: Color(0x66000000),
-      child: Center(child: CircularProgressIndicator(color: Color(0xFF9146FF))),
+      child: Center(
+        child: CircularProgressIndicator(color: TwitchUiColors.primarySoft),
+      ),
     );
   }
 }
