@@ -7,6 +7,7 @@ import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
+import 'twitch_chat_text_style.dart';
 import 'twitch_runtime_message_tile.dart';
 
 class TwitchChatMessageList extends StatefulWidget {
@@ -389,8 +390,13 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
 
     if (visibleMessages.isEmpty) {
       return widget.emptyBuilder?.call(context) ??
-          const Center(
-            child: Text('等待聊天室訊息...', style: TextStyle(color: Colors.white54)),
+          Center(
+            child: Text(
+              '等待聊天室訊息...',
+              style: twitchChatTextStyle(
+                const TextStyle(color: Colors.white54),
+              ),
+            ),
           );
     }
 
@@ -481,10 +487,12 @@ class _ScrollResumePill extends StatelessWidget {
           ),
           child: Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
+            style: twitchChatTextStyle(
+              const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),

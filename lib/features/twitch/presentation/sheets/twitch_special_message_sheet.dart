@@ -302,7 +302,7 @@ class _IssuesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Section(
-      title: 'Backend Notes',
+      title: '系統提示',
       children: snapshot.issues
           .map(
             (issue) => Text(
