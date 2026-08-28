@@ -170,7 +170,7 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
     }
 
     return <_QualityGroup>[
-      _QualityGroup('自動 / Source', source),
+      _QualityGroup('自動 / 原始', source),
       _QualityGroup('高畫質', high),
       _QualityGroup('中畫質', medium),
       _QualityGroup('低畫質', low),

@@ -882,11 +882,11 @@ query ChannelPointsContext($channelLogin: String!) {
             if (_lastTokenPreview != null) ...[
               const SizedBox(height: 14),
               Text(
-                'token=$_lastTokenPreview',
+                '已擷取 Web/GQL token：$_lastTokenPreview',
                 style: const TextStyle(
                   color: Colors.white38,
                   fontSize: 12,
-                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
