@@ -879,7 +879,7 @@ class _CampaignGameDialog extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${group.campaigns.length} 個活動・${group.totalDrops} 個 Drops',
+                        '${group.campaigns.length} 個活動・${group.totalDrops} 個 Drops 獎勵',
                         style: const TextStyle(
                           color: Colors.white54,
                           fontSize: 12,
@@ -1054,7 +1054,7 @@ class _CampaignDetailBody extends StatelessWidget {
           runSpacing: 8,
           children: <Widget>[
             _MiniBadge(text: campaign.gameName, color: _kPurpleLight),
-            _MiniBadge(text: '${sortedDrops.length} 個 Drops', color: _kGold),
+            _MiniBadge(text: '${sortedDrops.length} 個 Drops 獎勵', color: _kGold),
             if (campaign.allowedChannels.isNotEmpty)
               _MiniBadge(
                 text: '${campaign.allowedChannels.length} 個頻道',
@@ -1113,7 +1113,7 @@ class _CampaignDetailBody extends StatelessWidget {
         const SizedBox(height: 14),
         if (sortedDrops.isEmpty)
           const Text(
-            '這個活動沒有可顯示的 Drops。',
+            '這個活動沒有可顯示的 Drops 獎勵。',
             style: TextStyle(color: Colors.white54),
           )
         else
@@ -1225,7 +1225,7 @@ class _InventorySummaryGrid extends StatelessWidget {
     return _SummaryGrid(
       items: <_SummaryItem>[
         _SummaryItem(
-          '全部 Drops',
+          '全部獎勵',
           snapshot.totalDropCount.toString(),
           Icons.inventory_2_rounded,
           Colors.white70,
@@ -1464,7 +1464,7 @@ class _InventoryGameRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${group.campaignCount} 個活動・已領取 ${group.claimedDrops}/${group.totalDrops} 個 Drops',
+                      '${group.campaignCount} 個活動・已領取 ${group.claimedDrops}/${group.totalDrops} 個 Drops 獎勵',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -1622,7 +1622,7 @@ class _StatsSummaryGrid extends StatelessWidget {
     return _SummaryGrid(
       items: <_SummaryItem>[
         _SummaryItem(
-          '已領取 Drops',
+          '已領取獎勵',
           claimedCount.toString(),
           Icons.card_giftcard_rounded,
           Colors.lightBlueAccent,
@@ -2050,7 +2050,7 @@ class _IdleStatusCard extends StatelessWidget {
           Icon(Icons.extension_rounded, color: Colors.white38, size: 34),
           SizedBox(height: 12),
           Text(
-            '目前沒有正在累積的 Drops。',
+            '目前沒有正在累積的 Drops 獎勵。',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white70,
@@ -2060,7 +2060,7 @@ class _IdleStatusCard extends StatelessWidget {
           ),
           SizedBox(height: 5),
           Text(
-            '挑一個有 Drops 的直播觀看後，進度會顯示在這裡。',
+            '挑一個有 Drops 獎勵的直播觀看後，進度會顯示在這裡。',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white38,
@@ -2449,7 +2449,7 @@ class _CampaignDropsContent extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${campaign.gameName}｜${sortedDrops.length} 個 Drops',
+                    '${campaign.gameName}｜${sortedDrops.length} 個 Drops 獎勵',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -2480,7 +2480,7 @@ class _CampaignDropsContent extends StatelessWidget {
         const SizedBox(height: 12),
         if (sortedDrops.isEmpty)
           const Text(
-            '這個活動沒有可顯示的累積型 Drops。',
+            '這個活動沒有可顯示的累積型 Drops 獎勵。',
             style: TextStyle(color: Colors.white54),
           )
         else
