@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_emote_image_cache_manager_stage233c_static_precache
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

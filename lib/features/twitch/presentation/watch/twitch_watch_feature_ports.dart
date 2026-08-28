@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_feature_ports_force_modified_emote_route
 //
 // Feature-facing ports for Watch composition.
 //

@@ -1,4 +1,3 @@
-// PATCH VERSION: relationship_token_split_v15
 // ignore_for_file: unused_element
 
 // Twitch-aligned Twitch relationship API service.

@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_playback_api_service_ad_aware_contexts_v34
-
 import 'package:dio/dio.dart';
 
 import '../../models/playback/twitch_m3u8_variant.dart';

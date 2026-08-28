@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_stream_card_stage189b_obvious_glass_cards
-
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';

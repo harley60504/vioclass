@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_linked_login_page_responsive_compact_v33
 import 'dart:async';
 import 'dart:io' show Directory, Platform;
 

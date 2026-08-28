@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_user_profile_api_service_stage146
 //
 // Small Helix user profile resolver used by UI lanes that only have a user id
 // or login from GQL/IRC. Keep this generic so pinned chat, message context,

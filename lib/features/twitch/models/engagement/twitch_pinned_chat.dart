@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_pinned_chat_model_avatar_enrichment_stage145
-
 class TwitchPinnedChatMessage {
   final String pinId;
   final String type;

@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_player_loader_stage141
 //
 // Player-only WatchPage startup loader.
 // Keep playback/proxy/media_kit opening concerns out of TwitchWatchPage so

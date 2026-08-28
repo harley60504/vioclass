@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';

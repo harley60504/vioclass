@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_following_page_stage241_reconciler_refresh
 // Uses the same discovery template as BrowsePage and the actual project models/services.
 // Stage 241: refresh/re-enter keeps the grid visible, fetches the latest live
 // window, removes offline streams, adds newly live streams, and preserves the

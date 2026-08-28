@@ -199,8 +199,8 @@ class TwitchAppFontController extends ChangeNotifier {
   }
 
   Map<String, _CustomFontRecord> _readCustomFonts(SharedPreferences prefs) {
-    final families = prefs.getStringList(_customFontFamiliesKey) ??
-        const <String>[];
+    final families =
+        prefs.getStringList(_customFontFamiliesKey) ?? const <String>[];
     final labels =
         prefs.getStringList(_customFontLabelsKey) ?? const <String>[];
     final paths = prefs.getStringList(_customFontPathsKey) ?? const <String>[];
@@ -221,7 +221,10 @@ class TwitchAppFontController extends ChangeNotifier {
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_selectedFontKey, _selectedId);
-    await prefs.setStringList(_customFontFamiliesKey, _customFonts.keys.toList());
+    await prefs.setStringList(
+      _customFontFamiliesKey,
+      _customFonts.keys.toList(),
+    );
     await prefs.setStringList(
       _customFontLabelsKey,
       _customFonts.values.map((font) => font.label).toList(growable: false),

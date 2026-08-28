@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_third_party_emote_cache_service_stage245b_defer_image_precache
-
 import 'dart:async';
 import 'dart:convert';
 

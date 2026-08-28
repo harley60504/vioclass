@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_oauth_webview_login_page_platform_split_gql_merge_v30
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Directory, Platform;

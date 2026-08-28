@@ -1,4 +1,3 @@
-// PATCH VERSION: subscribe_api_service_v1
 // Opens official Twitch subscription/channel pages from Flutter desktop.
 
 import 'dart:io';

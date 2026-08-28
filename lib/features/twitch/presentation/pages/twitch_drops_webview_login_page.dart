@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_drops_webview_login_page_v17
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';

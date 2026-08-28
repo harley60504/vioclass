@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_cached_image_layer_stage219ad_optional_cache_manager
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';

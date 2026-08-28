@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_route_guard_stage139_route_visible_pause
 //
 // A lightweight route-level guard for WatchPage.
 //

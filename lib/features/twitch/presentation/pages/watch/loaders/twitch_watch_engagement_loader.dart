@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_engagement_loader_stage141
 //
 // Engagement-only WatchPage background loader.
 // Owns prediction / channel points / pinned-chat refresh as one independently

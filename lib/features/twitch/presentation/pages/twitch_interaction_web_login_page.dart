@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_interaction_web_login_page_platform_split_clean_v31
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Directory, Platform;

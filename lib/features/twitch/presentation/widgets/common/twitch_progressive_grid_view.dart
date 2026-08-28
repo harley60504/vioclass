@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_progressive_grid_view_stage185_simplified_tile
 //
 // Generic progressive grid renderer. It keeps the full data set intact but only
 // exposes an initial batch of widgets, then reveals more as the user scrolls or

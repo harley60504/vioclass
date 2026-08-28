@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_ui_tokens_stage145
 //
 // Centralized Twitch UI style tokens.
 // Start moving page / sheet / chat / discovery widgets to this file instead of

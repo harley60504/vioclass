@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_third_party_emote_api_stage233_static_animated_urls
-
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../core/twitch_api_client.dart';
 

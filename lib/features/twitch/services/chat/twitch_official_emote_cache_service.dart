@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_official_emote_cache_service_stage246_user_emote_owner_name_enrichment
-
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

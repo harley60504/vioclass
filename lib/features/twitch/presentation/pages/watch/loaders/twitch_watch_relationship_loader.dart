@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_relationship_loader_stage141
 //
 // Relationship-only WatchPage background loader.
 // Keeps follow-state synchronization separate from blocking startup.

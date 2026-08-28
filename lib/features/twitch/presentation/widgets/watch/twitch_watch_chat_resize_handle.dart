@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_resize_handle_stage210_drag_start_callback
-
 import 'package:flutter/material.dart';
 
 class TwitchWatchChatResizeHandle extends StatefulWidget {

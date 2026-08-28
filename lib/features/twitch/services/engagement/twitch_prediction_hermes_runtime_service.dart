@@ -742,7 +742,8 @@ class TwitchPredictionHermesRuntimeService {
     if (rewardTitle.isEmpty) return null;
 
     return TwitchCommunityRedemptionEvent(
-      channelId: channelId ?? _readString(_readNested(redemption, 'channel_id')),
+      channelId:
+          channelId ?? _readString(_readNested(redemption, 'channel_id')),
       redemptionId:
           _readString(redemption['id'] ?? redemption['redemption_id']) ?? '',
       userId: _readString(_readNested(user, 'id')) ?? '',

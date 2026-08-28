@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_third_party_emote_stage233_static_animated_urls
-
 enum TwitchThirdPartyEmoteProvider { bttv, ffz, sevenTv }
 
 enum TwitchThirdPartyEmoteScope { global, channel, shared, other }

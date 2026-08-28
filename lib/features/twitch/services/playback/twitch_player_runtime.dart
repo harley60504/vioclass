@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_player_runtime_ad_aware_selector_v34
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';

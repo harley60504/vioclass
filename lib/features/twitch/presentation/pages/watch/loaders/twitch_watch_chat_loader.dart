@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_loader_stage141
 //
 // Chat-only WatchPage startup loader.
 // Owns startup snapshot, OAuth validation, channel id resolution and IRC

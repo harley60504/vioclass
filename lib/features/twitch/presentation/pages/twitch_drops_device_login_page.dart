@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_drops_device_login_page_platform_split_clean_v30
 import 'dart:async';
 import 'dart:io' show Directory, Platform;
 

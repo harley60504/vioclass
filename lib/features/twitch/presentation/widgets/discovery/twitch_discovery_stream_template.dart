@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_discovery_stream_template_stage219m_emote_only_route_fix
 // Shared discovery stream grid for FollowingPage and BrowsePage.
 
 import 'dart:async';

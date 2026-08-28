@@ -1,4 +1,3 @@
-// PATCH VERSION: subscribe_webview_dialog_v1
 // Twitch subscribe popup dialog using the same InAppWebView cookie jar as the app.
 
 import 'package:flutter/material.dart';

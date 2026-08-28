@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_emote_loader_stage141
 //
 // Emote-only WatchPage background loader.
 // This lane is intentionally non-blocking for WatchPage startup.

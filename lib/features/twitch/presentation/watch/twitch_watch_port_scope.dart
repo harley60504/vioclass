@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_port_scope_stage186d
 //
 // Watch feature port scope.
 //

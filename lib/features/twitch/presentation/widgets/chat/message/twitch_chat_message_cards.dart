@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';

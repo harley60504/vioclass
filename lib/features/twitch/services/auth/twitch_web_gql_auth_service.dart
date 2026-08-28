@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_web_gql_auth_service_token_split_v15
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';

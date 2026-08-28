@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_playback_service_ad_aware_contexts_v34
-
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';

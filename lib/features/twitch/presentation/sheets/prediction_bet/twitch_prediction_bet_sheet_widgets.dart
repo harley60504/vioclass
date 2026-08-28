@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_prediction_bet_sheet_widgets_stage192_glass_cards
 //
 // UI widgets for the prediction bet sheet. Runtime / Hermes / GQL fallback
 // logic stays in twitch_prediction_bet_sheet.dart.

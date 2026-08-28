@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_fullscreen_controller_stage231_window_manager_api
 // Fullscreen and chat visibility are independent.
 // Desktop uses package:window_manager directly so Windows/macOS/Linux enter real
 // OS fullscreen. Android/iOS use Flutter immersive SystemChrome mode only.

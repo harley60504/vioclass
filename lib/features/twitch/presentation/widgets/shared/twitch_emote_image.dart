@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_emote_image_stage233h_frosty_like_no_fade
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 

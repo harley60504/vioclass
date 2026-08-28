@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_drops_auth_service_token_split_v15
 import 'dart:async';
 import 'dart:convert';
 

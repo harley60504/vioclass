@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_hls_low_latency_proxy_streamlink_tuning_v43
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';

@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_feature_services_stage251b_special_message_debug
 //
 // Feature-facing service groups for Watch composition.
 //

@@ -439,9 +439,7 @@ query ChannelPanels(\$login: String!) {
     );
   }
 
-  TwitchChannelClipPageResult _parseChannelClipPage(
-    Map<String, dynamic> raw,
-  ) {
+  TwitchChannelClipPageResult _parseChannelClipPage(Map<String, dynamic> raw) {
     final data = raw['data'];
     final pagination = raw['pagination'];
 

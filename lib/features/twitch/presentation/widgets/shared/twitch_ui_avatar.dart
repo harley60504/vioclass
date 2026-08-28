@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_ui_avatar_stage145
 //
 // Shared circular avatar used by player header, chat cards, pinned messages,
 // sheets and discovery widgets. Prefer this instead of rebuilding avatar

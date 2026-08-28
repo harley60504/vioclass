@@ -26,10 +26,7 @@ class TwitchVodCommentsApiService {
   final TwitchBadgeCacheService badgeCache;
   final TwitchIrcMessageParser _parser = const TwitchIrcMessageParser();
 
-  TwitchVodCommentsApiService({
-    required this.client,
-    required this.badgeCache,
-  });
+  TwitchVodCommentsApiService({required this.client, required this.badgeCache});
 
   Future<List<TwitchVodComment>> fetchComments({
     required String videoId,
@@ -48,7 +45,9 @@ class TwitchVodCommentsApiService {
         'operationName': _operationName,
         'variables': <String, dynamic>{
           'videoID': cleanVideoId,
-          'contentOffsetSeconds': offsetSeconds.clamp(0, double.infinity).floor(),
+          'contentOffsetSeconds': offsetSeconds
+              .clamp(0, double.infinity)
+              .floor(),
         },
         'extensions': const <String, dynamic>{
           'persistedQuery': <String, dynamic>{
@@ -72,19 +71,21 @@ class TwitchVodCommentsApiService {
     final data = response.data;
     final edges = _readEdges(data);
     final normalizer = TwitchChatMessageNormalizer(badgeCache: badgeCache);
-    return edges.map((edge) {
-      final node = _asMap(edge['node']);
-      final offset = _readDouble(node['contentOffsetSeconds']);
-      final rawLine = _buildIrcLine(node, cleanChannel);
-      final message = _parser.parseLine(rawLine);
-      return TwitchVodComment(
-        contentOffsetSeconds: offset,
-        message: normalizer.normalize(
-          message,
-          receivedAt: normalizer.readMessageTimeOrNow(message),
-        ),
-      );
-    }).toList(growable: false);
+    return edges
+        .map((edge) {
+          final node = _asMap(edge['node']);
+          final offset = _readDouble(node['contentOffsetSeconds']);
+          final rawLine = _buildIrcLine(node, cleanChannel);
+          final message = _parser.parseLine(rawLine);
+          return TwitchVodComment(
+            contentOffsetSeconds: offset,
+            message: normalizer.normalize(
+              message,
+              receivedAt: normalizer.readMessageTimeOrNow(message),
+            ),
+          );
+        })
+        .toList(growable: false);
   }
 
   List<Map<String, dynamic>> _readEdges(dynamic raw) {
@@ -133,7 +134,9 @@ class TwitchVodCommentsApiService {
       for (final rawBadge in rawBadges.whereType<Map<String, dynamic>>()) {
         final setId = rawBadge['setID']?.toString() ?? '';
         final version = rawBadge['version']?.toString() ?? '';
-        if (setId.isNotEmpty) badges.add('${_sanitizeTag(setId)}/${_sanitizeTag(version)}');
+        if (setId.isNotEmpty) {
+          badges.add('${_sanitizeTag(setId)}/${_sanitizeTag(version)}');
+        }
       }
     }
 

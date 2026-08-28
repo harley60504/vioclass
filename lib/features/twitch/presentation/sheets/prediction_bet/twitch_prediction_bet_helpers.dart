@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_prediction_bet_helpers_stage167
 //
 // Shared non-UI helpers for the prediction bet sheet and its widgets.
 

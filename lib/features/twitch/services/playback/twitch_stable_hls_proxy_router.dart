@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_stable_hls_proxy_router_stage232_seamless_stream_loop
 import 'dart:async';
 import 'dart:io';
 

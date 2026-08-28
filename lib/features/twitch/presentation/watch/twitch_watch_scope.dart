@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_scope_stage186b
 //
 // Watch composition scope.
 //
