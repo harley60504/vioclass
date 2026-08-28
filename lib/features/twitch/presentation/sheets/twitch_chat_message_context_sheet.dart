@@ -28,7 +28,7 @@ Future<void> showTwitchChatMessageContextSheet({
   return showTwitchUnifiedSheet<void>(
     context: context,
     title: '回覆串 · ${entries.length}',
-    subtitle: '依 reply 關係顯示；提及標記不聚集',
+    subtitle: '依回覆關係顯示；提及標記不聚集',
     icon: Icons.reply_rounded,
     size: TwitchUnifiedSheetSize.medium,
     showRefresh: false,

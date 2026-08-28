@@ -50,7 +50,7 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
     final cleanBody = body.trim();
 
     if (cleanName.isEmpty && cleanBody.isEmpty) {
-      return <InlineSpan>[TextSpan(text: 'reply', style: _baseStyle())];
+      return <InlineSpan>[TextSpan(text: '回覆', style: _baseStyle())];
     }
 
     final spans = <InlineSpan>[];
