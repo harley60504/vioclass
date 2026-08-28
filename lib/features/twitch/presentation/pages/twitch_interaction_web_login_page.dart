@@ -214,7 +214,7 @@ class _TwitchInteractionWebLoginPageState
       setState(() {
         _openingWindow = false;
         _windowOpen = false;
-        _errorText = '建立官方 Web 登入視窗失敗：$e';
+        _errorText = '建立官方 Web 登入視窗失敗，請稍後再試。';
         _statusText = '無法開啟桌面登入視窗。';
       });
     }
@@ -315,8 +315,8 @@ class _TwitchInteractionWebLoginPageState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorText = '檢查 Twitch Web 授權資訊失敗：$e';
-        _lastProbeText = '檢查失敗：$e';
+        _errorText = '檢查 Twitch Web 授權資訊失敗，請確認登入後再試。';
+        _lastProbeText = '檢查失敗，等待重新嘗試。';
       });
     } finally {
       _checking = false;
@@ -499,9 +499,9 @@ class _TwitchInteractionWebLoginPageState
       _startProbeTimer();
       if (!mounted) return;
       setState(() {
-        _errorText = 'Web/GQL 授權驗證失敗：$e';
+        _errorText = 'Web/GQL 授權驗證失敗，請重新登入後再試。';
         _statusText = '已讀到授權資訊，但尚未通過 GQL 檢查。';
-        _lastProbeText = '失敗：$e';
+        _lastProbeText = '驗證失敗，等待重新嘗試。';
       });
     }
   }
