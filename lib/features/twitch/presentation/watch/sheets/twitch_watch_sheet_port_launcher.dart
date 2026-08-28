@@ -116,7 +116,7 @@ class TwitchWatchSheetPortLauncher {
         channelLogin: channelLogin(),
         channelId: channelPointsSnapshot()?.channelId ?? channelId(),
         title: title,
-        subtitle: '在下方輸入欄輸入內容，按 Send 後兌換。',
+        subtitle: '在下方輸入欄輸入內容，按送出後兌換。',
         costLabel: cost > 0 ? '$cost 點' : null,
         payload: <String, dynamic>{'reward': reward},
       ),
