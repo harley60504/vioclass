@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchChatInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
@@ -144,13 +146,13 @@ class _SelfDrawnInputField extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: enabled
-                ? const Color(0xFFBF94FF).withValues(alpha: 0.22)
+                ? TwitchUiColors.primarySoft.withValues(alpha: 0.22)
                 : Colors.white.withValues(alpha: 0.065),
           ),
           boxShadow: enabled
               ? <BoxShadow>[
                   BoxShadow(
-                    color: const Color(0xFF9146FF).withValues(alpha: 0.10),
+                    color: TwitchUiColors.primary.withValues(alpha: 0.10),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -170,7 +172,7 @@ class _SelfDrawnInputField extends StatelessWidget {
             height: lineHeight,
             forceStrutHeight: true,
           ),
-          cursorColor: const Color(0xFFBF94FF),
+          cursorColor: TwitchUiColors.primarySoft,
           decoration: InputDecoration(
             isCollapsed: true,
             hintText: '輸入聊天室訊息...',
@@ -211,10 +213,10 @@ class _SelfDrawnSendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final foreground = enabled ? Colors.white : Colors.white38;
     final background = enabled
-        ? const Color(0xFF9146FF).withValues(alpha: 0.38)
+        ? TwitchUiColors.primary.withValues(alpha: 0.38)
         : Colors.white.withValues(alpha: 0.070);
     final borderColor = enabled
-        ? const Color(0xFFBF94FF).withValues(alpha: 0.46)
+        ? TwitchUiColors.primarySoft.withValues(alpha: 0.46)
         : Colors.white.withValues(alpha: 0.085);
 
     return Material(
@@ -235,7 +237,7 @@ class _SelfDrawnSendButton extends StatelessWidget {
             boxShadow: enabled
                 ? <BoxShadow>[
                     BoxShadow(
-                      color: const Color(0xFF9146FF).withValues(alpha: 0.22),
+                      color: TwitchUiColors.primary.withValues(alpha: 0.22),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),

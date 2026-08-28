@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../theme/twitch_ui_tokens.dart';
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
@@ -21,17 +22,17 @@ class TwitchChatSmallChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(
-        color: const Color(0xFF9146FF).withValues(alpha: 0.22),
+        color: TwitchUiColors.primary.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(99),
         border: Border.all(
-          color: const Color(0xFF9146FF).withValues(alpha: 0.35),
+          color: TwitchUiColors.primary.withValues(alpha: 0.35),
         ),
       ),
       child: Text(
         label,
         style: twitchChatTextStyle(
           TextStyle(
-            color: const Color(0xFFBF94FF),
+            color: TwitchUiColors.primarySoft,
             fontSize: metrics.chipFontSize,
             fontWeight: FontWeight.w800,
           ),
@@ -54,14 +55,14 @@ class TwitchChatFirstMessageChip extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(99),
         border: Border.all(
-          color: const Color(0xFFBF94FF).withValues(alpha: 0.45),
+          color: TwitchUiColors.primarySoft.withValues(alpha: 0.45),
         ),
       ),
       child: Text(
         '首聊',
         style: twitchChatTextStyle(
           TextStyle(
-            color: const Color(0xFFCBB2FF),
+            color: TwitchUiColors.primarySoft,
             fontSize: (metrics.chipFontSize - 0.5).clamp(8.0, 12.0),
             fontWeight: FontWeight.w800,
             height: 1.1,
