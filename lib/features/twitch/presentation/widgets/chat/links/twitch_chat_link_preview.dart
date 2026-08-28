@@ -9,84 +9,11 @@ import '../../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../pages/twitch_watch_page.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_cached_image_layer.dart';
+import 'twitch_chat_link_preview_models.dart';
+import 'twitch_chat_link_preview_policy.dart';
 
-final RegExp twitchChatUrlRegex = RegExp(
-  r'(https?:\/\/[^\s]+|www\.[^\s]+)',
-  caseSensitive: false,
-);
-
-const List<String> _trustedBaseDomains = <String>[
-  'youtube.com',
-  'youtu.be',
-  'twitch.tv',
-  'twitter.com',
-  'x.com',
-  'imgur.com',
-  'giphy.com',
-  'gph.is',
-  'tenor.com',
-  'reddit.com',
-  'redd.it',
-  'github.com',
-  'streamable.com',
-  'kick.com',
-  'spotify.com',
-  'soundcloud.com',
-  'tiktok.com',
-  'discord.gg',
-  'discord.com',
-  'discordapp.com',
-  'steampowered.com',
-  'steamcommunity.com',
-  'instagram.com',
-  'bsky.app',
-  'vimeo.com',
-  'bandcamp.com',
-];
-
-class TwitchChatTextPart {
-  final String text;
-  final bool isLink;
-
-  const TwitchChatTextPart({required this.text, required this.isLink});
-}
-
-class TwitchChatPreviewUrl {
-  final String url;
-  final bool trusted;
-
-  const TwitchChatPreviewUrl({required this.url, required this.trusted});
-}
-
-class TwitchChatLinkPreviewData {
-  final String url;
-  final String kind;
-  final String host;
-  final String? title;
-  final String? description;
-  final String? imageUrl;
-  final String? siteName;
-  final String? author;
-  final String? videoId;
-
-  const TwitchChatLinkPreviewData({
-    required this.url,
-    required this.kind,
-    required this.host,
-    this.title,
-    this.description,
-    this.imageUrl,
-    this.siteName,
-    this.author,
-    this.videoId,
-  });
-
-  bool get hasContent {
-    return (title?.trim().isNotEmpty ?? false) ||
-        (description?.trim().isNotEmpty ?? false) ||
-        (imageUrl?.trim().isNotEmpty ?? false);
-  }
-}
+export 'twitch_chat_link_preview_models.dart';
+export 'twitch_chat_link_preview_policy.dart';
 
 class _TwitchClipLink {
   final String slug;
@@ -135,82 +62,6 @@ const String _clipPreviewQuery = r'''
     }
   }
 ''';
-
-List<TwitchChatTextPart> splitTwitchChatLinks(String text) {
-  if (text.isEmpty) return const <TwitchChatTextPart>[];
-
-  final parts = <TwitchChatTextPart>[];
-  var cursor = 0;
-  for (final match in twitchChatUrlRegex.allMatches(text)) {
-    if (match.start > cursor) {
-      parts.add(
-        TwitchChatTextPart(
-          text: text.substring(cursor, match.start),
-          isLink: false,
-        ),
-      );
-    }
-
-    parts.add(TwitchChatTextPart(text: match.group(0) ?? '', isLink: true));
-    cursor = match.end;
-  }
-
-  if (cursor < text.length) {
-    parts.add(TwitchChatTextPart(text: text.substring(cursor), isLink: false));
-  }
-  return parts;
-}
-
-List<TwitchChatPreviewUrl> extractTwitchChatPreviewUrls(
-  String text, {
-  int max = 2,
-}) {
-  if (text.isEmpty || (!text.contains('http') && !text.contains('www.'))) {
-    return const <TwitchChatPreviewUrl>[];
-  }
-
-  final output = <TwitchChatPreviewUrl>[];
-  final seen = <String>{};
-  for (final match in twitchChatUrlRegex.allMatches(text)) {
-    if (output.length >= max) break;
-    final uri = normalizeTwitchChatUri(match.group(0) ?? '');
-    if (uri == null) continue;
-
-    final url = uri.toString();
-    if (!seen.add(url)) continue;
-    output.add(
-      TwitchChatPreviewUrl(url: url, trusted: isTrustedTwitchChatUri(uri)),
-    );
-  }
-  return output;
-}
-
-bool isTrustedTwitchChatUri(Uri uri) {
-  final host = uri.host.toLowerCase();
-  return _trustedBaseDomains.any((base) {
-    return host == base || host.endsWith('.$base');
-  });
-}
-
-String prettyTwitchChatUrlLabel(String rawUrl, {int maxLength = 44}) {
-  final uri = normalizeTwitchChatUri(rawUrl);
-  if (uri == null) {
-    return rawUrl.length > maxLength
-        ? '${rawUrl.substring(0, maxLength - 1)}...'
-        : rawUrl;
-  }
-
-  final host = uri.host.replaceFirst(RegExp(r'^www\.'), '');
-  final rest =
-      (uri.path == '/' ? '' : uri.path) +
-      (uri.hasQuery ? '?${uri.query}' : '') +
-      (uri.hasFragment ? '#${uri.fragment}' : '');
-  final full = '$host$rest';
-  if (full.length <= maxLength) return full;
-
-  final room = (maxLength - host.length - 3).clamp(0, maxLength);
-  return '$host${rest.substring(0, room)}...';
-}
 
 List<InlineSpan> buildTwitchChatLinkifiedSpans({
   required BuildContext context,
@@ -791,6 +642,7 @@ Future<TwitchChatLinkPreviewData?> _fetchTwitchChatLinkPreview(Uri uri) async {
   final status = response.statusCode ?? 0;
   final html = response.data ?? '';
   if (status >= 400 || html.trim().isEmpty) return null;
+  final responseUri = response.realUri;
 
   final title =
       _readMeta(html, const <String>['og:title', 'twitter:title']) ??
@@ -812,11 +664,11 @@ Future<TwitchChatLinkPreviewData?> _fetchTwitchChatLinkPreview(Uri uri) async {
 
   return TwitchChatLinkPreviewData(
     url: uri.toString(),
-    kind: _detectPreviewKind(uri),
-    host: uri.host.replaceFirst(RegExp(r'^www\.'), ''),
+    kind: _detectPreviewKind(responseUri),
+    host: responseUri.host.replaceFirst(RegExp(r'^www\.'), ''),
     title: _cleanPreviewText(title),
     description: _cleanPreviewText(description),
-    imageUrl: image == null ? null : uri.resolve(image).toString(),
+    imageUrl: image == null ? null : responseUri.resolve(image).toString(),
     siteName: _cleanPreviewText(siteName),
   );
 }
@@ -1127,28 +979,6 @@ Future<void> showTwitchChatLinkPreviewSheet(
       );
     },
   );
-}
-
-Uri? normalizeTwitchChatUri(String rawUrl) {
-  var text = rawUrl.trim();
-  while (text.endsWith('.') ||
-      text.endsWith(',') ||
-      text.endsWith('!') ||
-      text.endsWith('?') ||
-      text.endsWith(')') ||
-      text.endsWith(']')) {
-    text = text.substring(0, text.length - 1).trimRight();
-  }
-  if (text.isEmpty) return null;
-  if (text.startsWith('www.')) {
-    text = 'https://$text';
-  }
-
-  final uri = Uri.tryParse(text);
-  if (uri == null) return null;
-  final scheme = uri.scheme.toLowerCase();
-  if (scheme != 'http' && scheme != 'https') return null;
-  return uri;
 }
 
 Future<void> openTwitchChatLink(BuildContext context, String rawUrl) async {

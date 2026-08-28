@@ -148,6 +148,7 @@ class TwitchWatchServices {
     );
     final officialEmotes = TwitchOfficialEmoteCacheService(
       api: TwitchOfficialEmoteApiService(client: apiClient),
+      availableEmoteSetsGql: publicWebGqlApi,
       accessTokenProvider: authService.getValidAccessToken,
       clientIdProvider: () async {
         final stored = authService.clientId?.trim();

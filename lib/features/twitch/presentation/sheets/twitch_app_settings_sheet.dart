@@ -480,12 +480,142 @@ class _ChatSettingsPane extends StatelessWidget {
                     emoteSize: emoteSize,
                     compact: compact,
                   ),
+                  const SizedBox(height: 12),
+                  _TrustedDomainsControl(controller: controller),
                 ],
               ),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+class _TrustedDomainsControl extends StatefulWidget {
+  final TwitchChatAppearanceController controller;
+
+  const _TrustedDomainsControl({required this.controller});
+
+  @override
+  State<_TrustedDomainsControl> createState() => _TrustedDomainsControlState();
+}
+
+class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
+  final TextEditingController _textController = TextEditingController();
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addDomain() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+    await widget.controller.addTrustedPreviewDomain(text);
+    _textController.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final domains = widget.controller.trustedPreviewDomains;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SettingsSwitchRow(
+          title: '自動載入連結預覽',
+          subtitle: '只會自動載入內建可信網域和你加入的網域',
+          value: widget.controller.linkPreviewsEnabled,
+          onChanged: widget.controller.setLinkPreviewsEnabled,
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _textController,
+                minLines: 1,
+                maxLines: 1,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _addDomain(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: InputDecoration(
+                  isDense: true,
+                  hintText: '新增可信網域，例如 example.com',
+                  hintStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.36),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  filled: true,
+                  fillColor: Colors.black.withValues(alpha: 0.20),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(11),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.09),
+                    ),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(11),
+                    borderSide: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.09),
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(11),
+                    borderSide: const BorderSide(color: Color(0xFFBF94FF)),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 10,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: _addDomain,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('加入'),
+            ),
+          ],
+        ),
+        if (domains.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              for (final domain in domains)
+                InputChip(
+                  label: Text(domain),
+                  onDeleted: () {
+                    widget.controller.removeTrustedPreviewDomain(domain);
+                  },
+                  deleteIcon: const Icon(Icons.close_rounded, size: 16),
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(
+                    color: const Color(0xFFBF94FF).withValues(alpha: 0.24),
+                  ),
+                  backgroundColor: const Color(
+                    0xFF9146FF,
+                  ).withValues(alpha: 0.13),
+                  labelStyle: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

@@ -71,6 +71,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
         ? 'PINNED MESSAGE'
         : 'PINNED BY $pinnedBy';
     final cleanText = message.text.trim();
+    final previewItems = extractTwitchChatPreviewUrls(cleanText, max: 1);
     final scale = _safeFontScale;
 
     final nameFontSize = (TwitchUiFontSize.chatName + 0.8) * scale;
@@ -221,6 +222,13 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                           ),
                         ),
                       ),
+                      if (_expanded && previewItems.isNotEmpty) ...[
+                        SizedBox(height: 7 * scale),
+                        TwitchChatLinkPreviewColumn(
+                          items: previewItems,
+                          fontScale: scale,
+                        ),
+                      ],
                       if (_expanded) ...[
                         SizedBox(height: 7 * scale),
                         Text(

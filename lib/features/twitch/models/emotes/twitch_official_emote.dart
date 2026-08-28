@@ -9,6 +9,7 @@ class TwitchOfficialEmote {
   final String emoteSetId;
   final String ownerId;
   final String ownerDisplayName;
+  final List<String> formats;
   final TwitchOfficialEmoteSource source;
   final bool unlocked;
 
@@ -21,6 +22,7 @@ class TwitchOfficialEmote {
     required this.emoteSetId,
     required this.ownerId,
     this.ownerDisplayName = '',
+    this.formats = const <String>[],
     required this.source,
     required this.unlocked,
   });
@@ -33,6 +35,9 @@ class TwitchOfficialEmote {
     final id = json['id']?.toString() ?? '';
     final name = json['name']?.toString() ?? '';
     final images = json['images'];
+    final formats = _readStringList(
+      json['format'],
+    ).map((value) => value.toLowerCase()).toSet().toList(growable: false);
 
     var imageUrl = '';
     if (images is Map) {
@@ -60,6 +65,7 @@ class TwitchOfficialEmote {
           json['owner_display_name']?.toString() ??
           json['owner_login']?.toString() ??
           '',
+      formats: formats,
       source: source,
       unlocked: unlocked,
     );
@@ -74,6 +80,7 @@ class TwitchOfficialEmote {
     String? emoteSetId,
     String? ownerId,
     String? ownerDisplayName,
+    List<String>? formats,
     TwitchOfficialEmoteSource? source,
     bool? unlocked,
   }) {
@@ -86,12 +93,39 @@ class TwitchOfficialEmote {
       emoteSetId: emoteSetId ?? this.emoteSetId,
       ownerId: ownerId ?? this.ownerId,
       ownerDisplayName: ownerDisplayName ?? this.ownerDisplayName,
+      formats: formats ?? this.formats,
       source: source ?? this.source,
       unlocked: unlocked ?? this.unlocked,
     );
   }
 
   bool get locked => !unlocked;
+
+  bool get supportsAnimation {
+    return formats.any((format) => format.toLowerCase() == 'animated');
+  }
+
+  String officialAnimatedImageUrl({String scale = '2.0'}) {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty || !supportsAnimation) return '';
+    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/animated/dark/$scale';
+  }
+
+  String officialStaticImageUrl({String scale = '2.0'}) {
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) return imageUrl.trim();
+    return 'https://static-cdn.jtvnw.net/emoticons/v2/$cleanId/static/dark/$scale';
+  }
+
+  String preferredImageUrl({bool animated = true, String scale = '2.0'}) {
+    if (animated) {
+      final animatedUrl = officialAnimatedImageUrl(scale: scale);
+      if (animatedUrl.isNotEmpty) return animatedUrl;
+    }
+    final direct = imageUrl.trim();
+    if (direct.isNotEmpty) return direct;
+    return officialStaticImageUrl(scale: scale);
+  }
 
   bool get isSubscriptionLike {
     final type = emoteType.toLowerCase();
@@ -125,8 +159,17 @@ class TwitchOfficialEmote {
       'emoteSetId': emoteSetId,
       'ownerId': ownerId,
       'ownerDisplayName': ownerDisplayName,
+      'formats': formats,
       'source': source.name,
       'unlocked': unlocked,
     };
+  }
+
+  static List<String> _readStringList(Object? value) {
+    if (value is! List) return const <String>[];
+    return value
+        .map((item) => item?.toString().trim() ?? '')
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
   }
 }

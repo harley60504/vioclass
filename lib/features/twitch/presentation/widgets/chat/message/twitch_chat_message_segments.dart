@@ -458,20 +458,7 @@ String _officialImageUrl(
   TwitchOfficialEmote emote, {
   required bool animateEmotes,
 }) {
-  if (!animateEmotes) {
-    final staticUrl = TwitchEmoteImage.officialStaticEmoteUrl(emote.id);
-    if (staticUrl.isNotEmpty) return staticUrl;
-  }
-
-  final direct = emote.imageUrl.trim();
-  if (direct.isNotEmpty) return direct;
-
-  final id = emote.id.trim();
-  if (id.isEmpty) return '';
-
-  return animateEmotes
-      ? 'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0'
-      : TwitchEmoteImage.officialStaticEmoteUrl(id);
+  return emote.preferredImageUrl(animated: animateEmotes);
 }
 
 void _appendThirdPartyEmoteSpan({

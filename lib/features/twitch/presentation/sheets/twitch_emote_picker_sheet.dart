@@ -7,6 +7,7 @@ import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/chat/emotes/twitch_official_emote_pages.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_emote_image.dart';
 
@@ -201,59 +202,20 @@ class _TwitchUnifiedEmotePickerSheetState
       );
     }
 
-    final channel = _uniqueOfficial(official.channelEmotes);
-    final global = _uniqueOfficial(official.globalEmotes);
-    final user = _uniqueOfficial(official.userEmotes);
+    final officialPages = buildTwitchOfficialEmotePages(official);
 
     _emotePickerDebugLog(
-      'official tab channel=${channel.length} global=${global.length} user=${user.length}',
+      'official tab pages=${officialPages.map((page) => '${page.label}:${page.emotes.length}').join(', ')}',
     );
-
-    final channelKeys = channel.map(_officialKey).toSet();
-    final globalKeys = global.map(_officialKey).toSet();
-    final currentChannelId = official.channelId.trim();
-
-    final userOnly = user
-        .where((emote) {
-          final key = _officialKey(emote);
-          if (channelKeys.contains(key)) return false;
-          if (globalKeys.contains(key)) return false;
-          if (currentChannelId.isNotEmpty &&
-              emote.ownerId.trim() == currentChannelId) {
-            return false;
-          }
-          return true;
-        })
-        .toList(growable: false);
-
-    final unlocked = _uniqueOfficial(
-      userOnly.where((emote) => _isUnlockedOfficialEmote(emote)),
-    );
-    final subscriptions = _uniqueOfficial(
-      userOnly.where((emote) => !_isUnlockedOfficialEmote(emote)),
-    );
-    final subscriptionGroups = _groupOfficialByOwner(subscriptions);
 
     return _OuterTab(
       label: 'Twitch',
       pages: [
-        _InnerPage(
-          label: 'Channel',
-          entries: channel.map(_officialEntry).toList(growable: false),
-        ),
-        _InnerPage(
-          label: 'Global',
-          entries: global.map(_officialEntry).toList(growable: false),
-        ),
-        for (final group in subscriptionGroups.entries)
+        for (final page in officialPages)
           _InnerPage(
-            label: group.key,
-            entries: group.value.map(_officialEntry).toList(growable: false),
+            label: page.label,
+            entries: page.emotes.map(_officialEntry).toList(growable: false),
           ),
-        _InnerPage(
-          label: 'Unlocked',
-          entries: unlocked.map(_officialEntry).toList(growable: false),
-        ),
       ],
     );
   }
@@ -321,62 +283,6 @@ class _TwitchUnifiedEmotePickerSheetState
       return false;
     }
     return true;
-  }
-
-  Map<String, List<TwitchOfficialEmote>> _groupOfficialByOwner(
-    List<TwitchOfficialEmote> emotes,
-  ) {
-    final grouped = <String, List<TwitchOfficialEmote>>{};
-    for (final emote in emotes) {
-      final ownerLabel = _ownerLabel(emote);
-      grouped.putIfAbsent(ownerLabel, () => <TwitchOfficialEmote>[]).add(emote);
-    }
-    final keys = grouped.keys.toList(growable: false)
-      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-    return <String, List<TwitchOfficialEmote>>{
-      for (final key in keys)
-        key: _uniqueOfficial(grouped[key] ?? const <TwitchOfficialEmote>[]),
-    };
-  }
-
-  String _ownerLabel(TwitchOfficialEmote emote) {
-    final display = emote.ownerDisplayName.trim();
-    if (display.isNotEmpty) return display;
-    final ownerId = emote.ownerId.trim();
-    if (ownerId.isNotEmpty) return 'Sub $ownerId';
-    final setId = emote.emoteSetId.trim();
-    if (setId.isNotEmpty) return 'Sub $setId';
-    return 'Sub';
-  }
-
-  bool _isUnlockedOfficialEmote(TwitchOfficialEmote emote) {
-    final ownerId = emote.ownerId.trim();
-    final ownerDisplayName = emote.ownerDisplayName.trim();
-    final ownerIsMissing = ownerId.isEmpty && ownerDisplayName.isEmpty;
-    final type = emote.emoteType.toLowerCase();
-    return ownerIsMissing ||
-        type.contains('unlock') ||
-        type.contains('unlocked') ||
-        type.contains('hypetrain') ||
-        type.contains('prime') ||
-        type.contains('limitedtime');
-  }
-
-  List<TwitchOfficialEmote> _uniqueOfficial(
-    Iterable<TwitchOfficialEmote> source,
-  ) {
-    final byKey = <String, TwitchOfficialEmote>{};
-    for (final emote in source) {
-      byKey[_officialKey(emote)] = emote;
-    }
-    final output = byKey.values.toList(growable: false)
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return output;
-  }
-
-  String _officialKey(TwitchOfficialEmote emote) {
-    final id = emote.id.trim();
-    return id.isNotEmpty ? 'id:$id' : 'name:${emote.name.trim().toLowerCase()}';
   }
 
   void _selectEntry(_EmoteEntry entry) {
@@ -861,7 +767,7 @@ class _EmoteEntry {
     return _EmoteEntry(
       id: emote.id,
       name: emote.name,
-      imageUrl: emote.imageUrl,
+      imageUrl: emote.preferredImageUrl(),
       providerLabel: emote.sourceLabel,
       locked: locked ?? emote.locked,
       favorite: favorite,

@@ -1,6 +1,7 @@
 import '../../models/emotes/twitch_official_emote.dart';
 import '../core/twitch_api_client.dart';
 import '../core/twitch_api_constants.dart';
+import '../core/twitch_web_gql_persisted_api_service.dart';
 
 class TwitchOfficialEmoteApiService {
   final TwitchApiClient client;
@@ -124,6 +125,90 @@ class TwitchOfficialEmoteApiService {
     return output;
   }
 
+  Future<List<TwitchOfficialEmote>> fetchAvailableEmotesForChannel({
+    required String broadcasterId,
+    required TwitchWebGqlPersistedApiService gql,
+  }) async {
+    final cleanBroadcasterId = broadcasterId.trim();
+    if (cleanBroadcasterId.isEmpty) return const <TwitchOfficialEmote>[];
+
+    final output = <TwitchOfficialEmote>[];
+    String? cursor;
+
+    do {
+      final result = await gql.single(
+        TwitchWebGqlPersistedOperation(
+          operationName: 'AvailableEmotesForChannelPaginated',
+          variables: <String, dynamic>{
+            'channelID': cleanBroadcasterId,
+            'cursor': cursor,
+            'pageLimit': 350,
+            'withOwner': true,
+          },
+          sha256Hash:
+              '6c45e0ecaa823cc7db3ecdd1502af2223c775bdcfb0f18a3a0ce9a0b7db8ef6c',
+        ),
+      );
+
+      if (result.hasErrors) return const <TwitchOfficialEmote>[];
+
+      final data = result.data;
+      final channel = data is Map ? data['channel'] : null;
+      final self = channel is Map ? channel['self'] : null;
+      final sets = self is Map ? self['availableEmoteSetsPaginated'] : null;
+      final edges = sets is Map ? sets['edges'] : null;
+      if (edges is! List) break;
+
+      for (final edge in edges.whereType<Map>()) {
+        final node = edge['node'];
+        if (node is! Map) continue;
+        final owner = node['owner'];
+        final ownerId = owner is Map ? owner['id']?.toString() ?? '' : '';
+        final ownerDisplayName = owner is Map
+            ? (owner['displayName'] ?? owner['login'])?.toString() ?? ''
+            : '';
+        final emotes = node['emotes'];
+        if (emotes is! List) continue;
+
+        for (final item in emotes.whereType<Map>()) {
+          final id = item['id']?.toString() ?? '';
+          final name = _normalizeGqlEmoteToken(
+            item['token']?.toString() ?? item['name']?.toString() ?? '',
+            item['type']?.toString() ?? '',
+          );
+          if (id.trim().isEmpty || name.trim().isEmpty) continue;
+
+          output.add(
+            TwitchOfficialEmote(
+              id: id,
+              name: name,
+              imageUrl:
+                  'https://static-cdn.jtvnw.net/emoticons/v2/$id/default/dark/2.0',
+              emoteType: item['type']?.toString() ?? '',
+              tier: item['subscriptionTier']?.toString() ?? '',
+              emoteSetId: item['setID']?.toString() ?? '',
+              ownerId: ownerId,
+              ownerDisplayName: ownerDisplayName,
+              source: TwitchOfficialEmoteSource.user,
+              unlocked: true,
+            ),
+          );
+        }
+
+        final edgeCursor = edge['cursor']?.toString();
+        if (edgeCursor != null && edgeCursor.trim().isNotEmpty) {
+          cursor = edgeCursor;
+        }
+      }
+
+      final pageInfo = sets is Map ? sets['pageInfo'] : null;
+      final hasNext = pageInfo is Map && pageInfo['hasNextPage'] == true;
+      if (!hasNext) cursor = null;
+    } while (cursor != null && cursor.trim().isNotEmpty);
+
+    return output;
+  }
+
   List<TwitchOfficialEmote> _parseEmotes(
     Map<String, dynamic> raw, {
     required TwitchOfficialEmoteSource source,
@@ -145,7 +230,6 @@ class TwitchOfficialEmoteApiService {
       output.add(emote);
     }
 
-    output.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return output;
   }
 
@@ -157,5 +241,17 @@ class TwitchOfficialEmoteApiService {
       'Client-ID': clientId.trim(),
       'Authorization': 'Bearer ${accessToken.trim()}',
     };
+  }
+
+  String _normalizeGqlEmoteToken(String token, String type) {
+    var output = token.trim();
+    if (type.toLowerCase() == 'smilies') {
+      output = output
+          .replaceAll(r'\', '')
+          .replaceAll('?', '')
+          .replaceAll('&lt;', '<')
+          .replaceAll('&gt;', '>');
+    }
+    return output;
   }
 }
