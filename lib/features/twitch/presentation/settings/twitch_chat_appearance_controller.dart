@@ -112,3 +112,6 @@ class TwitchChatAppearanceController extends ChangeNotifier {
     return host.replaceFirst(RegExp(r'^www\.'), '');
   }
 }
+
+final TwitchChatAppearanceController twitchChatAppearanceController =
+    TwitchChatAppearanceController();

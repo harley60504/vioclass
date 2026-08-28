@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_timestamp_stage154
 //
 // Timestamp widgets and formatting for runtime chat messages.
 

@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_visual_metrics_stage152
 //
 // Central visual sizing for runtime chat messages. Adjust chat text / emote /
 // badge sizes here instead of editing the whole message tile file.

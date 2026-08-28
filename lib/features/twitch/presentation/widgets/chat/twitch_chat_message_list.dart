@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_list_stage242_simple_frosty_like
 
 import 'dart:async';
 

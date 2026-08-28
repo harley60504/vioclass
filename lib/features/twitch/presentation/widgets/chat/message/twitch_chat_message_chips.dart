@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_chips_stage154
 //
 // Small reusable chips used inside chat messages.
 

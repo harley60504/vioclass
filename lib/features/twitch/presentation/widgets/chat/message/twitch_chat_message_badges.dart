@@ -1,9 +1,7 @@
-// PATCH VERSION: twitch_chat_message_badges_stage219aa_frosty_light_badges
 //
 // Badge renderer for runtime chat messages. Badge sizing is controlled by
 // TwitchChatMessageVisualMetrics, while this file owns badge image rendering.
 //
-// Stage 219AA:
 // - Removes Tooltip from hot chat badge rendering.
 // - Disables badge image fade for lower rebuild/raster overhead in fast chats.
 

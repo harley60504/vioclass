@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_author_stage162
 //
 // Author name + first-message chip + colon renderer for runtime chat messages.
 // Keep this separate so author styling can change without touching segment or

@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_prediction_banner_stage192_glass_card
 //
 // Extracted prediction banner UI from TwitchChatEngagementStrip. Keep the
 // prediction card, countdown pill and split bar here so engagement strip remains

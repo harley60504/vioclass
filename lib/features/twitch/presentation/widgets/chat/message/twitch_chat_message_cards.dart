@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_cards_stage233_emote_animation_policy
 
 import 'package:flutter/material.dart';
 

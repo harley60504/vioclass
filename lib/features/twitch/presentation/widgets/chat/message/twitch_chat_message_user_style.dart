@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_user_style_stage152
 //
 // User display helpers for runtime chat messages.
 

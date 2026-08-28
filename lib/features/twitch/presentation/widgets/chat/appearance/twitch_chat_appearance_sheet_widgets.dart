@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_appearance_sheet_widgets_stage163
 //
 // UI pieces used by the chat appearance sheet. Keep slider and preview styling
 // here so the sheet entry file only wires the controller into the unified sheet.

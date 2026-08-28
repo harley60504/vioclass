@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_segments_inline_mentions
 
 import 'package:flutter/material.dart';
 

@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_engagement_area_stage198_font_scale
 //
 // Pinned message / prediction engagement section used by Watch chat.
 

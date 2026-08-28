@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_layout_metrics_stage227c_restore_layout_only_metrics
 //
 // Pure layout calculations for Watch chat. Keeping these numbers here makes
 // TwitchWatchChatPanel read like composition instead of a block of geometry.

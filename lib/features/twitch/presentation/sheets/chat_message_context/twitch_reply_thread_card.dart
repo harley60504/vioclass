@@ -1,8 +1,6 @@
-// PATCH VERSION: twitch_reply_thread_card_stage248_font_scale_tags
 //
 // Reply-thread card UI for Twitch chat message context sheet. This owns the
 // card shell, relation chips and copy-to-clipboard behavior.
-// Stage 248 makes the reply history sheet respect the active chat font scale
 // and improves @tag readability.
 
 import 'package:flutter/material.dart';

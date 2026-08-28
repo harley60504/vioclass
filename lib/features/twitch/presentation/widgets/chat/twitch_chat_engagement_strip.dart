@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_engagement_strip_stage198_font_scale
 
 import 'package:flutter/material.dart';
 

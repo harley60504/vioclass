@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_reply_preview_bright_mentions
 //
 // Reply preview widget used by runtime chat message content.
 // Highlights @mentions in the compact reply preview so tags remain

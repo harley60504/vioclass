@@ -102,7 +102,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       <String, String>{};
 
   final TwitchChatAppearanceController _appearanceController =
-      TwitchChatAppearanceController();
+      twitchChatAppearanceController;
 
   StreamSubscription<TwitchPredictionSnapshot?>? _predictionSubscription;
   Timer? _predictionAutoHideTimer;

@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_pinned_message_banner_stage198_font_scale
 //
 // Extracted pinned-message UI component. Keep pinned card visuals here instead
 // of embedding style decisions inside the engagement strip.

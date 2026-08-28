@@ -26,7 +26,7 @@ class TwitchVodReplayChatPanel extends StatefulWidget {
 class _TwitchVodReplayChatPanelState extends State<TwitchVodReplayChatPanel> {
   TwitchVodReplayChatMode _mode = TwitchVodReplayChatMode.replay;
   final TwitchChatAppearanceController _appearanceController =
-      TwitchChatAppearanceController();
+      twitchChatAppearanceController;
 
   @override
   void initState() {
@@ -45,12 +45,6 @@ class _TwitchVodReplayChatPanelState extends State<TwitchVodReplayChatPanel> {
         widget.runtime.nudge();
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _appearanceController.dispose();
-    super.dispose();
   }
 
   @override

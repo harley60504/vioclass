@@ -1,8 +1,6 @@
-// PATCH VERSION: twitch_chat_message_context_sheet_stage248_font_scale
 //
 // Chat message context sheet. Reply-thread construction and card UI live in
 // chat_message_context/* so this file stays as the sheet entry/list composer.
-// Stage 248 passes the active chat font scale into the reply history cards.
 
 import 'package:flutter/material.dart';
 

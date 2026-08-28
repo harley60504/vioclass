@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_chat_message_special_style_stage154
 //
 // Visual style mapping for Twitch special chat messages.
 

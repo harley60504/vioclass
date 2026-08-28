@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_runtime_message_tile_stage233_emote_animation_policy
 
 import 'package:flutter/material.dart';
 

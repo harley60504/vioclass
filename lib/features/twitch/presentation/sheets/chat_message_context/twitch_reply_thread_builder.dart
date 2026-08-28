@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_reply_thread_builder_stage266_full_conversation
 //
 // Reply-thread construction logic for Twitch chat message context sheet.
 // This file intentionally contains no Flutter UI code.

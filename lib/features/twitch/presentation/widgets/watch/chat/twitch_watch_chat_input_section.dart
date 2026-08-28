@@ -1,4 +1,3 @@
-// PATCH VERSION: twitch_watch_chat_input_section_pending_action_entry
 
 import 'package:flutter/material.dart';
 

@@ -72,7 +72,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       authService: authService,
       authApi: authApi,
     );
-    chatAppearanceController = TwitchChatAppearanceController();
+    chatAppearanceController = twitchChatAppearanceController;
     playerSettingsController = TwitchPlayerSettingsController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -85,7 +85,6 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   @override
   void dispose() {
     searchController.dispose();
-    chatAppearanceController.dispose();
     playerSettingsController.dispose();
     apiClient.close(force: true);
     super.dispose();
