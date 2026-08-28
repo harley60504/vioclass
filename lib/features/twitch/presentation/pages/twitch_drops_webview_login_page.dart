@@ -9,6 +9,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 
 /// Drops / Android token login through an embedded WebView OAuth page.
 ///
@@ -582,7 +583,10 @@ class _TwitchDropsWebViewLoginPageState
                 const SizedBox(
                   width: 14,
                   height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: TwitchUiColors.primarySoft,
+                  ),
                 ),
                 const SizedBox(width: 8),
               ] else ...[

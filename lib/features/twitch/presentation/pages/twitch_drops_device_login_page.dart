@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../../api/auth/twitch_device_auth_api_service.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 
 /// Drops / Android token login using Twitch Device Flow.
 ///
@@ -451,7 +452,7 @@ class _TwitchDropsDeviceLoginPageState
               height: 18,
               child: CircularProgressIndicator(
                 strokeWidth: 2.2,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
               ),
             ),
         ],

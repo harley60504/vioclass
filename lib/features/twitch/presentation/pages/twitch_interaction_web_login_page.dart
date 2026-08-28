@@ -12,6 +12,7 @@ import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 
 /// Official Twitch Web session + kimne Web GQL token capture.
 ///
@@ -624,7 +625,7 @@ query ChannelPointsContext($channelLogin: String!) {
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
               ),
             ),
         ],
