@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 class _TextInputDialog extends StatefulWidget {
@@ -58,7 +59,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
                 ? (_) => Navigator.of(context).pop(_controller.text)
                 : null,
             style: const TextStyle(color: Colors.white),
-            cursorColor: const Color(0xFFBF94FF),
+            cursorColor: TwitchUiColors.primarySoft,
             decoration: InputDecoration(
               labelText: widget.label,
               hintText: widget.hintText,
@@ -72,7 +73,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFF9146FF)),
+                borderSide: const BorderSide(color: TwitchUiColors.primary),
               ),
             ),
           ),
@@ -88,7 +89,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
               ElevatedButton(
                 onPressed: () => Navigator.of(context).pop(_controller.text),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF9146FF),
+                  backgroundColor: TwitchUiColors.primary,
                   foregroundColor: Colors.white,
                 ),
                 child: Text(widget.confirmLabel),
