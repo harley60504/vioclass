@@ -240,13 +240,9 @@ class TwitchWatchChatController extends ChangeNotifier {
       message: message,
     );
     if (!result.ok) {
-      throw StateError(
-        result.error?.toString() ?? 'Watch streak share failed.',
-      );
+      throw StateError(result.error?.toString() ?? '連續觀看分享失敗。');
     }
-    showMessage(
-      '已分享 Watch Streak ${status.streakCount ?? ''}${status.unitLabel}',
-    );
+    showMessage('已分享連續觀看 ${status.streakCount ?? ''}${status.unitLabel}');
     await refreshSpecialMessages(autoSelectPending: false);
   }
 
@@ -267,7 +263,7 @@ class TwitchWatchChatController extends ChangeNotifier {
       message: message,
     );
     if (!result.ok) {
-      throw StateError(result.error?.toString() ?? 'Resub share failed.');
+      throw StateError(result.error?.toString() ?? '續訂訊息分享失敗。');
     }
     showMessage('已分享訂閱 ${resub.cumulativeMonths ?? ''} 個月');
     await refreshSpecialMessages(autoSelectPending: false);
@@ -325,7 +321,7 @@ class TwitchWatchChatController extends ChangeNotifier {
       channelLogin: channelLogin(),
       channelId: channelId() ?? status.channelId,
       title: count == null ? '分享連續觀看' : '連續觀看 $count${status.unitLabel}',
-      subtitle: '送出訊息並分享 Watch Streak。',
+      subtitle: '送出訊息並分享連續觀看。',
       sendLabel: '分享',
       costLabel: count == null ? null : '$count${status.unitLabel}',
       payload: <String, dynamic>{'watchStreak': status},
@@ -341,7 +337,7 @@ class TwitchWatchChatController extends ChangeNotifier {
       channelLogin: channelLogin(),
       channelId: channelId() ?? resub.channelId,
       title: months == null ? '分享訂閱訊息' : '訂閱 $months 個月',
-      subtitle: '送出訊息並分享 Resub 訊息。',
+      subtitle: '送出訊息並分享續訂訊息。',
       sendLabel: '分享',
       costLabel: months == null ? null : '$months 個月',
       payload: <String, dynamic>{'resub': resub},
