@@ -1,7 +1,6 @@
 //
 // Reply-thread card UI for Twitch chat message context sheet. This owns the
-// card shell, relation chips and copy-to-clipboard behavior.
-// and improves @tag readability.
+// card shell, relation chips, copy-to-clipboard behavior, and @tag readability.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -219,7 +218,7 @@ class _RelationLine extends StatelessWidget {
     if (reply.isNotEmpty) {
       chips.add(
         _RelationChip(
-          label: 'reply @${_stripAt(reply)}',
+          label: '回覆 @${_stripAt(reply)}',
           type: _RelationChipType.reply,
           fontScale: fontScale,
         ),
@@ -231,7 +230,7 @@ class _RelationLine extends StatelessWidget {
       if (text.isEmpty) continue;
       chips.add(
         _RelationChip(
-          label: 'tag @${_stripAt(text)}',
+          label: '提及 @${_stripAt(text)}',
           type: _RelationChipType.tag,
           fontScale: fontScale,
         ),
