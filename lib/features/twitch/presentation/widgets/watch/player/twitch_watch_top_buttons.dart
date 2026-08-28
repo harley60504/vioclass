@@ -123,8 +123,8 @@ class SubscribeButton extends StatelessWidget {
         onTap: onPressed,
         child: TwitchGlassSurface(
           borderRadius: BorderRadius.circular(radius),
-          backgroundColor: const Color(0xFF9146FF).withValues(alpha: 0.28),
-          borderColor: const Color(0xFFBF94FF).withValues(alpha: 0.30),
+          backgroundColor: TwitchUiColors.primary.withValues(alpha: 0.28),
+          borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.30),
           blurSigma: 0,
           boxShadow: const <BoxShadow>[],
           child: SizedBox(
@@ -145,7 +145,7 @@ class SubscribeButton extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            'Subscribe',
+                            '訂閱',
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -199,7 +199,7 @@ class ChannelLibraryButton extends StatelessWidget {
         : 20.0;
 
     return Tooltip(
-      message: 'About / VOD',
+      message: '關於 / VOD',
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
@@ -209,7 +209,7 @@ class ChannelLibraryButton extends StatelessWidget {
           child: TwitchGlassSurface(
             borderRadius: BorderRadius.circular(radius),
             backgroundColor: Colors.black.withValues(alpha: 0.42),
-            borderColor: const Color(0xFFBF94FF).withValues(alpha: 0.22),
+            borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.22),
             blurSigma: 0,
             boxShadow: const <BoxShadow>[],
             child: SizedBox(
@@ -223,7 +223,7 @@ class ChannelLibraryButton extends StatelessWidget {
                   child: compact
                       ? Icon(
                           Icons.video_library_rounded,
-                          color: const Color(0xFFBF94FF),
+                          color: TwitchUiColors.primarySoft,
                           size: tiny ? 18 : 21,
                         )
                       : const Row(
@@ -231,12 +231,12 @@ class ChannelLibraryButton extends StatelessWidget {
                           children: [
                             Icon(
                               Icons.video_library_rounded,
-                              color: Color(0xFFBF94FF),
+                              color: TwitchUiColors.primarySoft,
                               size: 19,
                             ),
                             SizedBox(width: 8),
                             Text(
-                              'About / VOD',
+                              '關於 / VOD',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
@@ -297,7 +297,7 @@ class CreateClipButton extends StatelessWidget {
           child: TwitchGlassSurface(
             borderRadius: BorderRadius.circular(radius),
             backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.24),
-            borderColor: const Color(0xFFBF94FF).withValues(alpha: 0.26),
+            borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.26),
             blurSigma: 0,
             boxShadow: const <BoxShadow>[],
             child: SizedBox(
@@ -315,7 +315,7 @@ class CreateClipButton extends StatelessWidget {
                       )
                     : Icon(
                         Icons.movie_creation_outlined,
-                        color: const Color(0xFFBF94FF),
+                        color: TwitchUiColors.primarySoft,
                         size: tiny
                             ? 18
                             : compact
