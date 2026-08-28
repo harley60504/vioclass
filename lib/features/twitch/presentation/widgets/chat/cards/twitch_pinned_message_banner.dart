@@ -9,6 +9,7 @@ import '../../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../links/twitch_chat_link_preview.dart';
 import '../twitch_chat_text_style.dart';
+import '../message/twitch_chat_message_visual_metrics.dart';
 import '../../shared/twitch_ui_avatar.dart';
 
 class TwitchPinnedMessageBanner extends StatefulWidget {
@@ -72,11 +73,12 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
         : 'PINNED BY $pinnedBy';
     final cleanText = message.text.trim();
     final previewItems = extractTwitchChatPreviewUrls(cleanText, max: 1);
-    final scale = _safeFontScale;
+    final metrics = TwitchChatMessageVisualMetrics(_safeFontScale);
+    final scale = metrics.scale;
 
-    final nameFontSize = (TwitchUiFontSize.chatName + 0.8) * scale;
-    final metaFontSize = (TwitchUiFontSize.chatMeta + 0.6) * scale;
-    final bodyFontSize = (TwitchUiFontSize.cardBody + 1.2) * scale;
+    final nameFontSize = metrics.nameFontSize;
+    final metaFontSize = metrics.metaFontSize;
+    final bodyFontSize = metrics.messageFontSize;
     final hintFontSize = 10.8 * scale;
     final iconSize = (12.0 * scale).clamp(12.0, 16.0).toDouble();
     final pinBoxSize = (20.0 * scale).clamp(20.0, 26.0).toDouble();
