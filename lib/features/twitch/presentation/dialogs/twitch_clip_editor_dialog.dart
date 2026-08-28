@@ -654,5 +654,5 @@ String _clipEditorErrorText(Object error) {
       lower.contains('一直沒有完成處理')) {
     return '這個實況主可能沒有開放片段。';
   }
-  return '片段剪輯失敗：$message';
+  return '片段剪輯暫時失敗，請稍後再試。';
 }
