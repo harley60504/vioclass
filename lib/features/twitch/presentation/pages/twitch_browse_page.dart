@@ -839,7 +839,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       return TwitchDiscoveryEmptyState(
         icon: Icons.error_outline_rounded,
         title: '探索直播讀取失敗',
-        message: message,
+        message: '探索直播暫時讀取失敗，稍後再試或重新整理。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }

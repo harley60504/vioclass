@@ -539,7 +539,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       return TwitchDiscoveryEmptyState(
         icon: Icons.error_outline_rounded,
         title: '追隨直播讀取失敗',
-        message: message,
+        message: '追隨直播暫時讀取失敗，稍後再試或重新整理。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
@@ -551,7 +551,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         icon: Icons.favorite_border_rounded,
         title: '目前追隨頻道沒有直播',
         message: offlineError?.trim().isNotEmpty == true
-            ? '直播清單為空，離線追隨頻道也讀取失敗：$offlineError'
+            ? '直播清單為空，離線追隨頻道也暫時讀取失敗。'
             : '稍後重新整理，或切到瀏覽頁探索其他直播。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
