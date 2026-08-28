@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_channel_points_emote_overlay_state_stage173
-//
 // Immutable state holder for the Channel Points emote overlay. This prevents
 // twitch_channel_points_sheet.dart from carrying many independent overlay fields.
 

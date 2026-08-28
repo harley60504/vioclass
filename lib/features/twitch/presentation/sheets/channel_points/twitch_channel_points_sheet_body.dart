@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_channel_points_sheet_body_stage169
-//
 // Main body content for the Channel Points sheet. The parent sheet keeps the
 // redeem / emote-overlay state machine; this file owns banners, claim button,
 // empty state, and reward grid layout.

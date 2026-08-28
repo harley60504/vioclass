@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_channel_points_redeem_payload_builder_stage172
-//
 // Builds the redeem payload for Channel Points rewards. The parent sheet owns
 // the overlay state and passes an opener callback into this helper.
 

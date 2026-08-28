@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_channel_points_sheet_widgets_stage216_transparent_reward_cards
-
 import 'package:flutter/material.dart';
 
 import '../../../localization/twitch_reward_localizer.dart';
