@@ -186,9 +186,9 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
       }
 
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('尚未接上 reward redeem callback。')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('目前無法兌換這個獎勵，請稍後再試。')));
       }
       return;
     }

@@ -41,12 +41,12 @@ class TwitchChannelPointsSheetBody extends StatelessWidget {
         if (current != null && current.contextError != null)
           ChannelPointsErrorBanner(
             message: current.contextError!,
-            label: 'Balance',
+            label: '點數餘額',
           ),
         if (current != null && current.rewardsError != null)
           ChannelPointsErrorBanner(
             message: current.rewardsError!,
-            label: 'Rewards',
+            label: '獎勵清單',
           ),
         if (claimId != null && claimId.isNotEmpty)
           TwitchChannelPointsClaimButton(
