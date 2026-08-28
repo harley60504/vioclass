@@ -533,11 +533,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         if (!mounted) return;
         await preferencesController.applyPlayerVolume();
         final isLowLatencyLive =
-            !watchPorts.player.runtime.usingLiveDvrBridge &&
-            !watchPorts.player.runtime.usingExternalVodPlayback &&
-            offlineVodFallbackVideo == null &&
-            currentClipQualityClip == null &&
-            !preferVodReplayChat;
+            currentPlaybackKind == TwitchWatchPlaybackKind.live;
         if (isLowLatencyLive) {
           await playerSession.openOrResume(
             uri: currentUri,
