@@ -75,7 +75,7 @@ class _TwitchInteractionWebLoginPageState
       } else {
         setState(() {
           _lastUrl = _loginUrl;
-          _statusText = '請在 App 內 WebView 登入 Twitch 官方 Web；完成後會自動擷取 GQL token。';
+          _statusText = '請在 App 內 WebView 登入 Twitch 官方 Web；完成後會自動擷取 GQL 資訊。';
         });
       }
       _startProbeTimer();
@@ -133,7 +133,7 @@ class _TwitchInteractionWebLoginPageState
       if (!mounted) return;
       setState(() {
         _lastUrl = url;
-        _statusText = '目前平台使用 App 內 WebView，不開 desktop_webview_window。';
+        _statusText = '目前平台使用 App 內 WebView，不開桌面登入視窗。';
       });
       try {
         await _embeddedController?.loadUrl(
@@ -193,7 +193,7 @@ class _TwitchInteractionWebLoginPageState
           setState(() {
             _windowOpen = false;
             if (!_saving) {
-              _statusText = '官方 Web 登入視窗已關閉；可重新開啟或手動檢查 token。';
+              _statusText = '官方 Web 登入視窗已關閉；可重新開啟或手動檢查。';
             }
           });
         });
@@ -205,7 +205,7 @@ class _TwitchInteractionWebLoginPageState
       setState(() {
         _openingWindow = false;
         _windowOpen = true;
-        _statusText = '請在彈出的 Twitch 官方 Web 視窗登入；完成後會自動擷取 GQL token。';
+        _statusText = '請在彈出的 Twitch 官方 Web 視窗登入；完成後會自動擷取 GQL 資訊。';
       });
 
       _scheduleProbe();
@@ -215,7 +215,7 @@ class _TwitchInteractionWebLoginPageState
         _openingWindow = false;
         _windowOpen = false;
         _errorText = '建立官方 Web 登入視窗失敗：$e';
-        _statusText = '無法開啟 desktop_webview_window。';
+        _statusText = '無法開啟桌面登入視窗。';
       });
     }
   }
@@ -300,8 +300,8 @@ class _TwitchInteractionWebLoginPageState
       if (token == null || token.trim().isEmpty) {
         if (!mounted) return;
         setState(() {
-          _lastProbeText = '尚未讀到 Twitch Web auth-token。';
-          _statusText = '登入 Twitch 官方 Web 後會自動檢查 auth-token。';
+          _lastProbeText = '尚未讀到 Twitch Web 授權資訊。';
+          _statusText = '登入 Twitch 官方 Web 後會自動檢查授權資訊。';
         });
         return;
       }
@@ -309,13 +309,13 @@ class _TwitchInteractionWebLoginPageState
       if (!mounted) return;
       setState(() {
         _lastTokenPreview = _previewToken(token);
-        _statusText = '已讀到 Twitch Web auth-token，正在測試 kimne GQL...';
+        _statusText = '已讀到 Twitch Web 授權資訊，正在檢查 GQL...';
       });
       await _saveAndVerifyInteractionToken(token);
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorText = '檢查 Twitch Web token 失敗：$e';
+        _errorText = '檢查 Twitch Web 授權資訊失敗：$e';
         _lastProbeText = '檢查失敗：$e';
       });
     } finally {
@@ -464,7 +464,7 @@ class _TwitchInteractionWebLoginPageState
 
     setState(() {
       _errorText = null;
-      _statusText = '正在保存 Web GQL token 並測試 kimne GQL...';
+      _statusText = '正在儲存 Web/GQL 授權並檢查 GQL...';
     });
 
     try {
@@ -490,7 +490,7 @@ class _TwitchInteractionWebLoginPageState
 
       if (!mounted) return;
       setState(() {
-        _statusText = '官方 Web/GQL token 已保存，kimne GQL 測試成功。';
+        _statusText = '官方 Web/GQL 授權已儲存，GQL 檢查成功。';
         _lastProbeText = '官方 Web / GQL 完成。';
       });
       Navigator.of(context).pop(true);
@@ -499,8 +499,8 @@ class _TwitchInteractionWebLoginPageState
       _startProbeTimer();
       if (!mounted) return;
       setState(() {
-        _errorText = 'Web token 或 kimne GQL 測試失敗：$e';
-        _statusText = '有讀到 token，但尚未通過 kimne GQL。';
+        _errorText = 'Web/GQL 授權驗證失敗：$e';
+        _statusText = '已讀到授權資訊，但尚未通過 GQL 檢查。';
         _lastProbeText = '失敗：$e';
       });
     }
@@ -849,7 +849,7 @@ query ChannelPointsContext($channelLogin: String!) {
             ),
             const SizedBox(height: 8),
             const Text(
-              '這是單獨補 Web/GQL 的頁面。一般一鍵登入會在主 OAuth 視窗裡順手擷取 GQL token，不會再另外開這個視窗。',
+              '這是單獨補 Web/GQL 的頁面。一般一鍵登入會在主 OAuth 視窗裡順手擷取 GQL 資訊，不會再另外開這個視窗。',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white60,
@@ -882,7 +882,7 @@ query ChannelPointsContext($channelLogin: String!) {
             if (_lastTokenPreview != null) ...[
               const SizedBox(height: 14),
               Text(
-                '已擷取 Web/GQL token：$_lastTokenPreview',
+                '已擷取 Web/GQL 授權：$_lastTokenPreview',
                 style: const TextStyle(
                   color: Colors.white38,
                   fontSize: 12,
