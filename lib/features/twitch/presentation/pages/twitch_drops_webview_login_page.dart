@@ -263,7 +263,7 @@ class _TwitchDropsWebViewLoginPageState
       _isCompleting = false;
       if (!mounted) return;
       setState(() {
-        _errorText = 'Drops / Android 授權驗證或儲存失敗：$e';
+        _errorText = 'Drops / Android 授權驗證或儲存失敗，請重新授權後再試。';
         _statusText = '請確認這次 OAuth 使用的是 Android/Drops Client-ID。';
       });
     }

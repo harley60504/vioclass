@@ -332,7 +332,7 @@ class _TwitchOAuthWebViewLoginPageState
       _isCompleting = false;
       if (!mounted) return;
       setState(() {
-        _errorText = '登入失敗：$e';
+        _errorText = '登入流程未完成，請重新授權後再試。';
         _statusText = 'OAuth 已回傳，但授權驗證、儲存或 Web/GQL 擷取失敗。';
       });
     }
@@ -697,7 +697,7 @@ query ChannelPointsContext($channelLogin: String!) {
       setState(() {
         _openingWindow = false;
         _windowOpen = false;
-        _errorText = '建立 Twitch OAuth 視窗失敗：$e';
+        _errorText = '建立 Twitch OAuth 視窗失敗，請稍後再試。';
         _statusText = '無法開啟桌面授權視窗。';
       });
     }

@@ -131,7 +131,7 @@ class _TwitchDropsDeviceLoginPageState
         _openingWindow = false;
         _authWindowOpen = false;
         _embeddedWebViewReady = false;
-        _errorText = '啟動 Drops / Android 授權失敗：$e';
+        _errorText = '啟動 Drops / Android 授權失敗，請稍後再試。';
         _statusText = 'Drops / Android 尚未登入。';
       });
     }
@@ -221,7 +221,7 @@ class _TwitchDropsDeviceLoginPageState
         _openingWindow = false;
         _authWindowOpen = false;
         _embeddedWebViewReady = false;
-        _errorText = '獨立 Drops 授權視窗建立失敗：$e';
+        _errorText = 'Drops 授權視窗建立失敗，請稍後再試。';
         _statusText = '無法建立 Drops 授權視窗。';
       });
     }
@@ -344,7 +344,7 @@ class _TwitchDropsDeviceLoginPageState
       if (!mounted) return;
       setState(() {
         _polling = false;
-        _errorText = '檢查 Drops 授權失敗：$e';
+        _errorText = '檢查 Drops 授權失敗，稍後會自動重試。';
         _lastPollText = '稍後會自動重試。';
       });
       _schedulePoll();
