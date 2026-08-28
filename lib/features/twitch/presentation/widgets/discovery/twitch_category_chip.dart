@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
+import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchCategoryChip extends StatelessWidget {
   final TwitchGameCategory game;
@@ -26,12 +27,12 @@ class TwitchCategoryChip extends StatelessWidget {
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: selected
-                ? const Color(0xFF9146FF).withValues(alpha: 0.20)
+                ? TwitchUiColors.primary.withValues(alpha: 0.20)
                 : const Color(0xFF18181B),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF9146FF).withValues(alpha: 0.65)
+                  ? TwitchUiColors.primary.withValues(alpha: 0.65)
                   : Colors.white.withValues(alpha: 0.08),
             ),
           ),
@@ -57,7 +58,7 @@ class TwitchCategoryChip extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? const Color(0xFFD9C5FF) : Colors.white70,
+                  color: selected ? TwitchUiColors.primarySoft : Colors.white70,
                   fontSize: 12,
                   fontWeight: FontWeight.w900,
                 ),

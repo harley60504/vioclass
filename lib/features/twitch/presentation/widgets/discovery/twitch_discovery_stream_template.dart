@@ -193,20 +193,20 @@ class TwitchDiscoverySectionHeader extends StatelessWidget {
             height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFF9146FF).withValues(alpha: 0.18),
+              color: TwitchUiColors.primary.withValues(alpha: 0.18),
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFFBF94FF).withValues(alpha: 0.28),
+                color: TwitchUiColors.primarySoft.withValues(alpha: 0.28),
               ),
               boxShadow: <BoxShadow>[
                 BoxShadow(
-                  color: const Color(0xFF9146FF).withValues(alpha: 0.26),
+                  color: TwitchUiColors.primary.withValues(alpha: 0.26),
                   blurRadius: 18,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: Icon(icon, color: const Color(0xFFBF94FF), size: 19),
+            child: Icon(icon, color: TwitchUiColors.primarySoft, size: 19),
           ),
           const SizedBox(width: 11),
           Expanded(
@@ -264,8 +264,8 @@ class TwitchDiscoveryFooter extends StatelessWidget {
             icon: const Icon(Icons.refresh_rounded),
             label: const Text('載入更多失敗，重試'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFBF94FF),
-              side: const BorderSide(color: Color(0xFF9146FF)),
+              foregroundColor: TwitchUiColors.primarySoft,
+              side: const BorderSide(color: TwitchUiColors.primary),
             ),
           ),
         ),
@@ -283,7 +283,7 @@ class TwitchDiscoveryFooter extends StatelessWidget {
             icon: const Icon(Icons.keyboard_arrow_down_rounded),
             label: const Text('載入更多'),
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFBF94FF),
+              foregroundColor: TwitchUiColors.primarySoft,
             ),
           ),
         ),
@@ -328,7 +328,7 @@ class TwitchDiscoveryEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(icon, color: const Color(0xFF9146FF), size: 46),
+            Icon(icon, color: TwitchUiColors.primary, size: 46),
             const SizedBox(height: 14),
             Text(
               title,
@@ -357,8 +357,8 @@ class TwitchDiscoveryEmptyState extends StatelessWidget {
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('重新整理'),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFBF94FF),
-                  side: const BorderSide(color: Color(0xFF9146FF)),
+                  foregroundColor: TwitchUiColors.primarySoft,
+                  side: const BorderSide(color: TwitchUiColors.primary),
                 ),
               ),
             ],

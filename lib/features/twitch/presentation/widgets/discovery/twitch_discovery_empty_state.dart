@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchDiscoveryEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -30,7 +32,7 @@ class TwitchDiscoveryEmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: const Color(0xFF9146FF), size: 44),
+            Icon(icon, color: TwitchUiColors.primary, size: 44),
             const SizedBox(height: 12),
             Text(
               title,
