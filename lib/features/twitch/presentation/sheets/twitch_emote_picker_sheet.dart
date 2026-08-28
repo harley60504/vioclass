@@ -442,9 +442,7 @@ class _ProviderPageState extends State<_ProviderPage>
                     ),
                     entries: page.entries,
                     query: widget.query,
-                    emptyText: widget.loading
-                        ? 'Loading emotes...'
-                        : 'No emotes',
+                    emptyText: widget.loading ? '正在載入貼圖...' : '沒有可用貼圖',
                     onSelect: widget.onSelect,
                     onLongPress: widget.onLongPress,
                   ),
