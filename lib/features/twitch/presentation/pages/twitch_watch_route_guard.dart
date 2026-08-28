@@ -1,7 +1,6 @@
 //
 // A lightweight route-level guard for WatchPage.
 //
-// Stage 139:
 // - Use Flutter's internal route visibility via RouteObserver / RouteAware.
 // - Pause only when the WatchPage route itself is popped.
 // - Do not pause on desktop window focus changes.

@@ -12,7 +12,6 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 /// Keep the native media_kit [Player] warm for fast re-entry, but do not keep
 /// the Flutter [VideoController] / texture surface as a process-wide singleton.
 ///
-/// Stage 243B reason:
 /// - CPU profiles showed proxy/player were not the heavy path.
 /// - Replacing only the Video widget with a placeholder restored stable 90 FPS.
 /// - Therefore the expensive / sticky part is the Flutter video surface.
@@ -86,8 +85,8 @@ class TwitchMediaKitPlayerHost {
       final player = await Player.create(
         configuration: PlayerConfiguration(
           title: title,
-          // Match the player_core Stage 220H low-latency profile used in the
-          // isolated Android test page.
+          // Match the low-latency profile used in the isolated Android test
+          // page.
           bufferSize: 8 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
           options: const <String, String>{

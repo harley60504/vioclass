@@ -1,7 +1,7 @@
 // Uses the same discovery template as BrowsePage and the actual project models/services.
-// Stage 241: refresh/re-enter keeps the grid visible, fetches the latest live
-// window, removes offline streams, adds newly live streams, and preserves the
-// latest Twitch API order through TwitchStreamRefreshReconciler.
+// Refresh/re-enter keeps the grid visible, fetches the latest live window,
+// removes offline streams, adds newly live streams, and preserves the latest
+// Twitch API order through TwitchStreamRefreshReconciler.
 
 import 'dart:async';
 
