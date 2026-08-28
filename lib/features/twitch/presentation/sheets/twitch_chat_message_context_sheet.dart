@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/chat/twitch_chat_runtime_message.dart';
+import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../widgets/chat/twitch_chat_text_style.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -16,6 +17,7 @@ Future<void> showTwitchChatMessageContextSheet({
   required TwitchChatRuntimeMessage selectedMessage,
   required List<TwitchChatRuntimeMessage> messages,
   TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
+  TwitchOfficialEmoteCacheService? officialEmotes,
   double fontScale = 1.0,
 }) {
   final entries = TwitchReplyThreadBuilder.build(
@@ -34,6 +36,7 @@ Future<void> showTwitchChatMessageContextSheet({
       selectedMessage: selectedMessage,
       entries: entries,
       thirdPartyEmotes: thirdPartyEmotes,
+      officialEmotes: officialEmotes,
       fontScale: fontScale,
     ),
   );
@@ -43,12 +46,14 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
   final TwitchChatRuntimeMessage selectedMessage;
   final List<TwitchReplyThreadEntry> entries;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final double fontScale;
 
   const _TwitchChatMessageContextSheet({
     required this.selectedMessage,
     required this.entries,
     required this.thirdPartyEmotes,
+    required this.officialEmotes,
     required this.fontScale,
   });
 
@@ -65,6 +70,7 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
             entry: entry,
             selected: _isSelectedEntry(entry.message),
             thirdPartyEmotes: thirdPartyEmotes,
+            officialEmotes: officialEmotes,
             fontScale: fontScale,
           );
         },

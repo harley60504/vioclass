@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../widgets/chat/twitch_runtime_message_tile.dart';
@@ -16,6 +17,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
   final TwitchReplyThreadEntry entry;
   final bool selected;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
+  final TwitchOfficialEmoteCacheService? officialEmotes;
   final double fontScale;
 
   const TwitchReplyThreadMessageCard({
@@ -23,6 +25,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
     required this.entry,
     required this.selected,
     required this.thirdPartyEmotes,
+    this.officialEmotes,
     this.fontScale = 1.0,
   });
 
@@ -73,6 +76,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
                   TwitchRuntimeMessageTile(
                     message: message,
                     thirdPartyEmotes: thirdPartyEmotes,
+                    officialEmotes: officialEmotes,
                     showTimestamp: false,
                     fontScale: compactBodyScale,
                     compact: true,

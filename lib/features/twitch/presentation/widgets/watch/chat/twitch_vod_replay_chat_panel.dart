@@ -236,6 +236,7 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
                   selectedMessage: message,
                   messages: messages,
                   thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                  officialEmotes: widget.officialEmoteCache,
                   fontScale: widget.fontScale,
                 ),
             emptyBuilder: (_) => _VodReplayEmptyState(
