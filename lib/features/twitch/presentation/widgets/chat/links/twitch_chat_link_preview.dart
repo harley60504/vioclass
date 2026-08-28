@@ -607,7 +607,7 @@ void _openTwitchClipInside(
           videoId: '',
           gameId: '',
           language: '',
-          title: cleanTitle.isEmpty ? 'Twitch Clip' : cleanTitle,
+          title: cleanTitle.isEmpty ? 'Twitch 片段' : cleanTitle,
           viewCount: 0,
           createdAt: null,
           thumbnailUrl: cleanThumbnail,
@@ -761,19 +761,19 @@ Future<TwitchChatLinkPreviewData?> _fetchTwitchClipPreview(
   final descriptionParts = <String>[
     ?broadcasterName,
     ?gameName,
-    if (curatorName != null) '$curatorName 建立的 Clip',
+    if (curatorName != null) '$curatorName 建立的片段',
   ];
 
   return TwitchChatLinkPreviewData(
     url: uri.toString(),
     kind: 'clip',
     host: uri.host.replaceFirst(RegExp(r'^www\.'), ''),
-    title: _cleanPreviewText(clip['title']?.toString()) ?? 'Twitch Clip',
+    title: _cleanPreviewText(clip['title']?.toString()) ?? 'Twitch 片段',
     description: descriptionParts.isEmpty
         ? prettyTwitchChatUrlLabel(uri.toString())
         : descriptionParts.join(' · '),
     imageUrl: thumbnail?.isEmpty == false ? thumbnail : null,
-    siteName: 'Twitch Clip',
+    siteName: 'Twitch 片段',
     author: broadcasterName,
   );
 }

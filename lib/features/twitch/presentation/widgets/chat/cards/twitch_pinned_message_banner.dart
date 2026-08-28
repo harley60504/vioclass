@@ -63,14 +63,14 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
     final sender =
         _cleanName(senderUser?.displayName) ??
         _cleanName(widget.fallbackDisplayName) ??
-        'Pinned';
+        '置頂留言';
     final pinnedBy = _cleanName(message.pinnedBy?.displayName);
     final senderColor =
         _parseUserColor(senderUser?.chatColor) ?? TwitchUiColors.primarySoft;
     final avatarUrl = _resolveAvatarUrl(senderUser);
     final metaText = pinnedBy == null || pinnedBy == sender
-        ? 'PINNED MESSAGE'
-        : 'PINNED BY $pinnedBy';
+        ? '置頂留言'
+        : '$pinnedBy 置頂';
     final cleanText = message.text.trim();
     final previewItems = extractTwitchChatPreviewUrls(cleanText, max: 1);
     final metrics = TwitchChatMessageVisualMetrics(_safeFontScale);
