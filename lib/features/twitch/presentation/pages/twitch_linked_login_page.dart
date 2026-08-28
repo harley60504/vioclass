@@ -127,9 +127,9 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     }
 
     final missing = <String>[];
-    if (!_webGqlTokenReady) missing.add('官方 Web / GQL token');
-    if (!_mainLoggedIn) missing.add('主 Twitch token');
-    if (!_dropsTokenReady) missing.add('Drops / Android token');
+    if (!_webGqlTokenReady) missing.add('官方 Web / GQL 授權');
+    if (!_mainLoggedIn) missing.add('主 Twitch 授權');
+    if (!_dropsTokenReady) missing.add('Drops / Android 授權');
     return '尚缺：${missing.join('、')}';
   }
 
@@ -154,16 +154,13 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!status.webGqlReady || !status.mainReady) {
         await _pushMainLogin(captureWebGqlToken: !status.webGqlReady);
         status = await _readUnifiedStatus();
-        await _applyStatus(
-          status,
-          actionText: '主 OAuth / 官方 Web GQL token 檢查完成。',
-        );
+        await _applyStatus(status, actionText: '主 OAuth / 官方 Web GQL 授權檢查完成。');
       }
 
       if (!status.dropsReady) {
         await _pushDropsLogin();
         status = await _readUnifiedStatus();
-        await _applyStatus(status, actionText: 'Drops / Android token 檢查完成。');
+        await _applyStatus(status, actionText: 'Drops / Android 授權檢查完成。');
       }
 
       if (!mounted) return;
@@ -171,7 +168,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (status.complete) {
         setState(() {
           _statusText = '完整登入完成，正在進入 App...';
-          _lastActionText = '三種 token 都已通過驗證。';
+          _lastActionText = '三種授權都已通過驗證。';
         });
 
         if (widget.autoCloseOnComplete || Navigator.of(context).canPop()) {
@@ -216,7 +213,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
   Future<void> _pushWebGqlLogin() async {
     if (!mounted) return;
     setState(() {
-      _statusText = '正在建立官方 Twitch Web session 並擷取 GQL token...';
+      _statusText = '正在建立官方 Twitch Web 授權並擷取 GQL 資訊...';
     });
 
     await Navigator.of(context).push<bool>(
@@ -232,7 +229,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
   Future<void> _pushMainLogin({bool captureWebGqlToken = true}) async {
     if (!mounted) return;
     setState(() {
-      _statusText = '正在登入主 Twitch token，並嘗試在同一視窗擷取官方 Web/GQL token...';
+      _statusText = '正在登入主 Twitch 授權，並嘗試在同一視窗擷取官方 Web/GQL 資訊...';
     });
 
     await Navigator.of(context).push<bool>(
@@ -252,7 +249,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
   Future<void> _pushDropsLogin() async {
     if (!mounted) return;
     setState(() {
-      _statusText = '正在登入 Drops / Android token...';
+      _statusText = '正在登入 Drops / Android 授權...';
     });
 
     await Navigator.of(context).push<bool>(
@@ -539,8 +536,8 @@ query ChannelPointsContext($channelLogin: String!) {
     final titleText = _completeLogin ? 'Twitch 完整登入完成' : 'Twitch 統一登入 v32';
 
     final descriptionText = _completeLogin
-        ? '官方 Twitch Web / GQL、主 OAuth token、Drops / Android token 都已通過。'
-        : '按一鍵登入後，主 OAuth 容器會順手擷取官方 Web/GQL token，不會再另外跳一次 Web/GQL；桌面使用獨立 WebView 視窗，Android / iOS 使用 App 內 WebView；登出時會依平台清除對應 cookie。';
+        ? '官方 Twitch Web / GQL、主 OAuth、Drops / Android 授權都已通過。'
+        : '按一鍵登入後，主 OAuth 容器會順手擷取官方 Web/GQL 資訊，不會再另外跳一次 Web/GQL；桌面使用獨立 WebView 視窗，Android / iOS 使用 App 內 WebView；登出時會依平台清除對應 cookie。';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0E0E10),
@@ -887,14 +884,14 @@ class _LoginStateChecklist extends StatelessWidget {
           const SizedBox(height: 10),
           _LoginStateRow(
             done: mainLoggedIn,
-            title: '2. 主 OAuth token',
-            subtitle: '你的 App OAuth；同一視窗會順手讀官方 Web/GQL token',
+            title: '2. 主 OAuth 授權',
+            subtitle: '你的 App OAuth；同一視窗會順手讀官方 Web/GQL 資訊',
           ),
           const SizedBox(height: 10),
           _LoginStateRow(
             done: dropsTokenReady,
-            title: '3. Drops / Android token',
-            subtitle: 'Twitch-style Follow / Unfollow / Drops APQ',
+            title: '3. Drops / Android 授權',
+            subtitle: '用於追隨、取消追隨與 Drops 互動',
           ),
         ],
       ),
