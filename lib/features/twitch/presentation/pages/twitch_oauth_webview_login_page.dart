@@ -153,7 +153,7 @@ class _TwitchOAuthWebViewLoginPageState
       } else {
         setState(() {
           _statusText = _shouldCaptureGql
-              ? '請在 App 內 WebView 完成主 OAuth；完成後會切到 Twitch 官方頁擷取 Web/GQL token。'
+              ? '請在 App 內 WebView 完成主 OAuth；完成後會切到 Twitch 官方頁擷取 Web/GQL 資訊。'
               : '請在 App 內 WebView 完成主 OAuth。';
         });
       }
@@ -252,7 +252,7 @@ class _TwitchOAuthWebViewLoginPageState
         returnedState != _state) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'OAuth state 不一致，已阻擋這次回傳。';
+        _errorText = 'OAuth 回傳狀態不一致，已阻擋這次授權。';
         _statusText = 'Twitch OAuth 回傳驗證失敗。';
       });
       return;
@@ -262,8 +262,8 @@ class _TwitchOAuthWebViewLoginPageState
     if (accessToken == null || accessToken.trim().isEmpty) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'OAuth 回傳沒有 access_token。';
-        _statusText = '尚未取得 Twitch token。';
+        _errorText = 'OAuth 回傳沒有可用授權。';
+        _statusText = '尚未取得 Twitch 授權。';
       });
       return;
     }
@@ -275,7 +275,7 @@ class _TwitchOAuthWebViewLoginPageState
     if (mounted) {
       setState(() {
         _errorText = null;
-        _statusText = '已取得 Twitch token，正在驗證並保存...';
+        _statusText = '已取得 Twitch 授權，正在驗證並儲存...';
       });
     }
 
@@ -333,7 +333,7 @@ class _TwitchOAuthWebViewLoginPageState
       if (!mounted) return;
       setState(() {
         _errorText = '登入失敗：$e';
-        _statusText = 'OAuth 已回傳，但 token 驗證、保存或 Web/GQL 擷取失敗。';
+        _statusText = 'OAuth 已回傳，但授權驗證、儲存或 Web/GQL 擷取失敗。';
       });
     }
   }
@@ -350,7 +350,7 @@ class _TwitchOAuthWebViewLoginPageState
     if (!mounted) return;
     setState(() {
       _capturingGql = true;
-      _statusText = '主 OAuth 已完成，正在同一個視窗擷取官方 Web/GQL token...';
+      _statusText = '主 OAuth 已完成，正在同一個視窗擷取官方 Web/GQL 資訊...';
       _currentUrlText = _homeUrl;
     });
 
@@ -383,7 +383,7 @@ class _TwitchOAuthWebViewLoginPageState
       if (!mounted) return;
       setState(() {
         _capturingGql = false;
-        _statusText = '主 OAuth 已完成，但未從同一視窗讀到 Web/GQL token。';
+        _statusText = '主 OAuth 已完成，但未從同一視窗讀到 Web/GQL 資訊。';
       });
       return;
     }
@@ -410,7 +410,7 @@ class _TwitchOAuthWebViewLoginPageState
     setState(() {
       _capturingGql = false;
       _webGqlCaptured = true;
-      _statusText = '主 OAuth 與官方 Web/GQL token 都已完成。';
+      _statusText = '主 OAuth 與官方 Web/GQL 都已完成。';
     });
   }
 
@@ -618,7 +618,7 @@ query ChannelPointsContext($channelLogin: String!) {
       if (!mounted) return;
       setState(() {
         _currentUrlText = url;
-        _statusText = '目前平台使用 App 內 WebView，不開 desktop_webview_window。';
+        _statusText = '目前平台使用 App 內 WebView，不開桌面授權視窗。';
       });
       try {
         await _embeddedController?.loadUrl(
@@ -689,7 +689,7 @@ query ChannelPointsContext($channelLogin: String!) {
         _openingWindow = false;
         _windowOpen = true;
         _statusText = _shouldCaptureGql
-            ? '請在彈出的 Twitch OAuth 視窗完成授權；完成後會在同一視窗擷取官方 Web/GQL token。'
+            ? '請在彈出的 Twitch OAuth 視窗完成授權；完成後會在同一視窗擷取官方 Web/GQL 資訊。'
             : '請在彈出的 Twitch OAuth 視窗完成授權。';
       });
     } catch (e) {
@@ -698,7 +698,7 @@ query ChannelPointsContext($channelLogin: String!) {
         _openingWindow = false;
         _windowOpen = false;
         _errorText = '建立 Twitch OAuth 視窗失敗：$e';
-        _statusText = '無法開啟 desktop_webview_window。';
+        _statusText = '無法開啟桌面授權視窗。';
       });
     }
   }
@@ -960,7 +960,7 @@ query ChannelPointsContext($channelLogin: String!) {
                 if (nextUrl != null) _currentUrlText = nextUrl;
                 if (!_isCompleting && !_capturingGql) {
                   _statusText = _shouldCaptureGql
-                      ? '請完成 OAuth；完成後會在同一個 App 內 WebView 擷取 Web/GQL token。'
+                      ? '請完成 OAuth；完成後會在同一個 App 內 WebView 擷取 Web/GQL 資訊。'
                       : '請完成 Twitch OAuth。';
                 }
               });
@@ -1007,7 +1007,7 @@ query ChannelPointsContext($channelLogin: String!) {
             ),
             const SizedBox(height: 14),
             const Text(
-              '主 OAuth token',
+              '主 OAuth 授權',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 21,
@@ -1017,8 +1017,8 @@ query ChannelPointsContext($channelLogin: String!) {
             const SizedBox(height: 8),
             Text(
               _shouldCaptureGql
-                  ? '這一步會在同一個授權容器內完成主 OAuth，接著切回 Twitch 官方頁讀取 Web/GQL token，不再另外跳一次 Web/GQL。'
-                  : '這一步會完成你的 App OAuth，OAuth redirect 到 localhost 時會直接攔截 access_token。',
+                  ? '這一步會在同一個授權容器內完成主 OAuth，接著切回 Twitch 官方頁讀取 Web/GQL 資訊，不再另外跳一次 Web/GQL。'
+                  : '這一步會完成你的 App OAuth，OAuth redirect 到 localhost 時會直接攔截授權回傳。',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white60,
