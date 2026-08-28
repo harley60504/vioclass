@@ -85,6 +85,6 @@ class TwitchChatBitsChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TwitchChatSmallChip(label: '$bits bits', metrics: metrics);
+    return TwitchChatSmallChip(label: '$bits Bits', metrics: metrics);
   }
 }
