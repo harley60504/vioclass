@@ -19,11 +19,14 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
   bool get isPushedMediaPlayback =>
       widget.initialVodVideo != null || widget.initialClip != null;
 
+  bool get shouldRestorePreviousPlaybackOnPop =>
+      isPushedMediaPlayback && hasRouteRestorePlayback;
+
   Future<void> leaveToMiniPlayer() async {
     if (leavingToMiniPlayer) return;
     leavingToMiniPlayer = true;
 
-    if (isPushedMediaPlayback && hasRouteRestorePlayback) {
+    if (shouldRestorePreviousPlaybackOnPop) {
       handedOffToMiniPlayer = false;
       if (mounted) Navigator.of(context).pop();
       return;
