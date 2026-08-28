@@ -81,7 +81,7 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
 
     setState(() {
       checking = true;
-      statusText = '正在載入 Drops inventory...';
+      statusText = '正在載入 Drops 庫存...';
     });
 
     final next = await service.checkConnection();
@@ -109,8 +109,8 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
         twitchAppNotificationCenter.showSuccess(
           title: 'Drops 已更新',
           message: snapshot == null
-              ? 'Drops token、Inventory、Campaigns 都已連上。'
-              : 'Inventory 已更新，${snapshot.watchingDropCount} 個進行中，${snapshot.readyDropCount} 個可領取。',
+              ? 'Drops token、庫存與活動都已連上。'
+              : 'Drops 庫存已更新，${snapshot.watchingDropCount} 個進行中，${snapshot.readyDropCount} 個可領取。',
         );
       }
     } else {
@@ -226,7 +226,7 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
             ),
             const SizedBox(width: 10),
             const Text(
-              'Drops & Channel Points',
+              'Drops 與 Channel Points',
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
           ],
@@ -339,7 +339,7 @@ class _EmptyDropsCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             connected
-                ? '目前沒有可顯示的 Drops inventory。'
+                ? '目前沒有可顯示的 Drops 庫存。'
                 : '如果還沒登入 Drops token，請先完成完整登入或 Drops 登入流程。',
             textAlign: TextAlign.center,
             style: const TextStyle(
@@ -377,19 +377,19 @@ class _DropsTabBar extends StatelessWidget {
           children: <Widget>[
             _DropsTabButton(
               icon: Icons.desktop_windows_rounded,
-              label: 'Campaigns',
+              label: '活動',
               selected: activeTab == _DropsTab.campaigns,
               onTap: () => onChanged(_DropsTab.campaigns),
             ),
             _DropsTabButton(
               icon: Icons.inventory_2_rounded,
-              label: 'Inventory',
+              label: '庫存',
               selected: activeTab == _DropsTab.inventory,
               onTap: () => onChanged(_DropsTab.inventory),
             ),
             _DropsTabButton(
               icon: Icons.analytics_rounded,
-              label: 'Stats',
+              label: '統計',
               selected: activeTab == _DropsTab.stats,
               onTap: () => onChanged(_DropsTab.stats),
             ),
@@ -1177,16 +1177,15 @@ class _DropsInventoryPageState extends State<_DropsInventoryPage> {
         if (completedDrops > 0) ...<Widget>[
           _InventoryCompactRow(
             icon: Icons.check_rounded,
-            title: 'Completed Drops',
-            subtitle:
-                '$completedDrops drops you have earned across all campaigns',
-            trailing: '$completedDrops total',
+            title: '已完成 Drops',
+            subtitle: '你在所有活動中已取得 $completedDrops 個 Drops',
+            trailing: '共 $completedDrops 個',
             color: _kGreen,
           ),
           const SizedBox(height: 12),
         ],
         if (groups.isEmpty)
-          const _SimpleInfoCard(text: '目前 Inventory 沒有 Drops campaign。')
+          const _SimpleInfoCard(text: '目前庫存沒有 Drops 活動。')
         else
           for (final group in groups) ...<Widget>[
             _InventoryGameRow(
@@ -1228,25 +1227,25 @@ class _InventorySummaryGrid extends StatelessWidget {
     return _SummaryGrid(
       items: <_SummaryItem>[
         _SummaryItem(
-          'Total Drops',
+          '全部 Drops',
           snapshot.totalDropCount.toString(),
           Icons.inventory_2_rounded,
           Colors.white70,
         ),
         _SummaryItem(
-          'Claimed',
+          '已領取',
           claimedCount.toString(),
           Icons.check_circle_rounded,
           _kGreen,
         ),
         _SummaryItem(
-          'Ready to Claim',
+          '可領取',
           snapshot.readyDropCount.toString(),
           Icons.card_giftcard_rounded,
           _kGold,
         ),
         _SummaryItem(
-          'In Progress',
+          '進行中',
           snapshot.watchingDropCount.toString(),
           Icons.timelapse_rounded,
           _kPurpleLight,
@@ -1625,7 +1624,7 @@ class _StatsSummaryGrid extends StatelessWidget {
     return _SummaryGrid(
       items: <_SummaryItem>[
         _SummaryItem(
-          'Drops Claimed',
+          '已領取 Drops',
           claimedCount.toString(),
           Icons.card_giftcard_rounded,
           Colors.lightBlueAccent,
@@ -1637,13 +1636,13 @@ class _StatsSummaryGrid extends StatelessWidget {
           _kPurpleLight,
         ),
         _SummaryItem(
-          'Available Campaigns',
+          '可參與活動',
           snapshot.activeCampaignCount.toString(),
           Icons.trending_up_rounded,
           _kGreen,
         ),
         _SummaryItem(
-          'In Progress',
+          '進行中',
           snapshot.watchingDropCount.toString(),
           Icons.access_time_rounded,
           Colors.lightBlueAccent,
@@ -1693,13 +1692,10 @@ class _CurrentDropStatusCard extends StatelessWidget {
           const SizedBox(height: 16),
           _StatusDetailRow(label: '遊戲', value: drop.gameName),
           _StatusDetailRow(label: '活動', value: drop.campaignName),
-          _StatusDetailRow(
-            label: 'Current Drop',
-            value: drop.displayRewardName,
-          ),
+          _StatusDetailRow(label: '目前 Drop', value: drop.displayRewardName),
           if (campaign != null)
             _StatusDetailRow(
-              label: 'Account',
+              label: '帳號',
               value: campaign!.isAccountConnected ? '已連結' : '未連結',
               valueColor: campaign!.isAccountConnected
                   ? _kGreen
@@ -1709,7 +1705,7 @@ class _CurrentDropStatusCard extends StatelessWidget {
           Row(
             children: <Widget>[
               const Text(
-                'Progress',
+                '進度',
                 style: TextStyle(
                   color: Colors.white54,
                   fontSize: 12,
