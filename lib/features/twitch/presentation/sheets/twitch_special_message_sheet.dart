@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/chat/twitch_chat_text_style.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 Future<void> showTwitchSpecialMessageSheetStage251({
@@ -84,47 +85,49 @@ class _TwitchSpecialMessageSheetStage251State
       icon: Icons.auto_awesome_rounded,
       loading: _loading,
       onRefresh: _loading ? null : _refresh,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (_errorText != null) _ErrorBox(text: _errorText!),
-            Expanded(
-              child: snapshot == null && _loading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: TwitchUiColors.primarySoft,
-                      ),
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      children: <Widget>[
-                        _ShareSection(
-                          snapshot: snapshot,
-                          onShareWatchStreak: (status) {
-                            widget.onShareWatchStreak(status);
-                            Navigator.of(context).maybePop();
-                          },
-                          onShareResub: (resub) {
-                            widget.onShareResub(resub);
-                            Navigator.of(context).maybePop();
-                          },
+      child: TwitchChatTextScope(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              if (_errorText != null) _ErrorBox(text: _errorText!),
+              Expanded(
+                child: snapshot == null && _loading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: TwitchUiColors.primarySoft,
                         ),
-                        const SizedBox(height: 12),
-                        _BadgeSection(
-                          snapshot: snapshot,
-                          selectingBadgeId: _selectingBadgeId,
-                          onSelectBadge: _selectBadge,
-                        ),
-                        if (snapshot?.hasIssues ?? false) ...<Widget>[
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        children: <Widget>[
+                          _ShareSection(
+                            snapshot: snapshot,
+                            onShareWatchStreak: (status) {
+                              widget.onShareWatchStreak(status);
+                              Navigator.of(context).maybePop();
+                            },
+                            onShareResub: (resub) {
+                              widget.onShareResub(resub);
+                              Navigator.of(context).maybePop();
+                            },
+                          ),
                           const SizedBox(height: 12),
-                          _IssuesSection(snapshot: snapshot!),
+                          _BadgeSection(
+                            snapshot: snapshot,
+                            selectingBadgeId: _selectingBadgeId,
+                            onSelectBadge: _selectBadge,
+                          ),
+                          if (snapshot?.hasIssues ?? false) ...<Widget>[
+                            const SizedBox(height: 12),
+                            _IssuesSection(snapshot: snapshot!),
+                          ],
                         ],
-                      ],
-                    ),
-            ),
-          ],
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
