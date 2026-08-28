@@ -271,6 +271,12 @@ class _CompactWatchBottomControls extends StatelessWidget {
           _LivePlaybackSheetButton(
             player: player,
             playerRuntime: playerRuntime,
+            hasDvrReplay: hasDvrReplay,
+            showLiveEdgeLabel: showLiveEdgeLabel,
+            liveDvrDuration: liveDvrDuration,
+            liveDvrStartedAt: liveDvrStartedAt,
+            onOpenDvrReplayAt: onOpenDvrReplayAt,
+            onReturnToLive: onReturnToLive,
           ),
           const Spacer(),
         ] else ...[
@@ -598,10 +604,22 @@ class _FullscreenToggleButton extends StatelessWidget {
 class _LivePlaybackSheetButton extends StatelessWidget {
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
+  final bool hasDvrReplay;
+  final bool showLiveEdgeLabel;
+  final Duration? liveDvrDuration;
+  final DateTime? liveDvrStartedAt;
+  final ValueChanged<double>? onOpenDvrReplayAt;
+  final VoidCallback? onReturnToLive;
 
   const _LivePlaybackSheetButton({
     required this.player,
     required this.playerRuntime,
+    required this.hasDvrReplay,
+    required this.showLiveEdgeLabel,
+    required this.liveDvrDuration,
+    required this.liveDvrStartedAt,
+    required this.onOpenDvrReplayAt,
+    required this.onReturnToLive,
   });
 
   void _showPlaybackSheet(BuildContext context) {
@@ -681,7 +699,16 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 10),
-                      TwitchVodPlaybackStrip(player: player),
+                      _WatchPlaybackStrip(
+                        player: player,
+                        playerRuntime: playerRuntime,
+                        hasDvrReplay: hasDvrReplay,
+                        showLiveEdgeLabel: showLiveEdgeLabel,
+                        liveDvrDuration: liveDvrDuration,
+                        liveDvrStartedAt: liveDvrStartedAt,
+                        onOpenDvrReplayAt: onOpenDvrReplayAt,
+                        onReturnToLive: onReturnToLive,
+                      ),
                     ],
                   ),
                 ),
