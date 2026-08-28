@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
 const double twitchStreamCardGridHorizontalPadding = 36;
@@ -116,9 +117,9 @@ class TwitchStreamCard extends StatelessWidget {
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: <Color>[
-                          const Color(0xFF9146FF).withValues(alpha: 0.0),
-                          const Color(0xFFBF94FF).withValues(alpha: 0.70),
-                          const Color(0xFF9146FF).withValues(alpha: 0.0),
+                          TwitchUiColors.primary.withValues(alpha: 0.0),
+                          TwitchUiColors.primarySoft.withValues(alpha: 0.70),
+                          TwitchUiColors.primary.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -438,7 +439,7 @@ class _GameBadge extends StatelessWidget {
         border: Border.all(color: colors.gameBorder, width: 1.1),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFF9146FF).withValues(alpha: 0.20),
+            color: TwitchUiColors.primary.withValues(alpha: 0.20),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -595,7 +596,7 @@ class _Avatar extends StatelessWidget {
         border: Border.all(color: colors.border),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: const Color(0xFF9146FF).withValues(alpha: 0.20),
+            color: TwitchUiColors.primary.withValues(alpha: 0.20),
             blurRadius: 12,
           ),
         ],
@@ -649,23 +650,21 @@ class _StreamCardColors {
   });
 
   factory _StreamCardColors.fromContext(BuildContext _) {
-    const twitchPurple = Color(0xFF9146FF);
-
     return _StreamCardColors(
       cardTop: const Color(0xFF23202D).withValues(alpha: 0.98),
       cardMiddle: const Color(0xFF191922).withValues(alpha: 0.96),
       cardBottom: const Color(0xFF15151C).withValues(alpha: 0.98),
-      border: twitchPurple.withValues(alpha: 0.24),
+      border: TwitchUiColors.primary.withValues(alpha: 0.24),
       shadow: Colors.black.withValues(alpha: 0.50),
-      purpleGlow: twitchPurple.withValues(alpha: 0.20),
+      purpleGlow: TwitchUiColors.primary.withValues(alpha: 0.20),
       thumbnailFallback: const Color(0xFF111116),
       softFill: Colors.white.withValues(alpha: 0.075),
       primaryText: Colors.white,
       secondaryText: Colors.white.withValues(alpha: 0.78),
       mutedText: Colors.white.withValues(alpha: 0.46),
-      accent: const Color(0xFFBF94FF),
-      gameBadge: twitchPurple.withValues(alpha: 0.26),
-      gameBorder: twitchPurple.withValues(alpha: 0.58),
+      accent: TwitchUiColors.primarySoft,
+      gameBadge: TwitchUiColors.primary.withValues(alpha: 0.26),
+      gameBorder: TwitchUiColors.primary.withValues(alpha: 0.58),
       gameText: const Color(0xFFF0E7FF),
     );
   }
