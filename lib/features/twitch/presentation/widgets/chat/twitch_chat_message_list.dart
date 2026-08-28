@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -34,7 +33,65 @@ class TwitchChatMessageList extends StatefulWidget {
   State<TwitchChatMessageList> createState() => _TwitchChatMessageListState();
 }
 
+class TwitchChatMessageFeed extends StatefulWidget {
+  final List<TwitchChatRuntimeMessage> messages;
+  final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService? officialEmoteCache;
+  final bool showTimestamp;
+  final double fontScale;
+  final bool compact;
+  final bool animateEmotes;
+  final WidgetBuilder? emptyBuilder;
+  final ValueChanged<TwitchChatRuntimeMessage>? onOpenMessageContext;
+
+  const TwitchChatMessageFeed({
+    super.key,
+    required this.messages,
+    this.thirdPartyEmoteCache,
+    this.officialEmoteCache,
+    this.showTimestamp = false,
+    this.fontScale = 1.0,
+    this.compact = false,
+    this.animateEmotes = true,
+    this.emptyBuilder,
+    this.onOpenMessageContext,
+  });
+
+  @override
+  State<TwitchChatMessageFeed> createState() => _TwitchChatMessageFeedState();
+}
+
 class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
+  void _openContextSheet(TwitchChatRuntimeMessage message) {
+    final externalHandler = widget.onOpenMessageContext;
+    if (externalHandler != null) {
+      externalHandler(message);
+      return;
+    }
+
+    showTwitchChatMessageContextSheet(
+      context: context,
+      selectedMessage: message,
+      messages: widget.runtime.messages,
+      thirdPartyEmotes: widget.thirdPartyEmoteCache,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TwitchChatMessageFeed(
+      messages: widget.runtime.messages,
+      thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
+      officialEmoteCache: widget.officialEmoteCache,
+      showTimestamp: widget.showTimestamp,
+      fontScale: widget.fontScale,
+      compact: widget.compact,
+      onOpenMessageContext: _openContextSheet,
+    );
+  }
+}
+
+class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   static const double _autoScrollThreshold = 36;
   static const double _cheapResumeAnimationDistance = 420;
   static const int _autoFollowRenderMessageLimit = 100;
@@ -59,8 +116,6 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   List<TwitchChatRuntimeMessage> _visibleMessages =
       <TwitchChatRuntimeMessage>[];
 
-  TwitchChatRuntime get runtime => widget.runtime;
-
   @override
   void initState() {
     super.initState();
@@ -70,10 +125,12 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   }
 
   @override
-  void didUpdateWidget(covariant TwitchChatMessageList oldWidget) {
+  void didUpdateWidget(covariant TwitchChatMessageFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.runtime != widget.runtime) {
+    if (!identical(oldWidget.messages, widget.messages) &&
+        oldWidget.messages.isNotEmpty &&
+        widget.messages.isEmpty) {
       _bufferFlushTimer?.cancel();
       _pendingBufferedSourceMessages = null;
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
@@ -93,7 +150,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   }
 
   void _resetVisibleMessagesFromRuntime({required bool forceAutoScroll}) {
-    final sourceMessages = runtime.messages;
+    final sourceMessages = widget.messages;
     if (forceAutoScroll) _autoScroll = true;
     _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
     _lastSourceMessageCount = sourceMessages.length;
@@ -115,7 +172,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   }
 
   void _syncVisibleMessagesFromRuntime() {
-    final sourceMessages = runtime.messages;
+    final sourceMessages = widget.messages;
     final sourceCount = sourceMessages.length;
     final sourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
 
@@ -156,7 +213,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (_bufferFlushTimer?.isActive ?? false) return;
 
     _bufferFlushTimer = Timer(_bufferFlushInterval, () {
-      final sourceMessages = _pendingBufferedSourceMessages ?? runtime.messages;
+      final sourceMessages = _pendingBufferedSourceMessages ?? widget.messages;
       _pendingBufferedSourceMessages = null;
       if (!mounted) return;
       if (!_autoScroll && !_isNearLatest) return;
@@ -232,10 +289,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     if (nearLatest && !_autoScroll) {
       setState(() {
         _autoScroll = true;
-        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
-        _lastSourceMessageCount = runtime.messages.length;
+        _visibleMessages = _renderMessagesForCurrentMode(widget.messages);
+        _lastSourceMessageCount = widget.messages.length;
         _lastSourceNewestFingerprint = _newestMessageFingerprint(
-          runtime.messages,
+          widget.messages,
         );
         _hiddenNewMessageCount = 0;
       });
@@ -248,7 +305,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
       _pendingBufferedSourceMessages = null;
       setState(() {
         _autoScroll = false;
-        _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
+        _visibleMessages = _renderMessagesForCurrentMode(widget.messages);
       });
     }
   }
@@ -313,11 +370,9 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 
     setState(() {
       _autoScroll = true;
-      _visibleMessages = _renderMessagesForCurrentMode(runtime.messages);
-      _lastSourceMessageCount = runtime.messages.length;
-      _lastSourceNewestFingerprint = _newestMessageFingerprint(
-        runtime.messages,
-      );
+      _visibleMessages = _renderMessagesForCurrentMode(widget.messages);
+      _lastSourceMessageCount = widget.messages.length;
+      _lastSourceNewestFingerprint = _newestMessageFingerprint(widget.messages);
       _hiddenNewMessageCount = 0;
     });
 
@@ -325,22 +380,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   }
 
   void _openContextSheet(TwitchChatRuntimeMessage message) {
-    final externalHandler = widget.onOpenMessageContext;
-    if (externalHandler != null) {
-      externalHandler(message);
-      return;
-    }
-
-    final contextMessages = runtime.messages.isEmpty
-        ? _visibleMessages
-        : runtime.messages;
-
-    showTwitchChatMessageContextSheet(
-      context: context,
-      selectedMessage: message,
-      messages: contextMessages,
-      thirdPartyEmotes: widget.thirdPartyEmoteCache,
-    );
+    widget.onOpenMessageContext?.call(message);
   }
 
   @override
@@ -348,9 +388,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
     final visibleMessages = _visibleMessages;
 
     if (visibleMessages.isEmpty) {
-      return const Center(
-        child: Text('等待聊天室訊息...', style: TextStyle(color: Colors.white54)),
-      );
+      return widget.emptyBuilder?.call(context) ??
+          const Center(
+            child: Text('等待聊天室訊息...', style: TextStyle(color: Colors.white54)),
+          );
     }
 
     return ColoredBox(
@@ -376,7 +417,7 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
                 showTimestamp: widget.showTimestamp,
                 fontScale: widget.fontScale,
                 compact: widget.compact,
-                animateEmotes: true,
+                animateEmotes: widget.animateEmotes,
                 onOpenContext: () => _openContextSheet(message),
               );
             },

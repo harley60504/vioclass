@@ -1,20 +1,26 @@
 import 'package:flutter/material.dart';
 
 import '../../../../services/chat/twitch_vod_chat_replay_runtime.dart';
+import '../../../../services/chat/twitch_official_emote_cache_service.dart';
+import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../../settings/twitch_chat_appearance_controller.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../chat/twitch_chat_text_style.dart';
-import '../../chat/twitch_runtime_message_tile.dart';
+import '../../chat/twitch_chat_message_list.dart';
 
 class TwitchVodReplayChatPanel extends StatefulWidget {
   final TwitchVodChatReplayRuntime runtime;
   final Widget liveChat;
+  final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService? officialEmoteCache;
   final TwitchVodReplayChatMode preferredMode;
 
   const TwitchVodReplayChatPanel({
     super.key,
     required this.runtime,
     required this.liveChat,
+    this.thirdPartyEmoteCache,
+    this.officialEmoteCache,
     this.preferredMode = TwitchVodReplayChatMode.replay,
   });
 
@@ -74,6 +80,8 @@ class _TwitchVodReplayChatPanelState extends State<TwitchVodReplayChatPanel> {
               child: _mode == TwitchVodReplayChatMode.replay
                   ? _VodReplayMessageList(
                       runtime: widget.runtime,
+                      thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
+                      officialEmoteCache: widget.officialEmoteCache,
                       fontScale: fontScale,
                     )
                   : widget.liveChat,
@@ -189,23 +197,22 @@ class _ChatModeBadge extends StatelessWidget {
 
 class _VodReplayMessageList extends StatefulWidget {
   final TwitchVodChatReplayRuntime runtime;
+  final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
+  final TwitchOfficialEmoteCacheService? officialEmoteCache;
   final double fontScale;
 
-  const _VodReplayMessageList({required this.runtime, required this.fontScale});
+  const _VodReplayMessageList({
+    required this.runtime,
+    required this.thirdPartyEmoteCache,
+    required this.officialEmoteCache,
+    required this.fontScale,
+  });
 
   @override
   State<_VodReplayMessageList> createState() => _VodReplayMessageListState();
 }
 
 class _VodReplayMessageListState extends State<_VodReplayMessageList> {
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -213,35 +220,21 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
       builder: (context, _) {
         final messages = widget.runtime.messages;
         final error = widget.runtime.error;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!_scrollController.hasClients) return;
-          _scrollController.jumpTo(0);
-        });
 
         return TwitchChatTextScope(
-          child: messages.isEmpty
-              ? _VodReplayEmptyState(
-                  error: error,
-                  fetching: widget.runtime.fetching,
-                  fontScale: widget.fontScale,
-                )
-              : ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final chronologicalIndex = messages.length - 1 - index;
-                    final message = messages[chronologicalIndex];
-                    return TwitchRuntimeMessageTile(
-                      key: ValueKey<String>(message.id),
-                      message: message,
-                      showTimestamp: true,
-                      fontScale: widget.fontScale,
-                      compact: true,
-                    );
-                  },
-                ),
+          child: TwitchChatMessageFeed(
+            messages: messages,
+            thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
+            officialEmoteCache: widget.officialEmoteCache,
+            showTimestamp: true,
+            fontScale: widget.fontScale,
+            compact: true,
+            emptyBuilder: (_) => _VodReplayEmptyState(
+              error: error,
+              fetching: widget.runtime.fetching,
+              fontScale: widget.fontScale,
+            ),
+          ),
         );
       },
     );

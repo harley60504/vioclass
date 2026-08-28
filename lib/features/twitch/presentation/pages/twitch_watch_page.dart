@@ -891,6 +891,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         : TwitchVodReplayChatPanel(
             runtime: vodReplayController,
             liveChat: liveChatPanelWithoutHeader,
+            thirdPartyEmoteCache: watchPorts.emotes.thirdParty,
+            officialEmoteCache: watchPorts.emotes.official,
             preferredMode: preferVodReplayChat
                 ? TwitchVodReplayChatMode.replay
                 : TwitchVodReplayChatMode.live,
