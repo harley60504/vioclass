@@ -1,4 +1,4 @@
-// Stage 220A: Independent Twitch player view.
+// Independent Twitch player view.
 //
 // This view renders the media_kit Video surface owned by TwitchPlayerController.
 // It is intentionally small: no WatchPage chat, no engagement UI, no sheet logic.

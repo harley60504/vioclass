@@ -1,4 +1,4 @@
-// Stage 220A: Independent Twitch player core state.
+// Independent Twitch player core state.
 
 import 'twitch_player_profile.dart';
 

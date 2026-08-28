@@ -1,4 +1,4 @@
-// Stage 220A: Barrel exports for the independent Twitch player core.
+// Barrel exports for the independent Twitch player core.
 
 export 'twitch_media_kit_player_engine.dart';
 export 'twitch_player_controller.dart';

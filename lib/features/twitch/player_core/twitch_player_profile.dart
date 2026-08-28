@@ -1,5 +1,5 @@
-// Stage 220H: Independent Twitch player core profile with aggressive
-// lower-latency PiliPlus-style media_kit tuning.
+// Independent Twitch player core profile with aggressive lower-latency
+// PiliPlus-style media_kit tuning.
 //
 // Previous working media_kit path used almost no mpv options, while this branch
 // can now inject options through the fork API. Keep only options that help live

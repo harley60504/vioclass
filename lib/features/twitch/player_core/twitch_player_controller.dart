@@ -1,4 +1,4 @@
-// Stage 220F: Independent Twitch player controller.
+// Independent Twitch player controller.
 //
 // Design goals:
 // - Keep media_kit lifecycle out of WatchPage.

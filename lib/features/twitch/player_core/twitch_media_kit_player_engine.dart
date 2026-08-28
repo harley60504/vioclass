@@ -1,5 +1,5 @@
-// Stage 220F: Independent media_kit engine using a fully pinned
-// PiliPlus-style media_kit fork stack.
+// Independent media_kit engine using a fully pinned PiliPlus-style media_kit
+// fork stack.
 
 import 'dart:async';
 
