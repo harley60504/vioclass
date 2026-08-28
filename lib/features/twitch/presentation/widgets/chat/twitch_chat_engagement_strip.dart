@@ -93,7 +93,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
                 ),
               ),
               child: Text(
-                error!,
+                '聊天室活動暫時讀取失敗，稍後再試。',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: twitchChatTextStyle(
