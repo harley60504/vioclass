@@ -1079,10 +1079,7 @@ class _CampaignDetailBody extends StatelessWidget {
             spacing: 12,
             runSpacing: 4,
             children: <Widget>[
-              _CampaignLinkText(
-                label: 'Connect account',
-                url: campaign.accountLinkUrl,
-              ),
+              _CampaignLinkText(label: '連結帳號', url: campaign.accountLinkUrl),
             ],
           ),
         ],
