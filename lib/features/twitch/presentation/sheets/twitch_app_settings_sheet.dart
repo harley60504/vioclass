@@ -141,25 +141,25 @@ class _SettingsTabSelector extends StatelessWidget {
       const _SettingsTabMeta(
         tab: _TwitchSettingsTab.account,
         icon: Icons.person_rounded,
-        label: 'Account',
+        label: '帳號',
         description: '登入與帳號',
       ),
       const _SettingsTabMeta(
         tab: _TwitchSettingsTab.chat,
         icon: Icons.chat_bubble_rounded,
-        label: 'Chat',
+        label: '聊天',
         description: '聊天室顯示',
       ),
       const _SettingsTabMeta(
         tab: _TwitchSettingsTab.player,
         icon: Icons.play_circle_rounded,
-        label: 'Player',
+        label: '播放器',
         description: '播放預設',
       ),
       const _SettingsTabMeta(
         tab: _TwitchSettingsTab.appearance,
         icon: Icons.palette_rounded,
-        label: 'Appearance',
+        label: '外觀',
         description: '字體與外觀',
       ),
     ];
@@ -672,7 +672,7 @@ class _PlayerSettingsPane extends StatelessWidget {
                   ),
                   _SettingsSwitchRow(
                     title: '預設顯示聊天室',
-                    subtitle: '新開 watch page 時先顯示右側聊天欄',
+                    subtitle: '新開觀看頁時先顯示右側聊天欄',
                     value: controller.chatVisible,
                     onChanged: controller.setChatVisible,
                   ),
@@ -683,7 +683,7 @@ class _PlayerSettingsPane extends StatelessWidget {
                     onChanged: controller.setAndroidPipEnabled,
                   ),
                   _SettingsSwitchRow(
-                    title: '離開 WatchPage 保留小窗',
+                    title: '離開觀看頁保留小窗',
                     subtitle: '從直播、VOD 或 Clip 回主畫面時保留 app 內小窗',
                     value: controller.homeKeepsMiniPlayer,
                     onChanged: controller.setHomeKeepsMiniPlayer,
