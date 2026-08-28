@@ -205,7 +205,7 @@ class _TwitchSubscribeWebViewDialogBodyState
               onReceivedError: (controller, request, error) {
                 if (!mounted) return;
                 setState(() {
-                  _errorText = '訂閱頁載入訊息：${error.description} (${error.type})';
+                  _errorText = '訂閱頁暫時載入失敗，請稍後重試。';
                 });
               },
               onCreateWindow: (controller, createWindowAction) async {

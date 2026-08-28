@@ -434,8 +434,7 @@ class _TwitchDropsWebViewLoginPageState
                     if (handled) return;
                     if (!mounted) return;
                     setState(() {
-                      _statusText =
-                          'WebView 載入失敗：${error.description} (${error.type})';
+                      _statusText = 'Drops / Android 授權頁暫時載入失敗，請稍後重試。';
                     });
                   },
                 ),

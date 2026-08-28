@@ -978,7 +978,7 @@ query ChannelPointsContext($channelLogin: String!) {
             onReceivedError: (controller, request, error) {
               if (!mounted || request.isForMainFrame != true) return;
               setState(() {
-                _errorText = 'App 內 OAuth WebView 載入失敗：${error.description}';
+                _errorText = 'App 內 Twitch 登入頁暫時載入失敗，請稍後重試。';
               });
             },
           ),
