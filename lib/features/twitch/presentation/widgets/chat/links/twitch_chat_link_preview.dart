@@ -472,11 +472,13 @@ class _LinkPreviewTextBlock extends StatelessWidget {
                 heading,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12.5 * scale,
-                  fontWeight: FontWeight.w900,
-                  height: 1.1,
+                style: twitchChatTextStyle(
+                  TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5 * scale,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                  ),
                 ),
               ),
             ),
@@ -487,11 +489,13 @@ class _LinkPreviewTextBlock extends StatelessWidget {
                   cleanAuthor,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: TwitchUiColors.textMuted,
-                    fontSize: 10.5 * scale,
-                    fontWeight: FontWeight.w700,
-                    height: 1.1,
+                  style: twitchChatTextStyle(
+                    TextStyle(
+                      color: TwitchUiColors.textMuted,
+                      fontSize: 10.5 * scale,
+                      fontWeight: FontWeight.w700,
+                      height: 1.1,
+                    ),
                   ),
                 ),
               ),
@@ -503,11 +507,13 @@ class _LinkPreviewTextBlock extends StatelessWidget {
           body,
           maxLines: compact ? 2 : 2,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: TwitchUiColors.textMuted,
-            fontSize: 11 * scale,
-            fontWeight: FontWeight.w700,
-            height: 1.16,
+          style: twitchChatTextStyle(
+            TextStyle(
+              color: TwitchUiColors.textMuted,
+              fontSize: 11 * scale,
+              fontWeight: FontWeight.w700,
+              height: 1.16,
+            ),
           ),
         ),
       ],
