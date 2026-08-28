@@ -106,7 +106,7 @@ class ChannelPointsErrorBanner extends StatelessWidget {
         border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
       ),
       child: Text(
-        '$label：$message',
+        '$label 暫時讀取失敗，稍後再試。',
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(

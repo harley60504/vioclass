@@ -216,7 +216,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                   : error != null
                   ? _OverlayMessage(
                       icon: Icons.error_outline_rounded,
-                      message: '載入貼圖清單失敗：$error',
+                      message: '貼圖清單暫時載入失敗，稍後再試。',
                     )
                   : choosingModifier
                   ? _ModifierGrid(
