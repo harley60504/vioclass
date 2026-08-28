@@ -9,6 +9,51 @@ import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
+List<InlineSpan> buildTwitchChatMessageAuthorSpans({
+  required String displayNameText,
+  required Color displayColor,
+  required bool isAction,
+  required bool isFirstMessage,
+  required bool compact,
+  required TwitchChatMessageVisualMetrics metrics,
+}) {
+  return <InlineSpan>[
+    TextSpan(
+      text: displayNameText,
+      style: twitchChatTextStyle(
+        TextStyle(
+          color: displayColor,
+          fontWeight: FontWeight.w900,
+          fontSize: compact
+              ? metrics.compactNameFontSize
+              : metrics.nameFontSize,
+          fontStyle: isAction ? FontStyle.italic : FontStyle.normal,
+          height: metrics.lineHeight,
+        ),
+      ),
+    ),
+    if (isFirstMessage)
+      WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        child: Padding(
+          padding: const EdgeInsets.only(left: 4, right: 3),
+          child: TwitchChatFirstMessageChip(metrics: metrics),
+        ),
+      ),
+    TextSpan(
+      text: ': ',
+      style: twitchChatTextStyle(
+        TextStyle(
+          color: Colors.white54,
+          fontWeight: FontWeight.w700,
+          fontSize: metrics.messageFontSize,
+          height: metrics.lineHeight,
+        ),
+      ),
+    ),
+  ];
+}
+
 class TwitchChatMessageAuthor extends StatelessWidget {
   final String displayNameText;
   final Color displayColor;

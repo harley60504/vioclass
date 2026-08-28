@@ -4,6 +4,7 @@ import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../twitch_chat_text_style.dart';
+import 'twitch_chat_message_author.dart';
 import 'twitch_chat_message_badges.dart';
 import 'twitch_chat_message_chips.dart';
 import 'twitch_chat_message_reply_preview.dart';
@@ -108,48 +109,14 @@ class TwitchChatMessageContent extends StatelessWidget {
       );
     }
 
-    spans.add(
-      TextSpan(
-        text: displayNameText,
-        style: twitchChatTextStyle(
-          TextStyle(
-            color: displayColor,
-            fontWeight: FontWeight.w900,
-            fontSize: compact
-                ? metrics.compactNameFontSize
-                : metrics.nameFontSize,
-            fontStyle: message.metadata.isAction
-                ? FontStyle.italic
-                : FontStyle.normal,
-            height: metrics.lineHeight,
-          ),
-        ),
-      ),
-    );
-
-    if (message.metadata.isFirstMessage) {
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 4, right: 3),
-            child: TwitchChatFirstMessageChip(metrics: metrics),
-          ),
-        ),
-      );
-    }
-
-    spans.add(
-      TextSpan(
-        text: ': ',
-        style: twitchChatTextStyle(
-          TextStyle(
-            color: Colors.white54,
-            fontWeight: FontWeight.w700,
-            fontSize: metrics.messageFontSize,
-            height: metrics.lineHeight,
-          ),
-        ),
+    spans.addAll(
+      buildTwitchChatMessageAuthorSpans(
+        displayNameText: displayNameText,
+        displayColor: displayColor,
+        isAction: message.metadata.isAction,
+        isFirstMessage: message.metadata.isFirstMessage,
+        compact: compact,
+        metrics: metrics,
       ),
     );
 
