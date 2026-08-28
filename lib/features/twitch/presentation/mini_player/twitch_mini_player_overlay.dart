@@ -281,6 +281,7 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard> {
                         _MiniPlayerFooter(
                           title: title.isEmpty ? '直播小窗' : title,
                           subtitle: subtitle,
+                          playbackKind: widget.entry.kind,
                           androidPipEnabled: widget.androidPipEnabled,
                           onClose: widget.onClose,
                         ),
@@ -300,12 +301,14 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard> {
 class _MiniPlayerFooter extends StatelessWidget {
   final String title;
   final String subtitle;
+  final TwitchWatchPlaybackKind playbackKind;
   final bool androidPipEnabled;
   final VoidCallback onClose;
 
   const _MiniPlayerFooter({
     required this.title,
     required this.subtitle,
+    required this.playbackKind,
     required this.androidPipEnabled,
     required this.onClose,
   });
@@ -331,17 +334,26 @@ class _MiniPlayerFooter extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                if (subtitle.isNotEmpty)
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.58),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                Row(
+                  children: [
+                    _MiniPlaybackKindBadge(kind: playbackKind),
+                    if (subtitle.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.58),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ),
           ),
@@ -366,6 +378,44 @@ class _MiniPlayerFooter extends StatelessWidget {
             color: Colors.white70,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MiniPlaybackKindBadge extends StatelessWidget {
+  final TwitchWatchPlaybackKind kind;
+
+  const _MiniPlaybackKindBadge({required this.kind});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = switch (kind) {
+      TwitchWatchPlaybackKind.live => '直播',
+      TwitchWatchPlaybackKind.liveDvr => 'DVR',
+      TwitchWatchPlaybackKind.vod => 'VOD',
+      TwitchWatchPlaybackKind.clip => 'Clip',
+      TwitchWatchPlaybackKind.none => '播放',
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.72),
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }
