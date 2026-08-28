@@ -55,14 +55,17 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   }
 
   TwitchPlaybackSessionState? buildPlaybackSnapshot() {
-    final state = TwitchPlaybackSessionController.instance.playableState;
-    if (state == null) return null;
-    final mediaUri = state.mediaUri.trim();
     final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
-    if (currentUri != mediaUri) {
+    final state = TwitchPlaybackSessionController.instance
+        .playableStateForMediaUri(currentUri);
+    if (state == null) {
+      final ownedUri =
+          TwitchPlaybackSessionController.instance.playableState?.mediaUri
+              .trim() ??
+          '';
       debugPrint(
         '[WatchPlaybackState] skip mini snapshot because owner uri is stale: '
-        'owned=$mediaUri current=$currentUri',
+        'owned=$ownedUri current=$currentUri',
       );
       return null;
     }

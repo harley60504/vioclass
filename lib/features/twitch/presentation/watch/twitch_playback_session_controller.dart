@@ -60,6 +60,15 @@ class TwitchPlaybackSessionController extends ChangeNotifier {
     return current != null && current.playable ? current : null;
   }
 
+  TwitchPlaybackSessionState? playableStateForMediaUri(String? mediaUri) {
+    final current = playableState;
+    if (current == null) return null;
+
+    final safeUri = mediaUri?.trim();
+    if (safeUri == null || safeUri.isEmpty) return null;
+    return current.mediaUri.trim() == safeUri ? current : null;
+  }
+
   void setPlayback({
     required TwitchWatchPlaybackKind kind,
     required String? mediaUri,
