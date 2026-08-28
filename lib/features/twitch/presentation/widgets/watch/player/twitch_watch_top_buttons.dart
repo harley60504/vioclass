@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
 
 class FollowButton extends StatelessWidget {
@@ -62,7 +63,10 @@ class FollowButton extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: TwitchUiColors.primarySoft,
+                        ),
                       )
                     : Icon(
                         followed ? Icons.favorite : Icons.favorite_border,
@@ -304,7 +308,10 @@ class CreateClipButton extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: TwitchUiColors.primarySoft,
+                        ),
                       )
                     : Icon(
                         Icons.movie_creation_outlined,

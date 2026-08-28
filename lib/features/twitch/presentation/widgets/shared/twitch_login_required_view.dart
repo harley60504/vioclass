@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchLoginRequiredView extends StatelessWidget {
   final String statusText;
   final bool loading;
@@ -114,7 +116,10 @@ class TwitchLoginRequiredView extends StatelessWidget {
                       ? const SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: TwitchUiColors.primarySoft,
+                          ),
                         )
                       : const Icon(Icons.refresh_rounded),
                   label: const Text('重新檢查'),

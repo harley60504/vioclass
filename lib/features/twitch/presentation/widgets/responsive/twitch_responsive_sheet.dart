@@ -441,7 +441,10 @@ class _SheetHeaderIconButton extends StatelessWidget {
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: TwitchUiColors.primarySoft,
+                  ),
                 )
               : Icon(
                   icon,
@@ -592,7 +595,10 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                 ? SizedBox(
                     width: compact ? 16 : 18,
                     height: compact ? 16 : 18,
-                    child: const CircularProgressIndicator(strokeWidth: 2),
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: TwitchUiColors.primarySoft,
+                    ),
                   )
                 : Icon(Icons.refresh_rounded, size: compact ? 19 : 21),
           ),
