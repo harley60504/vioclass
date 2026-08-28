@@ -518,7 +518,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                       if (loadingGames && games.isEmpty) {
                         return const Center(
                           child: CircularProgressIndicator(
-                            color: Color(0xFF9146FF),
+                            color: TwitchUiColors.primary,
                           ),
                         );
                       }
@@ -762,7 +762,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                               ? Icons.check_circle_rounded
                               : Icons.language_rounded,
                           color: selected
-                              ? const Color(0xFF9146FF)
+                              ? TwitchUiColors.primary
                               : Colors.white54,
                         ),
                         title: Text(label),
@@ -862,7 +862,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFF9146FF),
+      color: TwitchUiColors.primary,
       onRefresh: refreshStreams,
       child: TwitchDiscoveryStreamGrid(
         controller: scrollController,
@@ -915,7 +915,7 @@ class _GameCategoryGridTile extends StatelessWidget {
 
     return Material(
       color: selected
-          ? const Color(0xFF9146FF).withValues(alpha: 0.18)
+          ? TwitchUiColors.primary.withValues(alpha: 0.18)
           : Colors.white.withValues(alpha: 0.045),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
@@ -926,7 +926,7 @@ class _GameCategoryGridTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: selected
-                  ? const Color(0xFF9146FF).withValues(alpha: 0.72)
+                  ? TwitchUiColors.primary.withValues(alpha: 0.72)
                   : Colors.white.withValues(alpha: 0.075),
             ),
           ),
@@ -940,19 +940,19 @@ class _GameCategoryGridTile extends StatelessWidget {
                       ? Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: const Color(
-                              0xFF9146FF,
-                            ).withValues(alpha: 0.13),
+                            color: TwitchUiColors.primary.withValues(
+                              alpha: 0.13,
+                            ),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: const Color(
-                                0xFF9146FF,
-                              ).withValues(alpha: 0.20),
+                              color: TwitchUiColors.primary.withValues(
+                                alpha: 0.20,
+                              ),
                             ),
                           ),
                           child: const Icon(
                             Icons.grid_view_rounded,
-                            color: Color(0xFFBF94FF),
+                            color: TwitchUiColors.primarySoft,
                             size: 42,
                           ),
                         )
@@ -985,7 +985,7 @@ class _GameCategoryGridTile extends StatelessWidget {
                     if (selected) ...[
                       const Icon(
                         Icons.check_circle_rounded,
-                        color: Color(0xFFBF94FF),
+                        color: TwitchUiColors.primarySoft,
                         size: 16,
                       ),
                       const SizedBox(width: 6),
@@ -998,7 +998,7 @@ class _GameCategoryGridTile extends StatelessWidget {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: selected
-                              ? const Color(0xFFD8BFFF)
+                              ? TwitchUiColors.primarySoft
                               : Colors.white,
                           fontSize: 13.2,
                           height: 1.12,
