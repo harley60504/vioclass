@@ -106,7 +106,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                 )
                         : position;
                     final positionText = _formatDuration(previewPosition);
-                    const durationText = 'LIVE';
+                    const durationText = '直播';
                     final timeColor = buffering
                         ? Colors.orangeAccent
                         : Colors.white60;

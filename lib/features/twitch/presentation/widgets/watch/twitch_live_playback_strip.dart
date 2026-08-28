@@ -344,7 +344,7 @@ class _LiveEdgeButton extends StatelessWidget {
                 ),
                 SizedBox(width: compact ? 4 : 5),
                 Text(
-                  'LIVE',
+                  '直播',
                   style: TextStyle(
                     color: enabled ? foreground : Colors.white24,
                     fontSize: compact ? 10 : 11,
