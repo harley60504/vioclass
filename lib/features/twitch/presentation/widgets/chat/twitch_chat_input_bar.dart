@@ -246,7 +246,10 @@ class _SelfDrawnSendButton extends StatelessWidget {
               ? SizedBox(
                   width: compact ? 13 : 14,
                   height: compact ? 13 : 14,
-                  child: const CircularProgressIndicator(strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: foreground,
+                  ),
                 )
               : Row(
                   mainAxisSize: MainAxisSize.min,
@@ -260,7 +263,7 @@ class _SelfDrawnSendButton extends StatelessWidget {
                     if (!compact) ...[
                       const SizedBox(width: 7),
                       Text(
-                        'Send',
+                        '送出',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: foreground,
