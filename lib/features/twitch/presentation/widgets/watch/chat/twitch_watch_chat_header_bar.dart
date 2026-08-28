@@ -80,7 +80,7 @@ class _ConnectionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = connected ? TwitchUiColors.green : Colors.white38;
-    final label = connected ? 'LIVE' : 'OFF';
+    final label = connected ? '直播' : '離線';
 
     return Container(
       height: compact ? 25 : 28,

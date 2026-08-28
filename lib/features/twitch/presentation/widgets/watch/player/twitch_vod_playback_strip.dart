@@ -114,7 +114,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                 : position;
             final liveTailActive = widget.showLiveEdgeLabel && value >= 0.98;
             final tailText = widget.showLiveEdgeLabel
-                ? 'LIVE'
+                ? '直播'
                 : hasDuration
                 ? _formatDuration(displayDuration)
                 : '--:--';
