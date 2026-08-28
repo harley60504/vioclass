@@ -313,7 +313,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   Future<void> createLiveClip() async {
     if (creatingClip) return;
     if (currentPlaybackKind != TwitchWatchPlaybackKind.live) {
-      showSnack('目前在 VOD/Clip 模式，請先回直播再建立 Clip。');
+      showSnack('目前在 VOD/片段模式，請先回直播再建立片段。');
       return;
     }
 
@@ -342,7 +342,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
                 .inSeconds
                 .toDouble();
       if (offsetSeconds < 30) {
-        showSnack('直播剛開始，至少約 30 秒後才能剪 Clip。');
+        showSnack('直播剛開始，至少約 30 秒後才能剪片段。');
         return;
       }
       if (!mounted) return;
@@ -358,11 +358,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     } catch (error) {
       final message = error.toString();
       if (message.contains('Drops / Android token')) {
-        showSnack('Clip 剪輯失敗：請先補 Drops / Android token。');
+        showSnack('片段剪輯失敗：請先補 Drops / Android token。');
       } else if (_looksLikeClipDisabledError(message)) {
-        showSnack('這個實況主可能沒有開放 Clip。');
+        showSnack('這個實況主可能沒有開放片段。');
       } else {
-        showSnack('Clip 剪輯失敗：$error');
+        showSnack('片段剪輯失敗：$error');
       }
     } finally {
       if (mounted) setState(() => creatingClip = false);
@@ -721,7 +721,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       final user = await userApi.getChannelProfileByLogin(login);
       if (!mounted) return;
       if (user == null || user.id.trim().isEmpty) {
-        showSnack('頻道資訊讀取失敗，無法開啟 About/VOD。');
+        showSnack('頻道資訊讀取失敗，無法開啟關於 / VOD。');
         return;
       }
 

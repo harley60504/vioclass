@@ -535,7 +535,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     } catch (error) {
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('initial clip playback failed: $error');
-        showSnack('Clip 載入失敗：$error');
+        showSnack('片段載入失敗：$error');
       }
       return false;
     }

@@ -91,7 +91,7 @@ class _TwitchClipEditorDialogBodyState
 
   Future<void> _initialize() async {
     final player = await Player.create(
-      configuration: const PlayerConfiguration(title: 'Clip Editor'),
+      configuration: const PlayerConfiguration(title: '片段剪輯器'),
     );
     final controller = await VideoController.create(
       player,
@@ -177,12 +177,12 @@ class _TwitchClipEditorDialogBodyState
     if (session == null || _creating) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      setState(() => _errorText = '請先輸入 Clip 標題。');
+      setState(() => _errorText = '請先輸入片段標題。');
       return;
     }
     final length = _end - _start;
     if (length < _minClipLength || length > _maxClipLength) {
-      setState(() => _errorText = 'Clip 長度需介於 5 到 60 秒。');
+      setState(() => _errorText = '片段長度需介於 5 到 60 秒。');
       return;
     }
     setState(() {
@@ -218,7 +218,7 @@ class _TwitchClipEditorDialogBodyState
   Future<void> _openCreatedClipPlayback(String playbackUrl) async {
     final url = playbackUrl.trim();
     if (url.isEmpty) {
-      throw StateError('Clip 播放 URL 是空的。');
+      throw StateError('片段播放 URL 是空的。');
     }
 
     await _positionSubscription?.cancel();
@@ -230,7 +230,7 @@ class _TwitchClipEditorDialogBodyState
     if (oldPlayer != null) await oldPlayer.dispose();
 
     final player = await Player.create(
-      configuration: const PlayerConfiguration(title: 'Clip Playback'),
+      configuration: const PlayerConfiguration(title: '片段預覽'),
     );
     final controller = await VideoController.create(
       player,
@@ -259,7 +259,7 @@ class _TwitchClipEditorDialogBodyState
   Future<TwitchClipPlaybackResult> _waitForClipPlayback(String clipSlug) async {
     final slug = clipSlug.trim();
     if (slug.isEmpty) {
-      throw StateError('Twitch 回傳的 Clip slug 是空的。');
+      throw StateError('Twitch 回傳的片段 slug 是空的。');
     }
 
     Object? lastError;
@@ -277,7 +277,7 @@ class _TwitchClipEditorDialogBodyState
         lastError = error;
       }
     }
-    throw StateError('Clip 已建立，但 Twitch 還沒準備好播放：$lastError');
+    throw StateError('片段已建立，但 Twitch 還沒準備好播放：$lastError');
   }
 
   @override
@@ -309,7 +309,7 @@ class _TwitchClipEditorDialogBodyState
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
-                      '剪輯 Clip',
+                      '剪輯片段',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -474,7 +474,7 @@ class _TwitchClipEditorDialogBodyState
                             style: const TextStyle(color: Colors.white),
                             decoration: const InputDecoration(
                               counterText: '',
-                              hintText: 'Clip 標題',
+                              hintText: '片段標題',
                               hintStyle: TextStyle(color: Colors.white38),
                               filled: true,
                               fillColor: Color(0xFF202027),
@@ -516,7 +516,7 @@ class _TwitchClipEditorDialogBodyState
                                   ),
                                 )
                               : const Icon(Icons.movie_creation_outlined),
-                          label: Text(_creating ? '建立中' : '建立 Clip'),
+                          label: Text(_creating ? '建立中' : '建立片段'),
                         ),
                       ],
                     ),
@@ -539,7 +539,7 @@ class _TwitchClipEditorDialogBodyState
                   ],
                 )
               : _CreatedClipControls(
-                  title: _createdClipTitle ?? 'Clip',
+                  title: _createdClipTitle ?? '片段',
                   onClose: () => Navigator.of(context).pop(),
                 ),
         ),
@@ -566,7 +566,7 @@ class _CreatedClipControls extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Clip 已建立',
+                '片段已建立',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -613,7 +613,7 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.error_outline, color: Colors.redAccent, size: 32),
             const SizedBox(height: 10),
             Text(
-              errorText ?? 'Clip 片段準備失敗。',
+              errorText ?? '片段準備失敗。',
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white70),
             ),
@@ -652,7 +652,7 @@ String _clipEditorErrorText(Object error) {
       lower.contains('clip finalize') ||
       lower.contains('沒有回傳 raw media') ||
       lower.contains('一直沒有完成處理')) {
-    return '這個實況主可能沒有開放 Clip。';
+    return '這個實況主可能沒有開放片段。';
   }
-  return 'Clip 剪輯失敗：$message';
+  return '片段剪輯失敗：$message';
 }

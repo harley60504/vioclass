@@ -287,7 +287,7 @@ class CreateClipButton extends StatelessWidget {
         : 20.0;
 
     return Tooltip(
-      message: '建立 Clip',
+      message: '建立片段',
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),

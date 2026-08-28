@@ -686,7 +686,7 @@ class _PlayerSettingsPane extends StatelessWidget {
                   ),
                   _SettingsSwitchRow(
                     title: '離開觀看頁保留小窗',
-                    subtitle: '從直播、VOD 或 Clip 回主畫面時保留 app 內小窗',
+                    subtitle: '從直播、VOD 或片段回主畫面時保留 app 內小窗',
                     value: controller.homeKeepsMiniPlayer,
                     onChanged: controller.setHomeKeepsMiniPlayer,
                   ),
