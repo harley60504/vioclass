@@ -180,9 +180,9 @@ class _TwitchUnifiedEmotePickerSheetState
       return const _OuterTab(
         label: 'Twitch',
         pages: [
-          _InnerPage(label: 'Channel', entries: <_EmoteEntry>[]),
-          _InnerPage(label: 'Global', entries: <_EmoteEntry>[]),
-          _InnerPage(label: 'Unlocked', entries: <_EmoteEntry>[]),
+          _InnerPage(label: '頻道', entries: <_EmoteEntry>[]),
+          _InnerPage(label: '全域', entries: <_EmoteEntry>[]),
+          _InnerPage(label: '已解鎖', entries: <_EmoteEntry>[]),
         ],
       );
     }
@@ -231,10 +231,10 @@ class _TwitchUnifiedEmotePickerSheetState
       label: label,
       pages: [
         _InnerPage(
-          label: 'Channel',
+          label: '頻道',
           entries: <_EmoteEntry>[...channel, ...shared, ...other],
         ),
-        _InnerPage(label: 'Global', entries: global),
+        _InnerPage(label: '全域', entries: global),
         if (zeroWidth.isNotEmpty) _InnerPage(label: 'ZW', entries: zeroWidth),
       ],
     );
