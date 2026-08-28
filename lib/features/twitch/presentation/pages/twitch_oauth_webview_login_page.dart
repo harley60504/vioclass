@@ -1043,7 +1043,7 @@ query ChannelPointsContext($channelLogin: String!) {
               icon: const Icon(Icons.open_in_new_rounded),
               label: Text(_windowOpen ? '重開 OAuth 視窗' : '開啟 OAuth 視窗'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF9146FF),
+                backgroundColor: TwitchUiColors.primary,
                 foregroundColor: Colors.white,
               ),
             ),

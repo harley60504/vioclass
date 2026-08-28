@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 Future<void> showTwitchSubscribeWebViewDialogV1({
@@ -95,7 +96,7 @@ class _TwitchSubscribeWebViewDialogBodyState
               const SizedBox(width: 8),
               const Icon(
                 Icons.star_rate_rounded,
-                color: Color(0xFFBF94FF),
+                color: TwitchUiColors.primarySoft,
                 size: 22,
               ),
               const SizedBox(width: 10),
@@ -139,7 +140,7 @@ class _TwitchSubscribeWebViewDialogBodyState
           LinearProgressIndicator(
             value: _progress,
             minHeight: 2,
-            color: const Color(0xFF9146FF),
+            color: TwitchUiColors.primary,
             backgroundColor: const Color(0xFF2D2D35),
           ),
         if (_errorText != null)
