@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../api/clips/twitch_clip_api_service.dart';
 import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
 const double _minClipLength = 5;
@@ -351,7 +352,10 @@ class _TwitchClipEditorDialogBodyState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(strokeWidth: 2.4),
+            CircularProgressIndicator(
+              strokeWidth: 2.4,
+              color: TwitchUiColors.primarySoft,
+            ),
             SizedBox(height: 12),
             Text('正在準備可剪輯片段...', style: TextStyle(color: Colors.white70)),
           ],
@@ -369,7 +373,11 @@ class _TwitchClipEditorDialogBodyState
           child: ColoredBox(
             color: Colors.black,
             child: controller == null
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: TwitchUiColors.primarySoft,
+                    ),
+                  )
                 : Video(controller: controller, controls: NoVideoControls),
           ),
         ),
@@ -504,6 +512,7 @@ class _TwitchClipEditorDialogBodyState
                                   height: 18,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
+                                    color: TwitchUiColors.primarySoft,
                                   ),
                                 )
                               : const Icon(Icons.movie_creation_outlined),
