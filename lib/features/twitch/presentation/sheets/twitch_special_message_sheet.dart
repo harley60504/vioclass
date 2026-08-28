@@ -183,14 +183,14 @@ class _ShareSection extends StatelessWidget {
     final resub = snapshot?.resub;
 
     return _Section(
-      title: 'Shareable Messages',
+      title: '可分享訊息',
       children: <Widget>[
         _ActionTile(
           icon: Icons.local_fire_department_rounded,
           title: _watchStreakTitle(watchStreak),
           subtitle: watchStreak?.canShare == true
-              ? 'Ready to share your watch streak message'
-              : 'No shareable watch streak message right now',
+              ? '可以分享你的連續觀看訊息'
+              : '目前沒有可分享的連續觀看訊息',
           value: watchStreak?.streakCount == null
               ? null
               : '${watchStreak!.streakCount}${watchStreak.unitLabel}',
@@ -206,7 +206,7 @@ class _ShareSection extends StatelessWidget {
           subtitle: _resubSubtitle(resub),
           value: resub?.cumulativeMonths == null
               ? null
-              : '${resub!.cumulativeMonths} mo',
+              : '${resub!.cumulativeMonths} 個月',
           enabled: resub?.canShare ?? false,
           onTap: resub == null ? null : () => onShareResub(resub),
         ),
@@ -217,30 +217,28 @@ class _ShareSection extends StatelessWidget {
   String _watchStreakTitle(TwitchWatchStreakStatusStage251? status) {
     final count = status?.streakCount;
     if (count != null && count > 0) {
-      return 'Watch Streak $count${status!.unitLabel}';
+      return '連續觀看 $count${status!.unitLabel}';
     }
-    return 'Watch Streak';
+    return '連續觀看';
   }
 
   String _resubTitle(TwitchResubNotificationStage251? resub) {
     final months = resub?.cumulativeMonths;
-    if (months != null && months > 0) return 'Resub $months mo';
-    return 'Resub Message';
+    if (months != null && months > 0) return '續訂 $months 個月';
+    return '續訂訊息';
   }
 
   String _resubSubtitle(TwitchResubNotificationStage251? resub) {
-    if (resub == null) return 'No shareable Resub message right now';
+    if (resub == null) return '目前沒有可分享的續訂訊息';
     final parts = <String>[];
     final streak = resub.streakMonths;
     final duration = resub.durationMonths;
-    if (streak != null && streak > 0) parts.add('streak $streak mo');
-    if (duration != null && duration > 0) parts.add('duration $duration mo');
+    if (streak != null && streak > 0) parts.add('連續 $streak 個月');
+    if (duration != null && duration > 0) parts.add('本次 $duration 個月');
     final plan = resub.subPlan?.trim();
     if (plan != null && plan.isNotEmpty) parts.add(plan);
     if (parts.isNotEmpty) return parts.join(' / ');
-    return resub.canShare
-        ? 'Ready to share your Resub message'
-        : 'No shareable Resub message right now';
+    return resub.canShare ? '可以分享你的續訂訊息' : '目前沒有可分享的續訂訊息';
   }
 }
 
@@ -262,11 +260,11 @@ class _BadgeSection extends StatelessWidget {
         const <TwitchChatIdentityBadgeStage251>[];
 
     return _Section(
-      title: 'Chat Identity Badges',
+      title: '聊天室身分徽章',
       children: <Widget>[
         if (badges.isEmpty)
           Text(
-            'No switchable badges loaded yet.',
+            '目前沒有可切換的徽章',
             style: TextStyle(
               color: TwitchUiColors.textSecondary,
               fontSize: 12.5,
