@@ -342,13 +342,16 @@ class _MiniPlayerFooter extends StatelessWidget {
           if (androidPipEnabled && Platform.isAndroid)
             IconButton(
               tooltip: '子母畫面',
-              onPressed: () {
-                unawaited(
-                  TwitchAndroidPipController.instance.enterPictureInPicture(
-                    aspectRatioWidth: 16,
-                    aspectRatioHeight: 9,
-                  ),
-                );
+              onPressed: () async {
+                final entered = await TwitchAndroidPipController.instance
+                    .enterPictureInPicture(
+                      aspectRatioWidth: 16,
+                      aspectRatioHeight: 9,
+                    );
+                if (entered || !context.mounted) return;
+                ScaffoldMessenger.maybeOf(
+                  context,
+                )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援子母畫面')));
               },
               icon: const Icon(Icons.picture_in_picture_alt_rounded),
               color: Colors.white70,
