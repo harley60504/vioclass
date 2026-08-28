@@ -85,4 +85,24 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     }
     return TwitchWatchPlaybackKind.live;
   }
+
+  bool get usesVodQualityControls {
+    return watchPorts.player.runtime.usingLiveDvrBridge ||
+        watchPorts.player.runtime.usingExternalVodPlayback;
+  }
+
+  bool get shouldShowVodReplayChat {
+    return offlineVodFallbackVideo != null || vodReplayController.active;
+  }
+
+  bool get hasDvrReplayPlayback {
+    return watchPorts.player.runtime.usingLiveDvrBridge ||
+        watchPorts.player.runtime.usingExternalVodPlayback ||
+        activeGrowingVodVideo != null;
+  }
+
+  bool get showsLiveDvrEdgeLabel {
+    return watchPorts.player.runtime.usingLiveDvrBridge ||
+        activeGrowingVodVideo != null;
+  }
 }

@@ -59,6 +59,7 @@ import 'watch/twitch_watch_page_engagement.dart';
 import 'watch/twitch_watch_page_navigation.dart';
 import 'watch/twitch_watch_page_relationship.dart';
 import 'watch/twitch_watch_page_ui.dart';
+import 'watch/twitch_watch_playback_state.dart';
 
 const bool enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
@@ -766,9 +767,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       clearViewerCount: fallbackVideo != null,
     );
 
-    final usingVodQuality =
-        watchPorts.player.runtime.usingLiveDvrBridge ||
-        watchPorts.player.runtime.usingExternalVodPlayback;
     final playerArea = TwitchWatchPlayerAreaPortAdapter(
       metadata: metadata,
       loading: loadingPlayer,
@@ -788,9 +786,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       volume: volume,
       onToggleMute: () => unawaited(togglePlayerMute()),
       onVolumeChanged: (value) => unawaited(setPlayerVolume(value)),
-      qualityVariants: usingVodQuality ? vodQualityVariants : null,
-      currentVariant: usingVodQuality ? currentVodQualityVariant : null,
-      onQualitySelected: usingVodQuality
+      qualityVariants: usesVodQualityControls ? vodQualityVariants : null,
+      currentVariant: usesVodQualityControls ? currentVodQualityVariant : null,
+      onQualitySelected: usesVodQualityControls
           ? (variant) => unawaited(switchVodQuality(variant))
           : null,
       onBack: () => unawaited(leaveToMiniPlayer()),
@@ -798,13 +796,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onOpenChannel: () => unawaited(openCurrentChannelSheet(metadata)),
       onCreateClip: () => unawaited(createLiveClip()),
       creatingClip: creatingClip,
-      hasDvrReplay:
-          watchPorts.player.runtime.usingLiveDvrBridge ||
-          watchPorts.player.runtime.usingExternalVodPlayback ||
-          activeGrowingVodVideo != null,
-      showLiveEdgeLabel:
-          watchPorts.player.runtime.usingLiveDvrBridge ||
-          activeGrowingVodVideo != null,
+      hasDvrReplay: hasDvrReplayPlayback,
+      showLiveEdgeLabel: showsLiveDvrEdgeLabel,
       liveDvrDuration:
           watchPorts.player.runtime.liveDvrBridgeDuration ??
           activeGrowingVodVideo?.parsedDuration,
@@ -884,8 +877,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onCancelPendingSpecialMessage: clearPendingSpecialMessage,
       showHeader: false,
     );
-    final shouldShowVodReplayChat =
-        offlineVodFallbackVideo != null || vodReplayController.active;
     final chatPanel = !shouldShowVodReplayChat
         ? liveChatPanel
         : TwitchVodReplayChatPanel(
