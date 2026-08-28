@@ -102,16 +102,16 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
       );
       if (snapshot != null && snapshot.hasReadyDrops) {
         twitchAppNotificationCenter.showWarning(
-          title: '有 Drops 可領取',
-          message: '目前有 ${snapshot.readyDropCount} 個 Drops 可領取。',
+          title: '有 Drops 獎勵可領取',
+          message: '目前有 ${snapshot.readyDropCount} 個 Drops 獎勵可領取。',
           duration: const Duration(seconds: 8),
         );
       } else if (showToast) {
         twitchAppNotificationCenter.showSuccess(
           title: 'Drops 已更新',
           message: snapshot == null
-              ? 'Drops token、庫存與活動都已連上。'
-              : 'Drops 庫存已更新，${snapshot.watchingDropCount} 個進行中，${snapshot.readyDropCount} 個可領取。',
+              ? 'Drops 授權、庫存與活動都已連上。'
+              : 'Drops 庫存已更新，${snapshot.watchingDropCount} 個進行中，${snapshot.readyDropCount} 個可領取獎勵。',
         );
       }
     } else {
@@ -186,13 +186,13 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
 
     if (claimResult.ok) {
       twitchAppNotificationCenter.showSuccess(
-        title: 'Drop 領取成功',
+        title: 'Drops 獎勵領取成功',
         message: drop.displayRewardName,
       );
       await runCheck(showToast: false);
     } else {
       twitchAppNotificationCenter.showWarning(
-        title: 'Drop 領取失敗',
+        title: 'Drops 獎勵領取失敗',
         message: claimResult.message,
         duration: const Duration(seconds: 8),
       );
@@ -1175,8 +1175,8 @@ class _DropsInventoryPageState extends State<_DropsInventoryPage> {
         if (completedDrops > 0) ...<Widget>[
           _InventoryCompactRow(
             icon: Icons.check_rounded,
-            title: '已完成 Drops',
-            subtitle: '你在所有活動中已取得 $completedDrops 個 Drops',
+            title: '已完成 Drops 獎勵',
+            subtitle: '你在所有活動中已取得 $completedDrops 個 Drops 獎勵',
             trailing: '共 $completedDrops 個',
             color: _kGreen,
           ),
@@ -1690,7 +1690,7 @@ class _CurrentDropStatusCard extends StatelessWidget {
           const SizedBox(height: 16),
           _StatusDetailRow(label: '遊戲', value: drop.gameName),
           _StatusDetailRow(label: '活動', value: drop.campaignName),
-          _StatusDetailRow(label: '目前 Drop', value: drop.displayRewardName),
+          _StatusDetailRow(label: '目前獎勵', value: drop.displayRewardName),
           if (campaign != null)
             _StatusDetailRow(
               label: '帳號',
