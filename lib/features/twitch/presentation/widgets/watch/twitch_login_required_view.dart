@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchLoginRequiredView extends StatelessWidget {
   final String statusText;
   final bool loading;
@@ -43,12 +45,12 @@ class TwitchLoginRequiredView extends StatelessWidget {
               width: 62,
               height: 62,
               decoration: BoxDecoration(
-                color: const Color(0xFF9146FF).withValues(alpha: 0.16),
+                color: TwitchUiColors.primary.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
                 Icons.login_rounded,
-                color: Color(0xFF9146FF),
+                color: TwitchUiColors.primary,
                 size: 38,
               ),
             ),
@@ -81,7 +83,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
                 ElevatedButton.icon(
                   onPressed: loading ? null : onLoginPressed,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9146FF),
+                    backgroundColor: TwitchUiColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
@@ -113,7 +115,10 @@ class TwitchLoginRequiredView extends StatelessWidget {
                       ? const SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: TwitchUiColors.primarySoft,
+                          ),
                         )
                       : const Icon(Icons.refresh_rounded),
                   label: const Text('重新檢查'),

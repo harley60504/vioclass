@@ -45,12 +45,12 @@ class TwitchLoginRequiredView extends StatelessWidget {
               width: 62,
               height: 62,
               decoration: BoxDecoration(
-                color: const Color(0xFF9146FF).withValues(alpha: 0.16),
+                color: TwitchUiColors.primary.withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Icon(
                 Icons.login_rounded,
-                color: Color(0xFF9146FF),
+                color: TwitchUiColors.primary,
                 size: 38,
               ),
             ),
@@ -85,7 +85,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
                 ElevatedButton.icon(
                   onPressed: loading ? null : onLoginPressed,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF9146FF),
+                    backgroundColor: TwitchUiColors.primary,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 18,
