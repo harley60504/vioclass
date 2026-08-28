@@ -1,5 +1,3 @@
-// PATCH VERSION: twitch_emote_picker_sheet_shared_emote_image
-
 import 'package:flutter/material.dart';
 
 import '../../models/emotes/twitch_official_emote.dart';
@@ -15,12 +13,6 @@ const int _initialGridCount = 96;
 const int _searchGridLimit = 240;
 const double _cardMaxExtent = 154.0;
 const double _cardAspectRatio = 0.98;
-const bool _emotePickerDebugEnabled = false;
-
-void _emotePickerDebugLog(String message) {
-  if (!_emotePickerDebugEnabled) return;
-  debugPrint('[TwitchEmotePickerDebug] $message', wrapWidth: 1024);
-}
 
 Future<void> showTwitchEmotePickerSheet({
   required BuildContext context,
@@ -30,13 +22,6 @@ Future<void> showTwitchEmotePickerSheet({
   required Future<void> Function() onRefresh,
   required ValueChanged<String> onEmoteSelected,
 }) {
-  _emotePickerDebugLog(
-    'show sheet loading=$loading thirdParty=${cache.count} '
-    'officialChannel=${officialCache?.channelEmotes.length} '
-    'officialGlobal=${officialCache?.globalEmotes.length} '
-    'officialUser=${officialCache?.userEmotes.length}',
-  );
-
   return showTwitchResponsiveSheet<void>(
     context: context,
     size: TwitchUnifiedSheetSize.large,
@@ -203,10 +188,6 @@ class _TwitchUnifiedEmotePickerSheetState
     }
 
     final officialPages = buildTwitchOfficialEmotePages(official);
-
-    _emotePickerDebugLog(
-      'official tab pages=${officialPages.map((page) => '${page.label}:${page.emotes.length}').join(', ')}',
-    );
 
     return _OuterTab(
       label: 'Twitch',
