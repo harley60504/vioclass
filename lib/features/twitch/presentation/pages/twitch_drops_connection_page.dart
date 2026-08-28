@@ -12,10 +12,11 @@ import '../../services/drops/twitch_drops_connection_check.dart';
 import '../../services/drops/twitch_drops_connection_service.dart';
 import '../../services/drops/twitch_drops_snapshot.dart';
 import '../../services/notifications/twitch_app_notification_service.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 
-const Color _kPurple = Color(0xFF9146FF);
-const Color _kPurpleLight = Color(0xFFBF94FF);
+const Color _kPurple = TwitchUiColors.primary;
+const Color _kPurpleLight = TwitchUiColors.primarySoft;
 const Color _kPanel = Color(0xFF18181B);
 const Color _kPanelSoft = Color(0xFF202027);
 const Color _kBackground = Color(0xFF0E0E10);
