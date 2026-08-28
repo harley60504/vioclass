@@ -160,7 +160,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        outcome.title.isEmpty ? 'Outcome' : outcome.title,
+                        outcome.title.isEmpty ? '選項' : outcome.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -172,7 +172,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                     ),
                     if (outcome.isWinner)
                       const TwitchPredictionBetChip(
-                        label: 'WIN',
+                        label: '勝出',
                         color: Colors.greenAccent,
                       ),
                     if (selectedByViewer)
