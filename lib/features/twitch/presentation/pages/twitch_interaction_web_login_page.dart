@@ -794,7 +794,7 @@ query ChannelPointsContext($channelLogin: String!) {
                 _embeddedWebViewReady = true;
                 if (nextUrl != null) _lastUrl = nextUrl;
                 if (!_saving) {
-                  _statusText = '登入 Twitch 官方 Web 後會自動檢查 auth-token。';
+                  _statusText = '登入 Twitch 官方 Web 後會自動檢查授權資訊。';
                 }
               });
               _scheduleProbe();

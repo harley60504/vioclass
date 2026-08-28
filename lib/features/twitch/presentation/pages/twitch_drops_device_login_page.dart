@@ -424,7 +424,7 @@ class _TwitchDropsDeviceLoginPageState
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Drops / Android token 授權',
+                  'Drops / Android 授權',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,

@@ -341,7 +341,7 @@ class _EmptyDropsCard extends StatelessWidget {
           Text(
             connected
                 ? '目前沒有可顯示的 Drops 庫存。'
-                : '如果還沒登入 Drops token，請先完成完整登入或 Drops 登入流程。',
+                : '如果還沒完成 Drops 授權，請先完成完整登入或 Drops 登入流程。',
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white54,
