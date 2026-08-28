@@ -56,7 +56,7 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
     if (!entered && mounted) {
       ScaffoldMessenger.maybeOf(
         context,
-      )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援子母畫面')));
+      )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援系統子母畫面')));
     }
   }
 
@@ -67,7 +67,7 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
     }
 
     return PlainIconButton(
-      tooltip: '子母畫面',
+      tooltip: '系統子母畫面',
       icon: Icons.picture_in_picture_alt_rounded,
       size: widget.size,
       dense: widget.dense,
