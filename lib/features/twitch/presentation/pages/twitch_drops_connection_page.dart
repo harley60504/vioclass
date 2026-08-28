@@ -1804,7 +1804,7 @@ class _ChannelPointsLeaderboardCard extends StatelessWidget {
               loading
                   ? '正在讀取你追隨頻道的 Channel Points...'
                   : (errorText?.trim().isNotEmpty ?? false)
-                  ? 'Channel Points 讀取失敗：$errorText'
+                  ? 'Channel Points 暫時讀取失敗，稍後再試。'
                   : '目前沒有可顯示的 Channel Points 點數。',
               style: const TextStyle(
                 color: Colors.white54,
