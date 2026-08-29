@@ -50,15 +50,13 @@ class VioClassUpdateInstaller {
     final helper = File(
       '${helperDirectory.path}${Platform.pathSeparator}update_vioclass.ps1',
     );
-    helper.writeAsStringSync(
-      _windowsUpdateScript(
-        pid: pid,
-        zipPath: file.path,
-        appDirectory: appDirectory.path,
-        executableName: executable.path.split(Platform.pathSeparator).last,
-      ),
-      encoding: utf8,
+    final script = _windowsUpdateScript(
+      pid: pid,
+      zipPath: file.path,
+      appDirectory: appDirectory.path,
+      executableName: executable.path.split(Platform.pathSeparator).last,
     );
+    helper.writeAsBytesSync(<int>[0xEF, 0xBB, 0xBF, ...utf8.encode(script)]);
 
     await Process.start('powershell.exe', <String>[
       '-NoProfile',
@@ -92,7 +90,7 @@ class VioClassUpdateInstaller {
 
 function Write-UpdateLog([string]\$message) {
   \$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
-  Add-Content -LiteralPath \$logPath -Value "[\$timestamp] \$message"
+  Add-Content -LiteralPath \$logPath -Encoding UTF8 -Value "[\$timestamp] \$message"
 }
 
 try {
