@@ -132,6 +132,13 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
               initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
                 stream,
               ),
+              initialOfflineChannel: TwitchFollowedChannel(
+                broadcasterId: stream.userId,
+                broadcasterLogin: stream.userLogin,
+                broadcasterName: stream.userName,
+                followedAt: null,
+                profileImageUrl: stream.profileImageUrl,
+              ),
               initialDiscoveryService: discoveryService,
             ),
           ),
