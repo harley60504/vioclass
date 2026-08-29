@@ -159,6 +159,43 @@ class TwitchDiscoveryService {
     return _parseStreamPage(raw);
   }
 
+  Future<TwitchFollowedChannelPageResult> searchOfflineChannels({
+    required String query,
+    int first = 30,
+  }) async {
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) {
+      return const TwitchFollowedChannelPageResult(
+        channels: <TwitchFollowedChannel>[],
+        cursor: null,
+      );
+    }
+
+    final auth = await resolveViewerAuth();
+
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/search/channels',
+      queryParameters: <String, dynamic>{
+        'query': cleanQuery,
+        'first': first.clamp(1, 100),
+        'live_only': false,
+      },
+      headers: _helixHeaders(auth),
+    );
+
+    final page = _parseSearchOfflineChannelPage(raw);
+    if (page.channels.isEmpty) return page;
+
+    final channels = await _attachFollowedChannelProfiles(
+      auth: auth,
+      channels: page.channels,
+    );
+    return TwitchFollowedChannelPageResult(
+      channels: channels,
+      cursor: page.cursor,
+    );
+  }
+
   Future<TwitchGamePageResult> fetchTopGames({
     String? after,
     int first = 50,
@@ -408,6 +445,28 @@ query ChannelPanels(\$login: String!) {
         ? data
               .whereType<Map<String, dynamic>>()
               .map(TwitchFollowedChannel.fromHelixJson)
+              .where((channel) => channel.channelLogin.isNotEmpty)
+              .toList(growable: false)
+        : const <TwitchFollowedChannel>[];
+
+    return TwitchFollowedChannelPageResult(
+      channels: channels,
+      cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+    );
+  }
+
+  TwitchFollowedChannelPageResult _parseSearchOfflineChannelPage(
+    Map<String, dynamic> raw,
+  ) {
+    final data = raw['data'];
+    final pagination = raw['pagination'];
+
+    final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
+    final channels = data is List
+        ? data
+              .whereType<Map<String, dynamic>>()
+              .where((channel) => channel['is_live'] != true)
+              .map(TwitchFollowedChannel.fromHelixSearchChannelJson)
               .where((channel) => channel.channelLogin.isNotEmpty)
               .toList(growable: false)
         : const <TwitchFollowedChannel>[];

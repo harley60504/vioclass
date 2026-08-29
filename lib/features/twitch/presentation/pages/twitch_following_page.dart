@@ -42,18 +42,24 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
   List<TwitchFollowedChannel> offlineFollowedChannels =
       const <TwitchFollowedChannel>[];
+  List<TwitchFollowedChannel> searchedOfflineChannels =
+      const <TwitchFollowedChannel>[];
   String? nextCursor;
   String? errorText;
   String? paginationError;
   String? offlineError;
+  String? channelSearchError;
   String currentLanguage = '';
 
   bool loadingFirstPage = true;
   bool loadingMore = false;
   bool loadingOfflineChannels = false;
+  bool loadingChannelSearch = false;
   bool hasMore = true;
 
   int _refreshGeneration = 0;
+  int _channelSearchGeneration = 0;
+  Timer? _channelSearchDebounce;
 
   static const List<Map<String, String>> languageFilters =
       <Map<String, String>>[
@@ -94,12 +100,13 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     if (oldWidget.reloadTick != widget.reloadTick) {
       unawaited(refreshStreams());
     } else if (oldWidget.searchText != widget.searchText) {
-      setState(() {});
+      _handleSearchTextChanged();
     }
   }
 
   @override
   void dispose() {
+    _channelSearchDebounce?.cancel();
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
     super.dispose();
@@ -254,6 +261,55 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     }
   }
 
+  void _handleSearchTextChanged() {
+    final keyword = widget.searchText.trim();
+    _channelSearchDebounce?.cancel();
+
+    if (keyword.isEmpty) {
+      _channelSearchGeneration++;
+      setState(() {
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        loadingChannelSearch = false;
+        channelSearchError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      loadingChannelSearch = true;
+      channelSearchError = null;
+    });
+
+    final generation = ++_channelSearchGeneration;
+    _channelSearchDebounce = Timer(const Duration(milliseconds: 360), () {
+      unawaited(_searchOfflineChannels(keyword, generation));
+    });
+  }
+
+  Future<void> _searchOfflineChannels(String keyword, int generation) async {
+    try {
+      final page = await widget.discoveryService.searchOfflineChannels(
+        query: keyword,
+        first: 40,
+      );
+      if (!mounted || generation != _channelSearchGeneration) return;
+
+      setState(() {
+        searchedOfflineChannels = page.channels;
+        loadingChannelSearch = false;
+        channelSearchError = null;
+      });
+    } catch (error) {
+      if (!mounted || generation != _channelSearchGeneration) return;
+
+      setState(() {
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        loadingChannelSearch = false;
+        channelSearchError = error.toString();
+      });
+    }
+  }
+
   Future<void> loadMore() async {
     if (loadingMore || !hasMore) return;
     final cursor = nextCursor;
@@ -371,6 +427,36 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     return offlineFollowedChannels
         .where((channel) {
+          final haystack = <String>[
+            channel.broadcasterName,
+            channel.broadcasterLogin,
+            channel.description,
+          ].join(' ').toLowerCase();
+          return haystack.contains(keyword);
+        })
+        .toList(growable: false);
+  }
+
+  List<TwitchFollowedChannel> _filteredSearchOfflineChannels() {
+    final keyword = widget.searchText.trim().toLowerCase();
+    if (keyword.isEmpty) return const <TwitchFollowedChannel>[];
+
+    final existingIds = <String>{
+      ...loadedStreams.map((stream) => stream.userId.trim()),
+      ...offlineFollowedChannels.map((channel) => channel.broadcasterId.trim()),
+    }.where((id) => id.isNotEmpty).toSet();
+    final existingLogins = <String>{
+      ...loadedStreams.map((stream) => stream.channelLogin),
+      ...offlineFollowedChannels.map((channel) => channel.channelLogin),
+    }.where((login) => login.isNotEmpty).toSet();
+
+    return searchedOfflineChannels
+        .where((channel) {
+          final id = channel.broadcasterId.trim();
+          final login = channel.channelLogin;
+          if (id.isNotEmpty && existingIds.contains(id)) return false;
+          if (login.isNotEmpty && existingLogins.contains(login)) return false;
+
           final haystack = <String>[
             channel.broadcasterName,
             channel.broadcasterLogin,
@@ -512,6 +598,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   Widget build(BuildContext context) {
     final filtered = _filteredStreams();
     final filteredOffline = _filteredOfflineChannels();
+    final filteredSearchOffline = _filteredSearchOfflineChannels();
 
     if (loadingFirstPage &&
         loadedStreams.isEmpty &&
@@ -546,7 +633,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     if (loadedStreams.isEmpty &&
         offlineFollowedChannels.isEmpty &&
-        !loadingOfflineChannels) {
+        searchedOfflineChannels.isEmpty &&
+        !loadingOfflineChannels &&
+        !loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.favorite_border_rounded,
         title: '目前追隨頻道沒有直播',
@@ -559,11 +648,15 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     if (filtered.isEmpty &&
         filteredOffline.isEmpty &&
-        !loadingOfflineChannels) {
+        filteredSearchOffline.isEmpty &&
+        !loadingOfflineChannels &&
+        !loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
-        title: '找不到符合條件的追隨直播',
-        message: '可以清除搜尋文字或語言篩選。',
+        title: '找不到符合條件的頻道',
+        message: channelSearchError?.trim().isNotEmpty == true
+            ? '已載入的追隨清單沒有結果，Twitch 頻道搜尋暫時失敗。'
+            : '可以清除搜尋文字或語言篩選。',
       );
     }
 
@@ -578,7 +671,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         streams: filtered,
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
-        extraSliversBeforeFooter: _offlineSlivers(filteredOffline),
+        extraSliversBeforeFooter: _offlineSlivers(
+          followedChannels: filteredOffline,
+          searchedChannels: filteredSearchOffline,
+        ),
         footer: TwitchDiscoveryFooter(
           loadingMore: loadingMore,
           hasMore: hasMore,
@@ -589,9 +685,14 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     );
   }
 
-  List<Widget> _offlineSlivers(List<TwitchFollowedChannel> channels) {
+  List<Widget> _offlineSlivers({
+    required List<TwitchFollowedChannel> followedChannels,
+    required List<TwitchFollowedChannel> searchedChannels,
+  }) {
+    final slivers = <Widget>[];
+
     if (loadingOfflineChannels) {
-      return const <Widget>[
+      slivers.add(
         SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.fromLTRB(26, 0, 26, 24),
@@ -618,15 +719,72 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
             ),
           ),
         ),
-      ];
+      );
     }
 
-    if (channels.isEmpty) return const <Widget>[];
+    if (followedChannels.isNotEmpty) {
+      slivers.addAll(
+        _channelGridSlivers(
+          icon: Icons.video_library_rounded,
+          title: '未開台追隨頻道',
+          channels: followedChannels,
+        ),
+      );
+    }
 
+    if (loadingChannelSearch) {
+      slivers.add(
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(26, 0, 26, 24),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: TwitchUiColors.primary,
+                    strokeWidth: 2.4,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  '正在搜尋更多未開台頻道...',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (searchedChannels.isNotEmpty) {
+      slivers.addAll(
+        _channelGridSlivers(
+          icon: Icons.search_rounded,
+          title: '搜尋到的未開台頻道',
+          channels: searchedChannels,
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
+  List<Widget> _channelGridSlivers({
+    required IconData icon,
+    required String title,
+    required List<TwitchFollowedChannel> channels,
+  }) {
     return <Widget>[
       TwitchDiscoverySectionHeader(
-        icon: Icons.video_library_rounded,
-        title: '未開台追隨頻道',
+        icon: icon,
+        title: title,
         count: channels.length,
       ).asSliverBox(),
       SliverPadding(

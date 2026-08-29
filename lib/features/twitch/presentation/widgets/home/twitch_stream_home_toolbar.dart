@@ -1,17 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../../pages/twitch_stream_home_models.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import 'twitch_stream_home_account_menu.dart';
 
 const Color _kSoftPanel = Color(0xB8221B32);
 
 class TwitchStreamHomeToolbar extends StatelessWidget {
-  final TwitchHomeSection selectedSection;
   final TextEditingController searchController;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
-  final VoidCallback? onShowGameMenu;
   final VoidCallback onShowLanguageMenu;
   final Future<void> Function() onRefresh;
   final Future<void> Function() onOpenDropsConnector;
@@ -20,11 +17,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
 
   const TwitchStreamHomeToolbar({
     super.key,
-    required this.selectedSection,
     required this.searchController,
     required this.onSearchChanged,
     required this.onClearSearch,
-    required this.onShowGameMenu,
     required this.onShowLanguageMenu,
     required this.onRefresh,
     required this.onOpenDropsConnector,
@@ -35,14 +30,6 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final actions = <Widget>[
-      if (selectedSection == TwitchHomeSection.browse) ...<Widget>[
-        TwitchStreamHomeToolbarIconButton(
-          tooltip: '遊戲分類',
-          icon: Icons.sports_esports_rounded,
-          onPressed: onShowGameMenu,
-        ),
-        const SizedBox(width: 4),
-      ],
       TwitchStreamHomeToolbarIconButton(
         tooltip: '語言篩選',
         icon: Icons.tune_rounded,
@@ -130,9 +117,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
         decoration: InputDecoration(
-          hintText: selectedSection == TwitchHomeSection.following
-              ? '搜尋追隨直播'
-              : '搜尋直播、遊戲或實況主',
+          hintText: '搜尋追隨直播、頻道或實況主',
           hintStyle: const TextStyle(
             color: Colors.white38,
             fontWeight: FontWeight.w700,
