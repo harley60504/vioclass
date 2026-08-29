@@ -163,7 +163,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   void dispose() {
     _predictionAutoHideTimer?.cancel();
     _predictionSubscription?.cancel();
-    _appearanceController.dispose();
     super.dispose();
   }
 
