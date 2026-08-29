@@ -19,6 +19,10 @@ import 'twitch_stream_refresh_reconciler.dart';
 class TwitchFollowingPage extends StatefulWidget {
   final TwitchDiscoveryService discoveryService;
   final String searchText;
+  final List<TwitchLiveStream> searchedLiveStreams;
+  final List<TwitchFollowedChannel> searchedOfflineChannels;
+  final bool loadingChannelSearch;
+  final String? channelSearchError;
   final int reloadTick;
   final Future<void> Function() onLoginPressed;
 
@@ -26,6 +30,10 @@ class TwitchFollowingPage extends StatefulWidget {
     super.key,
     required this.discoveryService,
     required this.searchText,
+    required this.searchedLiveStreams,
+    required this.searchedOfflineChannels,
+    required this.loadingChannelSearch,
+    required this.channelSearchError,
     required this.reloadTick,
     required this.onLoginPressed,
   });
@@ -42,25 +50,18 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
   List<TwitchFollowedChannel> offlineFollowedChannels =
       const <TwitchFollowedChannel>[];
-  List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
-  List<TwitchFollowedChannel> searchedOfflineChannels =
-      const <TwitchFollowedChannel>[];
   String? nextCursor;
   String? errorText;
   String? paginationError;
   String? offlineError;
-  String? channelSearchError;
   String currentLanguage = '';
 
   bool loadingFirstPage = true;
   bool loadingMore = false;
   bool loadingOfflineChannels = false;
-  bool loadingChannelSearch = false;
   bool hasMore = true;
 
   int _refreshGeneration = 0;
-  int _channelSearchGeneration = 0;
-  Timer? _channelSearchDebounce;
 
   static const List<Map<String, String>> languageFilters =
       <Map<String, String>>[
@@ -100,14 +101,11 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     if (oldWidget.reloadTick != widget.reloadTick) {
       unawaited(refreshStreams());
-    } else if (oldWidget.searchText != widget.searchText) {
-      _handleSearchTextChanged();
     }
   }
 
   @override
   void dispose() {
-    _channelSearchDebounce?.cancel();
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
     super.dispose();
@@ -262,57 +260,6 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     }
   }
 
-  void _handleSearchTextChanged() {
-    final keyword = widget.searchText.trim();
-    _channelSearchDebounce?.cancel();
-
-    if (keyword.isEmpty) {
-      _channelSearchGeneration++;
-      setState(() {
-        searchedLiveStreams = const <TwitchLiveStream>[];
-        searchedOfflineChannels = const <TwitchFollowedChannel>[];
-        loadingChannelSearch = false;
-        channelSearchError = null;
-      });
-      return;
-    }
-
-    setState(() {
-      loadingChannelSearch = true;
-      channelSearchError = null;
-    });
-
-    final generation = ++_channelSearchGeneration;
-    _channelSearchDebounce = Timer(const Duration(milliseconds: 360), () {
-      unawaited(_searchChannels(keyword, generation));
-    });
-  }
-
-  Future<void> _searchChannels(String keyword, int generation) async {
-    try {
-      final result = await widget.discoveryService.searchChannels(
-        query: keyword,
-      );
-      if (!mounted || generation != _channelSearchGeneration) return;
-
-      setState(() {
-        searchedLiveStreams = result.liveStreams;
-        searchedOfflineChannels = result.offlineChannels;
-        loadingChannelSearch = false;
-        channelSearchError = null;
-      });
-    } catch (error) {
-      if (!mounted || generation != _channelSearchGeneration) return;
-
-      setState(() {
-        searchedLiveStreams = const <TwitchLiveStream>[];
-        searchedOfflineChannels = const <TwitchFollowedChannel>[];
-        loadingChannelSearch = false;
-        channelSearchError = error.toString();
-      });
-    }
-  }
-
   Future<void> loadMore() async {
     if (loadingMore || !hasMore) return;
     final cursor = nextCursor;
@@ -453,7 +400,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         .where((login) => login.isNotEmpty)
         .toSet();
 
-    return searchedLiveStreams
+    return widget.searchedLiveStreams
         .where((stream) {
           final id = stream.userId.trim();
           final login = stream.channelLogin;
@@ -477,7 +424,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       ...offlineFollowedChannels.map((channel) => channel.channelLogin),
     }.where((login) => login.isNotEmpty).toSet();
 
-    return searchedOfflineChannels
+    return widget.searchedOfflineChannels
         .where((channel) {
           final id = channel.broadcasterId.trim();
           final login = channel.channelLogin;
@@ -642,7 +589,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     if (loadingFirstPage &&
         loadedStreams.isEmpty &&
-        offlineFollowedChannels.isEmpty) {
+        offlineFollowedChannels.isEmpty &&
+        widget.searchedLiveStreams.isEmpty &&
+        widget.searchedOfflineChannels.isEmpty &&
+        !widget.loadingChannelSearch) {
       return const Center(
         child: CircularProgressIndicator(color: TwitchUiColors.primary),
       );
@@ -689,11 +639,11 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         filteredSearchLive.isEmpty &&
         filteredSearchOffline.isEmpty &&
         !loadingOfflineChannels &&
-        !loadingChannelSearch) {
+        !widget.loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
         title: '找不到符合條件的頻道',
-        message: channelSearchError?.trim().isNotEmpty == true
+        message: widget.channelSearchError?.trim().isNotEmpty == true
             ? '已載入的追隨清單沒有結果，Twitch 頻道搜尋暫時失敗。'
             : '可以清除搜尋文字或語言篩選。',
       );
@@ -773,7 +723,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       );
     }
 
-    if (loadingChannelSearch) {
+    if (widget.loadingChannelSearch) {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(

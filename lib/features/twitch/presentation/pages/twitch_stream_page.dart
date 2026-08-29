@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
+import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -54,9 +55,16 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   String searchText = '';
   String loginStatus = '檢查登入狀態...';
   String viewerLabel = '未登入';
+  List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
+  List<TwitchFollowedChannel> searchedOfflineChannels =
+      const <TwitchFollowedChannel>[];
+  String? channelSearchError;
   int reloadTick = 0;
   bool loadingLoginState = true;
+  bool loadingChannelSearch = false;
   bool _loginStateLoadRunning = false;
+  int _channelSearchGeneration = 0;
+  Timer? _channelSearchDebounce;
 
   @override
   void initState() {
@@ -84,6 +92,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
 
   @override
   void dispose() {
+    _channelSearchDebounce?.cancel();
     searchController.dispose();
     playerSettingsController.dispose();
     apiClient.close(force: true);
@@ -221,10 +230,57 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
 
   void selectSection(TwitchHomeSection section) {
     if (selectedSection == section) return;
+    setState(() => selectedSection = section);
+  }
+
+  void updateSearchText(String value) {
+    final keyword = value.trim().toLowerCase();
+    if (searchText == keyword) return;
+
+    _channelSearchDebounce?.cancel();
     setState(() {
-      selectedSection = section;
-      reloadTick++;
+      searchText = keyword;
+      if (keyword.isEmpty) {
+        _channelSearchGeneration++;
+        searchedLiveStreams = const <TwitchLiveStream>[];
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        loadingChannelSearch = false;
+        channelSearchError = null;
+      } else {
+        loadingChannelSearch = true;
+        channelSearchError = null;
+      }
     });
+
+    if (keyword.isEmpty) return;
+
+    final generation = ++_channelSearchGeneration;
+    _channelSearchDebounce = Timer(const Duration(milliseconds: 360), () {
+      unawaited(searchChannels(keyword, generation));
+    });
+  }
+
+  Future<void> searchChannels(String keyword, int generation) async {
+    try {
+      final result = await discoveryService.searchChannels(query: keyword);
+      if (!mounted || generation != _channelSearchGeneration) return;
+
+      setState(() {
+        searchedLiveStreams = result.liveStreams;
+        searchedOfflineChannels = result.offlineChannels;
+        loadingChannelSearch = false;
+        channelSearchError = null;
+      });
+    } catch (error) {
+      if (!mounted || generation != _channelSearchGeneration) return;
+
+      setState(() {
+        searchedLiveStreams = const <TwitchLiveStream>[];
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        loadingChannelSearch = false;
+        channelSearchError = error.toString();
+      });
+    }
   }
 
   @override
@@ -307,12 +363,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
           selectedSection: selectedSection,
           searchController: searchController,
           forceTwoRows: layout.shouldUseTwoRowHomeToolbar,
-          onSearchChanged: (value) {
-            setState(() => searchText = value.trim().toLowerCase());
-          },
+          onSearchChanged: updateSearchText,
           onClearSearch: () {
             searchController.clear();
-            setState(() => searchText = '');
+            updateSearchText('');
           },
           onShowGameMenu: selectedSection == TwitchHomeSection.browse
               ? () => browsePageKey.currentState?.showGameMenu(context)
@@ -341,6 +395,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               key: followingPageKey,
               discoveryService: discoveryService,
               searchText: searchText,
+              searchedLiveStreams: searchedLiveStreams,
+              searchedOfflineChannels: searchedOfflineChannels,
+              loadingChannelSearch: loadingChannelSearch,
+              channelSearchError: channelSearchError,
               reloadTick: reloadTick,
               onLoginPressed: runLinkedTwitchLoginFlow,
             )
@@ -348,6 +406,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               key: browsePageKey,
               discoveryService: discoveryService,
               searchText: searchText,
+              searchedLiveStreams: searchedLiveStreams,
+              searchedOfflineChannels: searchedOfflineChannels,
+              loadingChannelSearch: loadingChannelSearch,
+              channelSearchError: channelSearchError,
               reloadTick: reloadTick,
               onLoginPressed: runLinkedTwitchLoginFlow,
             ),

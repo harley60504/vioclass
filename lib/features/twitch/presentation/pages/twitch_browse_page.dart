@@ -19,6 +19,10 @@ import 'twitch_stream_refresh_reconciler.dart';
 class TwitchBrowsePage extends StatefulWidget {
   final TwitchDiscoveryService discoveryService;
   final String searchText;
+  final List<TwitchLiveStream> searchedLiveStreams;
+  final List<TwitchFollowedChannel> searchedOfflineChannels;
+  final bool loadingChannelSearch;
+  final String? channelSearchError;
   final int reloadTick;
   final Future<void> Function() onLoginPressed;
 
@@ -26,6 +30,10 @@ class TwitchBrowsePage extends StatefulWidget {
     super.key,
     required this.discoveryService,
     required this.searchText,
+    required this.searchedLiveStreams,
+    required this.searchedOfflineChannels,
+    required this.loadingChannelSearch,
+    required this.channelSearchError,
     required this.reloadTick,
     required this.onLoginPressed,
   });
@@ -40,9 +48,6 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   final ScrollController scrollController = ScrollController();
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
-  List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
-  List<TwitchFollowedChannel> searchedOfflineChannels =
-      const <TwitchFollowedChannel>[];
   List<TwitchGameCategory> games = const <TwitchGameCategory>[];
 
   String? nextCursor;
@@ -50,7 +55,6 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   String? errorText;
   String? paginationError;
   String? gamePaginationError;
-  String? channelSearchError;
   String currentLanguage = '';
   String? selectedGameId;
   String? selectedGameName;
@@ -60,12 +64,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   bool hasMore = true;
   bool loadingGames = false;
   bool loadingMoreGames = false;
-  bool loadingChannelSearch = false;
   bool hasMoreGames = true;
 
   int _refreshGeneration = 0;
-  int _channelSearchGeneration = 0;
-  Timer? _channelSearchDebounce;
 
   static const List<Map<String, String>> languageFilters =
       <Map<String, String>>[
@@ -110,14 +111,11 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     if (oldWidget.reloadTick != widget.reloadTick) {
       unawaited(refreshStreams());
       if (games.isEmpty) unawaited(loadGames());
-    } else if (oldWidget.searchText != widget.searchText) {
-      _handleSearchTextChanged();
     }
   }
 
   @override
   void dispose() {
-    _channelSearchDebounce?.cancel();
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
     super.dispose();
@@ -228,57 +226,6 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       cursor: cursor,
       hasMore: hasMorePage,
     );
-  }
-
-  void _handleSearchTextChanged() {
-    final keyword = widget.searchText.trim();
-    _channelSearchDebounce?.cancel();
-
-    if (keyword.isEmpty) {
-      _channelSearchGeneration++;
-      setState(() {
-        searchedLiveStreams = const <TwitchLiveStream>[];
-        searchedOfflineChannels = const <TwitchFollowedChannel>[];
-        loadingChannelSearch = false;
-        channelSearchError = null;
-      });
-      return;
-    }
-
-    setState(() {
-      loadingChannelSearch = true;
-      channelSearchError = null;
-    });
-
-    final generation = ++_channelSearchGeneration;
-    _channelSearchDebounce = Timer(const Duration(milliseconds: 360), () {
-      unawaited(_searchChannels(keyword, generation));
-    });
-  }
-
-  Future<void> _searchChannels(String keyword, int generation) async {
-    try {
-      final result = await widget.discoveryService.searchChannels(
-        query: keyword,
-      );
-      if (!mounted || generation != _channelSearchGeneration) return;
-
-      setState(() {
-        searchedLiveStreams = result.liveStreams;
-        searchedOfflineChannels = result.offlineChannels;
-        loadingChannelSearch = false;
-        channelSearchError = null;
-      });
-    } catch (error) {
-      if (!mounted || generation != _channelSearchGeneration) return;
-
-      setState(() {
-        searchedLiveStreams = const <TwitchLiveStream>[];
-        searchedOfflineChannels = const <TwitchFollowedChannel>[];
-        loadingChannelSearch = false;
-        channelSearchError = error.toString();
-      });
-    }
   }
 
   Future<void> loadMore() async {
@@ -454,7 +401,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         .where((login) => login.isNotEmpty)
         .toSet();
 
-    return searchedLiveStreams
+    return widget.searchedLiveStreams
         .where((stream) {
           final id = stream.userId.trim();
           final login = stream.channelLogin;
@@ -478,7 +425,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         .where((login) => login.isNotEmpty)
         .toSet();
 
-    return searchedOfflineChannels
+    return widget.searchedOfflineChannels
         .where((channel) {
           final id = channel.broadcasterId.trim();
           final login = channel.channelLogin;
@@ -933,7 +880,11 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     final filteredSearchLive = _filteredSearchLiveStreams();
     final filteredSearchOffline = _filteredSearchOfflineChannels();
 
-    if (loadingFirstPage && loadedStreams.isEmpty) {
+    if (loadingFirstPage &&
+        loadedStreams.isEmpty &&
+        widget.searchedLiveStreams.isEmpty &&
+        widget.searchedOfflineChannels.isEmpty &&
+        !widget.loadingChannelSearch) {
       return const Center(
         child: CircularProgressIndicator(color: TwitchUiColors.primary),
       );
@@ -963,9 +914,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     }
 
     if (loadedStreams.isEmpty &&
-        searchedLiveStreams.isEmpty &&
-        searchedOfflineChannels.isEmpty &&
-        !loadingChannelSearch) {
+        widget.searchedLiveStreams.isEmpty &&
+        widget.searchedOfflineChannels.isEmpty &&
+        !widget.loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.explore_off_rounded,
         title: '目前沒有可顯示直播',
@@ -977,11 +928,11 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     if (filtered.isEmpty &&
         filteredSearchLive.isEmpty &&
         filteredSearchOffline.isEmpty &&
-        !loadingChannelSearch) {
+        !widget.loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
         title: '找不到符合條件的頻道',
-        message: channelSearchError?.trim().isNotEmpty == true
+        message: widget.channelSearchError?.trim().isNotEmpty == true
             ? '已載入的直播沒有結果，Twitch 頻道搜尋暫時失敗。'
             : '可以清除搜尋文字、分類或語言篩選。',
       );
@@ -1020,7 +971,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }) {
     final slivers = <Widget>[];
 
-    if (loadingChannelSearch) {
+    if (widget.loadingChannelSearch) {
       slivers.add(
         const SliverToBoxAdapter(
           child: Padding(
