@@ -86,7 +86,7 @@ class _TwitchOAuthWebViewLoginPageState
   late final TextEditingController _manualTextController;
 
   String _state = '';
-  String _statusText = '準備開啟 Twitch OAuth 視窗...';
+  String _statusText = '準備開啟 Twitch 登入授權視窗...';
   String? _errorText;
   String _currentUrlText = '';
 
@@ -233,15 +233,12 @@ class _TwitchOAuthWebViewLoginPageState
 
     final params = _parseOAuthResponse(uri);
     final error = params['error'];
-    final errorDescription = params['error_description'];
 
     if (error != null && error.isNotEmpty) {
       if (!mounted) return;
       setState(() {
-        _errorText = errorDescription?.isNotEmpty == true
-            ? '$error：$errorDescription'
-            : error;
-        _statusText = 'Twitch OAuth 授權失敗。';
+        _errorText = 'Twitch 登入授權失敗，請重新開啟登入頁再試。';
+        _statusText = 'Twitch 登入授權失敗。';
       });
       return;
     }
@@ -252,8 +249,8 @@ class _TwitchOAuthWebViewLoginPageState
         returnedState != _state) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'OAuth 回傳狀態不一致，已阻擋這次授權。';
-        _statusText = 'Twitch OAuth 回傳驗證失敗。';
+        _errorText = 'Twitch 登入授權狀態不一致，已阻擋這次授權。';
+        _statusText = 'Twitch 登入授權驗證失敗。';
       });
       return;
     }
@@ -262,7 +259,7 @@ class _TwitchOAuthWebViewLoginPageState
     if (accessToken == null || accessToken.trim().isEmpty) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'OAuth 回傳沒有可用授權。';
+        _errorText = 'Twitch 登入沒有回傳可用授權。';
         _statusText = '尚未取得 Twitch 授權。';
       });
       return;
@@ -632,7 +629,7 @@ query ChannelPointsContext($channelLogin: String!) {
     setState(() {
       _openingWindow = true;
       _errorText = null;
-      _statusText = '正在建立 Twitch OAuth 授權視窗...';
+      _statusText = '正在建立 Twitch 登入授權視窗...';
       _currentUrlText = url;
     });
 
@@ -677,7 +674,7 @@ query ChannelPointsContext($channelLogin: String!) {
           if (!mounted) return;
           setState(() {
             _windowOpen = false;
-            if (!_isCompleting) _statusText = 'OAuth 授權視窗已關閉。';
+            if (!_isCompleting) _statusText = 'Twitch 登入授權視窗已關閉。';
           });
         });
       } catch (_) {}
@@ -689,15 +686,15 @@ query ChannelPointsContext($channelLogin: String!) {
         _openingWindow = false;
         _windowOpen = true;
         _statusText = _shouldCaptureGql
-            ? '請在彈出的 Twitch OAuth 視窗完成授權；完成後會在同一視窗擷取官方 Web/GQL 資訊。'
-            : '請在彈出的 Twitch OAuth 視窗完成授權。';
+            ? '請在彈出的 Twitch 登入視窗完成授權；完成後會在同一視窗擷取官方 Web/GQL 資訊。'
+            : '請在彈出的 Twitch 登入視窗完成授權。';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _openingWindow = false;
         _windowOpen = false;
-        _errorText = '建立 Twitch OAuth 視窗失敗，請稍後再試。';
+        _errorText = '建立 Twitch 登入授權視窗失敗，請稍後再試。';
         _statusText = '無法開啟桌面授權視窗。';
       });
     }
@@ -724,7 +721,7 @@ query ChannelPointsContext($channelLogin: String!) {
     final uri = _buildAuthorizationUri();
     setState(() {
       _errorText = null;
-      _statusText = '正在重新載入 Twitch OAuth...';
+      _statusText = '正在重新載入 Twitch 登入授權...';
       _currentUrlText = uri.toString();
       _mainTokenSaved = false;
       _webGqlCaptured = false;
@@ -738,7 +735,7 @@ query ChannelPointsContext($channelLogin: String!) {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已複製 Twitch OAuth 連結')));
+    ).showSnackBar(const SnackBar(content: Text('已複製 Twitch 登入連結')));
   }
 
   Future<void> _tryManualInput() async {
@@ -870,7 +867,7 @@ query ChannelPointsContext($channelLogin: String!) {
           OutlinedButton.icon(
             onPressed: busy ? null : _reloadOAuth,
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('重新開 OAuth'),
+            label: const Text('重新開登入頁'),
           ),
           const SizedBox(width: 8),
           OutlinedButton.icon(
@@ -884,15 +881,13 @@ query ChannelPointsContext($channelLogin: String!) {
           OutlinedButton.icon(
             onPressed: _copyAuthorizationUrl,
             icon: const Icon(Icons.copy_rounded, size: 18),
-            label: const Text('複製 OAuth 連結'),
+            label: const Text('複製登入連結'),
           ),
           const Spacer(),
           Flexible(
             child: Text(
               _useEmbeddedMobileWebView
-                  ? (_embeddedWebViewReady
-                        ? 'App 內 OAuth 頁已載入'
-                        : '等待 App 內 OAuth 頁...')
+                  ? (_embeddedWebViewReady ? 'App 內登入頁已載入' : '等待 App 內登入頁...')
                   : (_windowOpen ? '桌面授權視窗已開啟' : '等待授權視窗...'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -949,7 +944,7 @@ query ChannelPointsContext($channelLogin: String!) {
               setState(() {
                 _embeddedWebViewReady = false;
                 if (nextUrl != null) _currentUrlText = nextUrl;
-                _statusText = 'App 內 WebView 正在載入 Twitch OAuth...';
+                _statusText = 'App 內 WebView 正在載入 Twitch 登入頁...';
               });
             },
             onLoadStop: (controller, webUri) {
@@ -960,8 +955,8 @@ query ChannelPointsContext($channelLogin: String!) {
                 if (nextUrl != null) _currentUrlText = nextUrl;
                 if (!_isCompleting && !_capturingGql) {
                   _statusText = _shouldCaptureGql
-                      ? '請完成 OAuth；完成後會在同一個 App 內 WebView 擷取 Web/GQL 資訊。'
-                      : '請完成 Twitch OAuth。';
+                      ? '請完成 Twitch 登入授權；完成後會在同一個 App 內 WebView 擷取 Web/GQL 資訊。'
+                      : '請完成 Twitch 登入授權。';
                 }
               });
             },
@@ -1007,7 +1002,7 @@ query ChannelPointsContext($channelLogin: String!) {
             ),
             const SizedBox(height: 14),
             const Text(
-              '主 OAuth 授權',
+              '主 Twitch 授權',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 21,
@@ -1041,7 +1036,7 @@ query ChannelPointsContext($channelLogin: String!) {
             ElevatedButton.icon(
               onPressed: busy ? null : _reloadOAuth,
               icon: const Icon(Icons.open_in_new_rounded),
-              label: Text(_windowOpen ? '重開 OAuth 視窗' : '開啟 OAuth 視窗'),
+              label: Text(_windowOpen ? '重開登入視窗' : '開啟登入視窗'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: TwitchUiColors.primary,
                 foregroundColor: Colors.white,
