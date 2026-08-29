@@ -130,7 +130,9 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
         decoration: InputDecoration(
-          hintText: '搜尋直播或實況主',
+          hintText: selectedSection == TwitchHomeSection.following
+              ? '搜尋追隨直播'
+              : '搜尋直播、遊戲或實況主',
           hintStyle: const TextStyle(
             color: Colors.white38,
             fontWeight: FontWeight.w700,

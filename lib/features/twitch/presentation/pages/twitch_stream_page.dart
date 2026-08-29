@@ -13,9 +13,11 @@ import '../settings/twitch_player_settings_controller.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
 import '../mini_player/twitch_mini_player_overlay.dart';
 import '../sheets/twitch_app_settings_sheet.dart';
+import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
+import 'twitch_browse_page.dart';
 import 'twitch_drops_connection_page.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
@@ -35,6 +37,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
 
   final GlobalKey<TwitchFollowingPageState> followingPageKey =
       GlobalKey<TwitchFollowingPageState>();
+  final GlobalKey<TwitchBrowsePageState> browsePageKey =
+      GlobalKey<TwitchBrowsePageState>();
 
   late final TwitchApiClient apiClient;
   late final TwitchAuthService authService;
@@ -44,6 +48,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   late final TwitchDiscoveryService discoveryService;
   late final TwitchChatAppearanceController chatAppearanceController;
   late final TwitchPlayerSettingsController playerSettingsController;
+
+  TwitchHomeSection selectedSection = TwitchHomeSection.following;
 
   String searchText = '';
   String loginStatus = '檢查登入狀態...';
@@ -213,6 +219,14 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     );
   }
 
+  void selectSection(TwitchHomeSection section) {
+    if (selectedSection == section) return;
+    setState(() {
+      selectedSection = section;
+      reloadTick++;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -263,9 +277,11 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     return Row(
       children: <Widget>[
         TwitchStreamHomeSidebar(
+          selectedSection: selectedSection,
           viewerLabel: viewerLabel,
           loginStatus: loginStatus,
           loadingLoginState: loadingLoginState,
+          onSelectSection: selectSection,
         ),
         Expanded(child: _buildContentColumn(layout)),
       ],
@@ -274,7 +290,13 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
 
   Widget _buildMobileShell(TwitchResponsiveLayout layout) {
     return Column(
-      children: <Widget>[Expanded(child: _buildContentColumn(layout))],
+      children: <Widget>[
+        Expanded(child: _buildContentColumn(layout)),
+        TwitchStreamHomeBottomNavigation(
+          selectedSection: selectedSection,
+          onSelectSection: selectSection,
+        ),
+      ],
     );
   }
 
@@ -282,7 +304,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     return Column(
       children: <Widget>[
         TwitchStreamHomeToolbar(
-          selectedSection: TwitchHomeSection.following,
+          selectedSection: selectedSection,
           searchController: searchController,
           forceTwoRows: layout.shouldUseTwoRowHomeToolbar,
           onSearchChanged: (value) {
@@ -292,9 +314,15 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
             searchController.clear();
             setState(() => searchText = '');
           },
-          onShowGameMenu: null,
+          onShowGameMenu: selectedSection == TwitchHomeSection.browse
+              ? () => browsePageKey.currentState?.showGameMenu(context)
+              : null,
           onShowLanguageMenu: () {
-            followingPageKey.currentState?.showLanguageMenu(context);
+            if (selectedSection == TwitchHomeSection.following) {
+              followingPageKey.currentState?.showLanguageMenu(context);
+            } else {
+              browsePageKey.currentState?.showLanguageMenu(context);
+            }
           },
           onRefresh: refreshCurrentPage,
           onOpenDropsConnector: openDropsConnectorPage,
@@ -306,12 +334,23 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   }
 
   Widget _buildHomeContent() {
-    return TwitchFollowingPage(
-      key: followingPageKey,
-      discoveryService: discoveryService,
-      searchText: searchText,
-      reloadTick: reloadTick,
-      onLoginPressed: runLinkedTwitchLoginFlow,
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 160),
+      child: selectedSection == TwitchHomeSection.following
+          ? TwitchFollowingPage(
+              key: followingPageKey,
+              discoveryService: discoveryService,
+              searchText: searchText,
+              reloadTick: reloadTick,
+              onLoginPressed: runLinkedTwitchLoginFlow,
+            )
+          : TwitchBrowsePage(
+              key: browsePageKey,
+              discoveryService: discoveryService,
+              searchText: searchText,
+              reloadTick: reloadTick,
+              onLoginPressed: runLinkedTwitchLoginFlow,
+            ),
     );
   }
 }

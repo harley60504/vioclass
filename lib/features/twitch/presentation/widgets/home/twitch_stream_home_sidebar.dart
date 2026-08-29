@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../../pages/twitch_stream_home_models.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 const Color _kPanel = Color(0xCC15121F);
 
 class TwitchStreamHomeSidebar extends StatelessWidget {
+  final TwitchHomeSection selectedSection;
   final String viewerLabel;
   final String loginStatus;
   final bool loadingLoginState;
+  final ValueChanged<TwitchHomeSection> onSelectSection;
 
   const TwitchStreamHomeSidebar({
     super.key,
+    required this.selectedSection,
     required this.viewerLabel,
     required this.loginStatus,
     required this.loadingLoginState,
+    required this.onSelectSection,
   });
 
   @override
@@ -86,7 +91,19 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(10, 12, 10, 18),
-              children: <Widget>[const _SidebarHomeBadge()],
+              children: <Widget>[
+                _SidebarButton(
+                  section: TwitchHomeSection.following,
+                  selected: selectedSection == TwitchHomeSection.following,
+                  onTap: () => onSelectSection(TwitchHomeSection.following),
+                ),
+                const SizedBox(height: 8),
+                _SidebarButton(
+                  section: TwitchHomeSection.browse,
+                  selected: selectedSection == TwitchHomeSection.browse,
+                  onTap: () => onSelectSection(TwitchHomeSection.browse),
+                ),
+              ],
             ),
           ),
         ],
@@ -95,35 +112,60 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
   }
 }
 
-class _SidebarHomeBadge extends StatelessWidget {
-  const _SidebarHomeBadge();
+class _SidebarButton extends StatelessWidget {
+  final TwitchHomeSection section;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SidebarButton({
+    required this.section,
+    required this.selected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-      decoration: BoxDecoration(
-        color: TwitchUiColors.primary.withValues(alpha: 0.22),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: TwitchUiColors.primarySoft.withValues(alpha: 0.38),
-        ),
-      ),
-      child: Row(
-        children: <Widget>[
-          Icon(Icons.home_rounded, color: TwitchUiColors.primarySoft, size: 21),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              '首頁',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? TwitchUiColors.primary.withValues(alpha: 0.22)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? TwitchUiColors.primarySoft.withValues(alpha: 0.38)
+                  : Colors.transparent,
             ),
           ),
-        ],
+          child: Row(
+            children: <Widget>[
+              Icon(
+                section.icon,
+                color: selected ? TwitchUiColors.primarySoft : Colors.white54,
+                size: 21,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  section.label,
+                  style: TextStyle(
+                    color: selected ? Colors.white : Colors.white70,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
