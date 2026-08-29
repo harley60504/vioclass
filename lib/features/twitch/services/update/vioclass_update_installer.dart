@@ -50,6 +50,9 @@ class VioClassUpdateInstaller {
     final helper = File(
       '${helperDirectory.path}${Platform.pathSeparator}update_vioclass.ps1',
     );
+    final launcher = File(
+      '${helperDirectory.path}${Platform.pathSeparator}launch_update.cmd',
+    );
     final script = _windowsUpdateScript(
       pid: pid,
       zipPath: file.path,
@@ -57,17 +60,24 @@ class VioClassUpdateInstaller {
       executableName: executable.path.split(Platform.pathSeparator).last,
     );
     helper.writeAsBytesSync(<int>[0xEF, 0xBB, 0xBF, ...utf8.encode(script)]);
+    launcher.writeAsStringSync(
+      _windowsLauncherBatch(helper.path),
+      encoding: ascii,
+    );
 
-    await Process.start('powershell.exe', <String>[
-      '-NoProfile',
-      '-WindowStyle',
-      'Hidden',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-File',
-      helper.path,
+    await Process.start('cmd.exe', <String>[
+      '/c',
+      launcher.path,
     ], mode: ProcessStartMode.detached);
     exit(0);
+  }
+
+  String _windowsLauncherBatch(String helperPath) {
+    final batchPath = helperPath.replaceAll('%', '%%');
+    return '''
+@echo off
+start "" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$batchPath"
+''';
   }
 
   String _windowsUpdateScript({
