@@ -592,7 +592,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
               if (followedLiveStreams.isNotEmpty)
                 TwitchDiscoveryStreamSliverSection(
                   icon: Icons.favorite_rounded,
-                  title: '已追隨的直播',
+                  title: '已追隨 · 直播中',
                   streams: followedLiveStreams,
                   discoveryService: discoveryService,
                   onReturnFromStream: onRefresh,
@@ -600,14 +600,14 @@ class _TwitchChannelSearchPage extends StatelessWidget {
               if (followedOfflineChannels.isNotEmpty)
                 ..._offlineChannelSlivers(
                   icon: Icons.favorite_border_rounded,
-                  title: '已追隨但未開台',
+                  title: '已追隨 · 未開台',
                   channels: followedOfflineChannels,
                 ),
             ],
             if (otherLiveStreams.isNotEmpty)
               TwitchDiscoveryStreamSliverSection(
                 icon: Icons.live_tv_rounded,
-                title: '直播',
+                title: '其他頻道 · 直播中',
                 streams: otherLiveStreams,
                 discoveryService: discoveryService,
                 onReturnFromStream: onRefresh,
@@ -615,7 +615,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
             if (otherOfflineChannels.isNotEmpty)
               ..._offlineChannelSlivers(
                 icon: Icons.tv_off_rounded,
-                title: '未開台頻道',
+                title: '其他頻道 · 未開台',
                 channels: otherOfflineChannels,
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
