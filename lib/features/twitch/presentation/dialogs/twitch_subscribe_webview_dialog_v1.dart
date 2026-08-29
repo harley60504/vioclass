@@ -1,8 +1,10 @@
-// Twitch subscribe popup dialog using the same InAppWebView cookie jar as the app.
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
@@ -16,6 +18,7 @@ Future<void> showTwitchSubscribeWebViewDialogV1({
     maxWidth: 1080,
     portraitHeightFactor: 0.92,
     landscapeHeightFactor: 0.94,
+    enableDrag: false,
     builder: (_) => SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.86,
       child: _TwitchSubscribeWebViewDialogBody(
@@ -46,19 +49,53 @@ class _TwitchSubscribeWebViewDialogBodyState
   double _progress = 0;
   String _currentUrl = '';
   String? _errorText;
+  bool _cookiesPrimed = false;
+  late final Future<void> _cookiePrimeFuture;
 
   @override
   void initState() {
     super.initState();
     _currentUrl = widget.initialUri.toString();
+    _cookiePrimeFuture = _primeTwitchAuthCookie();
   }
 
-  Future<void> _goBack() async {
-    final controller = _controller;
-    if (controller == null) return;
+  Future<void> _primeTwitchAuthCookie() async {
+    if (_cookiesPrimed) return;
+    _cookiesPrimed = true;
 
-    if (await controller.canGoBack()) {
-      await controller.goBack();
+    final token = await _readStoredWebGqlToken();
+    if (token == null || token.isEmpty) return;
+
+    final cookieManager = CookieManager.instance();
+    for (final url in const <String>[
+      'https://www.twitch.tv',
+      'https://twitch.tv',
+    ]) {
+      try {
+        await cookieManager.setCookie(
+          url: WebUri(url),
+          name: 'auth-token',
+          value: token,
+          domain: '.twitch.tv',
+          path: '/',
+          isSecure: true,
+        );
+      } catch (_) {}
+    }
+  }
+
+  Future<String?> _readStoredWebGqlToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(TwitchWebGqlAuthService.tokenStorageKey);
+    if (raw == null || raw.trim().isEmpty) return null;
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return null;
+      final token = decoded['accessToken']?.toString().trim();
+      return token == null || token.isEmpty ? null : token;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -83,11 +120,6 @@ class _TwitchSubscribeWebViewDialogBodyState
           ),
           child: Row(
             children: [
-              IconButton(
-                tooltip: null,
-                onPressed: _goBack,
-                icon: const Icon(Icons.arrow_back, color: Colors.white70),
-              ),
               IconButton(
                 tooltip: null,
                 onPressed: _reload,
@@ -162,70 +194,86 @@ class _TwitchSubscribeWebViewDialogBodyState
         Expanded(
           child: ColoredBox(
             color: Colors.black,
-            child: InAppWebView(
-              initialUrlRequest: URLRequest(
-                url: WebUri(widget.initialUri.toString()),
-              ),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                javaScriptCanOpenWindowsAutomatically: true,
-                supportMultipleWindows: true,
-                thirdPartyCookiesEnabled: true,
-                sharedCookiesEnabled: true,
-                domStorageEnabled: true,
-                databaseEnabled: true,
-                mediaPlaybackRequiresUserGesture: false,
-                allowsInlineMediaPlayback: true,
-                transparentBackground: false,
-                useShouldOverrideUrlLoading: true,
-              ),
-              onWebViewCreated: (controller) {
-                _controller = controller;
-              },
-              onLoadStart: (controller, url) {
-                if (!mounted) return;
-                setState(() {
-                  _currentUrl = url?.toString() ?? _currentUrl;
-                  _errorText = null;
-                });
-              },
-              onLoadStop: (controller, url) {
-                if (!mounted) return;
-                setState(() {
-                  _currentUrl = url?.toString() ?? _currentUrl;
-                  _progress = 1;
-                });
-              },
-              onProgressChanged: (controller, progress) {
-                if (!mounted) return;
-                setState(() {
-                  _progress = (progress / 100.0).clamp(0.0, 1.0);
-                });
-              },
-              onReceivedError: (controller, request, error) {
-                if (!mounted) return;
-                setState(() {
-                  _errorText = '訂閱頁暫時載入失敗，請稍後重試。';
-                });
-              },
-              onCreateWindow: (controller, createWindowAction) async {
-                final url = createWindowAction.request.url;
-                if (url != null) {
-                  await controller.loadUrl(urlRequest: URLRequest(url: url));
-                }
-                return true;
-              },
-              shouldOverrideUrlLoading: (controller, navigationAction) async {
-                final url = navigationAction.request.url;
-                if (url == null) return NavigationActionPolicy.ALLOW;
-
-                final scheme = url.scheme.toLowerCase();
-                if (scheme == 'http' || scheme == 'https') {
-                  return NavigationActionPolicy.ALLOW;
+            child: FutureBuilder<void>(
+              future: _cookiePrimeFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: TwitchUiColors.primary,
+                    ),
+                  );
                 }
 
-                // Prevent non-web schemes from crashing desktop WebView.
-                return NavigationActionPolicy.CANCEL;
+                return InAppWebView(
+                  initialUrlRequest: URLRequest(
+                    url: WebUri(widget.initialUri.toString()),
+                  ),
+                  initialSettings: InAppWebViewSettings(
+                    javaScriptEnabled: true,
+                    javaScriptCanOpenWindowsAutomatically: true,
+                    supportMultipleWindows: true,
+                    thirdPartyCookiesEnabled: true,
+                    sharedCookiesEnabled: true,
+                    domStorageEnabled: true,
+                    databaseEnabled: true,
+                    mediaPlaybackRequiresUserGesture: false,
+                    allowsInlineMediaPlayback: true,
+                    transparentBackground: false,
+                    useShouldOverrideUrlLoading: true,
+                  ),
+                  onWebViewCreated: (controller) {
+                    _controller = controller;
+                  },
+                  onLoadStart: (controller, url) {
+                    if (!mounted) return;
+                    setState(() {
+                      _currentUrl = url?.toString() ?? _currentUrl;
+                      _errorText = null;
+                    });
+                  },
+                  onLoadStop: (controller, url) {
+                    if (!mounted) return;
+                    setState(() {
+                      _currentUrl = url?.toString() ?? _currentUrl;
+                      _progress = 1;
+                    });
+                  },
+                  onProgressChanged: (controller, progress) {
+                    if (!mounted) return;
+                    setState(() {
+                      _progress = (progress / 100.0).clamp(0.0, 1.0);
+                    });
+                  },
+                  onReceivedError: (controller, request, error) {
+                    if (!mounted) return;
+                    setState(() {
+                      _errorText = '訂閱頁暫時載入失敗，請稍後重試。';
+                    });
+                  },
+                  onCreateWindow: (controller, createWindowAction) async {
+                    final url = createWindowAction.request.url;
+                    if (url != null) {
+                      await controller.loadUrl(
+                        urlRequest: URLRequest(url: url),
+                      );
+                    }
+                    return true;
+                  },
+                  shouldOverrideUrlLoading:
+                      (controller, navigationAction) async {
+                        final url = navigationAction.request.url;
+                        if (url == null) return NavigationActionPolicy.ALLOW;
+
+                        final scheme = url.scheme.toLowerCase();
+                        if (scheme == 'http' || scheme == 'https') {
+                          return NavigationActionPolicy.ALLOW;
+                        }
+
+                        // Prevent non-web schemes from crashing desktop WebView.
+                        return NavigationActionPolicy.CANCEL;
+                      },
+                );
               },
             ),
           ),

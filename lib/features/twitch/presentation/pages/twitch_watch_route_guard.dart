@@ -36,6 +36,7 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   final TwitchChannelVideo? initialVodVideo;
   final TwitchChannelClip? initialClip;
   final double? initialVodReplayRatio;
+  final bool initialVodPlaybackOnly;
   final bool initialPreferVodReplayChat;
   final bool initialReuseCurrentPlayback;
   final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
@@ -58,6 +59,7 @@ class TwitchWatchRouteGuard extends StatefulWidget {
     this.initialVodVideo,
     this.initialClip,
     this.initialVodReplayRatio,
+    this.initialVodPlaybackOnly = false,
     this.initialPreferVodReplayChat = false,
     this.initialReuseCurrentPlayback = false,
     this.initialPlayerRuntime,
@@ -163,6 +165,7 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         initialVodVideo: widget.initialVodVideo,
         initialClip: widget.initialClip,
         initialVodReplayRatio: widget.initialVodReplayRatio,
+        initialVodPlaybackOnly: widget.initialVodPlaybackOnly,
         initialPreferVodReplayChat: widget.initialPreferVodReplayChat,
         initialReuseCurrentPlayback: widget.initialReuseCurrentPlayback,
         initialPlayerRuntime: widget.initialPlayerRuntime,

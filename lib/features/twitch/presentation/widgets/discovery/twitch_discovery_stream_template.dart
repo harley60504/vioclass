@@ -407,6 +407,70 @@ class TwitchDiscoveryFooter extends StatelessWidget {
   }
 }
 
+class TwitchDiscoveryLowerContentState {
+  final List<Widget> slivers;
+  final Widget footer;
+
+  const TwitchDiscoveryLowerContentState({
+    required this.slivers,
+    required this.footer,
+  });
+}
+
+TwitchDiscoveryLowerContentState twitchDiscoveryLowerContentState({
+  required bool loadingInitial,
+  required bool hasAnyLoadedContent,
+  required bool filteredEmpty,
+  required Widget emptyState,
+  required Widget filteredEmptyState,
+  required List<Widget> contentSlivers,
+  required Widget footer,
+}) {
+  if (loadingInitial) {
+    return const TwitchDiscoveryLowerContentState(
+      slivers: <Widget>[TwitchDiscoveryLoadingSliver()],
+      footer: SizedBox.shrink(),
+    );
+  }
+
+  if (!hasAnyLoadedContent) {
+    return TwitchDiscoveryLowerContentState(
+      slivers: <Widget>[
+        SliverFillRemaining(hasScrollBody: false, child: emptyState),
+      ],
+      footer: const SizedBox.shrink(),
+    );
+  }
+
+  if (filteredEmpty) {
+    return TwitchDiscoveryLowerContentState(
+      slivers: <Widget>[
+        SliverFillRemaining(hasScrollBody: false, child: filteredEmptyState),
+      ],
+      footer: const SizedBox.shrink(),
+    );
+  }
+
+  return TwitchDiscoveryLowerContentState(
+    slivers: contentSlivers,
+    footer: footer,
+  );
+}
+
+class TwitchDiscoveryLoadingSliver extends StatelessWidget {
+  const TwitchDiscoveryLoadingSliver({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const SliverFillRemaining(
+      hasScrollBody: false,
+      child: Center(
+        child: CircularProgressIndicator(color: TwitchUiColors.primary),
+      ),
+    );
+  }
+}
+
 class TwitchDiscoveryEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;

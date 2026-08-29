@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/discovery/twitch_game_filter_grid_sheet.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -477,9 +478,6 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   }
 
   Future<void> showGameMenu(BuildContext context) async {
-    final searchController = TextEditingController();
-    String keyword = '';
-
     List<TwitchLiveStream> gameSource() {
       final language = currentLanguage.trim().toLowerCase();
       if (language.isEmpty) return loadedStreams;
@@ -488,154 +486,35 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           .toList(growable: false);
     }
 
-    List<_FollowingGameFilter> buildGames() {
-      final byId = <String, _FollowingGameFilter>{};
+    List<TwitchGameCategory> buildGames() {
+      final byId = <String, TwitchGameCategory>{};
       for (final stream in gameSource()) {
         final id = stream.gameId.trim();
         final name = stream.gameName.trim();
         if (id.isEmpty || name.isEmpty) continue;
-        byId.putIfAbsent(id, () => _FollowingGameFilter(id: id, name: name));
+        byId.putIfAbsent(
+          id,
+          () => TwitchGameCategory(id: id, name: name, boxArtUrl: ''),
+        );
       }
       final games = byId.values.toList(growable: false);
       games.sort((left, right) => left.name.compareTo(right.name));
       return games;
     }
 
-    await showTwitchUnifiedSheet<void>(
+    await showTwitchGameFilterGridSheet(
       context: context,
-      title: '遊戲分類',
-      subtitle: selectedGameName == null || selectedGameName!.isEmpty
-          ? '全部分類'
-          : selectedGameName,
-      icon: Icons.sports_esports_rounded,
-      size: TwitchUnifiedSheetSize.medium,
-      showRefresh: false,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final lowerKeyword = keyword.trim().toLowerCase();
-            final games = buildGames();
-            final filteredGames = lowerKeyword.isEmpty
-                ? games
-                : games
-                      .where(
-                        (game) =>
-                            game.name.toLowerCase().contains(lowerKeyword),
-                      )
-                      .toList(growable: false);
-            final items = <_FollowingGameFilter?>[null, ...filteredGames];
-
-            void selectGame(_FollowingGameFilter? game) {
-              setState(() {
-                selectedGameId = game?.id;
-                selectedGameName = game?.name;
-              });
-              Navigator.of(sheetContext).maybePop();
-            }
-
-            return Column(
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                  child: TextField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      hintText: '搜尋遊戲分類',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: keyword.isNotEmpty
-                          ? IconButton(
-                              onPressed: () {
-                                searchController.clear();
-                                setSheetState(() => keyword = '');
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: const Color(0xFF0E0E10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (value) => setSheetState(() => keyword = value),
-                  ),
-                ),
-                Expanded(
-                  child: filteredGames.isEmpty && lowerKeyword.isNotEmpty
-                      ? const Center(
-                          child: Text(
-                            '目前追隨直播中找不到這個分類',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                          itemCount: items.length,
-                          itemBuilder: (context, index) {
-                            final game = items[index];
-                            final selected = game == null
-                                ? selectedGameId == null
-                                : selectedGameId == game.id;
-                            return ListTile(
-                              selected: selected,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              leading: Icon(
-                                selected
-                                    ? Icons.check_circle_rounded
-                                    : Icons.sports_esports_rounded,
-                                color: selected
-                                    ? TwitchUiColors.primary
-                                    : Colors.white54,
-                              ),
-                              title: Text(game?.name ?? '全部分類'),
-                              onTap: () => selectGame(game),
-                            );
-                          },
-                        ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111116),
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => selectGame(null),
-                        child: const Text('全部分類'),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () => Navigator.of(sheetContext).maybePop(),
-                        child: const Text('關閉'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        );
+      games: buildGames(),
+      selectedGameId: selectedGameId,
+      selectedGameName: selectedGameName,
+      emptySearchText: '目前追隨直播中找不到這個分類',
+      onSelected: (game) {
+        setState(() {
+          selectedGameId = game?.id;
+          selectedGameName = game?.name;
+        });
       },
     );
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 260), () {
-        searchController.dispose();
-      });
-    });
   }
 
   Future<void> showLanguageMenu(BuildContext context) async {
@@ -772,17 +651,6 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     final filteredSearchLive = _filteredSearchLiveStreams();
     final filteredSearchOffline = _filteredSearchOfflineChannels();
 
-    if (loadingFirstPage &&
-        loadedStreams.isEmpty &&
-        offlineFollowedChannels.isEmpty &&
-        widget.searchedLiveStreams.isEmpty &&
-        widget.searchedOfflineChannels.isEmpty &&
-        !widget.loadingChannelSearch) {
-      return const Center(
-        child: CircularProgressIndicator(color: TwitchUiColors.primary),
-      );
-    }
-
     if (errorText != null && loadedStreams.isEmpty) {
       final message = errorText ?? '';
       final needsLogin =
@@ -806,33 +674,54 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       );
     }
 
-    if (loadedStreams.isEmpty &&
-        offlineFollowedChannels.isEmpty &&
-        !loadingOfflineChannels) {
-      return TwitchDiscoveryEmptyState(
+    final lowerState = twitchDiscoveryLowerContentState(
+      loadingInitial:
+          loadingFirstPage &&
+          loadedStreams.isEmpty &&
+          offlineFollowedChannels.isEmpty &&
+          widget.searchedLiveStreams.isEmpty &&
+          widget.searchedOfflineChannels.isEmpty &&
+          !widget.loadingChannelSearch,
+      hasAnyLoadedContent:
+          loadedStreams.isNotEmpty ||
+          offlineFollowedChannels.isNotEmpty ||
+          widget.searchedLiveStreams.isNotEmpty ||
+          widget.searchedOfflineChannels.isNotEmpty ||
+          loadingOfflineChannels,
+      filteredEmpty:
+          filtered.isEmpty &&
+          filteredOffline.isEmpty &&
+          filteredSearchLive.isEmpty &&
+          filteredSearchOffline.isEmpty &&
+          !loadingOfflineChannels &&
+          !widget.loadingChannelSearch,
+      emptyState: TwitchDiscoveryEmptyState(
         icon: Icons.favorite_border_rounded,
         title: '目前追隨頻道沒有直播',
         message: offlineError?.trim().isNotEmpty == true
             ? '直播清單為空，離線追隨頻道也暫時讀取失敗。'
             : '稍後重新整理，或切到瀏覽頁探索其他直播。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
-      );
-    }
-
-    if (filtered.isEmpty &&
-        filteredOffline.isEmpty &&
-        filteredSearchLive.isEmpty &&
-        filteredSearchOffline.isEmpty &&
-        !loadingOfflineChannels &&
-        !widget.loadingChannelSearch) {
-      return TwitchDiscoveryEmptyState(
+      ),
+      filteredEmptyState: TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
         title: '找不到符合條件的頻道',
         message: widget.channelSearchError?.trim().isNotEmpty == true
             ? '已載入的追隨清單沒有結果，Twitch 頻道搜尋暫時失敗。'
             : '可以清除搜尋文字、遊戲分類或語言篩選。',
-      );
-    }
+      ),
+      contentSlivers: _extraSearchAndOfflineSlivers(
+        followedOfflineChannels: filteredOffline,
+        searchedLiveStreams: filteredSearchLive,
+        searchedOfflineChannels: filteredSearchOffline,
+      ),
+      footer: TwitchDiscoveryFooter(
+        loadingMore: loadingMore,
+        hasMore: hasMore,
+        errorText: paginationError,
+        onLoadMore: loadMore,
+      ),
+    );
 
     return RefreshIndicator(
       color: TwitchUiColors.primary,
@@ -848,17 +737,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
         showSectionCount: false,
-        extraSliversBeforeFooter: _extraSearchAndOfflineSlivers(
-          followedOfflineChannels: filteredOffline,
-          searchedLiveStreams: filteredSearchLive,
-          searchedOfflineChannels: filteredSearchOffline,
-        ),
-        footer: TwitchDiscoveryFooter(
-          loadingMore: loadingMore,
-          hasMore: hasMore,
-          errorText: paginationError,
-          onLoadMore: loadMore,
-        ),
+        extraSliversBeforeFooter: lowerState.slivers,
+        footer: lowerState.footer,
       ),
     );
   }
@@ -1012,13 +892,6 @@ class _FollowingRefreshWindow {
     required this.cursor,
     required this.hasMore,
   });
-}
-
-class _FollowingGameFilter {
-  final String id;
-  final String name;
-
-  const _FollowingGameFilter({required this.id, required this.name});
 }
 
 class _OfflineFollowedResult {

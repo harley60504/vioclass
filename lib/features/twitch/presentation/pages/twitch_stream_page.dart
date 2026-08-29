@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../models/discovery/twitch_live_stream.dart';
+import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -22,11 +23,13 @@ import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
+import '../widgets/shared/twitch_cached_image_layer.dart';
 import 'twitch_browse_page.dart';
 import 'twitch_drops_connection_page.dart';
 import 'twitch_following_page.dart';
 import 'twitch_linked_login_page.dart';
 import 'twitch_stream_home_models.dart';
+import 'twitch_watch_route_guard.dart';
 
 const Color _kBackground = Color(0xFF0A0A0F);
 
@@ -63,6 +66,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
   List<TwitchFollowedChannel> searchedOfflineChannels =
       const <TwitchFollowedChannel>[];
+  List<_TwitchSearchVideoResult> searchedVideos =
+      const <_TwitchSearchVideoResult>[];
+  List<_TwitchSearchClipResult> searchedClips =
+      const <_TwitchSearchClipResult>[];
   Set<String> followedUserIds = const <String>{};
   Set<String> followedLogins = const <String>{};
   String? channelSearchError;
@@ -276,6 +283,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       _channelSearchGeneration++;
       searchedLiveStreams = const <TwitchLiveStream>[];
       searchedOfflineChannels = const <TwitchFollowedChannel>[];
+      searchedVideos = const <_TwitchSearchVideoResult>[];
+      searchedClips = const <_TwitchSearchClipResult>[];
       loadingChannelSearch = false;
       channelSearchError = null;
     });
@@ -306,6 +315,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       _channelSearchGeneration++;
       searchedLiveStreams = const <TwitchLiveStream>[];
       searchedOfflineChannels = const <TwitchFollowedChannel>[];
+      searchedVideos = const <_TwitchSearchVideoResult>[];
+      searchedClips = const <_TwitchSearchClipResult>[];
       loadingChannelSearch = false;
       channelSearchError = null;
     });
@@ -330,11 +341,15 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
         _channelSearchGeneration++;
         searchedLiveStreams = const <TwitchLiveStream>[];
         searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        searchedVideos = const <_TwitchSearchVideoResult>[];
+        searchedClips = const <_TwitchSearchClipResult>[];
         loadingChannelSearch = false;
         channelSearchError = null;
       } else {
         searchedLiveStreams = const <TwitchLiveStream>[];
         searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        searchedVideos = const <_TwitchSearchVideoResult>[];
+        searchedClips = const <_TwitchSearchClipResult>[];
         loadingChannelSearch = true;
         channelSearchError = null;
       }
@@ -351,11 +366,18 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Future<void> searchChannels(String keyword, int generation) async {
     try {
       final result = await discoveryService.searchChannels(query: keyword);
+      final media = await _searchChannelMedia(
+        keyword: keyword,
+        liveStreams: result.liveStreams,
+        offlineChannels: result.offlineChannels,
+      );
       if (!mounted || generation != _channelSearchGeneration) return;
 
       setState(() {
         searchedLiveStreams = result.liveStreams;
         searchedOfflineChannels = result.offlineChannels;
+        searchedVideos = media.videos;
+        searchedClips = media.clips;
         loadingChannelSearch = false;
         channelSearchError = null;
       });
@@ -365,10 +387,114 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       setState(() {
         searchedLiveStreams = const <TwitchLiveStream>[];
         searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        searchedVideos = const <_TwitchSearchVideoResult>[];
+        searchedClips = const <_TwitchSearchClipResult>[];
         loadingChannelSearch = false;
         channelSearchError = error.toString();
       });
     }
+  }
+
+  Future<_TwitchSearchMediaBundle> _searchChannelMedia({
+    required String keyword,
+    required List<TwitchLiveStream> liveStreams,
+    required List<TwitchFollowedChannel> offlineChannels,
+  }) async {
+    final cleanKeyword = keyword.trim().toLowerCase();
+    if (cleanKeyword.isEmpty) return const _TwitchSearchMediaBundle.empty();
+
+    final candidates = _searchMediaCandidateChannels(
+      liveStreams: liveStreams,
+      offlineChannels: offlineChannels,
+    );
+    if (candidates.isEmpty) return const _TwitchSearchMediaBundle.empty();
+
+    final videoResults = <_TwitchSearchVideoResult>[];
+    final clipResults = <_TwitchSearchClipResult>[];
+
+    for (final channel in candidates.take(8)) {
+      if (videoResults.length < 12) {
+        try {
+          final page = await discoveryService.fetchChannelVideos(
+            userId: channel.broadcasterId,
+            first: 8,
+          );
+          videoResults.addAll(
+            page.videos
+                .where((video) => _matchesSearchMediaVideo(video, cleanKeyword))
+                .take(4)
+                .map(
+                  (video) =>
+                      _TwitchSearchVideoResult(channel: channel, video: video),
+                ),
+          );
+        } catch (_) {}
+      }
+
+      if (clipResults.length < 12) {
+        try {
+          final page = await discoveryService.fetchChannelClips(
+            broadcasterId: channel.broadcasterId,
+            first: 8,
+          );
+          clipResults.addAll(
+            page.clips
+                .where((clip) => _matchesSearchMediaClip(clip, cleanKeyword))
+                .take(4)
+                .map(
+                  (clip) =>
+                      _TwitchSearchClipResult(channel: channel, clip: clip),
+                ),
+          );
+        } catch (_) {}
+      }
+
+      if (videoResults.length >= 12 && clipResults.length >= 12) break;
+    }
+
+    return _TwitchSearchMediaBundle(
+      videos: videoResults.take(12).toList(growable: false),
+      clips: clipResults.take(12).toList(growable: false),
+    );
+  }
+
+  List<TwitchFollowedChannel> _searchMediaCandidateChannels({
+    required List<TwitchLiveStream> liveStreams,
+    required List<TwitchFollowedChannel> offlineChannels,
+  }) {
+    final byId = <String, TwitchFollowedChannel>{};
+
+    for (final channel in offlineChannels) {
+      final id = channel.broadcasterId.trim();
+      if (id.isEmpty) continue;
+      byId[id] = channel;
+    }
+
+    for (final stream in liveStreams) {
+      final id = stream.userId.trim();
+      if (id.isEmpty || byId.containsKey(id)) continue;
+      byId[id] = TwitchFollowedChannel(
+        broadcasterId: id,
+        broadcasterLogin: stream.channelLogin,
+        broadcasterName: stream.displayName,
+        followedAt: null,
+        profileImageUrl: stream.profileImageUrl,
+        description: stream.title,
+      );
+    }
+
+    return byId.values.toList(growable: false);
+  }
+
+  bool _matchesSearchMediaVideo(TwitchChannelVideo video, String keyword) {
+    return video.title.toLowerCase().contains(keyword) ||
+        video.userName.toLowerCase().contains(keyword);
+  }
+
+  bool _matchesSearchMediaClip(TwitchChannelClip clip, String keyword) {
+    return clip.title.toLowerCase().contains(keyword) ||
+        clip.broadcasterName.toLowerCase().contains(keyword) ||
+        clip.creatorName.toLowerCase().contains(keyword);
   }
 
   Future<void> refreshChannelSearch() async {
@@ -518,6 +644,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               query: searchText,
               liveStreams: searchedLiveStreams,
               offlineChannels: searchedOfflineChannels,
+              videos: searchedVideos,
+              clips: searchedClips,
               followedUserIds: followedUserIds,
               followedLogins: followedLogins,
               loading: loadingChannelSearch,
@@ -557,6 +685,8 @@ class _TwitchChannelSearchPage extends StatelessWidget {
   final String query;
   final List<TwitchLiveStream> liveStreams;
   final List<TwitchFollowedChannel> offlineChannels;
+  final List<_TwitchSearchVideoResult> videos;
+  final List<_TwitchSearchClipResult> clips;
   final Set<String> followedUserIds;
   final Set<String> followedLogins;
   final bool loading;
@@ -569,6 +699,8 @@ class _TwitchChannelSearchPage extends StatelessWidget {
     required this.query,
     required this.liveStreams,
     required this.offlineChannels,
+    required this.videos,
+    required this.clips,
     required this.followedUserIds,
     required this.followedLogins,
     required this.loading,
@@ -579,7 +711,11 @@ class _TwitchChannelSearchPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasResults = liveStreams.isNotEmpty || offlineChannels.isNotEmpty;
+    final hasResults =
+        liveStreams.isNotEmpty ||
+        offlineChannels.isNotEmpty ||
+        videos.isNotEmpty ||
+        clips.isNotEmpty;
     final followedLiveStreams = liveStreams
         .where(_isFollowedStream)
         .toList(growable: false);
@@ -631,7 +767,11 @@ class _TwitchChannelSearchPage extends StatelessWidget {
               child: TwitchDiscoverySectionHeader(
                 icon: Icons.search_rounded,
                 title: '搜尋結果',
-                count: liveStreams.length + offlineChannels.length,
+                count:
+                    liveStreams.length +
+                    offlineChannels.length +
+                    videos.length +
+                    clips.length,
               ),
             ),
             if (loading)
@@ -650,7 +790,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                       ),
                       SizedBox(width: 10),
                       Text(
-                        '正在搜尋頻道...',
+                        '正在搜尋...',
                         style: TextStyle(
                           color: Colors.white54,
                           fontSize: 12.5,
@@ -690,6 +830,30 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                 icon: Icons.tv_off_rounded,
                 title: '其他頻道 · 未開台',
                 channels: otherOfflineChannels,
+              ),
+            if (videos.isNotEmpty)
+              _mediaSliverSection<_TwitchSearchVideoResult>(
+                icon: Icons.video_library_outlined,
+                title: '影片',
+                items: videos,
+                itemBuilder: (context, result) {
+                  return _SearchVodCard(
+                    discoveryService: discoveryService,
+                    result: result,
+                  );
+                },
+              ),
+            if (clips.isNotEmpty)
+              _mediaSliverSection<_TwitchSearchClipResult>(
+                icon: Icons.movie_filter_outlined,
+                title: '片段',
+                items: clips,
+                itemBuilder: (context, result) {
+                  return _SearchClipCard(
+                    discoveryService: discoveryService,
+                    result: result,
+                  );
+                },
               ),
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
@@ -744,4 +908,305 @@ class _TwitchChannelSearchPage extends StatelessWidget {
       ),
     ];
   }
+
+  Widget _mediaSliverSection<T>({
+    required IconData icon,
+    required String title,
+    required List<T> items,
+    required Widget Function(BuildContext context, T item) itemBuilder,
+  }) {
+    return SliverMainAxisGroup(
+      slivers: <Widget>[
+        SliverToBoxAdapter(
+          child: TwitchDiscoverySectionHeader(
+            icon: icon,
+            title: title,
+            count: items.length,
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 340,
+              mainAxisExtent: 238,
+              crossAxisSpacing: 14,
+              mainAxisSpacing: 14,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              return itemBuilder(context, items[index]);
+            }, childCount: items.length),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TwitchSearchMediaBundle {
+  final List<_TwitchSearchVideoResult> videos;
+  final List<_TwitchSearchClipResult> clips;
+
+  const _TwitchSearchMediaBundle({required this.videos, required this.clips});
+
+  const _TwitchSearchMediaBundle.empty()
+    : videos = const <_TwitchSearchVideoResult>[],
+      clips = const <_TwitchSearchClipResult>[];
+}
+
+class _TwitchSearchVideoResult {
+  final TwitchFollowedChannel channel;
+  final TwitchChannelVideo video;
+
+  const _TwitchSearchVideoResult({required this.channel, required this.video});
+}
+
+class _TwitchSearchClipResult {
+  final TwitchFollowedChannel channel;
+  final TwitchChannelClip clip;
+
+  const _TwitchSearchClipResult({required this.channel, required this.clip});
+}
+
+class _SearchVodCard extends StatelessWidget {
+  final TwitchDiscoveryService discoveryService;
+  final _TwitchSearchVideoResult result;
+
+  const _SearchVodCard({required this.discoveryService, required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final video = result.video;
+    final channel = result.channel;
+    final isGrowingArchive = video.isLikelyGrowingArchive;
+
+    return _SearchMediaCardFrame(
+      thumbnailUrl: video.thumbnail(),
+      fallbackIcon: Icons.video_library_outlined,
+      topLeftPill: isGrowingArchive ? '直播存檔中' : 'VOD',
+      bottomRightPill: video.duration,
+      title: video.title.trim().isEmpty ? '未命名 VOD' : video.title,
+      subtitle: '${channel.displayName} · ${_formatCount(video.viewCount)} 次觀看',
+      avatarUrl: channel.profileImageUrl,
+      onTap: () {
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TwitchWatchRouteGuard(
+              initialMetadata: TwitchStreamHeaderMetadata(
+                channelLogin: channel.channelLogin,
+                streamTitle: video.title,
+                language: video.language,
+                profileImageUrl: channel.profileImageUrl,
+              ),
+              initialOfflineChannel: channel,
+              initialDiscoveryService: discoveryService,
+              initialActiveDvrVideo: isGrowingArchive ? video : null,
+              initialVodVideo: isGrowingArchive ? null : video,
+              initialVodPlaybackOnly: !isGrowingArchive,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SearchClipCard extends StatelessWidget {
+  final TwitchDiscoveryService discoveryService;
+  final _TwitchSearchClipResult result;
+
+  const _SearchClipCard({required this.discoveryService, required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    final clip = result.clip;
+    final channel = result.channel;
+
+    return _SearchMediaCardFrame(
+      thumbnailUrl: clip.thumbnailUrl,
+      fallbackIcon: Icons.movie_filter_outlined,
+      topLeftPill: '片段',
+      bottomRightPill: '${clip.duration.toStringAsFixed(1)}s',
+      title: clip.title.trim().isEmpty ? '未命名片段' : clip.title,
+      subtitle: '${channel.displayName} · ${_formatCount(clip.viewCount)} 次觀看',
+      avatarUrl: channel.profileImageUrl,
+      onTap: () {
+        Navigator.of(context, rootNavigator: true).push(
+          MaterialPageRoute<void>(
+            builder: (_) => TwitchWatchRouteGuard(
+              initialMetadata: TwitchStreamHeaderMetadata(
+                channelLogin: channel.channelLogin,
+                streamTitle: clip.title,
+                language: clip.language,
+                profileImageUrl: channel.profileImageUrl,
+              ),
+              initialOfflineChannel: channel,
+              initialDiscoveryService: discoveryService,
+              initialClip: clip,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SearchMediaCardFrame extends StatelessWidget {
+  final String thumbnailUrl;
+  final IconData fallbackIcon;
+  final String topLeftPill;
+  final String bottomRightPill;
+  final String title;
+  final String subtitle;
+  final String avatarUrl;
+  final VoidCallback onTap;
+
+  const _SearchMediaCardFrame({
+    required this.thumbnailUrl,
+    required this.fallbackIcon,
+    required this.topLeftPill,
+    required this.bottomRightPill,
+    required this.title,
+    required this.subtitle,
+    required this.avatarUrl,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                Colors.white.withValues(alpha: 0.062),
+                Colors.white.withValues(alpha: 0.022),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: <Widget>[
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        return TwitchCachedImageLayer(
+                          imageUrl: thumbnailUrl,
+                          width: constraints.maxWidth,
+                          height: constraints.maxHeight,
+                          fit: BoxFit.cover,
+                          fallbackColor: Colors.white.withValues(alpha: 0.06),
+                          fallbackIcon: fallbackIcon,
+                          fallbackIconColor: Colors.white38,
+                        );
+                      },
+                    ),
+                    Positioned(
+                      left: 8,
+                      top: 8,
+                      child: _SearchMediaPill(text: topLeftPill),
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: _SearchMediaPill(text: bottomRightPill),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 74,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          height: 1.14,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const Spacer(),
+                      Row(
+                        children: <Widget>[
+                          TwitchCachedImageLayer.avatar(
+                            imageUrl: avatarUrl,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: Text(
+                              subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchMediaPill extends StatelessWidget {
+  final String text;
+
+  const _SearchMediaPill({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _formatCount(int value) {
+  if (value >= 10000) return '${(value / 10000).toStringAsFixed(1)}萬';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
+  return value.toString();
 }

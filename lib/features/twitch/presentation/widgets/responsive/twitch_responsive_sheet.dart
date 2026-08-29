@@ -72,6 +72,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
   double? portraitHeightFactor,
   double? landscapeHeightFactor,
   Color backgroundColor = TwitchUiColors.surface,
+  bool enableDrag = false,
 }) {
   final resolvedSize = _resolveUnifiedSheetSize(
     size: size,
@@ -143,6 +144,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
     useSafeArea: false,
+    enableDrag: enableDrag,
     builder: (sheetContext) {
       final insetBottom = MediaQuery.of(sheetContext).viewInsets.bottom;
       return SafeArea(
@@ -195,6 +197,7 @@ Future<T?> showTwitchUnifiedSheet<T>({
   double? portraitHeightFactor,
   double? landscapeHeightFactor,
   Color backgroundColor = TwitchUiColors.surface,
+  bool enableDrag = false,
 }) {
   final refreshHandler = onRefresh;
 
@@ -205,6 +208,7 @@ Future<T?> showTwitchUnifiedSheet<T>({
     portraitHeightFactor: portraitHeightFactor,
     landscapeHeightFactor: landscapeHeightFactor,
     backgroundColor: backgroundColor,
+    enableDrag: enableDrag,
     builder: (sheetContext) {
       return TwitchUnifiedSheetScaffold(
         title: title,

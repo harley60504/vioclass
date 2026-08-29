@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/discovery/twitch_game_filter_grid_sheet.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -643,11 +644,11 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Container(
-              height: 46,
+              height: 38,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.055),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                color: const Color(0xFF18161F),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
               child: TextField(
                 controller: tagSearchController,
@@ -656,7 +657,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                 onChanged: _updateTagSearchText,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
                 decoration: InputDecoration(
@@ -668,7 +669,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   prefixIcon: const Icon(
                     Icons.sell_rounded,
                     color: Colors.white54,
-                    size: 20,
+                    size: 18,
                   ),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -693,7 +694,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                           icon: const Icon(
                             Icons.add_rounded,
                             color: TwitchUiColors.primarySoft,
-                            size: 21,
+                            size: 19,
                           ),
                         ),
                       if (hasTags || hasTypedTag)
@@ -704,7 +705,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                           icon: const Icon(
                             Icons.close_rounded,
                             color: Colors.white54,
-                            size: 19,
+                            size: 18,
                           ),
                         ),
                     ],
@@ -712,20 +713,21 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   border: InputBorder.none,
                   isDense: true,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 13,
+                    horizontal: 12,
+                    vertical: 10,
                   ),
                 ),
               ),
             ),
             if (hasTags) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 6,
+                runSpacing: 6,
                 children: <Widget>[
                   ...selectedTags.map((tag) {
                     return InputChip(
+                      visualDensity: VisualDensity.compact,
                       label: Text(selectedTagLabels[tag] ?? tag),
                       onDeleted: () => _removeSelectedTag(tag),
                       backgroundColor: TwitchUiColors.primary.withValues(
@@ -734,7 +736,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                       deleteIconColor: Colors.white70,
                       labelStyle: const TextStyle(
                         color: Colors.white,
-                        fontSize: 12.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
                       side: BorderSide(
@@ -748,20 +750,21 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
               ),
             ],
             if (tagSuggestions.isNotEmpty) ...[
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 6,
+                runSpacing: 6,
                 children: tagSuggestions
                     .map((tag) {
                       return ActionChip(
-                        avatar: const Icon(Icons.sell_rounded, size: 15),
+                        visualDensity: VisualDensity.compact,
+                        avatar: const Icon(Icons.sell_rounded, size: 14),
                         label: Text(tag.label),
                         onPressed: () => _addSelectedTagSuggestion(tag),
                         backgroundColor: Colors.white.withValues(alpha: 0.06),
                         labelStyle: const TextStyle(
                           color: Colors.white70,
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
                         side: BorderSide(
@@ -793,290 +796,26 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       unawaited(loadGames());
     }
 
-    final searchController = TextEditingController();
-    final sheetScrollController = ScrollController();
-    String keyword = '';
-    StateSetter? setSheetStateRef;
-    bool sheetClosed = false;
-
-    Future<void> requestMoreGames() async {
-      if (sheetClosed || loadingMoreGames || !hasMoreGames) return;
-      await loadMoreGames();
-      if (!sheetClosed) setSheetStateRef?.call(() {});
-    }
-
-    Future<void> reloadGamesForSheet() async {
-      if (sheetClosed) return;
-      await loadGames();
-      if (!sheetClosed) setSheetStateRef?.call(() {});
-    }
-
-    void handleSheetScroll() {
-      if (!sheetScrollController.hasClients) return;
-      final position = sheetScrollController.position;
-      if (position.pixels >= position.maxScrollExtent - 320) {
-        unawaited(requestMoreGames());
-      }
-    }
-
-    void selectSheetGame(BuildContext sheetContext, TwitchGameCategory? game) {
-      setState(() {
-        selectedGameId = game?.id;
-        selectedGameName = game?.name;
-      });
-      Navigator.of(sheetContext).maybePop();
-      unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
-    }
-
-    sheetScrollController.addListener(handleSheetScroll);
-
-    await showTwitchUnifiedSheet<void>(
+    await showTwitchGameFilterGridSheet(
       context: context,
-      title: '遊戲分類',
-      subtitle: selectedGameName == null || selectedGameName!.isEmpty
-          ? '全部分類'
-          : selectedGameName,
-      icon: Icons.grid_view_rounded,
-      size: TwitchUnifiedSheetSize.large,
+      games: games,
+      selectedGameId: selectedGameId,
+      selectedGameName: selectedGameName,
       loading: loadingGames,
-      onRefresh: reloadGamesForSheet,
       showRefresh: true,
-      builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            setSheetStateRef = setSheetState;
-            final lowerKeyword = keyword.trim().toLowerCase();
-            final filteredGames = lowerKeyword.isEmpty
-                ? games
-                : games
-                      .where(
-                        (game) =>
-                            game.name.toLowerCase().contains(lowerKeyword),
-                      )
-                      .toList(growable: false);
-            final items = <TwitchGameCategory?>[null, ...filteredGames];
-
-            return Column(
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0E0E10),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                    child: TextField(
-                      controller: searchController,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '搜尋遊戲分類',
-                        hintStyle: const TextStyle(
-                          color: Colors.white54,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.search_rounded,
-                          color: Colors.white70,
-                        ),
-                        suffixIcon: keyword.isNotEmpty
-                            ? IconButton(
-                                onPressed: () {
-                                  searchController.clear();
-                                  setSheetState(() => keyword = '');
-                                },
-                                icon: const Icon(
-                                  Icons.close_rounded,
-                                  color: Colors.white54,
-                                ),
-                              )
-                            : null,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 14,
-                        ),
-                      ),
-                      onChanged: (value) =>
-                          setSheetState(() => keyword = value),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Builder(
-                    builder: (context) {
-                      if (loadingGames && games.isEmpty) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: TwitchUiColors.primary,
-                          ),
-                        );
-                      }
-
-                      if (filteredGames.isEmpty && lowerKeyword.isNotEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.search_off_rounded,
-                                  color: Colors.white38,
-                                  size: 42,
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  '目前已載入分類中找不到結果',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                if (hasMoreGames) ...[
-                                  const SizedBox(height: 12),
-                                  OutlinedButton.icon(
-                                    onPressed: () =>
-                                        unawaited(requestMoreGames()),
-                                    icon: const Icon(Icons.download_rounded),
-                                    label: const Text('繼續載入更多分類再搜尋'),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final maxWidth = constraints.maxWidth;
-                          final crossAxisCount = maxWidth >= 680
-                              ? 4
-                              : maxWidth >= 500
-                              ? 3
-                              : 2;
-
-                          return GridView.builder(
-                            controller: sheetScrollController,
-                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: crossAxisCount,
-                                  crossAxisSpacing: 12,
-                                  mainAxisSpacing: 12,
-                                  childAspectRatio: 0.78,
-                                ),
-                            itemCount: items.length + 1,
-                            itemBuilder: (context, index) {
-                              if (index >= items.length) {
-                                return _buildGameDialogFooter(requestMoreGames);
-                              }
-
-                              final game = items[index];
-                              final selected = game == null
-                                  ? selectedGameId == null
-                                  : selectedGameId == game.id;
-
-                              return _GameCategoryGridTile(
-                                game: game,
-                                selected: selected,
-                                onTap: () =>
-                                    selectSheetGame(sheetContext, game),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111116),
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                      ),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => selectSheetGame(sheetContext, null),
-                        child: const Text('全部分類'),
-                      ),
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () => Navigator.of(sheetContext).maybePop(),
-                        child: const Text('關閉'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          },
-        );
+      onRefresh: loadGames,
+      onLoadMore: loadMoreGames,
+      loadingMore: loadingMoreGames,
+      hasMore: hasMoreGames,
+      paginationError: gamePaginationError,
+      emptySearchText: '目前已載入分類中找不到結果',
+      onSelected: (game) {
+        setState(() {
+          selectedGameId = game?.id;
+          selectedGameName = game?.name;
+        });
+        unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
       },
-    );
-
-    sheetClosed = true;
-    sheetScrollController.removeListener(handleSheetScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future<void>.delayed(const Duration(milliseconds: 260), () {
-        sheetScrollController.dispose();
-        searchController.dispose();
-      });
-    });
-  }
-
-  Widget _buildGameDialogFooter(Future<void> Function() requestMoreGames) {
-    if (loadingMoreGames) {
-      return const Padding(
-        padding: EdgeInsets.all(14),
-        child: Center(
-          child: CircularProgressIndicator(color: TwitchUiColors.primary),
-        ),
-      );
-    }
-
-    if (gamePaginationError != null) {
-      return Padding(
-        padding: const EdgeInsets.all(10),
-        child: OutlinedButton.icon(
-          onPressed: () => unawaited(requestMoreGames()),
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('載入分類失敗，重試'),
-        ),
-      );
-    }
-
-    if (hasMoreGames) {
-      return Padding(
-        padding: const EdgeInsets.all(10),
-        child: TextButton.icon(
-          onPressed: () => unawaited(requestMoreGames()),
-          icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          label: const Text('載入更多分類'),
-        ),
-      );
-    }
-
-    return const Padding(
-      padding: EdgeInsets.all(12),
-      child: Center(
-        child: Text('分類已經到底了', style: TextStyle(color: Colors.white38)),
-      ),
     );
   }
 
@@ -1214,16 +953,6 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     final filteredSearchLive = _filteredSearchLiveStreams();
     final filteredSearchOffline = _filteredSearchOfflineChannels();
 
-    if (loadingFirstPage &&
-        loadedStreams.isEmpty &&
-        widget.searchedLiveStreams.isEmpty &&
-        widget.searchedOfflineChannels.isEmpty &&
-        !widget.loadingChannelSearch) {
-      return const Center(
-        child: CircularProgressIndicator(color: TwitchUiColors.primary),
-      );
-    }
-
     if (errorText != null && loadedStreams.isEmpty) {
       final message = errorText ?? '';
       final needsLogin =
@@ -1247,30 +976,46 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       );
     }
 
-    if (loadedStreams.isEmpty &&
-        widget.searchedLiveStreams.isEmpty &&
-        widget.searchedOfflineChannels.isEmpty &&
-        !widget.loadingChannelSearch) {
-      return TwitchDiscoveryEmptyState(
+    final lowerState = twitchDiscoveryLowerContentState(
+      loadingInitial:
+          loadingFirstPage &&
+          loadedStreams.isEmpty &&
+          widget.searchedLiveStreams.isEmpty &&
+          widget.searchedOfflineChannels.isEmpty &&
+          !widget.loadingChannelSearch,
+      hasAnyLoadedContent:
+          loadedStreams.isNotEmpty ||
+          widget.searchedLiveStreams.isNotEmpty ||
+          widget.searchedOfflineChannels.isNotEmpty,
+      filteredEmpty:
+          filtered.isEmpty &&
+          filteredSearchLive.isEmpty &&
+          filteredSearchOffline.isEmpty &&
+          !widget.loadingChannelSearch,
+      emptyState: TwitchDiscoveryEmptyState(
         icon: Icons.explore_off_rounded,
         title: '目前沒有可顯示直播',
         message: '可以清除分類、語言或標籤篩選後重新整理。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
-      );
-    }
-
-    if (filtered.isEmpty &&
-        filteredSearchLive.isEmpty &&
-        filteredSearchOffline.isEmpty &&
-        !widget.loadingChannelSearch) {
-      return TwitchDiscoveryEmptyState(
+      ),
+      filteredEmptyState: TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
         title: '找不到符合條件的頻道',
         message: widget.channelSearchError?.trim().isNotEmpty == true
             ? '已載入的直播沒有結果，Twitch 頻道搜尋暫時失敗。'
             : '可以清除搜尋文字、分類、語言或標籤篩選。',
-      );
-    }
+      ),
+      contentSlivers: _searchResultSlivers(
+        liveStreams: filteredSearchLive,
+        offlineChannels: filteredSearchOffline,
+      ),
+      footer: TwitchDiscoveryFooter(
+        loadingMore: loadingMore,
+        hasMore: hasMore,
+        errorText: paginationError,
+        onLoadMore: loadMore,
+      ),
+    );
 
     return RefreshIndicator(
       color: TwitchUiColors.primary,
@@ -1285,16 +1030,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         onReturnFromStream: refreshStreams,
         showSectionCount: false,
         extraSliversAfterHeader: <Widget>[_buildTagFilterSliver()],
-        extraSliversBeforeFooter: _searchResultSlivers(
-          liveStreams: filteredSearchLive,
-          offlineChannels: filteredSearchOffline,
-        ),
-        footer: TwitchDiscoveryFooter(
-          loadingMore: loadingMore,
-          hasMore: hasMore,
-          errorText: paginationError,
-          onLoadMore: loadMore,
-        ),
+        extraSliversBeforeFooter: lowerState.slivers,
+        footer: lowerState.footer,
       ),
     );
   }
@@ -1408,124 +1145,4 @@ class _BrowseRefreshWindow {
     required this.cursor,
     required this.hasMore,
   });
-}
-
-class _GameCategoryGridTile extends StatelessWidget {
-  final TwitchGameCategory? game;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _GameCategoryGridTile({
-    required this.game,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final item = game;
-    final isAllCategories = item == null;
-
-    return Material(
-      color: selected
-          ? TwitchUiColors.primary.withValues(alpha: 0.18)
-          : Colors.white.withValues(alpha: 0.045),
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected
-                  ? TwitchUiColors.primary.withValues(alpha: 0.72)
-                  : Colors.white.withValues(alpha: 0.075),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                  child: isAllCategories
-                      ? Container(
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: TwitchUiColors.primary.withValues(
-                              alpha: 0.13,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: TwitchUiColors.primary.withValues(
-                                alpha: 0.20,
-                              ),
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.grid_view_rounded,
-                            color: TwitchUiColors.primarySoft,
-                            size: 42,
-                          ),
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Image.network(
-                            item.boxArt(width: 188, height: 250),
-                            fit: BoxFit.cover,
-                            cacheWidth: 188,
-                            cacheHeight: 250,
-                            errorBuilder: (_, _, _) {
-                              return Container(
-                                alignment: Alignment.center,
-                                color: Colors.black26,
-                                child: const Icon(
-                                  Icons.videogame_asset_rounded,
-                                  color: Colors.white54,
-                                  size: 34,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Row(
-                  children: [
-                    if (selected) ...[
-                      const Icon(
-                        Icons.check_circle_rounded,
-                        color: TwitchUiColors.primarySoft,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Expanded(
-                      child: Text(
-                        item?.name ?? '全部分類',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: selected
-                              ? TwitchUiColors.primarySoft
-                              : Colors.white,
-                          fontSize: 13.2,
-                          height: 1.12,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

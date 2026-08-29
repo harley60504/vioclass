@@ -10,6 +10,7 @@ import '../../services/discovery/twitch_discovery_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import '../widgets/shared/twitch_cached_image_layer.dart';
+import '../widgets/shared/twitch_centered_text_field.dart';
 import 'twitch_watch_page.dart';
 
 Future<void> showTwitchChannelSheet({
@@ -158,6 +159,8 @@ class TwitchChannelPage extends StatefulWidget {
 class _TwitchChannelPageState extends State<TwitchChannelPage>
     with SingleTickerProviderStateMixin {
   late final TabController tabController;
+  final TextEditingController clipSearchController = TextEditingController();
+  final TextEditingController vodSearchController = TextEditingController();
   List<TwitchChannelVideo> videos = const <TwitchChannelVideo>[];
   List<TwitchChannelClip> clips = const <TwitchChannelClip>[];
   List<TwitchChannelPanel> panels = const <TwitchChannelPanel>[];
@@ -167,6 +170,8 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
   String? errorText;
   String? clipsErrorText;
   String? panelsErrorText;
+  String clipSearchText = '';
+  String vodSearchText = '';
   bool loadingFirstPage = false;
   bool loadingClipsFirstPage = false;
   bool loadingPanels = false;
@@ -191,6 +196,8 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
   void dispose() {
     tabController.removeListener(_loadActiveTab);
     tabController.dispose();
+    clipSearchController.dispose();
+    vodSearchController.dispose();
     super.dispose();
   }
 
@@ -361,6 +368,11 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
             discoveryService: widget.discoveryService,
             channel: widget.channel,
             clips: clips,
+            searchController: clipSearchController,
+            searchText: clipSearchText,
+            onSearchChanged: (value) {
+              setState(() => clipSearchText = value.trim().toLowerCase());
+            },
             loadingFirstPage: loadingClipsFirstPage,
             loadingMore: loadingMoreClips,
             hasMore:
@@ -373,6 +385,11 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
             discoveryService: widget.discoveryService,
             channel: widget.channel,
             videos: videos,
+            searchController: vodSearchController,
+            searchText: vodSearchText,
+            onSearchChanged: (value) {
+              setState(() => vodSearchText = value.trim().toLowerCase());
+            },
             loadingFirstPage: loadingFirstPage,
             loadingMore: loadingMore,
             hasMore: nextCursor != null && nextCursor!.trim().isNotEmpty,
@@ -836,10 +853,53 @@ Future<void> _openExternalUrl(String url) async {
   await launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
+Widget _mediaSearchSliver({
+  required TextEditingController controller,
+  required String hintText,
+  required ValueChanged<String> onChanged,
+}) {
+  return SliverToBoxAdapter(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+      child: TwitchCenteredTextField(
+        controller: controller,
+        hintText: hintText,
+        prefixIcon: Icons.search_rounded,
+        onChanged: onChanged,
+        height: 42,
+        radius: 14,
+        fontSize: 13,
+        fillColor: Colors.white.withValues(alpha: 0.055),
+        borderColor: Colors.white.withValues(alpha: 0.10),
+        hintColor: Colors.white38,
+        iconColor: Colors.white54,
+        suffixIcon: controller.text.trim().isNotEmpty
+            ? IconButton(
+                tooltip: '清空搜尋',
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  controller.clear();
+                  onChanged('');
+                },
+                icon: const Icon(
+                  Icons.close_rounded,
+                  color: Colors.white54,
+                  size: 18,
+                ),
+              )
+            : null,
+      ),
+    ),
+  );
+}
+
 class _ClipTab extends StatelessWidget {
   final TwitchDiscoveryService discoveryService;
   final TwitchFollowedChannel channel;
   final List<TwitchChannelClip> clips;
+  final TextEditingController searchController;
+  final String searchText;
+  final ValueChanged<String> onSearchChanged;
   final bool loadingFirstPage;
   final bool loadingMore;
   final bool hasMore;
@@ -851,6 +911,9 @@ class _ClipTab extends StatelessWidget {
     required this.discoveryService,
     required this.channel,
     required this.clips,
+    required this.searchController,
+    required this.searchText,
+    required this.onSearchChanged,
     required this.loadingFirstPage,
     required this.loadingMore,
     required this.hasMore,
@@ -861,6 +924,8 @@ class _ClipTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final filteredClips = _filterClips(clips, searchText);
+
     if (loadingFirstPage) {
       return const Center(
         child: CircularProgressIndicator(color: TwitchUiColors.primary),
@@ -888,8 +953,38 @@ class _ClipTab extends StatelessWidget {
       );
     }
 
+    if (filteredClips.isEmpty) {
+      return CustomScrollView(
+        slivers: [
+          _mediaSearchSliver(
+            controller: searchController,
+            hintText: '搜尋片段',
+            onChanged: onSearchChanged,
+          ),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _CenteredAction(
+              icon: Icons.search_off_rounded,
+              title: '找不到符合的片段',
+              message: '可以換個關鍵字，或清空搜尋回到全部片段。',
+              actionLabel: '清空搜尋',
+              onPressed: () {
+                searchController.clear();
+                onSearchChanged('');
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
     return CustomScrollView(
       slivers: [
+        _mediaSearchSliver(
+          controller: searchController,
+          hintText: '搜尋片段',
+          onChanged: onSearchChanged,
+        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
           sliver: SliverGrid(
@@ -903,9 +998,9 @@ class _ClipTab extends StatelessWidget {
               return _ClipCard(
                 discoveryService: discoveryService,
                 channel: channel,
-                clip: clips[index],
+                clip: filteredClips[index],
               );
-            }, childCount: clips.length),
+            }, childCount: filteredClips.length),
           ),
         ),
         SliverToBoxAdapter(
@@ -940,6 +1035,21 @@ class _ClipTab extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  List<TwitchChannelClip> _filterClips(
+    List<TwitchChannelClip> clips,
+    String query,
+  ) {
+    final keyword = query.trim().toLowerCase();
+    if (keyword.isEmpty) return clips;
+    return clips
+        .where((clip) {
+          return clip.title.toLowerCase().contains(keyword) ||
+              clip.creatorName.toLowerCase().contains(keyword) ||
+              clip.broadcasterName.toLowerCase().contains(keyword);
+        })
+        .toList(growable: false);
   }
 }
 
@@ -1128,6 +1238,9 @@ class _VodTab extends StatelessWidget {
   final TwitchDiscoveryService discoveryService;
   final TwitchFollowedChannel channel;
   final List<TwitchChannelVideo> videos;
+  final TextEditingController searchController;
+  final String searchText;
+  final ValueChanged<String> onSearchChanged;
   final bool loadingFirstPage;
   final bool loadingMore;
   final bool hasMore;
@@ -1139,6 +1252,9 @@ class _VodTab extends StatelessWidget {
     required this.discoveryService,
     required this.channel,
     required this.videos,
+    required this.searchController,
+    required this.searchText,
+    required this.onSearchChanged,
     required this.loadingFirstPage,
     required this.loadingMore,
     required this.hasMore,
@@ -1149,6 +1265,8 @@ class _VodTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final filteredVideos = _filterVideos(videos, searchText);
+
     if (loadingFirstPage) {
       return const Center(
         child: CircularProgressIndicator(color: TwitchUiColors.primary),
@@ -1176,8 +1294,38 @@ class _VodTab extends StatelessWidget {
       );
     }
 
+    if (filteredVideos.isEmpty) {
+      return CustomScrollView(
+        slivers: [
+          _mediaSearchSliver(
+            controller: searchController,
+            hintText: '搜尋 VOD',
+            onChanged: onSearchChanged,
+          ),
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _CenteredAction(
+              icon: Icons.search_off_rounded,
+              title: '找不到符合的 VOD',
+              message: '可以換個關鍵字，或清空搜尋回到全部 VOD。',
+              actionLabel: '清空搜尋',
+              onPressed: () {
+                searchController.clear();
+                onSearchChanged('');
+              },
+            ),
+          ),
+        ],
+      );
+    }
+
     return CustomScrollView(
       slivers: [
+        _mediaSearchSliver(
+          controller: searchController,
+          hintText: '搜尋 VOD',
+          onChanged: onSearchChanged,
+        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
           sliver: SliverGrid(
@@ -1191,9 +1339,9 @@ class _VodTab extends StatelessWidget {
               return _VodCard(
                 discoveryService: discoveryService,
                 channel: channel,
-                video: videos[index],
+                video: filteredVideos[index],
               );
-            }, childCount: videos.length),
+            }, childCount: filteredVideos.length),
           ),
         ),
         SliverToBoxAdapter(
@@ -1228,6 +1376,21 @@ class _VodTab extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  List<TwitchChannelVideo> _filterVideos(
+    List<TwitchChannelVideo> videos,
+    String query,
+  ) {
+    final keyword = query.trim().toLowerCase();
+    if (keyword.isEmpty) return videos;
+    return videos
+        .where((video) {
+          return video.title.toLowerCase().contains(keyword) ||
+              video.description.toLowerCase().contains(keyword) ||
+              video.userName.toLowerCase().contains(keyword);
+        })
+        .toList(growable: false);
   }
 }
 

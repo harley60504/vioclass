@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../pages/twitch_stream_home_models.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../shared/twitch_centered_text_field.dart';
 import 'twitch_stream_home_account_menu.dart';
 
 const Color _kSoftPanel = Color(0xB8221B32);
@@ -112,53 +113,30 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   }
 
   Widget _buildSearchField() {
-    return Container(
+    return TwitchCenteredTextField(
       height: 50,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.055),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: TextField(
-        controller: searchController,
-        onChanged: onSearchChanged,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 14.5,
-          fontWeight: FontWeight.w700,
-        ),
-        decoration: InputDecoration(
-          hintText: '搜尋直播、遊戲或實況主',
-          hintStyle: const TextStyle(
-            color: Colors.white38,
-            fontWeight: FontWeight.w700,
-          ),
-          prefixIcon: const Icon(
-            Icons.search_rounded,
-            color: Colors.white54,
-            size: 21,
-          ),
-          suffixIcon: searchController.text.isNotEmpty
-              ? IconButton(
-                  tooltip: '清除搜尋',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onClearSearch,
-                  icon: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white54,
-                    size: 19,
-                  ),
-                )
-              : null,
-          filled: false,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 14,
-          ),
-          border: InputBorder.none,
-        ),
-      ),
+      radius: 18,
+      controller: searchController,
+      hintText: '搜尋直播、遊戲或實況主',
+      prefixIcon: Icons.search_rounded,
+      onChanged: onSearchChanged,
+      fontSize: 14.5,
+      fillColor: Colors.white.withValues(alpha: 0.055),
+      borderColor: Colors.white.withValues(alpha: 0.12),
+      hintColor: Colors.white38,
+      iconColor: Colors.white54,
+      suffixIcon: searchController.text.isNotEmpty
+          ? IconButton(
+              tooltip: '清除搜尋',
+              visualDensity: VisualDensity.compact,
+              onPressed: onClearSearch,
+              icon: const Icon(
+                Icons.close_rounded,
+                color: Colors.white54,
+                size: 19,
+              ),
+            )
+          : null,
     );
   }
 }
