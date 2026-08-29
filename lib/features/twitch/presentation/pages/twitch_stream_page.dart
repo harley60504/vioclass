@@ -21,6 +21,7 @@ import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
+import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import 'twitch_browse_page.dart';
 import 'twitch_drops_connection_page.dart';
@@ -63,12 +64,18 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
   List<TwitchFollowedChannel> searchedOfflineChannels =
       const <TwitchFollowedChannel>[];
+  List<TwitchGameCategory> searchGames = const <TwitchGameCategory>[];
   Set<String> followedUserIds = const <String>{};
   Set<String> followedLogins = const <String>{};
   String? channelSearchError;
+  String? nextSearchGameCursor;
+  String? searchGameError;
   int reloadTick = 0;
   bool loadingLoginState = true;
   bool loadingChannelSearch = false;
+  bool loadingSearchGames = false;
+  bool loadingMoreSearchGames = false;
+  bool hasMoreSearchGames = true;
   bool _loginStateLoadRunning = false;
   int _channelSearchGeneration = 0;
   Timer? _channelSearchDebounce;
@@ -258,27 +265,233 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     setState(() => selectedSection = section);
   }
 
-  void showBrowseGameMenu() {
-    if (selectedSection == TwitchHomeSection.browse && searchText.isEmpty) {
-      browsePageKey.currentState?.showGameMenu(context);
+  Future<void> showSearchGameMenu() async {
+    if (searchGames.isEmpty && !loadingSearchGames) {
+      unawaited(loadSearchGames());
+    }
+
+    final sheetSearchController = TextEditingController();
+    final sheetScrollController = ScrollController();
+    StateSetter? setSheetStateRef;
+    var keyword = '';
+    var sheetClosed = false;
+
+    Future<void> requestMoreGames() async {
+      if (sheetClosed || loadingMoreSearchGames || !hasMoreSearchGames) return;
+      await loadMoreSearchGames();
+      if (!sheetClosed) setSheetStateRef?.call(() {});
+    }
+
+    void handleScroll() {
+      if (!sheetScrollController.hasClients) return;
+      final position = sheetScrollController.position;
+      if (position.pixels >= position.maxScrollExtent - 320) {
+        unawaited(requestMoreGames());
+      }
+    }
+
+    void selectGame(BuildContext sheetContext, TwitchGameCategory game) {
+      Navigator.of(sheetContext).maybePop();
+      searchController.text = game.name;
+      updateSearchText(game.name);
+    }
+
+    sheetScrollController.addListener(handleScroll);
+
+    await showTwitchUnifiedSheet<void>(
+      context: context,
+      title: '遊戲分類',
+      subtitle: '選擇分類後搜尋相關頻道',
+      icon: Icons.sports_esports_rounded,
+      size: TwitchUnifiedSheetSize.large,
+      loading: loadingSearchGames,
+      showRefresh: true,
+      onRefresh: () async {
+        await loadSearchGames();
+        if (!sheetClosed) setSheetStateRef?.call(() {});
+      },
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            setSheetStateRef = setSheetState;
+            final lowerKeyword = keyword.trim().toLowerCase();
+            final filteredGames = lowerKeyword.isEmpty
+                ? searchGames
+                : searchGames
+                      .where(
+                        (game) =>
+                            game.name.toLowerCase().contains(lowerKeyword),
+                      )
+                      .toList(growable: false);
+
+            return Column(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                  child: TextField(
+                    controller: sheetSearchController,
+                    decoration: InputDecoration(
+                      hintText: '搜尋遊戲分類',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: keyword.isNotEmpty
+                          ? IconButton(
+                              onPressed: () {
+                                sheetSearchController.clear();
+                                setSheetState(() => keyword = '');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: const Color(0xFF0E0E10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    onChanged: (value) => setSheetState(() => keyword = value),
+                  ),
+                ),
+                Expanded(
+                  child: Builder(
+                    builder: (context) {
+                      if (loadingSearchGames && searchGames.isEmpty) {
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: TwitchUiColors.primary,
+                          ),
+                        );
+                      }
+                      if (filteredGames.isEmpty) {
+                        return TwitchDiscoveryEmptyState(
+                          icon: Icons.search_off_rounded,
+                          title: '找不到分類',
+                          message: searchGameError?.trim().isNotEmpty == true
+                              ? '分類暫時載入失敗，稍後再試。'
+                              : '可以換個遊戲名稱搜尋。',
+                          onRetry: () => unawaited(loadSearchGames()),
+                        );
+                      }
+
+                      return LayoutBuilder(
+                        builder: (context, constraints) {
+                          final crossAxisCount = constraints.maxWidth >= 680
+                              ? 4
+                              : constraints.maxWidth >= 500
+                              ? 3
+                              : 2;
+                          return GridView.builder(
+                            controller: sheetScrollController,
+                            padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCount,
+                                  crossAxisSpacing: 12,
+                                  mainAxisSpacing: 12,
+                                  childAspectRatio: 0.78,
+                                ),
+                            itemCount: filteredGames.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index >= filteredGames.length) {
+                                return _SearchGameFooter(
+                                  loading: loadingMoreSearchGames,
+                                  hasMore: hasMoreSearchGames,
+                                  errorText: searchGameError,
+                                  onLoadMore: requestMoreGames,
+                                );
+                              }
+                              final game = filteredGames[index];
+                              return _SearchGameTile(
+                                game: game,
+                                onTap: () => selectGame(sheetContext, game),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    sheetClosed = true;
+    sheetScrollController.removeListener(handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(milliseconds: 260), () {
+        sheetScrollController.dispose();
+        sheetSearchController.dispose();
+      });
+    });
+  }
+
+  Future<void> loadSearchGames() async {
+    if (loadingSearchGames) return;
+    setState(() {
+      loadingSearchGames = true;
+      searchGameError = null;
+      nextSearchGameCursor = null;
+      hasMoreSearchGames = true;
+    });
+
+    try {
+      final page = await discoveryService.fetchTopGames(first: 100);
+      if (!mounted) return;
+      setState(() {
+        searchGames = page.games;
+        nextSearchGameCursor = page.cursor;
+        hasMoreSearchGames = page.hasMore;
+        loadingSearchGames = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        searchGameError = error.toString();
+        loadingSearchGames = false;
+      });
+    }
+  }
+
+  Future<void> loadMoreSearchGames() async {
+    if (loadingMoreSearchGames || !hasMoreSearchGames) return;
+    final cursor = nextSearchGameCursor;
+    if (cursor == null || cursor.trim().isEmpty) {
+      setState(() => hasMoreSearchGames = false);
       return;
     }
 
-    _channelSearchDebounce?.cancel();
-    searchController.clear();
     setState(() {
-      selectedSection = TwitchHomeSection.browse;
-      searchText = '';
-      _channelSearchGeneration++;
-      searchedLiveStreams = const <TwitchLiveStream>[];
-      searchedOfflineChannels = const <TwitchFollowedChannel>[];
-      loadingChannelSearch = false;
-      channelSearchError = null;
+      loadingMoreSearchGames = true;
+      searchGameError = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+
+    try {
+      final page = await discoveryService.fetchTopGames(
+        after: cursor,
+        first: 100,
+      );
       if (!mounted) return;
-      browsePageKey.currentState?.showGameMenu(context);
-    });
+      final existingIds = searchGames.map((game) => game.id).toSet();
+      final nextGames = page.games
+          .where((game) => !existingIds.contains(game.id))
+          .toList(growable: false);
+      setState(() {
+        searchGames = <TwitchGameCategory>[...searchGames, ...nextGames];
+        nextSearchGameCursor = page.cursor;
+        hasMoreSearchGames = page.hasMore;
+        loadingMoreSearchGames = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        searchGameError = error.toString();
+        loadingMoreSearchGames = false;
+      });
+    }
   }
 
   void updateSearchText(String value) {
@@ -460,7 +673,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
             searchController.clear();
             updateSearchText('');
           },
-          onShowGameMenu: showBrowseGameMenu,
+          onShowGameMenu: showSearchGameMenu,
           onShowLanguageMenu: () {
             if (selectedSection == TwitchHomeSection.following) {
               followingPageKey.currentState?.showLanguageMenu(context);
@@ -711,5 +924,130 @@ class _TwitchChannelSearchPage extends StatelessWidget {
         ),
       ),
     ];
+  }
+}
+
+class _SearchGameTile extends StatelessWidget {
+  final TwitchGameCategory game;
+  final VoidCallback onTap;
+
+  const _SearchGameTile({required this.game, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.045),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.075)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Image.network(
+                      game.boxArt(width: 188, height: 250),
+                      fit: BoxFit.cover,
+                      cacheWidth: 188,
+                      cacheHeight: 250,
+                      errorBuilder: (_, _, _) {
+                        return Container(
+                          alignment: Alignment.center,
+                          color: Colors.black26,
+                          child: const Icon(
+                            Icons.videogame_asset_rounded,
+                            color: Colors.white54,
+                            size: 34,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Text(
+                  game.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.2,
+                    height: 1.12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchGameFooter extends StatelessWidget {
+  final bool loading;
+  final bool hasMore;
+  final String? errorText;
+  final Future<void> Function() onLoadMore;
+
+  const _SearchGameFooter({
+    required this.loading,
+    required this.hasMore,
+    required this.errorText,
+    required this.onLoadMore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.all(14),
+        child: Center(
+          child: CircularProgressIndicator(color: TwitchUiColors.primary),
+        ),
+      );
+    }
+
+    if (errorText?.trim().isNotEmpty == true) {
+      return Padding(
+        padding: const EdgeInsets.all(10),
+        child: OutlinedButton.icon(
+          onPressed: () => unawaited(onLoadMore()),
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('載入分類失敗，重試'),
+        ),
+      );
+    }
+
+    if (hasMore) {
+      return Padding(
+        padding: const EdgeInsets.all(10),
+        child: TextButton.icon(
+          onPressed: () => unawaited(onLoadMore()),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded),
+          label: const Text('載入更多分類'),
+        ),
+      );
+    }
+
+    return const Padding(
+      padding: EdgeInsets.all(12),
+      child: Center(
+        child: Text('分類已經到底了', style: TextStyle(color: Colors.white38)),
+      ),
+    );
   }
 }
