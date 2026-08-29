@@ -53,106 +53,16 @@ Future<void> showVioClassUpdateSheet({
   return showTwitchUnifiedSheet<void>(
     context: context,
     title: 'VioClass 更新',
-    subtitle: startupPrompt ? '啟動時檢查到新版本' : 'GitHub Releases',
+    subtitle: startupPrompt ? '有新版本可以安裝' : '檢查與安裝更新',
     icon: Icons.system_update_rounded,
     size: TwitchUnifiedSheetSize.medium,
     showRefresh: false,
-    builder: (_) => _VioClassUpdatePrompt(controller: controller),
+    builder: (_) => _UpdateSettingsPane(
+      controller: controller,
+      showAutoCheck: false,
+      showLaterAction: startupPrompt,
+    ),
   );
-}
-
-class _VioClassUpdatePrompt extends StatelessWidget {
-  final VioClassUpdateController controller;
-
-  const _VioClassUpdatePrompt({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final info = controller.latest;
-        final release = info?.release;
-        final asset = info?.preferredAsset;
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
-          children: [
-            _UpdateStatusCard(
-              currentVersion: info?.currentVersion,
-              latestVersion: release?.tagName,
-              assetName: asset?.name,
-              status: controller.installing
-                  ? '正在下載並準備更新...'
-                  : info?.updateAvailable == true
-                  ? '有新版本可以更新'
-                  : '目前已是最新版本',
-              hasUpdate: info?.updateAvailable == true,
-              checking: controller.checking || controller.installing,
-              progress: controller.installing
-                  ? controller.installProgress
-                  : null,
-            ),
-            if (release?.body.trim().isNotEmpty == true) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: Text(
-                  release!.body,
-                  maxLines: 8,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.76),
-                    fontSize: 12.5,
-                    height: 1.35,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
-                  child: const Text('稍後'),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed:
-                      info?.updateAvailable == true && !controller.installing
-                      ? () async {
-                          final started = asset == null
-                              ? await controller.openUpdate()
-                              : await controller.installUpdate();
-                          if (started && context.mounted) {
-                            Navigator.of(context).maybePop();
-                          }
-                        }
-                      : null,
-                  icon: const Icon(Icons.download_rounded, size: 18),
-                  label: Text(
-                    controller.installing
-                        ? '更新中'
-                        : asset == null
-                        ? '開啟 Release'
-                        : '更新',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
 class TwitchAppSettingsSheet extends StatefulWidget {
@@ -901,8 +811,14 @@ class _AppearanceSettingsPane extends StatelessWidget {
 
 class _UpdateSettingsPane extends StatelessWidget {
   final VioClassUpdateController controller;
+  final bool showAutoCheck;
+  final bool showLaterAction;
 
-  const _UpdateSettingsPane({required this.controller});
+  const _UpdateSettingsPane({
+    required this.controller,
+    this.showAutoCheck = true,
+    this.showLaterAction = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -929,21 +845,22 @@ class _UpdateSettingsPane extends StatelessWidget {
           children: [
             _SettingsSection(
               title: 'App 更新',
-              subtitle: '從 GitHub Releases 檢查 VioClass 新版本',
+              subtitle: '讓 VioClass 維持在最新版',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _SettingsSwitchRow(
-                    title: '開啟 App 時檢查更新',
-                    subtitle: '有新版本時會顯示更新提示',
-                    value: controller.autoCheckEnabled,
-                    onChanged: controller.setAutoCheckEnabled,
-                  ),
-                  const SizedBox(height: 10),
+                  if (showAutoCheck) ...[
+                    _SettingsSwitchRow(
+                      title: '開啟 App 時檢查更新',
+                      subtitle: '有新版本時提醒你安裝',
+                      value: controller.autoCheckEnabled,
+                      onChanged: controller.setAutoCheckEnabled,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   _UpdateStatusCard(
                     currentVersion: latest?.currentVersion,
                     latestVersion: release?.tagName,
-                    assetName: asset?.name,
                     status: status,
                     hasUpdate: latest?.updateAvailable == true,
                     checking: controller.checking || controller.installing,
@@ -956,20 +873,15 @@ class _UpdateSettingsPane extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
+                      if (showLaterAction)
+                        TextButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          child: const Text('稍後'),
+                        ),
                       FilledButton.icon(
                         onPressed: controller.checking || controller.installing
                             ? null
-                            : () async {
-                                final info = await controller.checkNow();
-                                if (!context.mounted ||
-                                    info?.updateAvailable != true) {
-                                  return;
-                                }
-                                await showVioClassUpdateSheet(
-                                  context: context,
-                                  controller: controller,
-                                );
-                              },
+                            : controller.checkNow,
                         icon: controller.checking
                             ? const SizedBox(
                                 width: 16,
@@ -992,7 +904,13 @@ class _UpdateSettingsPane extends StatelessWidget {
                                   : controller.installUpdate
                             : null,
                         icon: const Icon(Icons.download_rounded, size: 18),
-                        label: Text(controller.installing ? '更新中' : '更新'),
+                        label: Text(
+                          controller.installing
+                              ? '安裝中'
+                              : asset == null
+                              ? '開啟下載頁'
+                              : '下載並安裝',
+                        ),
                       ),
                     ],
                   ),
@@ -1009,7 +927,6 @@ class _UpdateSettingsPane extends StatelessWidget {
 class _UpdateStatusCard extends StatelessWidget {
   final String? currentVersion;
   final String? latestVersion;
-  final String? assetName;
   final String status;
   final bool hasUpdate;
   final bool checking;
@@ -1018,7 +935,6 @@ class _UpdateStatusCard extends StatelessWidget {
   const _UpdateStatusCard({
     required this.currentVersion,
     required this.latestVersion,
-    required this.assetName,
     required this.status,
     required this.hasUpdate,
     required this.checking,
@@ -1079,9 +995,8 @@ class _UpdateStatusCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   [
-                    if (currentVersion != null) '目前 $currentVersion',
-                    if (latestVersion != null) '最新 $latestVersion',
-                    if (assetName != null && assetName!.isNotEmpty) assetName!,
+                    if (currentVersion != null) '目前版本 $currentVersion',
+                    if (latestVersion != null) '最新版本 $latestVersion',
                   ].join(' · '),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

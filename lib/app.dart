@@ -80,7 +80,6 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
   void initState() {
     super.initState();
 
-    // 先讓 Windows 主視窗成功畫出第一幀，再載入真正首頁。
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
@@ -118,15 +117,6 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.live_tv_rounded, color: Color(0xFF9146FF), size: 64),
-                SizedBox(height: 18),
-                Text(
-                  'Starting VioClass...',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
                 SizedBox(height: 14),
                 CircularProgressIndicator(color: Color(0xFF9146FF)),
               ],

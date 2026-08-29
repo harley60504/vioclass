@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 const String vioclassCurrentVersion = String.fromEnvironment(
   'VIOCLASS_VERSION',
-  defaultValue: '1.0.5',
+  defaultValue: '1.0.2',
 );
 
 class VioClassUpdateService {
