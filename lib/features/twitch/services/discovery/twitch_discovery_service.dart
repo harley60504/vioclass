@@ -358,6 +358,27 @@ query SearchFreeformTags(
     return _parseGamePage(raw);
   }
 
+  Future<List<TwitchGameCategory>> fetchGamesByIds(
+    Iterable<String> gameIds,
+  ) async {
+    final ids = gameIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .take(100)
+        .toList(growable: false);
+    if (ids.isEmpty) return const <TwitchGameCategory>[];
+
+    final auth = await resolveViewerAuth();
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/games',
+      queryParameters: <String, dynamic>{'id': ids},
+      headers: _helixHeaders(auth),
+    );
+
+    return _parseGamePage(raw).games;
+  }
+
   Future<TwitchChannelVideoPageResult> fetchChannelVideos({
     required String userId,
     String? after,

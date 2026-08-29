@@ -57,6 +57,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
   List<TwitchFollowedChannel> offlineFollowedChannels =
       const <TwitchFollowedChannel>[];
+  final Map<String, TwitchGameCategory> gameCategoryById =
+      <String, TwitchGameCategory>{};
   String? nextCursor;
   String? errorText;
   String? paginationError;
@@ -494,7 +496,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         if (id.isEmpty || name.isEmpty) continue;
         byId.putIfAbsent(
           id,
-          () => TwitchGameCategory(id: id, name: name, boxArtUrl: ''),
+          () =>
+              gameCategoryById[id] ??
+              TwitchGameCategory(id: id, name: name, boxArtUrl: ''),
         );
       }
       final games = byId.values.toList(growable: false);
@@ -502,6 +506,26 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       return games;
     }
 
+    final missingGameIds = gameSource()
+        .map((stream) => stream.gameId.trim())
+        .where((id) => id.isNotEmpty)
+        .where((id) => !gameCategoryById.containsKey(id))
+        .toSet();
+    if (missingGameIds.isNotEmpty) {
+      try {
+        final loadedGames = await widget.discoveryService.fetchGamesByIds(
+          missingGameIds,
+        );
+        if (!mounted) return;
+        setState(() {
+          for (final game in loadedGames) {
+            gameCategoryById[game.id] = game;
+          }
+        });
+      } catch (_) {}
+    }
+
+    if (!context.mounted) return;
     await showTwitchGameFilterGridSheet(
       context: context,
       games: buildGames(),
