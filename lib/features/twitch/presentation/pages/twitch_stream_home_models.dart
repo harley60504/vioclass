@@ -6,7 +6,7 @@ extension TwitchHomeSectionUi on TwitchHomeSection {
   String get label {
     switch (this) {
       case TwitchHomeSection.following:
-        return '直播';
+        return '追隨';
       case TwitchHomeSection.browse:
         return '瀏覽';
     }

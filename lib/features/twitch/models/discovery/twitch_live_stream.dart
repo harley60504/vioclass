@@ -170,20 +170,6 @@ class TwitchFollowedChannel {
     );
   }
 
-  factory TwitchFollowedChannel.fromHelixSearchChannelJson(
-    Map<String, dynamic> json,
-  ) {
-    return TwitchFollowedChannel(
-      broadcasterId: json['id']?.toString() ?? '',
-      broadcasterLogin:
-          json['broadcaster_login']?.toString().toLowerCase() ?? '',
-      broadcasterName: json['display_name']?.toString() ?? '',
-      followedAt: null,
-      profileImageUrl: json['thumbnail_url']?.toString().trim() ?? '',
-      description: json['title']?.toString().trim() ?? '',
-    );
-  }
-
   TwitchFollowedChannel copyWith({
     String? profileImageUrl,
     String? offlineImageUrl,

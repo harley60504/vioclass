@@ -6,15 +6,19 @@ import '../../theme/twitch_ui_tokens.dart';
 const Color _kPanel = Color(0xCC15121F);
 
 class TwitchStreamHomeSidebar extends StatelessWidget {
+  final TwitchHomeSection selectedSection;
   final String viewerLabel;
   final String loginStatus;
   final bool loadingLoginState;
+  final ValueChanged<TwitchHomeSection> onSelectSection;
 
   const TwitchStreamHomeSidebar({
     super.key,
+    required this.selectedSection,
     required this.viewerLabel,
     required this.loginStatus,
     required this.loadingLoginState,
+    required this.onSelectSection,
   });
 
   @override
@@ -90,8 +94,14 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
               children: <Widget>[
                 _SidebarButton(
                   section: TwitchHomeSection.following,
-                  selected: true,
-                  onTap: () {},
+                  selected: selectedSection == TwitchHomeSection.following,
+                  onTap: () => onSelectSection(TwitchHomeSection.following),
+                ),
+                const SizedBox(height: 8),
+                _SidebarButton(
+                  section: TwitchHomeSection.browse,
+                  selected: selectedSection == TwitchHomeSection.browse,
+                  onTap: () => onSelectSection(TwitchHomeSection.browse),
                 ),
               ],
             ),
