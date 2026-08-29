@@ -248,6 +248,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   String? warmedLiveDvrVideoId;
   String? warmedLiveDvrQualityKey;
   bool preferVodReplayChat = false;
+  bool showOfflineChannelPlaceholder = false;
   List<TwitchChannelPanel> aboutPanels = const <TwitchChannelPanel>[];
   List<TwitchChannelSocialLink> aboutSocialLinks =
       const <TwitchChannelSocialLink>[];
@@ -765,6 +766,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       metadata: metadata,
       loading: loadingPlayer,
       error: playerError,
+      showOfflinePlaceholder: showOfflineChannelPlaceholder,
+      offlineImageUrl: widget.initialOfflineChannel?.offlineImageUrl,
       isFollowing: isFollowing,
       relationshipBusy:
           checkingRelationship || followBusy || relationshipBootstrapping,
