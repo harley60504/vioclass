@@ -7,9 +7,11 @@ import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import 'player/twitch_media_kit_video_surface.dart';
+import 'player/twitch_player_common_buttons.dart';
 import 'player/twitch_watch_controls_overlay.dart';
 import 'player/twitch_watch_top_action_bar.dart';
 import '../shared/twitch_cached_image_layer.dart';
+import '../shared/twitch_glass.dart';
 
 /// Repaint isolation switches for profiling the 2nd-entry FPS drop.
 ///
@@ -151,7 +153,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
           video: child ?? stableVideoStage,
           overlay: showOfflineTopControls
               ? RepaintBoundary(
-                  child: _WatchOfflineTopControlsOverlay(
+                  child: _WatchOfflineControlsOverlay(
                     metadata: metadata,
                     isFollowing: isFollowing,
                     followBusy: state.effectiveFollowBusy,
@@ -160,6 +162,11 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     onToggleFollow: onToggleFollow,
                     onSubscribe: onSubscribe,
                     onOpenChannel: onOpenChannel,
+                    chatVisible: state.effectiveChatVisible,
+                    fullscreen: state.effectiveFullscreen,
+                    showFullscreenButton: showFullscreenButton,
+                    onToggleChat: onToggleChat,
+                    onToggleFullscreen: onToggleFullscreen,
                   ),
                 )
               : showPlayerControls
@@ -320,7 +327,7 @@ class _WatchPlayerShell extends StatelessWidget {
   }
 }
 
-class _WatchOfflineTopControlsOverlay extends StatelessWidget {
+class _WatchOfflineControlsOverlay extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool isFollowing;
   final bool followBusy;
@@ -329,8 +336,13 @@ class _WatchOfflineTopControlsOverlay extends StatelessWidget {
   final VoidCallback? onToggleFollow;
   final VoidCallback? onSubscribe;
   final VoidCallback? onOpenChannel;
+  final bool chatVisible;
+  final bool fullscreen;
+  final bool showFullscreenButton;
+  final VoidCallback? onToggleChat;
+  final VoidCallback? onToggleFullscreen;
 
-  const _WatchOfflineTopControlsOverlay({
+  const _WatchOfflineControlsOverlay({
     required this.metadata,
     required this.isFollowing,
     required this.followBusy,
@@ -339,6 +351,11 @@ class _WatchOfflineTopControlsOverlay extends StatelessWidget {
     required this.onToggleFollow,
     required this.onSubscribe,
     required this.onOpenChannel,
+    required this.chatVisible,
+    required this.fullscreen,
+    required this.showFullscreenButton,
+    required this.onToggleChat,
+    required this.onToggleFullscreen,
   });
 
   @override
@@ -383,7 +400,97 @@ class _WatchOfflineTopControlsOverlay extends StatelessWidget {
             creatingClip: false,
           ),
         ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 10,
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 2),
+            child: _WatchOfflineBottomControlBar(
+              chatVisible: chatVisible,
+              fullscreen: fullscreen,
+              showFullscreenButton: showFullscreenButton,
+              onToggleChat: onToggleChat,
+              onToggleFullscreen: onToggleFullscreen,
+            ),
+          ),
+        ),
       ],
+    );
+  }
+}
+
+class _WatchOfflineBottomControlBar extends StatelessWidget {
+  final bool chatVisible;
+  final bool fullscreen;
+  final bool showFullscreenButton;
+  final VoidCallback? onToggleChat;
+  final VoidCallback? onToggleFullscreen;
+
+  const _WatchOfflineBottomControlBar({
+    required this.chatVisible,
+    required this.fullscreen,
+    required this.showFullscreenButton,
+    required this.onToggleChat,
+    required this.onToggleFullscreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TwitchGlassSurface(
+      borderRadius: BorderRadius.circular(24),
+      backgroundColor: Colors.black.withValues(alpha: 0.56),
+      borderColor: Colors.white.withValues(alpha: 0.12),
+      blurSigma: 0,
+      boxShadow: const <BoxShadow>[],
+      child: SizedBox(
+        height: 58,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(
+                Icons.tv_off_rounded,
+                color: Colors.white.withValues(alpha: 0.72),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '目前未開台',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              PlainIconButton(
+                tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
+                icon: chatVisible
+                    ? Icons.chat_bubble
+                    : Icons.chat_bubble_outline,
+                size: 23,
+                active: chatVisible,
+                dense: true,
+                onPressed: onToggleChat,
+              ),
+              if (showFullscreenButton)
+                PlainIconButton(
+                  tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
+                  icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  size: 25,
+                  active: fullscreen,
+                  dense: true,
+                  onPressed: onToggleFullscreen,
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
