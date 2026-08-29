@@ -58,11 +58,10 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
     _videoId = videoId.trim();
     _channelLogin = channelLogin.trim().toLowerCase();
     _player = player;
-    _playerPositionBaseSeconds = player.state.position.inMilliseconds / 1000;
-    _timelineOffsetBaseSeconds = (timelineOffsetSeconds ?? 0).clamp(
-      0,
-      double.infinity,
-    );
+    final currentPlayerSeconds = player.state.position.inMilliseconds / 1000;
+    _playerPositionBaseSeconds = currentPlayerSeconds;
+    _timelineOffsetBaseSeconds = (timelineOffsetSeconds ?? currentPlayerSeconds)
+        .clamp(0, double.infinity);
     _active = _videoId.isNotEmpty && _channelLogin.isNotEmpty;
     _lastTime = _playerTimeSeconds();
     _nextFetchOffset = (_lastTime - backlogLeadSeconds).clamp(
