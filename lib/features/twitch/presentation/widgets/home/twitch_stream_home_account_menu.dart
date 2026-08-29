@@ -9,12 +9,29 @@ class TwitchStreamHomeAccountMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: '設定',
-      onPressed: () => onOpenSettings(),
-      icon: const Icon(
-        Icons.settings_rounded,
-        color: TwitchUiColors.primarySoft,
+    return Tooltip(
+      message: '設定',
+      child: Material(
+        color: const Color(0xB8221B32),
+        borderRadius: BorderRadius.circular(999),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => onOpenSettings(),
+          child: Container(
+            width: 48,
+            height: 48,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: const Icon(
+              Icons.settings_rounded,
+              color: TwitchUiColors.primarySoft,
+              size: 22,
+            ),
+          ),
+        ),
       ),
     );
   }

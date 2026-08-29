@@ -258,6 +258,29 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     setState(() => selectedSection = section);
   }
 
+  void showBrowseGameMenu() {
+    if (selectedSection == TwitchHomeSection.browse && searchText.isEmpty) {
+      browsePageKey.currentState?.showGameMenu(context);
+      return;
+    }
+
+    _channelSearchDebounce?.cancel();
+    searchController.clear();
+    setState(() {
+      selectedSection = TwitchHomeSection.browse;
+      searchText = '';
+      _channelSearchGeneration++;
+      searchedLiveStreams = const <TwitchLiveStream>[];
+      searchedOfflineChannels = const <TwitchFollowedChannel>[];
+      loadingChannelSearch = false;
+      channelSearchError = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      browsePageKey.currentState?.showGameMenu(context);
+    });
+  }
+
   void updateSearchText(String value) {
     final keyword = value.trim().toLowerCase();
     if (searchText == keyword) return;
@@ -437,9 +460,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
             searchController.clear();
             updateSearchText('');
           },
-          onShowGameMenu: selectedSection == TwitchHomeSection.browse
-              ? () => browsePageKey.currentState?.showGameMenu(context)
-              : null,
+          onShowGameMenu: showBrowseGameMenu,
           onShowLanguageMenu: () {
             if (selectedSection == TwitchHomeSection.following) {
               followingPageKey.currentState?.showLanguageMenu(context);
