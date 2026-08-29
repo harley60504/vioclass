@@ -7,7 +7,11 @@ import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import 'player/twitch_media_kit_video_surface.dart';
+import 'player/twitch_player_common_buttons.dart';
 import 'player/twitch_watch_controls_overlay.dart';
+import 'player/twitch_watch_top_action_bar.dart';
+import '../shared/twitch_cached_image_layer.dart';
+import '../shared/twitch_glass.dart';
 
 /// Repaint isolation switches for profiling the 2nd-entry FPS drop.
 ///
@@ -37,6 +41,8 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool loading;
   final String? error;
+  final bool showOfflinePlaceholder;
+  final String? offlineImageUrl;
   final VoidCallback onBack;
   final VoidCallback? onHome;
   final VoidCallback? onOpenChannel;
@@ -82,6 +88,8 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     required this.metadata,
     required this.loading,
     required this.error,
+    this.showOfflinePlaceholder = false,
+    this.offlineImageUrl,
     required this.onBack,
     this.onHome,
     this.onOpenChannel,
@@ -122,6 +130,8 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     final stableVideoStage = _WatchPlayerVideoStage(
       controller: videoController,
       usePlaceholder: _debugUseVideoPlaceholder,
+      showOfflinePlaceholder: showOfflinePlaceholder,
+      offlineImageUrl: offlineImageUrl,
     );
 
     return AnimatedBuilder(
@@ -129,11 +139,37 @@ class TwitchWatchPlayerArea extends StatelessWidget {
       child: stableVideoStage,
       builder: (context, child) {
         final state = _WatchPlayerAreaState.fromWidget(widget: this, pip: pip);
+        final showOfflineControls =
+            showOfflinePlaceholder &&
+            !state.inPipMode &&
+            !_debugHidePlayerOverlay;
+        final showPlayerControls =
+            !showOfflinePlaceholder &&
+            state.shouldShowControlsOverlay &&
+            !_debugHidePlayerOverlay;
 
         return _WatchPlayerShell(
           inPipMode: state.inPipMode,
           video: child ?? stableVideoStage,
-          overlay: state.shouldShowControlsOverlay && !_debugHidePlayerOverlay
+          overlay: showOfflineControls
+              ? RepaintBoundary(
+                  child: _WatchOfflineControlsOverlay(
+                    metadata: metadata,
+                    isFollowing: isFollowing,
+                    followBusy: state.effectiveFollowBusy,
+                    onBack: onBack,
+                    onHome: onHome,
+                    onToggleFollow: onToggleFollow,
+                    onSubscribe: onSubscribe,
+                    onOpenChannel: onOpenChannel,
+                    chatVisible: state.effectiveChatVisible,
+                    fullscreen: state.effectiveFullscreen,
+                    showFullscreenButton: showFullscreenButton,
+                    onToggleChat: onToggleChat,
+                    onToggleFullscreen: onToggleFullscreen,
+                  ),
+                )
+              : showPlayerControls
               ? RepaintBoundary(
                   child: WatchControlsOverlay(
                     loading: state.overlayLoading,
@@ -294,10 +330,14 @@ class _WatchPlayerShell extends StatelessWidget {
 class _WatchPlayerVideoStage extends StatelessWidget {
   final VideoController? controller;
   final bool usePlaceholder;
+  final bool showOfflinePlaceholder;
+  final String? offlineImageUrl;
 
   const _WatchPlayerVideoStage({
     required this.controller,
     required this.usePlaceholder,
+    required this.showOfflinePlaceholder,
+    required this.offlineImageUrl,
   });
 
   @override
@@ -306,9 +346,228 @@ class _WatchPlayerVideoStage extends StatelessWidget {
       return const _WatchVideoPlaceholderSurface();
     }
 
+    if (showOfflinePlaceholder) {
+      return _WatchOfflineImageSurface(imageUrl: offlineImageUrl);
+    }
+
     final controller = this.controller;
     if (controller == null) return const TwitchMediaKitVideoWaitingSurface();
     return TwitchMediaKitVideoSurface(controller: controller);
+  }
+}
+
+class _WatchOfflineControlsOverlay extends StatelessWidget {
+  final TwitchStreamHeaderMetadata metadata;
+  final bool isFollowing;
+  final bool followBusy;
+  final VoidCallback onBack;
+  final VoidCallback? onHome;
+  final VoidCallback? onToggleFollow;
+  final VoidCallback? onSubscribe;
+  final VoidCallback? onOpenChannel;
+  final bool chatVisible;
+  final bool fullscreen;
+  final bool showFullscreenButton;
+  final VoidCallback? onToggleChat;
+  final VoidCallback? onToggleFullscreen;
+
+  const _WatchOfflineControlsOverlay({
+    required this.metadata,
+    required this.isFollowing,
+    required this.followBusy,
+    required this.onBack,
+    required this.onHome,
+    required this.onToggleFollow,
+    required this.onSubscribe,
+    required this.onOpenChannel,
+    required this.chatVisible,
+    required this.fullscreen,
+    required this.showFullscreenButton,
+    required this.onToggleChat,
+    required this.onToggleFullscreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 136,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.74),
+                    Colors.black.withValues(alpha: 0.38),
+                    Colors.black.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          top: 12,
+          child: WatchTopActionBar(
+            metadata: metadata,
+            isFollowing: isFollowing,
+            followBusy: followBusy,
+            onBack: onBack,
+            onHome: onHome,
+            onToggleFollow: onToggleFollow,
+            onSubscribe: onSubscribe,
+            onOpenChannel: onOpenChannel,
+            onCreateClip: null,
+            creatingClip: false,
+          ),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 10,
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 2),
+            child: _WatchOfflineBottomControlBar(
+              chatVisible: chatVisible,
+              fullscreen: fullscreen,
+              showFullscreenButton: showFullscreenButton,
+              onToggleChat: onToggleChat,
+              onToggleFullscreen: onToggleFullscreen,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WatchOfflineBottomControlBar extends StatelessWidget {
+  final bool chatVisible;
+  final bool fullscreen;
+  final bool showFullscreenButton;
+  final VoidCallback? onToggleChat;
+  final VoidCallback? onToggleFullscreen;
+
+  const _WatchOfflineBottomControlBar({
+    required this.chatVisible,
+    required this.fullscreen,
+    required this.showFullscreenButton,
+    required this.onToggleChat,
+    required this.onToggleFullscreen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TwitchGlassSurface(
+      borderRadius: BorderRadius.circular(24),
+      backgroundColor: Colors.black.withValues(alpha: 0.56),
+      borderColor: Colors.white.withValues(alpha: 0.12),
+      blurSigma: 0,
+      boxShadow: const <BoxShadow>[],
+      child: SizedBox(
+        height: 58,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Icon(
+                Icons.tv_off_rounded,
+                color: Colors.white.withValues(alpha: 0.72),
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '目前未開台',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              PlainIconButton(
+                tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
+                icon: chatVisible
+                    ? Icons.chat_bubble
+                    : Icons.chat_bubble_outline,
+                size: 23,
+                active: chatVisible,
+                dense: true,
+                onPressed: onToggleChat,
+              ),
+              if (showFullscreenButton)
+                PlainIconButton(
+                  tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
+                  icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                  size: 25,
+                  active: fullscreen,
+                  dense: true,
+                  onPressed: onToggleFullscreen,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchOfflineImageSurface extends StatelessWidget {
+  final String? imageUrl;
+
+  const _WatchOfflineImageSurface({required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth;
+          final maxHeight = constraints.maxHeight;
+          if (maxWidth <= 0 || maxHeight <= 0) {
+            return const SizedBox.shrink();
+          }
+
+          var width = maxWidth;
+          var height = width / twitchWatchVideoAspectRatio;
+          if (height > maxHeight) {
+            height = maxHeight;
+            width = height * twitchWatchVideoAspectRatio;
+          }
+          width = width.clamp(1.0, maxWidth).toDouble();
+          height = height.clamp(1.0, maxHeight).toDouble();
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+
+          return Center(
+            child: TwitchCachedImageLayer(
+              imageUrl: imageUrl,
+              width: width,
+              height: height,
+              cacheWidth: (width * dpr).round().clamp(320, 1920),
+              cacheHeight: (height * dpr).round().clamp(180, 1080),
+              fit: BoxFit.contain,
+              fallbackColor: Colors.black,
+              fallbackIcon: Icons.tv_off_rounded,
+              fallbackIconColor: Colors.white30,
+              fallbackIconSize: 42,
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 

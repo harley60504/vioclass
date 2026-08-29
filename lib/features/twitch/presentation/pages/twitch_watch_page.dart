@@ -242,6 +242,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       engagementController.hypeTrainController;
   List<dynamic> get pinnedMessages => engagementController.pinnedMessages;
   TwitchChannelVideo? offlineVodFallbackVideo;
+  bool showOfflineChannelPlaceholder = false;
   TwitchChannelVideo? activeGrowingVodVideo;
   TwitchChannelVideo? currentVodQualityVideo;
   TwitchChannelClip? currentClipQualityClip;
@@ -767,6 +768,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       metadata: metadata,
       loading: loadingPlayer,
       error: playerError,
+      showOfflinePlaceholder: showOfflineChannelPlaceholder,
+      offlineImageUrl: widget.initialOfflineChannel?.offlineImageUrl,
       isFollowing: isFollowing,
       relationshipBusy:
           checkingRelationship || followBusy || relationshipBootstrapping,

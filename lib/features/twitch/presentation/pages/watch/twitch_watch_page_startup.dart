@@ -74,6 +74,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           clearStatus: false,
           cancelDeferredTasks: false,
         );
+        showOfflineChannelPlaceholder = false;
         if (!isCurrentWatchTask(generation, channel)) return;
         primeInitialActiveDvrAvailability(channel, generation);
       }
@@ -389,6 +390,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     playbackController.resetError();
     relationshipController.reset();
     offlineVodFallbackVideo = null;
+    showOfflineChannelPlaceholder = false;
     activeGrowingVodVideo = null;
     currentVodQualityVideo = null;
     currentClipQualityClip = null;
@@ -425,10 +427,16 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         first: 1,
       );
       if (!isCurrentWatchTask(generation, channel)) return false;
-      if (page.videos.isEmpty) return false;
+      if (page.videos.isEmpty) {
+        showOfflineChannelPlaceholder = true;
+        playbackController.setError(null);
+        if (mounted) setState(() {});
+        return true;
+      }
 
       final video = page.videos.first;
       if (video.isLikelyGrowingArchive) return false;
+      showOfflineChannelPlaceholder = false;
       return openVodPlayback(
         channel: channel,
         generation: generation,
@@ -882,6 +890,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
     if (!isCurrentWatchTask(generation, channel)) return false;
     offlineVodFallbackVideo = video;
+    showOfflineChannelPlaceholder = false;
     preferVodReplayChat = true;
     watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
     playbackController.setError(null);
