@@ -188,11 +188,17 @@ class TwitchDiscoveryService {
     );
 
     final parsed = _parseChannelSearch(raw);
-    final liveStreams = parsed.liveStreams.isEmpty
+    final refreshedLiveStreams = parsed.liveStreams.isEmpty
         ? parsed.liveStreams
         : await _fetchLiveStreamsForSearchResult(
             auth: auth,
             fallbackStreams: parsed.liveStreams,
+          );
+    final liveStreams = refreshedLiveStreams.isEmpty
+        ? refreshedLiveStreams
+        : await _attachLiveStreamProfiles(
+            auth: auth,
+            streams: refreshedLiveStreams,
           );
     if (parsed.offlineChannels.isEmpty) {
       return TwitchChannelSearchResult(
@@ -470,11 +476,69 @@ query ChannelPanels(\$login: String!) {
 
     if (ids.isEmpty) return channels;
 
-    final profiles = <String, Map<String, String>>{};
+    final profiles = await _fetchChannelProfilesByIds(auth: auth, ids: ids);
 
-    for (var start = 0; start < ids.length; start += 100) {
-      final end = (start + 100) > ids.length ? ids.length : start + 100;
-      final chunk = ids.sublist(start, end);
+    if (profiles.isEmpty) return channels;
+
+    return channels
+        .map((channel) {
+          final profile = profiles[channel.broadcasterId];
+          if (profile == null) return channel;
+          return channel.copyWith(
+            profileImageUrl: profile.profileImageUrl,
+            offlineImageUrl: profile.offlineImageUrl,
+            description: profile.description,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  Future<List<TwitchLiveStream>> _attachLiveStreamProfiles({
+    required TwitchViewerAuthSnapshot auth,
+    required List<TwitchLiveStream> streams,
+  }) async {
+    final ids = streams
+        .where((stream) => stream.profileImageUrl.trim().isEmpty)
+        .map((stream) => stream.userId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (ids.isEmpty) return streams;
+
+    final profiles = await _fetchChannelProfilesByIds(auth: auth, ids: ids);
+
+    if (profiles.isEmpty) return streams;
+
+    return streams
+        .map(
+          (stream) => stream.copyWith(
+            profileImageUrl: stream.profileImageUrl.trim().isNotEmpty
+                ? stream.profileImageUrl
+                : profiles[stream.userId.trim()]?.profileImageUrl ?? '',
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Future<Map<String, _TwitchChannelProfile>> _fetchChannelProfilesByIds({
+    required TwitchViewerAuthSnapshot auth,
+    required List<String> ids,
+  }) async {
+    final cleanIds = ids
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (cleanIds.isEmpty) return const <String, _TwitchChannelProfile>{};
+
+    final profiles = <String, _TwitchChannelProfile>{};
+
+    for (var start = 0; start < cleanIds.length; start += 100) {
+      final end = (start + 100) > cleanIds.length
+          ? cleanIds.length
+          : start + 100;
+      final chunk = cleanIds.sublist(start, end);
 
       final raw = await client.getJson<Map<String, dynamic>>(
         '${TwitchApiConstants.helixBaseUrl}/users',
@@ -488,27 +552,15 @@ query ChannelPanels(\$login: String!) {
       for (final user in data.whereType<Map<String, dynamic>>()) {
         final id = user['id']?.toString().trim() ?? '';
         if (id.isEmpty) continue;
-        profiles[id] = <String, String>{
-          'profileImageUrl': user['profile_image_url']?.toString().trim() ?? '',
-          'offlineImageUrl': user['offline_image_url']?.toString().trim() ?? '',
-          'description': user['description']?.toString().trim() ?? '',
-        };
+        profiles[id] = _TwitchChannelProfile(
+          profileImageUrl: user['profile_image_url']?.toString().trim() ?? '',
+          offlineImageUrl: user['offline_image_url']?.toString().trim() ?? '',
+          description: user['description']?.toString().trim() ?? '',
+        );
       }
     }
 
-    if (profiles.isEmpty) return channels;
-
-    return channels
-        .map((channel) {
-          final profile = profiles[channel.broadcasterId];
-          if (profile == null) return channel;
-          return channel.copyWith(
-            profileImageUrl: profile['profileImageUrl'],
-            offlineImageUrl: profile['offlineImageUrl'],
-            description: profile['description'],
-          );
-        })
-        .toList(growable: false);
+    return profiles;
   }
 
   Future<Map<String, String>> fetchProfileImagesForLogins(
@@ -732,5 +784,17 @@ class TwitchTagSuggestion {
     required this.id,
     required this.label,
     required this.value,
+  });
+}
+
+class _TwitchChannelProfile {
+  final String profileImageUrl;
+  final String offlineImageUrl;
+  final String description;
+
+  const _TwitchChannelProfile({
+    required this.profileImageUrl,
+    required this.offlineImageUrl,
+    required this.description,
   });
 }

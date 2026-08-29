@@ -118,6 +118,8 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                 : hasDuration
                 ? _formatDuration(displayDuration)
                 : '--:--';
+            final canTapLiveTail =
+                widget.showLiveEdgeLabel && widget.onReturnToLive != null;
 
             return Row(
               children: [
@@ -198,31 +200,49 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     minWidth: compact ? 82 : 108,
                     maxWidth: compact ? 104 : 136,
                   ),
-                  child: Text.rich(
-                    TextSpan(
-                      children: [
+                  child: MouseRegion(
+                    cursor: canTapLiveTail
+                        ? SystemMouseCursors.click
+                        : MouseCursor.defer,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: canTapLiveTail
+                          ? () {
+                              setState(() {
+                                _dragging = false;
+                                _dragValue = null;
+                                _scrubbedTimelineValue = null;
+                              });
+                              widget.onReturnToLive!();
+                            }
+                          : null,
+                      child: Text.rich(
                         TextSpan(
-                          text: '${_formatDuration(previewPosition)} / ',
+                          children: [
+                            TextSpan(
+                              text: '${_formatDuration(previewPosition)} / ',
+                            ),
+                            TextSpan(
+                              text: tailText,
+                              style: TextStyle(
+                                color: liveTailActive
+                                    ? Colors.redAccent
+                                    : Colors.white60,
+                              ),
+                            ),
+                          ],
                         ),
-                        TextSpan(
-                          text: tailText,
-                          style: TextStyle(
-                            color: liveTailActive
-                                ? Colors.redAccent
-                                : Colors.white60,
-                          ),
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: compact ? 11 : 12,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          fontWeight: FontWeight.w900,
                         ),
-                      ],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.fade,
-                    softWrap: false,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                      color: Colors.white60,
-                      fontSize: compact ? 11 : 12,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
