@@ -18,9 +18,11 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final int streamCount;
   final List<TwitchLiveStream> streams;
   final Widget footer;
+  final List<Widget> extraSliversAfterHeader;
   final List<Widget> extraSliversBeforeFooter;
   final Future<void> Function()? onReturnFromStream;
   final TwitchDiscoveryService? discoveryService;
+  final bool showSectionCount;
 
   const TwitchDiscoveryStreamGrid({
     super.key,
@@ -30,9 +32,11 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
     required this.streamCount,
     required this.streams,
     required this.footer,
+    this.extraSliversAfterHeader = const <Widget>[],
     this.extraSliversBeforeFooter = const <Widget>[],
     this.onReturnFromStream,
     this.discoveryService,
+    this.showSectionCount = true,
   });
 
   @override
@@ -84,8 +88,10 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                       icon: sectionIcon,
                       title: sectionTitle,
                       count: streamCount,
+                      showCount: showSectionCount,
                     ),
                   ),
+                  ...extraSliversAfterHeader,
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
                     sliver: SliverGrid(
@@ -267,12 +273,14 @@ class TwitchDiscoverySectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
   final int count;
+  final bool showCount;
 
   const TwitchDiscoverySectionHeader({
     super.key,
     required this.icon,
     required this.title,
     required this.count,
+    this.showCount = true,
   });
 
   @override
@@ -304,7 +312,7 @@ class TwitchDiscoverySectionHeader extends StatelessWidget {
           const SizedBox(width: 11),
           Expanded(
             child: Text(
-              count > 0 ? '$title · $count' : title,
+              showCount && count > 0 ? '$title · $count' : title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(

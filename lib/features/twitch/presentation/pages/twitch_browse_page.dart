@@ -44,8 +44,10 @@ class TwitchBrowsePage extends StatefulWidget {
 
 class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   static const int _browsePageSize = 100;
+  static const int _tagFilterScanPageLimit = 12;
 
   final ScrollController scrollController = ScrollController();
+  final TextEditingController tagSearchController = TextEditingController();
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
   List<TwitchGameCategory> games = const <TwitchGameCategory>[];
@@ -58,6 +60,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   String currentLanguage = '';
   String? selectedGameId;
   String? selectedGameName;
+  final List<String> selectedTags = <String>[];
+  final Map<String, String> selectedTagLabels = <String, String>{};
+  String tagSearchText = '';
 
   bool loadingFirstPage = true;
   bool loadingMore = false;
@@ -118,6 +123,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   void dispose() {
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
+    tagSearchController.dispose();
     super.dispose();
   }
 
@@ -195,24 +201,27 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       gameId: selectedGameId,
       language: currentLanguage,
     );
-    collected.addAll(page.streams);
+    collected.addAll(_applySelectedTags(page.streams));
 
     var cursor = page.cursor;
     var hasMorePage = page.hasMore;
+    var scannedPages = 1;
 
     while (hasMorePage &&
         cursor != null &&
         cursor.trim().isNotEmpty &&
-        collected.length < targetCount) {
+        collected.length < targetCount &&
+        _shouldContinueScanningTags(scannedPages)) {
       page = await widget.discoveryService.fetchBrowseStreams(
         after: cursor,
         first: _browsePageSize,
         gameId: selectedGameId,
         language: currentLanguage,
       );
-      collected.addAll(page.streams);
+      collected.addAll(_applySelectedTags(page.streams));
       cursor = page.cursor;
       hasMorePage = page.hasMore;
+      scannedPages++;
     }
 
     final reconciled = TwitchStreamRefreshReconciler.reconcileLatestWindow(
@@ -242,13 +251,37 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     });
 
     try {
-      final page = await widget.discoveryService.fetchBrowseStreams(
+      var page = await widget.discoveryService.fetchBrowseStreams(
         after: cursor,
         first: _browsePageSize,
         gameId: selectedGameId,
         language: currentLanguage,
       );
-      final streamsWithProfiles = await _attachProfileImages(page.streams);
+      final matchedStreams = <TwitchLiveStream>[
+        ..._applySelectedTags(page.streams),
+      ];
+      var nextPageCursor = page.cursor;
+      var nextPageHasMore = page.hasMore;
+      var scannedPages = 1;
+
+      while (matchedStreams.length < _browsePageSize &&
+          nextPageHasMore &&
+          nextPageCursor != null &&
+          nextPageCursor.trim().isNotEmpty &&
+          _shouldContinueScanningTags(scannedPages)) {
+        page = await widget.discoveryService.fetchBrowseStreams(
+          after: nextPageCursor,
+          first: _browsePageSize,
+          gameId: selectedGameId,
+          language: currentLanguage,
+        );
+        matchedStreams.addAll(_applySelectedTags(page.streams));
+        nextPageCursor = page.cursor;
+        nextPageHasMore = page.hasMore;
+        scannedPages++;
+      }
+
+      final streamsWithProfiles = await _attachProfileImages(matchedStreams);
       if (!mounted) return;
 
       setState(() {
@@ -257,8 +290,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           nextPage: streamsWithProfiles,
           identityOf: _streamIdentity,
         );
-        nextCursor = page.cursor;
-        hasMore = page.hasMore;
+        nextCursor = nextPageCursor;
+        hasMore = nextPageHasMore;
         loadingMore = false;
       });
     } catch (error) {
@@ -452,6 +485,185 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       ...stream.tags,
     ].join(' ').toLowerCase();
     return haystack.contains(keyword);
+  }
+
+  bool _streamMatchesSelectedTags(TwitchLiveStream stream) {
+    if (selectedTags.isEmpty) return true;
+    final streamTags = stream.tags
+        .map((tag) => tag.trim().toLowerCase())
+        .where((tag) => tag.isNotEmpty)
+        .toSet();
+    return selectedTags.every((tag) => streamTags.contains(tag.toLowerCase()));
+  }
+
+  List<TwitchLiveStream> _applySelectedTags(List<TwitchLiveStream> streams) {
+    if (selectedTags.isEmpty) return streams;
+    return streams.where(_streamMatchesSelectedTags).toList(growable: false);
+  }
+
+  bool _shouldContinueScanningTags(int scannedPages) {
+    return selectedTags.isEmpty || scannedPages < _tagFilterScanPageLimit;
+  }
+
+  String _sectionTitle() {
+    final parts = <String>['探索直播'];
+    final gameName = selectedGameName?.trim();
+    if (gameName != null && gameName.isNotEmpty) parts.add(gameName);
+    if (selectedTags.isNotEmpty) parts.add(_selectedTagText());
+    return parts.join(' · ');
+  }
+
+  String _selectedTagText() {
+    return selectedTags.map((tag) => selectedTagLabels[tag] ?? tag).join('、');
+  }
+
+  void _addSelectedTag(String label) {
+    final cleanLabel = label.trim();
+    if (cleanLabel.isEmpty) return;
+    final value = cleanLabel.toLowerCase();
+    if (selectedTags.contains(value)) {
+      tagSearchController.clear();
+      setState(() => tagSearchText = '');
+      return;
+    }
+
+    setState(() {
+      selectedTags.add(value);
+      selectedTagLabels[value] = cleanLabel;
+      tagSearchText = '';
+    });
+    tagSearchController.clear();
+    _jumpToTop();
+    unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
+  }
+
+  void _removeSelectedTag(String tag) {
+    setState(() {
+      selectedTags.remove(tag);
+      selectedTagLabels.remove(tag);
+    });
+    _jumpToTop();
+    unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
+  }
+
+  void _clearSelectedTags() {
+    if (selectedTags.isEmpty && tagSearchText.isEmpty) return;
+    tagSearchController.clear();
+    setState(() {
+      selectedTags.clear();
+      selectedTagLabels.clear();
+      tagSearchText = '';
+    });
+    _jumpToTop();
+    unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
+  }
+
+  Widget _buildTagFilterSliver() {
+    final hasTags = selectedTags.isNotEmpty;
+
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Container(
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.055),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+              ),
+              child: TextField(
+                controller: tagSearchController,
+                textInputAction: TextInputAction.done,
+                onSubmitted: _addSelectedTag,
+                onChanged: (value) => setState(() => tagSearchText = value),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+                decoration: InputDecoration(
+                  hintText: '輸入標籤篩選',
+                  hintStyle: const TextStyle(
+                    color: Colors.white38,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.sell_rounded,
+                    color: Colors.white54,
+                    size: 20,
+                  ),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      if (tagSearchText.trim().isNotEmpty)
+                        IconButton(
+                          tooltip: '加入標籤',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: () => _addSelectedTag(tagSearchText),
+                          icon: const Icon(
+                            Icons.add_rounded,
+                            color: TwitchUiColors.primarySoft,
+                            size: 21,
+                          ),
+                        ),
+                      if (hasTags || tagSearchText.trim().isNotEmpty)
+                        IconButton(
+                          tooltip: '清除標籤',
+                          visualDensity: VisualDensity.compact,
+                          onPressed: _clearSelectedTags,
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white54,
+                            size: 19,
+                          ),
+                        ),
+                    ],
+                  ),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
+                ),
+              ),
+            ),
+            if (hasTags) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  ...selectedTags.map((tag) {
+                    return InputChip(
+                      label: Text(selectedTagLabels[tag] ?? tag),
+                      onDeleted: () => _removeSelectedTag(tag),
+                      backgroundColor: TwitchUiColors.primary.withValues(
+                        alpha: 0.18,
+                      ),
+                      deleteIconColor: Colors.white70,
+                      labelStyle: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      side: BorderSide(
+                        color: TwitchUiColors.primarySoft.withValues(
+                          alpha: 0.35,
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> showGameMenu(BuildContext context) async {
@@ -920,7 +1132,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       return TwitchDiscoveryEmptyState(
         icon: Icons.explore_off_rounded,
         title: '目前沒有可顯示直播',
-        message: '可以清除分類或語言篩選後重新整理。',
+        message: '可以清除分類、語言或標籤篩選後重新整理。',
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
@@ -934,7 +1146,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         title: '找不到符合條件的頻道',
         message: widget.channelSearchError?.trim().isNotEmpty == true
             ? '已載入的直播沒有結果，Twitch 頻道搜尋暫時失敗。'
-            : '可以清除搜尋文字、分類或語言篩選。',
+            : '可以清除搜尋文字、分類、語言或標籤篩選。',
       );
     }
 
@@ -944,13 +1156,13 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       child: TwitchDiscoveryStreamGrid(
         controller: scrollController,
         sectionIcon: Icons.explore_rounded,
-        sectionTitle: selectedGameName == null || selectedGameName!.isEmpty
-            ? '探索直播'
-            : '探索直播 · $selectedGameName',
+        sectionTitle: _sectionTitle(),
         streamCount: filtered.length,
         streams: filtered,
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
+        showSectionCount: false,
+        extraSliversAfterHeader: <Widget>[_buildTagFilterSliver()],
         extraSliversBeforeFooter: _searchResultSlivers(
           liveStreams: filteredSearchLive,
           offlineChannels: filteredSearchOffline,
@@ -1040,6 +1252,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           icon: icon,
           title: title,
           count: channels.length,
+          showCount: false,
         ),
       ),
       SliverPadding(

@@ -847,6 +847,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         streams: filtered,
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
+        showSectionCount: false,
         extraSliversBeforeFooter: _extraSearchAndOfflineSlivers(
           followedOfflineChannels: filteredOffline,
           searchedLiveStreams: filteredSearchLive,
@@ -978,6 +979,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         icon: icon,
         title: title,
         count: channels.length,
+        showCount: false,
       ).asSliverBox(),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
