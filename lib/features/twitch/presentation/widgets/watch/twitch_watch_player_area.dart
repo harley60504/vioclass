@@ -5,6 +5,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../watch/twitch_watch_playback_kind.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import 'player/twitch_media_kit_video_surface.dart';
 import 'player/twitch_player_common_buttons.dart';
@@ -79,6 +80,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final DateTime? liveDvrStartedAt;
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const TwitchWatchPlayerArea({
     super.key,
@@ -122,6 +124,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     this.liveDvrStartedAt,
     this.onOpenDvrReplayAt,
     this.onReturnToLive,
+    this.playbackKind = TwitchWatchPlaybackKind.live,
   });
 
   @override
@@ -205,6 +208,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     liveDvrStartedAt: liveDvrStartedAt,
                     onOpenDvrReplayAt: onOpenDvrReplayAt,
                     onReturnToLive: onReturnToLive,
+                    playbackKind: playbackKind,
                   ),
                 )
               : null,

@@ -12,6 +12,7 @@ import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../widgets/watch/twitch_watch_chat_panel.dart';
 import '../../widgets/watch/twitch_watch_player_area.dart';
 import '../twitch_watch_feature_ports.dart';
+import '../twitch_watch_playback_kind.dart';
 import '../twitch_watch_port_scope.dart';
 
 class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
@@ -51,6 +52,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final DateTime? liveDvrStartedAt;
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const TwitchWatchPlayerAreaPortAdapter({
     super.key,
@@ -90,6 +92,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     this.liveDvrStartedAt,
     this.onOpenDvrReplayAt,
     this.onReturnToLive,
+    this.playbackKind = TwitchWatchPlaybackKind.live,
   });
 
   @override
@@ -137,6 +140,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       liveDvrStartedAt: liveDvrStartedAt,
       onOpenDvrReplayAt: onOpenDvrReplayAt,
       onReturnToLive: onReturnToLive,
+      playbackKind: playbackKind,
     );
   }
 

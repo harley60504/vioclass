@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../../../watch/twitch_watch_playback_kind.dart';
 import '../../shared/twitch_glass.dart';
 import 'twitch_live_playback_strip.dart';
 import 'twitch_player_common_buttons.dart';
@@ -36,6 +37,7 @@ class WatchBottomControlBar extends StatelessWidget {
   final DateTime? liveDvrStartedAt;
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const WatchBottomControlBar({
     super.key,
@@ -59,6 +61,7 @@ class WatchBottomControlBar extends StatelessWidget {
     this.liveDvrStartedAt,
     this.onOpenDvrReplayAt,
     this.onReturnToLive,
+    this.playbackKind = TwitchWatchPlaybackKind.live,
   });
 
   @override
@@ -105,6 +108,7 @@ class WatchBottomControlBar extends StatelessWidget {
                         liveDvrStartedAt: liveDvrStartedAt,
                         onOpenDvrReplayAt: onOpenDvrReplayAt,
                         onReturnToLive: onReturnToLive,
+                        playbackKind: playbackKind,
                         veryNarrow: layout.veryNarrow,
                       )
                     : _WideWatchBottomControls(
@@ -129,6 +133,7 @@ class WatchBottomControlBar extends StatelessWidget {
                         liveDvrStartedAt: liveDvrStartedAt,
                         onOpenDvrReplayAt: onOpenDvrReplayAt,
                         onReturnToLive: onReturnToLive,
+                        playbackKind: playbackKind,
                       ),
               ),
             );
@@ -231,6 +236,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
   final bool veryNarrow;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const _CompactWatchBottomControls({
     required this.player,
@@ -255,6 +261,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
     required this.onOpenDvrReplayAt,
     required this.onReturnToLive,
     required this.veryNarrow,
+    required this.playbackKind,
   });
 
   @override
@@ -278,6 +285,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
             liveDvrStartedAt: liveDvrStartedAt,
             onOpenDvrReplayAt: onOpenDvrReplayAt,
             onReturnToLive: onReturnToLive,
+            playbackKind: playbackKind,
           ),
           const Spacer(),
         ] else ...[
@@ -292,6 +300,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
               liveDvrStartedAt: liveDvrStartedAt,
               onOpenDvrReplayAt: onOpenDvrReplayAt,
               onReturnToLive: onReturnToLive,
+              playbackKind: playbackKind,
             ),
           ),
         ],
@@ -351,6 +360,7 @@ class _WideWatchBottomControls extends StatelessWidget {
   final DateTime? liveDvrStartedAt;
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const _WideWatchBottomControls({
     required this.player,
@@ -374,6 +384,7 @@ class _WideWatchBottomControls extends StatelessWidget {
     required this.liveDvrStartedAt,
     required this.onOpenDvrReplayAt,
     required this.onReturnToLive,
+    required this.playbackKind,
   });
 
   @override
@@ -392,6 +403,7 @@ class _WideWatchBottomControls extends StatelessWidget {
             liveDvrStartedAt: liveDvrStartedAt,
             onOpenDvrReplayAt: onOpenDvrReplayAt,
             onReturnToLive: onReturnToLive,
+            playbackKind: playbackKind,
           ),
         ),
         const SizedBox(width: 16),
@@ -434,6 +446,7 @@ class _WatchPlaybackStrip extends StatelessWidget {
   final DateTime? liveDvrStartedAt;
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const _WatchPlaybackStrip({
     required this.player,
@@ -445,18 +458,20 @@ class _WatchPlaybackStrip extends StatelessWidget {
     required this.liveDvrStartedAt,
     required this.onOpenDvrReplayAt,
     required this.onReturnToLive,
+    required this.playbackKind,
   });
 
   @override
   Widget build(BuildContext context) {
     if (playerRuntime.usingExternalVodPlayback) {
+      final useLiveTimeline = playbackKind == TwitchWatchPlaybackKind.liveDvr;
       return TwitchVodPlaybackStrip(
         player: player,
         compact: compact,
-        showLiveEdgeLabel: showLiveEdgeLabel,
-        liveTimelineDuration: liveDvrDuration,
-        liveTimelineStartedAt: liveDvrStartedAt,
-        onReturnToLive: onReturnToLive,
+        showLiveEdgeLabel: useLiveTimeline && showLiveEdgeLabel,
+        liveTimelineDuration: useLiveTimeline ? liveDvrDuration : null,
+        liveTimelineStartedAt: useLiveTimeline ? liveDvrStartedAt : null,
+        onReturnToLive: useLiveTimeline ? onReturnToLive : null,
       );
     }
 
@@ -611,6 +626,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
   final DateTime? liveDvrStartedAt;
   final ValueChanged<double>? onOpenDvrReplayAt;
   final VoidCallback? onReturnToLive;
+  final TwitchWatchPlaybackKind playbackKind;
 
   const _LivePlaybackSheetButton({
     required this.player,
@@ -621,6 +637,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
     required this.liveDvrStartedAt,
     required this.onOpenDvrReplayAt,
     required this.onReturnToLive,
+    required this.playbackKind,
   });
 
   void _showPlaybackSheet(BuildContext context) {
@@ -709,6 +726,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                         liveDvrStartedAt: liveDvrStartedAt,
                         onOpenDvrReplayAt: onOpenDvrReplayAt,
                         onReturnToLive: onReturnToLive,
+                        playbackKind: playbackKind,
                       ),
                     ],
                   ),

@@ -797,6 +797,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       creatingClip: creatingClip,
       hasDvrReplay: hasDvrReplayPlayback,
       showLiveEdgeLabel: showsLiveDvrEdgeLabel,
+      playbackKind: currentPlaybackKind,
       liveDvrDuration:
           watchPorts.player.runtime.liveDvrBridgeDuration ??
           activeGrowingVodVideo?.parsedDuration,
