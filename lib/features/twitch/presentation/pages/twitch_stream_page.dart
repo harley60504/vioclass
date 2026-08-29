@@ -14,6 +14,9 @@ import '../settings/twitch_player_settings_controller.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
 import '../mini_player/twitch_mini_player_overlay.dart';
 import '../sheets/twitch_app_settings_sheet.dart';
+import '../theme/twitch_ui_tokens.dart';
+import '../widgets/discovery/twitch_discovery_stream_template.dart';
+import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
 import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
@@ -247,6 +250,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
         loadingChannelSearch = false;
         channelSearchError = null;
       } else {
+        searchedLiveStreams = const <TwitchLiveStream>[];
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
         loadingChannelSearch = true;
         channelSearchError = null;
       }
@@ -281,6 +286,19 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
         channelSearchError = error.toString();
       });
     }
+  }
+
+  Future<void> refreshChannelSearch() async {
+    final keyword = searchText.trim().toLowerCase();
+    if (keyword.isEmpty) return;
+
+    _channelSearchDebounce?.cancel();
+    final generation = ++_channelSearchGeneration;
+    setState(() {
+      loadingChannelSearch = true;
+      channelSearchError = null;
+    });
+    await searchChannels(keyword, generation);
   }
 
   @override
@@ -390,7 +408,18 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   Widget _buildHomeContent() {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 160),
-      child: selectedSection == TwitchHomeSection.following
+      child: searchText.isNotEmpty
+          ? _TwitchChannelSearchPage(
+              key: const ValueKey<String>('twitch-channel-search-page'),
+              query: searchText,
+              liveStreams: searchedLiveStreams,
+              offlineChannels: searchedOfflineChannels,
+              loading: loadingChannelSearch,
+              errorText: channelSearchError,
+              discoveryService: discoveryService,
+              onRefresh: refreshChannelSearch,
+            )
+          : selectedSection == TwitchHomeSection.following
           ? TwitchFollowingPage(
               key: followingPageKey,
               discoveryService: discoveryService,
@@ -414,5 +443,141 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               onLoginPressed: runLinkedTwitchLoginFlow,
             ),
     );
+  }
+}
+
+class _TwitchChannelSearchPage extends StatelessWidget {
+  final String query;
+  final List<TwitchLiveStream> liveStreams;
+  final List<TwitchFollowedChannel> offlineChannels;
+  final bool loading;
+  final String? errorText;
+  final TwitchDiscoveryService discoveryService;
+  final Future<void> Function() onRefresh;
+
+  const _TwitchChannelSearchPage({
+    super.key,
+    required this.query,
+    required this.liveStreams,
+    required this.offlineChannels,
+    required this.loading,
+    required this.errorText,
+    required this.discoveryService,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasResults = liveStreams.isNotEmpty || offlineChannels.isNotEmpty;
+
+    if (!loading && !hasResults) {
+      return TwitchDiscoveryEmptyState(
+        icon: Icons.search_off_rounded,
+        title: '找不到符合條件的頻道',
+        message: errorText?.trim().isNotEmpty == true
+            ? 'Twitch 頻道搜尋暫時失敗，稍後再試。'
+            : '可以換個實況主名稱或登入名稱搜尋。',
+        onRetry: onRefresh,
+      );
+    }
+
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(-0.72, -0.92),
+          radius: 1.35,
+          colors: <Color>[
+            Color(0xFF24133A),
+            Color(0xFF14121E),
+            Color(0xFF0A0A0F),
+          ],
+          stops: <double>[0.0, 0.46, 1.0],
+        ),
+      ),
+      child: RefreshIndicator(
+        color: TwitchUiColors.primary,
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          key: const PageStorageKey<String>('twitch_channel_search_page'),
+          physics: const AlwaysScrollableScrollPhysics(),
+          cacheExtent: 840,
+          slivers: <Widget>[
+            SliverToBoxAdapter(
+              child: TwitchDiscoverySectionHeader(
+                icon: Icons.search_rounded,
+                title: '搜尋結果',
+                count: liveStreams.length + offlineChannels.length,
+              ),
+            ),
+            if (loading)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(26, 0, 26, 20),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: TwitchUiColors.primary,
+                          strokeWidth: 2.4,
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        '正在搜尋頻道...',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (liveStreams.isNotEmpty)
+              TwitchDiscoveryStreamSliverSection(
+                icon: Icons.live_tv_rounded,
+                title: '直播',
+                streams: liveStreams,
+                discoveryService: discoveryService,
+                onReturnFromStream: onRefresh,
+              ),
+            if (offlineChannels.isNotEmpty) ..._offlineChannelSlivers(),
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _offlineChannelSlivers() {
+    return <Widget>[
+      SliverToBoxAdapter(
+        child: TwitchDiscoverySectionHeader(
+          icon: Icons.tv_off_rounded,
+          title: '未開台頻道',
+          count: offlineChannels.length,
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 300,
+            mainAxisExtent: 168,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return TwitchOfflineChannelCard(
+              channel: offlineChannels[index],
+              discoveryService: discoveryService,
+            );
+          }, childCount: offlineChannels.length),
+        ),
+      ),
+    ];
   }
 }
