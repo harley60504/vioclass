@@ -5,16 +5,18 @@ import '../design/twitch_typography.dart';
 import '../settings/twitch_app_font_controller.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
+import '../settings/vioclass_update_controller.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
-enum _TwitchSettingsTab { account, chat, player, appearance }
+enum _TwitchSettingsTab { account, chat, player, appearance, updates }
 
 Future<void> showTwitchAppSettingsSheet({
   required BuildContext context,
   required TwitchChatAppearanceController chatAppearanceController,
   required TwitchPlayerSettingsController playerSettingsController,
+  required VioClassUpdateController updateController,
   required String Function() viewerLabel,
   required String Function() loginStatus,
   required bool Function() loadingLoginState,
@@ -32,6 +34,7 @@ Future<void> showTwitchAppSettingsSheet({
     builder: (_) => TwitchAppSettingsSheet(
       chatAppearanceController: chatAppearanceController,
       playerSettingsController: playerSettingsController,
+      updateController: updateController,
       viewerLabel: viewerLabel,
       loginStatus: loginStatus,
       loadingLoginState: loadingLoginState,
@@ -42,9 +45,102 @@ Future<void> showTwitchAppSettingsSheet({
   );
 }
 
+Future<void> showVioClassUpdateSheet({
+  required BuildContext context,
+  required VioClassUpdateController controller,
+  bool startupPrompt = false,
+}) {
+  return showTwitchUnifiedSheet<void>(
+    context: context,
+    title: 'VioClass 更新',
+    subtitle: startupPrompt ? '啟動時檢查到新版本' : 'GitHub Releases',
+    icon: Icons.system_update_rounded,
+    size: TwitchUnifiedSheetSize.medium,
+    showRefresh: false,
+    builder: (_) => _VioClassUpdatePrompt(controller: controller),
+  );
+}
+
+class _VioClassUpdatePrompt extends StatelessWidget {
+  final VioClassUpdateController controller;
+
+  const _VioClassUpdatePrompt({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final info = controller.latest;
+        final release = info?.release;
+        final asset = info?.preferredAsset;
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+          children: [
+            _UpdateStatusCard(
+              currentVersion: info?.currentVersion,
+              latestVersion: release?.tagName,
+              assetName: asset?.name,
+              status: info?.updateAvailable == true ? '有新版本可以更新' : '目前已是最新版本',
+              hasUpdate: info?.updateAvailable == true,
+              checking: controller.checking,
+            ),
+            if (release?.body.trim().isNotEmpty == true) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Text(
+                  release!.body,
+                  maxLines: 8,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.76),
+                    fontSize: 12.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  child: const Text('稍後'),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: info?.updateAvailable == true
+                      ? () async {
+                          await controller.openUpdate();
+                          if (context.mounted) Navigator.of(context).maybePop();
+                        }
+                      : null,
+                  icon: const Icon(Icons.download_rounded, size: 18),
+                  label: Text(asset == null ? '開啟 Release' : '下載更新'),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class TwitchAppSettingsSheet extends StatefulWidget {
   final TwitchChatAppearanceController chatAppearanceController;
   final TwitchPlayerSettingsController playerSettingsController;
+  final VioClassUpdateController updateController;
   final String Function() viewerLabel;
   final String Function() loginStatus;
   final bool Function() loadingLoginState;
@@ -56,6 +152,7 @@ class TwitchAppSettingsSheet extends StatefulWidget {
     super.key,
     required this.chatAppearanceController,
     required this.playerSettingsController,
+    required this.updateController,
     required this.viewerLabel,
     required this.loginStatus,
     required this.loadingLoginState,
@@ -97,6 +194,9 @@ class _TwitchAppSettingsSheetState extends State<TwitchAppSettingsSheet> {
             controller: widget.playerSettingsController,
           ),
           _TwitchSettingsTab.appearance => const _AppearanceSettingsPane(),
+          _TwitchSettingsTab.updates => _UpdateSettingsPane(
+            controller: widget.updateController,
+          ),
         };
 
         if (compact) {
@@ -161,6 +261,12 @@ class _SettingsTabSelector extends StatelessWidget {
         icon: Icons.palette_rounded,
         label: '外觀',
         description: '字體與外觀',
+      ),
+      const _SettingsTabMeta(
+        tab: _TwitchSettingsTab.updates,
+        icon: Icons.system_update_rounded,
+        label: '更新',
+        description: '版本檢查',
       ),
     ];
 
@@ -771,6 +877,195 @@ class _AppearanceSettingsPane extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _UpdateSettingsPane extends StatelessWidget {
+  final VioClassUpdateController controller;
+
+  const _UpdateSettingsPane({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final latest = controller.latest;
+        final asset = latest?.preferredAsset;
+        final release = latest?.release;
+        final status = controller.checking
+            ? '正在檢查 GitHub 最新版本...'
+            : controller.errorText?.trim().isNotEmpty == true
+            ? '更新檢查失敗，稍後再試。'
+            : latest == null
+            ? '尚未檢查更新。'
+            : latest.updateAvailable
+            ? '找到新版 ${release?.tagName ?? ''}'
+            : '目前已是最新版本。';
+
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+          children: [
+            _SettingsSection(
+              title: 'App 更新',
+              subtitle: '從 GitHub Releases 檢查 VioClass 新版本',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _SettingsSwitchRow(
+                    title: '開啟 App 時檢查更新',
+                    subtitle: '有新版本時會顯示更新提示',
+                    value: controller.autoCheckEnabled,
+                    onChanged: controller.setAutoCheckEnabled,
+                  ),
+                  const SizedBox(height: 10),
+                  _UpdateStatusCard(
+                    currentVersion: latest?.currentVersion,
+                    latestVersion: release?.tagName,
+                    assetName: asset?.name,
+                    status: status,
+                    hasUpdate: latest?.updateAvailable == true,
+                    checking: controller.checking,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.icon(
+                        onPressed: controller.checking
+                            ? null
+                            : () async {
+                                final info = await controller.checkNow();
+                                if (!context.mounted ||
+                                    info?.updateAvailable != true) {
+                                  return;
+                                }
+                                await showVioClassUpdateSheet(
+                                  context: context,
+                                  controller: controller,
+                                );
+                              },
+                        icon: controller.checking
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.refresh_rounded, size: 18),
+                        label: Text(controller.checking ? '檢查中' : '立即檢查'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: latest?.updateAvailable == true
+                            ? controller.openUpdate
+                            : null,
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: const Text('下載更新'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _UpdateStatusCard extends StatelessWidget {
+  final String? currentVersion;
+  final String? latestVersion;
+  final String? assetName;
+  final String status;
+  final bool hasUpdate;
+  final bool checking;
+
+  const _UpdateStatusCard({
+    required this.currentVersion,
+    required this.latestVersion,
+    required this.assetName,
+    required this.status,
+    required this.hasUpdate,
+    required this.checking,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = hasUpdate
+        ? TwitchUiColors.primarySoft
+        : Colors.white.withValues(alpha: 0.42);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 34,
+            height: 34,
+            child: Center(
+              child: checking
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: TwitchUiColors.primarySoft,
+                      ),
+                    )
+                  : Icon(
+                      hasUpdate
+                          ? Icons.system_update_alt_rounded
+                          : Icons.verified_rounded,
+                      color: accent,
+                      size: 22,
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  status,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    if (currentVersion != null) '目前 $currentVersion',
+                    if (latestVersion != null) '最新 $latestVersion',
+                    if (assetName != null && assetName!.isNotEmpty) assetName!,
+                  ].join(' · '),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.52),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

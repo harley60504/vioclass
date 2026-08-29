@@ -11,6 +11,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
+import '../settings/vioclass_update_controller.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
 import '../mini_player/twitch_mini_player_overlay.dart';
 import '../sheets/twitch_app_settings_sheet.dart';
@@ -52,6 +53,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   late final TwitchDiscoveryService discoveryService;
   late final TwitchChatAppearanceController chatAppearanceController;
   late final TwitchPlayerSettingsController playerSettingsController;
+  late final VioClassUpdateController updateController;
 
   TwitchHomeSection selectedSection = TwitchHomeSection.following;
 
@@ -87,11 +89,13 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     );
     chatAppearanceController = twitchChatAppearanceController;
     playerSettingsController = TwitchPlayerSettingsController();
+    updateController = VioClassUpdateController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadLoginState());
       unawaited(chatAppearanceController.load());
       unawaited(playerSettingsController.load());
+      unawaited(_loadUpdateSettingsAndCheck());
     });
   }
 
@@ -99,9 +103,24 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   void dispose() {
     _channelSearchDebounce?.cancel();
     searchController.dispose();
+    updateController.dispose();
     playerSettingsController.dispose();
     apiClient.close(force: true);
     super.dispose();
+  }
+
+  Future<void> _loadUpdateSettingsAndCheck() async {
+    await updateController.load();
+    if (!mounted || !updateController.autoCheckEnabled) return;
+    final info = await updateController.checkNow();
+    if (!mounted || info?.updateAvailable != true) return;
+    unawaited(
+      showVioClassUpdateSheet(
+        context: context,
+        controller: updateController,
+        startupPrompt: true,
+      ),
+    );
   }
 
   Future<void> _loadLoginState({bool refreshPages = false}) async {
@@ -224,6 +243,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       context: context,
       chatAppearanceController: chatAppearanceController,
       playerSettingsController: playerSettingsController,
+      updateController: updateController,
       viewerLabel: () => viewerLabel,
       loginStatus: () => loginStatus,
       loadingLoginState: () => loadingLoginState,
