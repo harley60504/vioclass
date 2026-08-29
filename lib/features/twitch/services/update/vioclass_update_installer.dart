@@ -62,6 +62,8 @@ class VioClassUpdateInstaller {
 
     await Process.start('powershell.exe', <String>[
       '-NoProfile',
+      '-WindowStyle',
+      'Hidden',
       '-ExecutionPolicy',
       'Bypass',
       '-File',
@@ -85,27 +87,58 @@ class VioClassUpdateInstaller {
 \$zipPath = '$safeZip'
 \$appDir = '$safeAppDir'
 \$exeName = '$safeExe'
+\$logPath = Join-Path \$env:TEMP 'VioClassUpdate.log'
 \$staging = Join-Path \$env:TEMP ('VioClassUpdate-' + [Guid]::NewGuid().ToString('N'))
 
-Start-Sleep -Milliseconds 500
-try {
-  Wait-Process -Id \$pidToWait -Timeout 45 -ErrorAction SilentlyContinue
-} catch {}
-
-New-Item -ItemType Directory -Path \$staging -Force | Out-Null
-Expand-Archive -LiteralPath \$zipPath -DestinationPath \$staging -Force
-
-\$source = \$staging
-\$children = @(Get-ChildItem -LiteralPath \$staging)
-if (\$children.Count -eq 1 -and \$children[0].PSIsContainer) {
-  \$candidateExe = Join-Path \$children[0].FullName \$exeName
-  if (Test-Path -LiteralPath \$candidateExe) {
-    \$source = \$children[0].FullName
-  }
+function Write-UpdateLog([string]\$message) {
+  \$timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+  Add-Content -LiteralPath \$logPath -Value "[\$timestamp] \$message"
 }
 
-Copy-Item -Path (Join-Path \$source '*') -Destination \$appDir -Recurse -Force
-Start-Process -FilePath (Join-Path \$appDir \$exeName) -WorkingDirectory \$appDir
+try {
+  Write-UpdateLog 'Update helper started.'
+  Write-UpdateLog "Zip: \$zipPath"
+  Write-UpdateLog "AppDir: \$appDir"
+  Write-UpdateLog "Exe: \$exeName"
+
+  Start-Sleep -Milliseconds 800
+  try {
+    Wait-Process -Id \$pidToWait -Timeout 60 -ErrorAction SilentlyContinue
+  } catch {
+    Write-UpdateLog "Wait-Process warning: \$(\$_.Exception.Message)"
+  }
+
+  New-Item -ItemType Directory -Path \$staging -Force | Out-Null
+  Expand-Archive -LiteralPath \$zipPath -DestinationPath \$staging -Force
+  Write-UpdateLog "Expanded to: \$staging"
+
+  \$candidateExe = Get-ChildItem -LiteralPath \$staging -Filter \$exeName -Recurse -File |
+    Select-Object -First 1
+  if (\$null -eq \$candidateExe) {
+    throw "Cannot find \$exeName in extracted update."
+  }
+  \$source = \$candidateExe.DirectoryName
+  Write-UpdateLog "Source: \$source"
+
+  robocopy \$source \$appDir /E /IS /IT /R:20 /W:1 /NFL /NDL /NP /NJH /NJS | Out-Null
+  \$copyExitCode = \$LASTEXITCODE
+  Write-UpdateLog "Robocopy exit code: \$copyExitCode"
+  if (\$copyExitCode -ge 8) {
+    throw "Robocopy failed with exit code \$copyExitCode."
+  }
+
+  \$targetExe = Join-Path \$appDir \$exeName
+  if (-not (Test-Path -LiteralPath \$targetExe)) {
+    throw "Updated executable not found: \$targetExe"
+  }
+
+  Write-UpdateLog "Restarting: \$targetExe"
+  Start-Process -FilePath \$targetExe -WorkingDirectory \$appDir
+  Write-UpdateLog 'Update helper finished.'
+} catch {
+  Write-UpdateLog "ERROR: \$(\$_.Exception.Message)"
+  Start-Sleep -Seconds 3
+}
 ''';
   }
 
