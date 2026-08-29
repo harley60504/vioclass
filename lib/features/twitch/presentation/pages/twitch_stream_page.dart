@@ -86,6 +86,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
       client: apiClient,
       authService: authService,
       authApi: authApi,
+      webTokenProvider: webGqlAuthService.getToken,
     );
     chatAppearanceController = twitchChatAppearanceController;
     playerSettingsController = TwitchPlayerSettingsController();

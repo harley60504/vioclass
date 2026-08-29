@@ -5,6 +5,8 @@ import '../../api/core/twitch_api_exception.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../auth/twitch_auth_service.dart';
 
+typedef TwitchWebTokenProvider = Future<String?> Function();
+
 class TwitchViewerAuthSnapshot {
   final String accessToken;
   final String clientId;
@@ -27,6 +29,7 @@ class TwitchDiscoveryService {
   final TwitchApiClient client;
   final TwitchAuthService authService;
   final TwitchAuthApiService authApi;
+  final TwitchWebTokenProvider? webTokenProvider;
 
   TwitchViewerAuthSnapshot? _cachedAuth;
 
@@ -34,6 +37,7 @@ class TwitchDiscoveryService {
     required this.client,
     required this.authService,
     required this.authApi,
+    this.webTokenProvider,
   });
 
   TwitchViewerAuthSnapshot? get cachedAuth => _cachedAuth;
@@ -207,6 +211,95 @@ class TwitchDiscoveryService {
       offlineChannels: offlineWithProfiles,
       cursor: parsed.cursor,
     );
+  }
+
+  Future<List<TwitchTagSuggestion>> searchFreeformTagSuggestions({
+    required String query,
+    int limit = 20,
+  }) async {
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) return const <TwitchTagSuggestion>[];
+
+    final token = (await webTokenProvider?.call())?.trim();
+    final raw = await client.postJson<dynamic>(
+      '${TwitchApiConstants.gqlEndpoint}#origin=twilight',
+      data: <String, dynamic>{
+        'operationName': 'SearchFreeformTags',
+        'variables': <String, dynamic>{
+          'userQuery': cleanQuery,
+          'first': limit.clamp(1, 50),
+        },
+        'query': r'''
+query SearchFreeformTags(
+  $userQuery: String!
+  $first: Int
+) {
+  searchFreeformTags(
+    userQuery: $userQuery
+    first: $first
+  ) {
+    edges {
+      node {
+        tagName
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}
+''',
+      },
+      headers: <String, String>{
+        ...TwitchApiConstants.twitchWebHeaders,
+        'Accept-Language': 'zh-TW',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Client-ID': TwitchApiConstants.twitchWebClientId,
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty) 'Authorization': 'OAuth $token',
+      },
+    );
+
+    if (raw is! Map<String, dynamic>) return const <TwitchTagSuggestion>[];
+    final errors = raw['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      throw TwitchApiException(
+        'Twitch tag GQL returned errors.',
+        details: errors,
+      );
+    }
+
+    final data = raw['data'];
+    if (data is! Map<String, dynamic>) {
+      return const <TwitchTagSuggestion>[];
+    }
+
+    final connection = data['searchFreeformTags'];
+    if (connection is! Map) return const <TwitchTagSuggestion>[];
+
+    final edges = connection['edges'];
+    if (edges is! List) return const <TwitchTagSuggestion>[];
+
+    final seen = <String>{};
+    final suggestions = <TwitchTagSuggestion>[];
+    for (final edge in edges) {
+      if (edge is! Map) continue;
+      final node = edge['node'];
+      if (node is! Map) continue;
+      final tagName = node['tagName']?.toString().trim() ?? '';
+      final label = tagName;
+      final value = tagName;
+      final normalized = value.trim().toLowerCase();
+      if (label.isEmpty || normalized.isEmpty || !seen.add(normalized)) {
+        continue;
+      }
+      suggestions.add(
+        TwitchTagSuggestion(id: normalized, label: label, value: normalized),
+      );
+    }
+
+    return suggestions;
   }
 
   Future<List<TwitchLiveStream>> _fetchLiveStreamsForSearchResult({
@@ -628,4 +721,16 @@ query ChannelPanels(\$login: String!) {
       'Authorization': 'Bearer ${auth.accessToken}',
     };
   }
+}
+
+class TwitchTagSuggestion {
+  final String id;
+  final String label;
+  final String value;
+
+  const TwitchTagSuggestion({
+    required this.id,
+    required this.label,
+    required this.value,
+  });
 }

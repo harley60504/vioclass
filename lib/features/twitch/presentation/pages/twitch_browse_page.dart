@@ -51,12 +51,14 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
   List<TwitchGameCategory> games = const <TwitchGameCategory>[];
+  List<TwitchTagSuggestion> tagSuggestions = const <TwitchTagSuggestion>[];
 
   String? nextCursor;
   String? nextGameCursor;
   String? errorText;
   String? paginationError;
   String? gamePaginationError;
+  String? tagSuggestionError;
   String currentLanguage = '';
   String? selectedGameId;
   String? selectedGameName;
@@ -70,8 +72,11 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   bool loadingGames = false;
   bool loadingMoreGames = false;
   bool hasMoreGames = true;
+  bool loadingTagSuggestions = false;
 
   int _refreshGeneration = 0;
+  int _tagSuggestionGeneration = 0;
+  Timer? _tagSuggestionDebounce;
 
   static const List<Map<String, String>> languageFilters =
       <Map<String, String>>[
@@ -121,6 +126,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
   @override
   void dispose() {
+    _tagSuggestionDebounce?.cancel();
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
     tagSearchController.dispose();
@@ -517,20 +523,84 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     return selectedTags.map((tag) => selectedTagLabels[tag] ?? tag).join('、');
   }
 
+  void _updateTagSearchText(String value) {
+    setState(() {
+      tagSearchText = value;
+      tagSuggestionError = null;
+    });
+
+    _tagSuggestionDebounce?.cancel();
+    final keyword = value.trim();
+    if (keyword.isEmpty) {
+      setState(() {
+        tagSuggestions = const <TwitchTagSuggestion>[];
+        loadingTagSuggestions = false;
+      });
+      return;
+    }
+
+    _tagSuggestionDebounce = Timer(const Duration(milliseconds: 260), () {
+      unawaited(_loadTagSuggestions(keyword));
+    });
+  }
+
+  Future<void> _loadTagSuggestions(String keyword) async {
+    final generation = ++_tagSuggestionGeneration;
+    setState(() {
+      loadingTagSuggestions = true;
+      tagSuggestionError = null;
+    });
+
+    try {
+      final suggestions = await widget.discoveryService
+          .searchFreeformTagSuggestions(query: keyword, limit: 16);
+      if (!mounted || generation != _tagSuggestionGeneration) return;
+      setState(() {
+        tagSuggestions = suggestions
+            .where((tag) => !selectedTags.contains(tag.value))
+            .toList(growable: false);
+        loadingTagSuggestions = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _tagSuggestionGeneration) return;
+      setState(() {
+        tagSuggestions = const <TwitchTagSuggestion>[];
+        tagSuggestionError = '標籤建議暫時不可用';
+        loadingTagSuggestions = false;
+      });
+    }
+  }
+
   void _addSelectedTag(String label) {
     final cleanLabel = label.trim();
     if (cleanLabel.isEmpty) return;
     final value = cleanLabel.toLowerCase();
-    if (selectedTags.contains(value)) {
+    _addSelectedTagValue(value: value, label: cleanLabel);
+  }
+
+  void _addSelectedTagSuggestion(TwitchTagSuggestion tag) {
+    _addSelectedTagValue(value: tag.value, label: tag.label);
+  }
+
+  void _addSelectedTagValue({required String value, required String label}) {
+    final cleanValue = value.trim().toLowerCase();
+    final cleanLabel = label.trim();
+    if (cleanValue.isEmpty || cleanLabel.isEmpty) return;
+    if (selectedTags.contains(cleanValue)) {
       tagSearchController.clear();
-      setState(() => tagSearchText = '');
+      setState(() {
+        tagSearchText = '';
+        tagSuggestions = const <TwitchTagSuggestion>[];
+      });
       return;
     }
 
     setState(() {
-      selectedTags.add(value);
-      selectedTagLabels[value] = cleanLabel;
+      selectedTags.add(cleanValue);
+      selectedTagLabels[cleanValue] = cleanLabel;
       tagSearchText = '';
+      tagSuggestions = const <TwitchTagSuggestion>[];
+      tagSuggestionError = null;
     });
     tagSearchController.clear();
     _jumpToTop();
@@ -541,6 +611,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     setState(() {
       selectedTags.remove(tag);
       selectedTagLabels.remove(tag);
+      tagSuggestions = const <TwitchTagSuggestion>[];
+      tagSuggestionError = null;
     });
     _jumpToTop();
     unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
@@ -553,6 +625,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       selectedTags.clear();
       selectedTagLabels.clear();
       tagSearchText = '';
+      tagSuggestions = const <TwitchTagSuggestion>[];
+      tagSuggestionError = null;
     });
     _jumpToTop();
     unawaited(refreshStreams(clearExisting: true, jumpToTop: true));
@@ -560,6 +634,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
   Widget _buildTagFilterSliver() {
     final hasTags = selectedTags.isNotEmpty;
+    final hasTypedTag = tagSearchText.trim().isNotEmpty;
 
     return SliverToBoxAdapter(
       child: Padding(
@@ -578,7 +653,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                 controller: tagSearchController,
                 textInputAction: TextInputAction.done,
                 onSubmitted: _addSelectedTag,
-                onChanged: (value) => setState(() => tagSearchText = value),
+                onChanged: _updateTagSearchText,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
@@ -598,7 +673,19 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      if (tagSearchText.trim().isNotEmpty)
+                      if (loadingTagSuggestions)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: TwitchUiColors.primarySoft,
+                              strokeWidth: 2.2,
+                            ),
+                          ),
+                        ),
+                      if (hasTypedTag)
                         IconButton(
                           tooltip: '加入標籤',
                           visualDensity: VisualDensity.compact,
@@ -609,7 +696,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                             size: 21,
                           ),
                         ),
-                      if (hasTags || tagSearchText.trim().isNotEmpty)
+                      if (hasTags || hasTypedTag)
                         IconButton(
                           tooltip: '清除標籤',
                           visualDensity: VisualDensity.compact,
@@ -658,6 +745,41 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                     );
                   }),
                 ],
+              ),
+            ],
+            if (tagSuggestions.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: tagSuggestions
+                    .map((tag) {
+                      return ActionChip(
+                        avatar: const Icon(Icons.sell_rounded, size: 15),
+                        label: Text(tag.label),
+                        onPressed: () => _addSelectedTagSuggestion(tag),
+                        backgroundColor: Colors.white.withValues(alpha: 0.06),
+                        labelStyle: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.10),
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
+              ),
+            ] else if (tagSuggestionError != null && hasTypedTag) ...[
+              const SizedBox(height: 8),
+              Text(
+                tagSuggestionError!,
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ],
