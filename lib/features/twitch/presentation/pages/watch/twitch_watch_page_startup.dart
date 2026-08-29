@@ -289,6 +289,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         );
         if (!loadedVod) {
           showSnack('播放器暫時載入失敗，請稍後再試。');
+        } else if (showOfflineChannelPlaceholder && !chatStartedEarly) {
+          setState(() => chatBootstrapping = true);
+          chatStartedEarly = true;
+          unawaited(runDeferredChatStartup(channel, generation));
         }
       }
     }
@@ -428,6 +432,12 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       );
       if (!isCurrentWatchTask(generation, channel)) return false;
       if (page.videos.isEmpty) {
+        offlineVodFallbackVideo = null;
+        currentVodQualityVideo = null;
+        currentClipQualityClip = null;
+        preferVodReplayChat = false;
+        vodReplayController.stop();
+        clearOwnedPlayback();
         showOfflineChannelPlaceholder = true;
         playbackController.setError(null);
         if (mounted) setState(() {});
