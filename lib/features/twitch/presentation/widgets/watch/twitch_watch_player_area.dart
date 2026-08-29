@@ -8,7 +8,6 @@ import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import 'player/twitch_media_kit_video_surface.dart';
 import 'player/twitch_watch_controls_overlay.dart';
-import 'player/twitch_watch_top_action_bar.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
 /// Repaint isolation switches for profiling the 2nd-entry FPS drop.
@@ -137,32 +136,11 @@ class TwitchWatchPlayerArea extends StatelessWidget {
       child: stableVideoStage,
       builder: (context, child) {
         final state = _WatchPlayerAreaState.fromWidget(widget: this, pip: pip);
-        final showOfflineTopControls =
-            showOfflinePlaceholder &&
-            !state.inPipMode &&
-            !_debugHidePlayerOverlay;
-        final showPlayerControls =
-            !showOfflinePlaceholder &&
-            state.shouldShowControlsOverlay &&
-            !_debugHidePlayerOverlay;
 
         return _WatchPlayerShell(
           inPipMode: state.inPipMode,
           video: child ?? stableVideoStage,
-          overlay: showOfflineTopControls
-              ? RepaintBoundary(
-                  child: _WatchOfflineTopControlsOverlay(
-                    metadata: metadata,
-                    isFollowing: isFollowing,
-                    followBusy: state.effectiveFollowBusy,
-                    onBack: onBack,
-                    onHome: onHome,
-                    onToggleFollow: onToggleFollow,
-                    onSubscribe: onSubscribe,
-                    onOpenChannel: onOpenChannel,
-                  ),
-                )
-              : showPlayerControls
+          overlay: state.shouldShowControlsOverlay && !_debugHidePlayerOverlay
               ? RepaintBoundary(
                   child: WatchControlsOverlay(
                     loading: state.overlayLoading,
@@ -316,74 +294,6 @@ class _WatchPlayerShell extends StatelessWidget {
             ),
         ],
       ),
-    );
-  }
-}
-
-class _WatchOfflineTopControlsOverlay extends StatelessWidget {
-  final TwitchStreamHeaderMetadata metadata;
-  final bool isFollowing;
-  final bool followBusy;
-  final VoidCallback onBack;
-  final VoidCallback? onHome;
-  final VoidCallback? onToggleFollow;
-  final VoidCallback? onSubscribe;
-  final VoidCallback? onOpenChannel;
-
-  const _WatchOfflineTopControlsOverlay({
-    required this.metadata,
-    required this.isFollowing,
-    required this.followBusy,
-    required this.onBack,
-    required this.onHome,
-    required this.onToggleFollow,
-    required this.onSubscribe,
-    required this.onOpenChannel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: 136,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.74),
-                    Colors.black.withValues(alpha: 0.38),
-                    Colors.black.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 12,
-          right: 12,
-          top: 12,
-          child: WatchTopActionBar(
-            metadata: metadata,
-            isFollowing: isFollowing,
-            followBusy: followBusy,
-            onBack: onBack,
-            onHome: onHome,
-            onToggleFollow: onToggleFollow,
-            onSubscribe: onSubscribe,
-            onOpenChannel: onOpenChannel,
-            onCreateClip: null,
-            creatingClip: false,
-          ),
-        ),
-      ],
     );
   }
 }
