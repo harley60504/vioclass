@@ -8,7 +8,6 @@ import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import 'player/twitch_media_kit_video_surface.dart';
 import 'player/twitch_watch_controls_overlay.dart';
-import '../shared/twitch_cached_image_layer.dart';
 
 /// Repaint isolation switches for profiling the 2nd-entry FPS drop.
 ///
@@ -38,8 +37,6 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool loading;
   final String? error;
-  final bool showOfflinePlaceholder;
-  final String? offlineImageUrl;
   final VoidCallback onBack;
   final VoidCallback? onHome;
   final VoidCallback? onOpenChannel;
@@ -85,8 +82,6 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     required this.metadata,
     required this.loading,
     required this.error,
-    this.showOfflinePlaceholder = false,
-    this.offlineImageUrl,
     required this.onBack,
     this.onHome,
     this.onOpenChannel,
@@ -127,8 +122,6 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     final stableVideoStage = _WatchPlayerVideoStage(
       controller: videoController,
       usePlaceholder: _debugUseVideoPlaceholder,
-      showOfflinePlaceholder: showOfflinePlaceholder,
-      offlineImageUrl: offlineImageUrl,
     );
 
     return AnimatedBuilder(
@@ -301,14 +294,10 @@ class _WatchPlayerShell extends StatelessWidget {
 class _WatchPlayerVideoStage extends StatelessWidget {
   final VideoController? controller;
   final bool usePlaceholder;
-  final bool showOfflinePlaceholder;
-  final String? offlineImageUrl;
 
   const _WatchPlayerVideoStage({
     required this.controller,
     required this.usePlaceholder,
-    required this.showOfflinePlaceholder,
-    required this.offlineImageUrl,
   });
 
   @override
@@ -317,60 +306,9 @@ class _WatchPlayerVideoStage extends StatelessWidget {
       return const _WatchVideoPlaceholderSurface();
     }
 
-    if (showOfflinePlaceholder) {
-      return _WatchOfflineImageSurface(imageUrl: offlineImageUrl);
-    }
-
     final controller = this.controller;
     if (controller == null) return const TwitchMediaKitVideoWaitingSurface();
     return TwitchMediaKitVideoSurface(controller: controller);
-  }
-}
-
-class _WatchOfflineImageSurface extends StatelessWidget {
-  final String? imageUrl;
-
-  const _WatchOfflineImageSurface({required this.imageUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final maxWidth = constraints.maxWidth;
-          final maxHeight = constraints.maxHeight;
-          if (maxWidth <= 0 || maxHeight <= 0) {
-            return const SizedBox.shrink();
-          }
-
-          var width = maxWidth;
-          var height = width / twitchWatchVideoAspectRatio;
-          if (height > maxHeight) {
-            height = maxHeight;
-            width = height * twitchWatchVideoAspectRatio;
-          }
-          width = width.clamp(1.0, maxWidth).toDouble();
-          height = height.clamp(1.0, maxHeight).toDouble();
-          final dpr = MediaQuery.devicePixelRatioOf(context);
-
-          return Center(
-            child: TwitchCachedImageLayer(
-              imageUrl: imageUrl,
-              width: width,
-              height: height,
-              cacheWidth: (width * dpr).round().clamp(320, 1920),
-              cacheHeight: (height * dpr).round().clamp(180, 1080),
-              fit: BoxFit.contain,
-              fallbackColor: Colors.black,
-              fallbackIcon: Icons.tv_off_rounded,
-              fallbackIconColor: Colors.white30,
-              fallbackIconSize: 42,
-            ),
-          );
-        },
-      ),
-    );
   }
 }
 

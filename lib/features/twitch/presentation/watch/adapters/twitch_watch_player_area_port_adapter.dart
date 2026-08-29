@@ -18,8 +18,6 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool loading;
   final String? error;
-  final bool showOfflinePlaceholder;
-  final String? offlineImageUrl;
   final VoidCallback onBack;
   final VoidCallback? onHome;
   final VoidCallback? onOpenChannel;
@@ -57,8 +55,6 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     required this.metadata,
     required this.loading,
     required this.error,
-    this.showOfflinePlaceholder = false,
-    this.offlineImageUrl,
     required this.onBack,
     this.onHome,
     this.onOpenChannel,
@@ -102,8 +98,6 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       metadata: metadata,
       loading: loading,
       error: error,
-      showOfflinePlaceholder: showOfflinePlaceholder,
-      offlineImageUrl: offlineImageUrl,
       qualityVariants: qualityVariants ?? port.qualityVariants,
       currentVariant: currentVariant ?? port.currentVariant,
       qualityBusy: port.runtime.switchingQuality || loading,
