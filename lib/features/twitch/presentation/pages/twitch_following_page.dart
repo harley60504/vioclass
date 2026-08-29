@@ -479,58 +479,65 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     return haystack.contains(keyword);
   }
 
-  Future<void> showGameMenu(BuildContext context) async {
-    List<TwitchLiveStream> gameSource() {
-      final language = currentLanguage.trim().toLowerCase();
-      if (language.isEmpty) return loadedStreams;
-      return loadedStreams
-          .where((stream) => stream.language.toLowerCase() == language)
-          .toList(growable: false);
-    }
+  List<TwitchLiveStream> _gameSourceForCurrentLanguage() {
+    final language = currentLanguage.trim().toLowerCase();
+    if (language.isEmpty) return loadedStreams;
+    return loadedStreams
+        .where((stream) => stream.language.toLowerCase() == language)
+        .toList(growable: false);
+  }
 
-    List<TwitchGameCategory> buildGames() {
-      final byId = <String, TwitchGameCategory>{};
-      for (final stream in gameSource()) {
-        final id = stream.gameId.trim();
-        final name = stream.gameName.trim();
-        if (id.isEmpty || name.isEmpty) continue;
-        byId.putIfAbsent(
-          id,
-          () =>
-              gameCategoryById[id] ??
-              TwitchGameCategory(id: id, name: name, boxArtUrl: ''),
-        );
-      }
-      final games = byId.values.toList(growable: false);
-      games.sort((left, right) => left.name.compareTo(right.name));
-      return games;
+  List<TwitchGameCategory> _buildFollowedGameCategories() {
+    final byId = <String, TwitchGameCategory>{};
+    for (final stream in _gameSourceForCurrentLanguage()) {
+      final id = stream.gameId.trim();
+      final name = stream.gameName.trim();
+      if (id.isEmpty || name.isEmpty) continue;
+      byId.putIfAbsent(
+        id,
+        () =>
+            gameCategoryById[id] ??
+            TwitchGameCategory(id: id, name: name, boxArtUrl: ''),
+      );
     }
+    final games = byId.values.toList(growable: false);
+    games.sort((left, right) => left.name.compareTo(right.name));
+    return games;
+  }
 
-    final missingGameIds = gameSource()
+  Future<void> _ensureFollowedGameArtwork() async {
+    final missingGameIds = _gameSourceForCurrentLanguage()
         .map((stream) => stream.gameId.trim())
         .where((id) => id.isNotEmpty)
         .where((id) => !gameCategoryById.containsKey(id))
         .toSet();
-    if (missingGameIds.isNotEmpty) {
-      try {
-        final loadedGames = await widget.discoveryService.fetchGamesByIds(
-          missingGameIds,
-        );
-        if (!mounted) return;
-        setState(() {
-          for (final game in loadedGames) {
-            gameCategoryById[game.id] = game;
-          }
-        });
-      } catch (_) {}
-    }
+    if (missingGameIds.isEmpty) return;
+
+    try {
+      final loadedGames = await widget.discoveryService.fetchGamesByIds(
+        missingGameIds,
+      );
+      if (!mounted) return;
+      setState(() {
+        for (final game in loadedGames) {
+          gameCategoryById[game.id] = game;
+        }
+      });
+    } catch (_) {}
+  }
+
+  Future<void> showGameMenu(BuildContext context) async {
+    await _ensureFollowedGameArtwork();
 
     if (!context.mounted) return;
     await showTwitchGameFilterGridSheet(
       context: context,
-      games: buildGames(),
+      games: _buildFollowedGameCategories(),
+      gamesProvider: _buildFollowedGameCategories,
       selectedGameId: selectedGameId,
       selectedGameName: selectedGameName,
+      loading: loadingFirstPage,
+      loadingProvider: () => loadingFirstPage,
       emptySearchText: '目前追隨直播中找不到這個分類',
       onSelected: (game) {
         setState(() {

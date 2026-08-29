@@ -13,6 +13,11 @@ Future<void> showTwitchGameFilterGridSheet({
   required String? selectedGameId,
   required String? selectedGameName,
   required ValueChanged<TwitchGameCategory?> onSelected,
+  List<TwitchGameCategory> Function()? gamesProvider,
+  bool Function()? loadingProvider,
+  bool Function()? loadingMoreProvider,
+  bool Function()? hasMoreProvider,
+  String? Function()? paginationErrorProvider,
   bool loading = false,
   bool showRefresh = false,
   Future<void> Function()? onRefresh,
@@ -29,7 +34,9 @@ Future<void> showTwitchGameFilterGridSheet({
   bool sheetClosed = false;
 
   Future<void> requestMore() async {
-    if (sheetClosed || loadingMore || !hasMore) return;
+    final currentLoadingMore = loadingMoreProvider?.call() ?? loadingMore;
+    final currentHasMore = hasMoreProvider?.call() ?? hasMore;
+    if (sheetClosed || currentLoadingMore || !currentHasMore) return;
     await onLoadMore?.call();
     if (!sheetClosed) setSheetStateRef?.call(() {});
   }
@@ -70,10 +77,16 @@ Future<void> showTwitchGameFilterGridSheet({
       return StatefulBuilder(
         builder: (context, setSheetState) {
           setSheetStateRef = setSheetState;
+          final currentGames = gamesProvider?.call() ?? games;
+          final currentLoading = loadingProvider?.call() ?? loading;
+          final currentLoadingMore = loadingMoreProvider?.call() ?? loadingMore;
+          final currentHasMore = hasMoreProvider?.call() ?? hasMore;
+          final currentPaginationError =
+              paginationErrorProvider?.call() ?? paginationError;
           final lowerKeyword = keyword.trim().toLowerCase();
           final filteredGames = lowerKeyword.isEmpty
-              ? games
-              : games
+              ? currentGames
+              : currentGames
                     .where(
                       (game) => game.name.toLowerCase().contains(lowerKeyword),
                     )
@@ -110,7 +123,7 @@ Future<void> showTwitchGameFilterGridSheet({
               Expanded(
                 child: Builder(
                   builder: (context) {
-                    if (loading && games.isEmpty) {
+                    if (currentLoading && currentGames.isEmpty) {
                       return const Center(
                         child: CircularProgressIndicator(
                           color: TwitchUiColors.primary,
@@ -139,7 +152,7 @@ Future<void> showTwitchGameFilterGridSheet({
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              if (hasMore && onLoadMore != null) ...[
+                              if (currentHasMore && onLoadMore != null) ...[
                                 const SizedBox(height: 12),
                                 OutlinedButton.icon(
                                   onPressed: () => unawaited(requestMore()),
@@ -177,9 +190,9 @@ Future<void> showTwitchGameFilterGridSheet({
                           itemBuilder: (context, index) {
                             if (index >= items.length) {
                               return _GameFilterGridFooter(
-                                loadingMore: loadingMore,
-                                hasMore: hasMore,
-                                paginationError: paginationError,
+                                loadingMore: currentLoadingMore,
+                                hasMore: currentHasMore,
+                                paginationError: currentPaginationError,
                                 onLoadMore: requestMore,
                               );
                             }

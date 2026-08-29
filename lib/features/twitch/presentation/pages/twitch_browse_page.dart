@@ -799,15 +799,18 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     await showTwitchGameFilterGridSheet(
       context: context,
       games: games,
+      gamesProvider: () => games,
       selectedGameId: selectedGameId,
       selectedGameName: selectedGameName,
       loading: loadingGames,
-      showRefresh: true,
-      onRefresh: loadGames,
+      loadingProvider: () => loadingGames,
       onLoadMore: loadMoreGames,
       loadingMore: loadingMoreGames,
+      loadingMoreProvider: () => loadingMoreGames,
       hasMore: hasMoreGames,
+      hasMoreProvider: () => hasMoreGames,
       paginationError: gamePaginationError,
+      paginationErrorProvider: () => gamePaginationError,
       emptySearchText: '目前已載入分類中找不到結果',
       onSelected: (game) {
         setState(() {
