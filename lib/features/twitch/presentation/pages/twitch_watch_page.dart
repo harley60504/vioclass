@@ -89,6 +89,7 @@ class TwitchWatchPage extends StatefulWidget {
   final String? initialProfileImageUrl;
   final TwitchFollowedChannel? initialOfflineChannel;
   final TwitchDiscoveryService? initialDiscoveryService;
+  final bool initialOfflineFallbackAllowed;
   final TwitchChannelVideo? initialActiveDvrVideo;
   final TwitchChannelVideo? initialVodVideo;
   final TwitchChannelClip? initialClip;
@@ -111,6 +112,7 @@ class TwitchWatchPage extends StatefulWidget {
     this.initialProfileImageUrl,
     this.initialOfflineChannel,
     this.initialDiscoveryService,
+    this.initialOfflineFallbackAllowed = false,
     this.initialActiveDvrVideo,
     this.initialVodVideo,
     this.initialClip,

@@ -159,6 +159,44 @@ class TwitchDiscoveryService {
     return _parseStreamPage(raw);
   }
 
+  Future<TwitchChannelSearchResult> searchChannels({
+    required String query,
+    int first = 40,
+  }) async {
+    final cleanQuery = query.trim();
+    if (cleanQuery.isEmpty) {
+      return const TwitchChannelSearchResult(
+        liveStreams: <TwitchLiveStream>[],
+        offlineChannels: <TwitchFollowedChannel>[],
+        cursor: null,
+      );
+    }
+
+    final auth = await resolveViewerAuth();
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/search/channels',
+      queryParameters: <String, dynamic>{
+        'query': cleanQuery,
+        'first': first.clamp(1, 100),
+        'live_only': false,
+      },
+      headers: _helixHeaders(auth),
+    );
+
+    final parsed = _parseChannelSearch(raw);
+    if (parsed.offlineChannels.isEmpty) return parsed;
+
+    final offlineWithProfiles = await _attachFollowedChannelProfiles(
+      auth: auth,
+      channels: parsed.offlineChannels,
+    );
+    return TwitchChannelSearchResult(
+      liveStreams: parsed.liveStreams,
+      offlineChannels: offlineWithProfiles,
+      cursor: parsed.cursor,
+    );
+  }
+
   Future<TwitchGamePageResult> fetchTopGames({
     String? after,
     int first = 50,
@@ -502,6 +540,40 @@ query ChannelPanels(\$login: String!) {
 
     return TwitchStreamPageResult(
       streams: streams,
+      cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+    );
+  }
+
+  TwitchChannelSearchResult _parseChannelSearch(Map<String, dynamic> raw) {
+    final data = raw['data'];
+    final pagination = raw['pagination'];
+    final cursor = pagination is Map ? pagination['cursor']?.toString() : null;
+    if (data is! List) {
+      return TwitchChannelSearchResult(
+        liveStreams: const <TwitchLiveStream>[],
+        offlineChannels: const <TwitchFollowedChannel>[],
+        cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
+      );
+    }
+
+    final liveStreams = <TwitchLiveStream>[];
+    final offlineChannels = <TwitchFollowedChannel>[];
+
+    for (final channel in data.whereType<Map<String, dynamic>>()) {
+      if (channel['is_live'] == true) {
+        final stream = TwitchLiveStream.fromHelixSearchChannelJson(channel);
+        if (stream.channelLogin.isNotEmpty) liveStreams.add(stream);
+      } else {
+        final offline = TwitchFollowedChannel.fromHelixSearchChannelJson(
+          channel,
+        );
+        if (offline.channelLogin.isNotEmpty) offlineChannels.add(offline);
+      }
+    }
+
+    return TwitchChannelSearchResult(
+      liveStreams: liveStreams,
+      offlineChannels: offlineChannels,
       cursor: cursor == null || cursor.trim().isEmpty ? null : cursor,
     );
   }

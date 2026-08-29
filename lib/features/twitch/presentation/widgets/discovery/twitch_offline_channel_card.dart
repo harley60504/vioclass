@@ -144,6 +144,7 @@ class TwitchOfflineChannelCard extends StatelessWidget {
           ),
           initialOfflineChannel: channel,
           initialDiscoveryService: discoveryService,
+          initialOfflineFallbackAllowed: true,
         ),
       ),
     );

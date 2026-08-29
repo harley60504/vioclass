@@ -11,6 +11,7 @@ import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
+import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_login_required_view.dart';
 import 'twitch_stream_refresh_reconciler.dart';
@@ -39,6 +40,9 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   final ScrollController scrollController = ScrollController();
 
   List<TwitchLiveStream> loadedStreams = const <TwitchLiveStream>[];
+  List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
+  List<TwitchFollowedChannel> searchedOfflineChannels =
+      const <TwitchFollowedChannel>[];
   List<TwitchGameCategory> games = const <TwitchGameCategory>[];
 
   String? nextCursor;
@@ -46,6 +50,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   String? errorText;
   String? paginationError;
   String? gamePaginationError;
+  String? channelSearchError;
   String currentLanguage = '';
   String? selectedGameId;
   String? selectedGameName;
@@ -55,9 +60,12 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   bool hasMore = true;
   bool loadingGames = false;
   bool loadingMoreGames = false;
+  bool loadingChannelSearch = false;
   bool hasMoreGames = true;
 
   int _refreshGeneration = 0;
+  int _channelSearchGeneration = 0;
+  Timer? _channelSearchDebounce;
 
   static const List<Map<String, String>> languageFilters =
       <Map<String, String>>[
@@ -103,12 +111,13 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       unawaited(refreshStreams());
       if (games.isEmpty) unawaited(loadGames());
     } else if (oldWidget.searchText != widget.searchText) {
-      setState(() {});
+      _handleSearchTextChanged();
     }
   }
 
   @override
   void dispose() {
+    _channelSearchDebounce?.cancel();
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
     super.dispose();
@@ -219,6 +228,57 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       cursor: cursor,
       hasMore: hasMorePage,
     );
+  }
+
+  void _handleSearchTextChanged() {
+    final keyword = widget.searchText.trim();
+    _channelSearchDebounce?.cancel();
+
+    if (keyword.isEmpty) {
+      _channelSearchGeneration++;
+      setState(() {
+        searchedLiveStreams = const <TwitchLiveStream>[];
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        loadingChannelSearch = false;
+        channelSearchError = null;
+      });
+      return;
+    }
+
+    setState(() {
+      loadingChannelSearch = true;
+      channelSearchError = null;
+    });
+
+    final generation = ++_channelSearchGeneration;
+    _channelSearchDebounce = Timer(const Duration(milliseconds: 360), () {
+      unawaited(_searchChannels(keyword, generation));
+    });
+  }
+
+  Future<void> _searchChannels(String keyword, int generation) async {
+    try {
+      final result = await widget.discoveryService.searchChannels(
+        query: keyword,
+      );
+      if (!mounted || generation != _channelSearchGeneration) return;
+
+      setState(() {
+        searchedLiveStreams = result.liveStreams;
+        searchedOfflineChannels = result.offlineChannels;
+        loadingChannelSearch = false;
+        channelSearchError = null;
+      });
+    } catch (error) {
+      if (!mounted || generation != _channelSearchGeneration) return;
+
+      setState(() {
+        searchedLiveStreams = const <TwitchLiveStream>[];
+        searchedOfflineChannels = const <TwitchFollowedChannel>[];
+        loadingChannelSearch = false;
+        channelSearchError = error.toString();
+      });
+    }
   }
 
   Future<void> loadMore() async {
@@ -377,18 +437,74 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     if (keyword.isEmpty) return loadedStreams;
 
     return loadedStreams
+        .where((stream) => _streamMatchesKeyword(stream, keyword))
+        .toList(growable: false);
+  }
+
+  List<TwitchLiveStream> _filteredSearchLiveStreams() {
+    final keyword = widget.searchText.trim().toLowerCase();
+    if (keyword.isEmpty) return const <TwitchLiveStream>[];
+
+    final existingIds = loadedStreams
+        .map((stream) => stream.userId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final existingLogins = loadedStreams
+        .map((stream) => stream.channelLogin)
+        .where((login) => login.isNotEmpty)
+        .toSet();
+
+    return searchedLiveStreams
         .where((stream) {
+          final id = stream.userId.trim();
+          final login = stream.channelLogin;
+          if (id.isNotEmpty && existingIds.contains(id)) return false;
+          if (login.isNotEmpty && existingLogins.contains(login)) return false;
+          return _streamMatchesKeyword(stream, keyword);
+        })
+        .toList(growable: false);
+  }
+
+  List<TwitchFollowedChannel> _filteredSearchOfflineChannels() {
+    final keyword = widget.searchText.trim().toLowerCase();
+    if (keyword.isEmpty) return const <TwitchFollowedChannel>[];
+
+    final existingIds = loadedStreams
+        .map((stream) => stream.userId.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final existingLogins = loadedStreams
+        .map((stream) => stream.channelLogin)
+        .where((login) => login.isNotEmpty)
+        .toSet();
+
+    return searchedOfflineChannels
+        .where((channel) {
+          final id = channel.broadcasterId.trim();
+          final login = channel.channelLogin;
+          if (id.isNotEmpty && existingIds.contains(id)) return false;
+          if (login.isNotEmpty && existingLogins.contains(login)) return false;
+
           final haystack = <String>[
-            stream.userName,
-            stream.userLogin,
-            stream.title,
-            stream.gameName,
-            stream.language,
-            ...stream.tags,
+            channel.broadcasterName,
+            channel.broadcasterLogin,
+            channel.description,
           ].join(' ').toLowerCase();
           return haystack.contains(keyword);
         })
         .toList(growable: false);
+  }
+
+  bool _streamMatchesKeyword(TwitchLiveStream stream, String keyword) {
+    final haystack = <String>[
+      stream.userName,
+      stream.userLogin,
+      stream.title,
+      stream.gameName,
+      stream.language,
+      ...stream.tags,
+    ].join(' ').toLowerCase();
+    return haystack.contains(keyword);
   }
 
   Future<void> showGameMenu(BuildContext context) async {
@@ -814,6 +930,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   @override
   Widget build(BuildContext context) {
     final filtered = _filteredStreams();
+    final filteredSearchLive = _filteredSearchLiveStreams();
+    final filteredSearchOffline = _filteredSearchOfflineChannels();
 
     if (loadingFirstPage && loadedStreams.isEmpty) {
       return const Center(
@@ -844,7 +962,10 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       );
     }
 
-    if (loadedStreams.isEmpty) {
+    if (loadedStreams.isEmpty &&
+        searchedLiveStreams.isEmpty &&
+        searchedOfflineChannels.isEmpty &&
+        !loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.explore_off_rounded,
         title: '目前沒有可顯示直播',
@@ -853,11 +974,16 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       );
     }
 
-    if (filtered.isEmpty) {
+    if (filtered.isEmpty &&
+        filteredSearchLive.isEmpty &&
+        filteredSearchOffline.isEmpty &&
+        !loadingChannelSearch) {
       return TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
-        title: '找不到符合條件的直播',
-        message: '可以清除搜尋文字、分類或語言篩選。',
+        title: '找不到符合條件的頻道',
+        message: channelSearchError?.trim().isNotEmpty == true
+            ? '已載入的直播沒有結果，Twitch 頻道搜尋暫時失敗。'
+            : '可以清除搜尋文字、分類或語言篩選。',
       );
     }
 
@@ -874,6 +1000,10 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         streams: filtered,
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
+        extraSliversBeforeFooter: _searchResultSlivers(
+          liveStreams: filteredSearchLive,
+          offlineChannels: filteredSearchOffline,
+        ),
         footer: TwitchDiscoveryFooter(
           loadingMore: loadingMore,
           hasMore: hasMore,
@@ -882,6 +1012,103 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         ),
       ),
     );
+  }
+
+  List<Widget> _searchResultSlivers({
+    required List<TwitchLiveStream> liveStreams,
+    required List<TwitchFollowedChannel> offlineChannels,
+  }) {
+    final slivers = <Widget>[];
+
+    if (loadingChannelSearch) {
+      slivers.add(
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(26, 0, 26, 24),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: TwitchUiColors.primary,
+                    strokeWidth: 2.4,
+                  ),
+                ),
+                SizedBox(width: 10),
+                Text(
+                  '正在搜尋更多頻道...',
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (liveStreams.isNotEmpty) {
+      slivers.add(
+        TwitchDiscoveryStreamSliverSection(
+          icon: Icons.search_rounded,
+          title: '搜尋到的直播',
+          streams: liveStreams,
+          discoveryService: widget.discoveryService,
+          onReturnFromStream: refreshStreams,
+        ),
+      );
+    }
+
+    if (offlineChannels.isNotEmpty) {
+      slivers.addAll(
+        _offlineChannelSlivers(
+          icon: Icons.search_off_rounded,
+          title: '搜尋到的未開台頻道',
+          channels: offlineChannels,
+        ),
+      );
+    }
+
+    return slivers;
+  }
+
+  List<Widget> _offlineChannelSlivers({
+    required IconData icon,
+    required String title,
+    required List<TwitchFollowedChannel> channels,
+  }) {
+    if (channels.isEmpty) return const <Widget>[];
+
+    return <Widget>[
+      SliverToBoxAdapter(
+        child: TwitchDiscoverySectionHeader(
+          icon: icon,
+          title: title,
+          count: channels.length,
+        ),
+      ),
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
+        sliver: SliverGrid(
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 300,
+            mainAxisExtent: 168,
+            crossAxisSpacing: 14,
+            mainAxisSpacing: 14,
+          ),
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return TwitchOfflineChannelCard(
+              channel: channels[index],
+              discoveryService: widget.discoveryService,
+            );
+          }, childCount: channels.length),
+        ),
+      ),
+    ];
   }
 }
 

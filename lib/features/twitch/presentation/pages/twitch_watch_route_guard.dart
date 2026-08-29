@@ -31,6 +31,7 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   final String? initialProfileImageUrl;
   final TwitchFollowedChannel? initialOfflineChannel;
   final TwitchDiscoveryService? initialDiscoveryService;
+  final bool initialOfflineFallbackAllowed;
   final TwitchChannelVideo? initialActiveDvrVideo;
   final TwitchChannelVideo? initialVodVideo;
   final TwitchChannelClip? initialClip;
@@ -52,6 +53,7 @@ class TwitchWatchRouteGuard extends StatefulWidget {
     this.initialProfileImageUrl,
     this.initialOfflineChannel,
     this.initialDiscoveryService,
+    this.initialOfflineFallbackAllowed = false,
     this.initialActiveDvrVideo,
     this.initialVodVideo,
     this.initialClip,
@@ -156,6 +158,7 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         initialProfileImageUrl: widget.initialProfileImageUrl,
         initialOfflineChannel: widget.initialOfflineChannel,
         initialDiscoveryService: widget.initialDiscoveryService,
+        initialOfflineFallbackAllowed: widget.initialOfflineFallbackAllowed,
         initialActiveDvrVideo: widget.initialActiveDvrVideo,
         initialVodVideo: widget.initialVodVideo,
         initialClip: widget.initialClip,

@@ -150,6 +150,99 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   }
 }
 
+class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<TwitchLiveStream> streams;
+  final TwitchDiscoveryService? discoveryService;
+  final Future<void> Function()? onReturnFromStream;
+
+  const TwitchDiscoveryStreamSliverSection({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.streams,
+    this.discoveryService,
+    this.onReturnFromStream,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (streams.isEmpty) return const SliverToBoxAdapter(child: SizedBox());
+
+    return SliverMainAxisGroup(
+      slivers: <Widget>[
+        SliverToBoxAdapter(
+          child: TwitchDiscoverySectionHeader(
+            icon: icon,
+            title: title,
+            count: streams.length,
+          ),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+          sliver: SliverLayoutBuilder(
+            builder: (context, constraints) {
+              final mainAxisExtent = twitchStreamCardGridMainAxisExtent(
+                constraints.crossAxisExtent,
+              );
+
+              return SliverGrid(
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
+                  mainAxisExtent: mainAxisExtent,
+                  crossAxisSpacing: twitchStreamCardGridSpacing,
+                  mainAxisSpacing: twitchStreamCardGridSpacing,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final stream = streams[index];
+                    return RepaintBoundary(
+                      child: TwitchStreamCard(
+                        stream: stream,
+                        onTap: () => _openStreamTarget(context, stream),
+                      ),
+                    );
+                  },
+                  childCount: streams.length,
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
+                  addSemanticIndexes: false,
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openStreamTarget(BuildContext context, TwitchLiveStream stream) {
+    Navigator.of(context)
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => TwitchWatchRouteGuard(
+              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
+                stream,
+              ),
+              initialOfflineChannel: TwitchFollowedChannel(
+                broadcasterId: stream.userId,
+                broadcasterLogin: stream.userLogin,
+                broadcasterName: stream.userName,
+                followedAt: null,
+                profileImageUrl: stream.profileImageUrl,
+              ),
+              initialDiscoveryService: discoveryService,
+            ),
+          ),
+        )
+        .then((_) {
+          final callback = onReturnFromStream;
+          if (callback != null) unawaited(callback());
+        });
+  }
+}
+
 class _DiscoveryGlowOrb extends StatelessWidget {
   final Color color;
 

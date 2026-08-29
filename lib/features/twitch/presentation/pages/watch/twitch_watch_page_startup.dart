@@ -416,6 +416,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }) async {
     final fallbackChannel = widget.initialOfflineChannel;
     final discoveryService = widget.initialDiscoveryService;
+    if (!widget.initialOfflineFallbackAllowed) return false;
     if (fallbackChannel == null || discoveryService == null) return false;
 
     try {

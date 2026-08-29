@@ -56,6 +56,37 @@ class TwitchLiveStream {
     );
   }
 
+  factory TwitchLiveStream.fromHelixSearchChannelJson(
+    Map<String, dynamic> json,
+  ) {
+    final id = json['id']?.toString() ?? '';
+    final login = json['broadcaster_login']?.toString().toLowerCase() ?? '';
+    final displayName = json['display_name']?.toString() ?? '';
+    final rawTags = json['tags'];
+
+    return TwitchLiveStream(
+      id: 'search:$id',
+      userId: id,
+      userLogin: login,
+      userName: displayName.isEmpty ? login : displayName,
+      gameId: json['game_id']?.toString() ?? '',
+      gameName: json['game_name']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      viewerCount: 0,
+      startedAt: DateTime.tryParse(json['started_at']?.toString() ?? ''),
+      language: json['broadcaster_language']?.toString() ?? '',
+      thumbnailUrl: '',
+      tags: rawTags is List
+          ? rawTags
+                .map((tag) => tag.toString())
+                .where((tag) => tag.isNotEmpty)
+                .toList(growable: false)
+          : const <String>[],
+      isMature: false,
+      profileImageUrl: json['thumbnail_url']?.toString().trim() ?? '',
+    );
+  }
+
   TwitchLiveStream copyWith({String? profileImageUrl}) {
     return TwitchLiveStream(
       id: id,
@@ -167,6 +198,20 @@ class TwitchFollowedChannel {
           json['broadcaster_login']?.toString().toLowerCase() ?? '',
       broadcasterName: json['broadcaster_name']?.toString() ?? '',
       followedAt: DateTime.tryParse(json['followed_at']?.toString() ?? ''),
+    );
+  }
+
+  factory TwitchFollowedChannel.fromHelixSearchChannelJson(
+    Map<String, dynamic> json,
+  ) {
+    return TwitchFollowedChannel(
+      broadcasterId: json['id']?.toString() ?? '',
+      broadcasterLogin:
+          json['broadcaster_login']?.toString().toLowerCase() ?? '',
+      broadcasterName: json['display_name']?.toString() ?? '',
+      followedAt: null,
+      profileImageUrl: json['thumbnail_url']?.toString().trim() ?? '',
+      description: json['title']?.toString().trim() ?? '',
     );
   }
 
@@ -439,6 +484,20 @@ class TwitchFollowedChannelPageResult {
 
   const TwitchFollowedChannelPageResult({
     required this.channels,
+    required this.cursor,
+  });
+
+  bool get hasMore => cursor != null && cursor!.trim().isNotEmpty;
+}
+
+class TwitchChannelSearchResult {
+  final List<TwitchLiveStream> liveStreams;
+  final List<TwitchFollowedChannel> offlineChannels;
+  final String? cursor;
+
+  const TwitchChannelSearchResult({
+    required this.liveStreams,
+    required this.offlineChannels,
     required this.cursor,
   });
 
