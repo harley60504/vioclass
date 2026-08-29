@@ -25,6 +25,11 @@ class TwitchFollowingPage extends StatefulWidget {
   final String? channelSearchError;
   final int reloadTick;
   final Future<void> Function() onLoginPressed;
+  final void Function(
+    List<TwitchLiveStream> liveStreams,
+    List<TwitchFollowedChannel> offlineChannels,
+  )?
+  onFollowedChannelsChanged;
 
   const TwitchFollowingPage({
     super.key,
@@ -36,6 +41,7 @@ class TwitchFollowingPage extends StatefulWidget {
     required this.channelSearchError,
     required this.reloadTick,
     required this.onLoginPressed,
+    this.onFollowedChannelsChanged,
   });
 
   @override
@@ -167,6 +173,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         paginationError = null;
         offlineError = offline.errorText;
       });
+      widget.onFollowedChannelsChanged?.call(
+        refreshed.streams,
+        offline.channels,
+      );
 
       if (jumpToTop || clearExisting) {
         _jumpToTop();
@@ -291,6 +301,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         hasMore = page.hasMore;
         loadingMore = false;
       });
+      widget.onFollowedChannelsChanged?.call(
+        loadedStreams,
+        offlineFollowedChannels,
+      );
     } catch (error) {
       if (!mounted) return;
       setState(() {

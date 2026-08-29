@@ -61,6 +61,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   List<TwitchLiveStream> searchedLiveStreams = const <TwitchLiveStream>[];
   List<TwitchFollowedChannel> searchedOfflineChannels =
       const <TwitchFollowedChannel>[];
+  Set<String> followedUserIds = const <String>{};
+  Set<String> followedLogins = const <String>{};
   String? channelSearchError;
   int reloadTick = 0;
   bool loadingLoginState = true;
@@ -301,6 +303,35 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     await searchChannels(keyword, generation);
   }
 
+  void rememberFollowedChannels(
+    List<TwitchLiveStream> liveStreams,
+    List<TwitchFollowedChannel> offlineChannels,
+  ) {
+    final ids = <String>{
+      ...followedUserIds,
+      ...liveStreams.map((stream) => stream.userId.trim()),
+      ...offlineChannels.map((channel) => channel.broadcasterId.trim()),
+    }.where((id) => id.isNotEmpty).toSet();
+    final logins = <String>{
+      ...followedLogins,
+      ...liveStreams.map((stream) => stream.channelLogin),
+      ...offlineChannels.map((channel) => channel.channelLogin),
+    }.where((login) => login.isNotEmpty).toSet();
+    if (_setEquals(followedUserIds, ids) &&
+        _setEquals(followedLogins, logins)) {
+      return;
+    }
+    setState(() {
+      followedUserIds = ids;
+      followedLogins = logins;
+    });
+  }
+
+  bool _setEquals(Set<String> a, Set<String> b) {
+    if (a.length != b.length) return false;
+    return a.containsAll(b);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -414,6 +445,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               query: searchText,
               liveStreams: searchedLiveStreams,
               offlineChannels: searchedOfflineChannels,
+              followedUserIds: followedUserIds,
+              followedLogins: followedLogins,
               loading: loadingChannelSearch,
               errorText: channelSearchError,
               discoveryService: discoveryService,
@@ -430,6 +463,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               channelSearchError: channelSearchError,
               reloadTick: reloadTick,
               onLoginPressed: runLinkedTwitchLoginFlow,
+              onFollowedChannelsChanged: rememberFollowedChannels,
             )
           : TwitchBrowsePage(
               key: browsePageKey,
@@ -450,6 +484,8 @@ class _TwitchChannelSearchPage extends StatelessWidget {
   final String query;
   final List<TwitchLiveStream> liveStreams;
   final List<TwitchFollowedChannel> offlineChannels;
+  final Set<String> followedUserIds;
+  final Set<String> followedLogins;
   final bool loading;
   final String? errorText;
   final TwitchDiscoveryService discoveryService;
@@ -460,6 +496,8 @@ class _TwitchChannelSearchPage extends StatelessWidget {
     required this.query,
     required this.liveStreams,
     required this.offlineChannels,
+    required this.followedUserIds,
+    required this.followedLogins,
     required this.loading,
     required this.errorText,
     required this.discoveryService,
@@ -469,6 +507,20 @@ class _TwitchChannelSearchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasResults = liveStreams.isNotEmpty || offlineChannels.isNotEmpty;
+    final followedLiveStreams = liveStreams
+        .where(_isFollowedStream)
+        .toList(growable: false);
+    final otherLiveStreams = liveStreams
+        .where((stream) => !_isFollowedStream(stream))
+        .toList(growable: false);
+    final followedOfflineChannels = offlineChannels
+        .where(_isFollowedChannel)
+        .toList(growable: false);
+    final otherOfflineChannels = offlineChannels
+        .where((channel) => !_isFollowedChannel(channel))
+        .toList(growable: false);
+    final followedCount =
+        followedLiveStreams.length + followedOfflineChannels.length;
 
     if (!loading && !hasResults) {
       return TwitchDiscoveryEmptyState(
@@ -536,15 +588,36 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                   ),
                 ),
               ),
-            if (liveStreams.isNotEmpty)
+            if (followedCount > 0) ...[
+              if (followedLiveStreams.isNotEmpty)
+                TwitchDiscoveryStreamSliverSection(
+                  icon: Icons.favorite_rounded,
+                  title: '已追隨的直播',
+                  streams: followedLiveStreams,
+                  discoveryService: discoveryService,
+                  onReturnFromStream: onRefresh,
+                ),
+              if (followedOfflineChannels.isNotEmpty)
+                ..._offlineChannelSlivers(
+                  icon: Icons.favorite_border_rounded,
+                  title: '已追隨但未開台',
+                  channels: followedOfflineChannels,
+                ),
+            ],
+            if (otherLiveStreams.isNotEmpty)
               TwitchDiscoveryStreamSliverSection(
                 icon: Icons.live_tv_rounded,
                 title: '直播',
-                streams: liveStreams,
+                streams: otherLiveStreams,
                 discoveryService: discoveryService,
                 onReturnFromStream: onRefresh,
               ),
-            if (offlineChannels.isNotEmpty) ..._offlineChannelSlivers(),
+            if (otherOfflineChannels.isNotEmpty)
+              ..._offlineChannelSlivers(
+                icon: Icons.tv_off_rounded,
+                title: '未開台頻道',
+                channels: otherOfflineChannels,
+              ),
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
         ),
@@ -552,13 +625,31 @@ class _TwitchChannelSearchPage extends StatelessWidget {
     );
   }
 
-  List<Widget> _offlineChannelSlivers() {
+  bool _isFollowedStream(TwitchLiveStream stream) {
+    final id = stream.userId.trim();
+    final login = stream.channelLogin;
+    if (id.isNotEmpty && followedUserIds.contains(id)) return true;
+    return login.isNotEmpty && followedLogins.contains(login);
+  }
+
+  bool _isFollowedChannel(TwitchFollowedChannel channel) {
+    final id = channel.broadcasterId.trim();
+    final login = channel.channelLogin;
+    if (id.isNotEmpty && followedUserIds.contains(id)) return true;
+    return login.isNotEmpty && followedLogins.contains(login);
+  }
+
+  List<Widget> _offlineChannelSlivers({
+    required IconData icon,
+    required String title,
+    required List<TwitchFollowedChannel> channels,
+  }) {
     return <Widget>[
       SliverToBoxAdapter(
         child: TwitchDiscoverySectionHeader(
-          icon: Icons.tv_off_rounded,
-          title: '未開台頻道',
-          count: offlineChannels.length,
+          icon: icon,
+          title: title,
+          count: channels.length,
         ),
       ),
       SliverPadding(
@@ -572,10 +663,10 @@ class _TwitchChannelSearchPage extends StatelessWidget {
           ),
           delegate: SliverChildBuilderDelegate((context, index) {
             return TwitchOfflineChannelCard(
-              channel: offlineChannels[index],
+              channel: channels[index],
               discoveryService: discoveryService,
             );
-          }, childCount: offlineChannels.length),
+          }, childCount: channels.length),
         ),
       ),
     ];

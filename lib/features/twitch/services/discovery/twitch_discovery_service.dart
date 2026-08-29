@@ -184,17 +184,61 @@ class TwitchDiscoveryService {
     );
 
     final parsed = _parseChannelSearch(raw);
-    if (parsed.offlineChannels.isEmpty) return parsed;
+    final liveStreams = parsed.liveStreams.isEmpty
+        ? parsed.liveStreams
+        : await _fetchLiveStreamsForSearchResult(
+            auth: auth,
+            fallbackStreams: parsed.liveStreams,
+          );
+    if (parsed.offlineChannels.isEmpty) {
+      return TwitchChannelSearchResult(
+        liveStreams: liveStreams,
+        offlineChannels: parsed.offlineChannels,
+        cursor: parsed.cursor,
+      );
+    }
 
     final offlineWithProfiles = await _attachFollowedChannelProfiles(
       auth: auth,
       channels: parsed.offlineChannels,
     );
     return TwitchChannelSearchResult(
-      liveStreams: parsed.liveStreams,
+      liveStreams: liveStreams,
       offlineChannels: offlineWithProfiles,
       cursor: parsed.cursor,
     );
+  }
+
+  Future<List<TwitchLiveStream>> _fetchLiveStreamsForSearchResult({
+    required TwitchViewerAuthSnapshot auth,
+    required List<TwitchLiveStream> fallbackStreams,
+  }) async {
+    final userIds = fallbackStreams
+        .map((stream) => stream.userId.trim())
+        .where((id) => id.isNotEmpty)
+        .toList(growable: false);
+    if (userIds.isEmpty) return fallbackStreams;
+
+    try {
+      final raw = await client.getJson<Map<String, dynamic>>(
+        '${TwitchApiConstants.helixBaseUrl}/streams',
+        queryParameters: <String, dynamic>{
+          'first': userIds.length.clamp(1, 100),
+          'user_id': userIds,
+        },
+        headers: _helixHeaders(auth),
+      );
+      final liveByUserId = <String, TwitchLiveStream>{
+        for (final stream in _parseStreamPage(raw).streams)
+          if (stream.userId.trim().isNotEmpty) stream.userId.trim(): stream,
+      };
+
+      return fallbackStreams
+          .map((stream) => liveByUserId[stream.userId.trim()] ?? stream)
+          .toList(growable: false);
+    } catch (_) {
+      return fallbackStreams;
+    }
   }
 
   Future<TwitchGamePageResult> fetchTopGames({
