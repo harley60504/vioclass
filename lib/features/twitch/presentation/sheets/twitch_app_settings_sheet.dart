@@ -81,9 +81,16 @@ class _VioClassUpdatePrompt extends StatelessWidget {
               currentVersion: info?.currentVersion,
               latestVersion: release?.tagName,
               assetName: asset?.name,
-              status: info?.updateAvailable == true ? '有新版本可以更新' : '目前已是最新版本',
+              status: controller.installing
+                  ? '正在下載並準備更新...'
+                  : info?.updateAvailable == true
+                  ? '有新版本可以更新'
+                  : '目前已是最新版本',
               hasUpdate: info?.updateAvailable == true,
-              checking: controller.checking,
+              checking: controller.checking || controller.installing,
+              progress: controller.installing
+                  ? controller.installProgress
+                  : null,
             ),
             if (release?.body.trim().isNotEmpty == true) ...[
               const SizedBox(height: 12),
@@ -119,14 +126,25 @@ class _VioClassUpdatePrompt extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
-                  onPressed: info?.updateAvailable == true
+                  onPressed:
+                      info?.updateAvailable == true && !controller.installing
                       ? () async {
-                          await controller.openUpdate();
-                          if (context.mounted) Navigator.of(context).maybePop();
+                          final started = asset == null
+                              ? await controller.openUpdate()
+                              : await controller.installUpdate();
+                          if (started && context.mounted) {
+                            Navigator.of(context).maybePop();
+                          }
                         }
                       : null,
                   icon: const Icon(Icons.download_rounded, size: 18),
-                  label: Text(asset == null ? '開啟 Release' : '下載更新'),
+                  label: Text(
+                    controller.installing
+                        ? '更新中'
+                        : asset == null
+                        ? '開啟 Release'
+                        : '更新',
+                  ),
                 ),
               ],
             ),
@@ -896,6 +914,8 @@ class _UpdateSettingsPane extends StatelessWidget {
         final release = latest?.release;
         final status = controller.checking
             ? '正在檢查 GitHub 最新版本...'
+            : controller.installing
+            ? '正在下載並準備更新...'
             : controller.errorText?.trim().isNotEmpty == true
             ? '更新檢查失敗，稍後再試。'
             : latest == null
@@ -926,7 +946,10 @@ class _UpdateSettingsPane extends StatelessWidget {
                     assetName: asset?.name,
                     status: status,
                     hasUpdate: latest?.updateAvailable == true,
-                    checking: controller.checking,
+                    checking: controller.checking || controller.installing,
+                    progress: controller.installing
+                        ? controller.installProgress
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -934,7 +957,7 @@ class _UpdateSettingsPane extends StatelessWidget {
                     runSpacing: 8,
                     children: [
                       FilledButton.icon(
-                        onPressed: controller.checking
+                        onPressed: controller.checking || controller.installing
                             ? null
                             : () async {
                                 final info = await controller.checkNow();
@@ -960,11 +983,16 @@ class _UpdateSettingsPane extends StatelessWidget {
                         label: Text(controller.checking ? '檢查中' : '立即檢查'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: latest?.updateAvailable == true
-                            ? controller.openUpdate
+                        onPressed:
+                            latest?.updateAvailable == true &&
+                                !controller.checking &&
+                                !controller.installing
+                            ? asset == null
+                                  ? controller.openUpdate
+                                  : controller.installUpdate
                             : null,
                         icon: const Icon(Icons.download_rounded, size: 18),
-                        label: const Text('下載更新'),
+                        label: Text(controller.installing ? '更新中' : '更新'),
                       ),
                     ],
                   ),
@@ -985,6 +1013,7 @@ class _UpdateStatusCard extends StatelessWidget {
   final String status;
   final bool hasUpdate;
   final bool checking;
+  final double? progress;
 
   const _UpdateStatusCard({
     required this.currentVersion,
@@ -993,6 +1022,7 @@ class _UpdateStatusCard extends StatelessWidget {
     required this.status,
     required this.hasUpdate,
     required this.checking,
+    this.progress,
   });
 
   @override
@@ -1061,6 +1091,16 @@ class _UpdateStatusCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (progress != null) ...[
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: progress!.clamp(0.0, 1.0),
+                    minHeight: 3,
+                    color: TwitchUiColors.primarySoft,
+                    backgroundColor: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ],
               ],
             ),
           ),

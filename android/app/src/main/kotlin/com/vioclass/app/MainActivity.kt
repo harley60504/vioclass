@@ -10,17 +10,23 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var pipBridge: TwitchPipBridge? = null
+    private var updateBridge: VioClassUpdateBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         val bridge = TwitchPipBridge(this)
         bridge.attach(MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vio_class/android_pip"))
         pipBridge = bridge
+        val updater = VioClassUpdateBridge(this)
+        updater.attach(MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vio_class/app_update"))
+        updateBridge = updater
     }
 
     override fun onDestroy() {
         pipBridge?.detach()
         pipBridge = null
+        updateBridge?.detach()
+        updateBridge = null
         super.onDestroy()
     }
 

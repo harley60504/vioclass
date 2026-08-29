@@ -2,25 +2,34 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../services/update/vioclass_update_installer.dart';
 import '../../services/update/vioclass_update_service.dart';
 
 class VioClassUpdateController extends ChangeNotifier {
   static const String _autoCheckKey = 'vioclass_auto_check_updates_v1';
 
   final VioClassUpdateService service;
+  final VioClassUpdateInstaller installer;
 
   bool _loaded = false;
   bool _autoCheckEnabled = false;
   bool _checking = false;
+  bool _installing = false;
+  double _installProgress = 0;
   String? _errorText;
   VioClassUpdateInfo? _latest;
 
-  VioClassUpdateController({VioClassUpdateService? service})
-    : service = service ?? VioClassUpdateService();
+  VioClassUpdateController({
+    VioClassUpdateService? service,
+    VioClassUpdateInstaller? installer,
+  }) : service = service ?? VioClassUpdateService(),
+       installer = installer ?? VioClassUpdateInstaller();
 
   bool get loaded => _loaded;
   bool get autoCheckEnabled => _autoCheckEnabled;
   bool get checking => _checking;
+  bool get installing => _installing;
+  double get installProgress => _installProgress;
   String? get errorText => _errorText;
   VioClassUpdateInfo? get latest => _latest;
   bool get hasUpdate => _latest?.updateAvailable == true;
@@ -70,6 +79,34 @@ class VioClassUpdateController extends ChangeNotifier {
     final uri = Uri.tryParse(target);
     if (uri == null) return false;
     return launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<bool> installUpdate() async {
+    final info = _latest;
+    if (info == null) return false;
+    if (_installing) return false;
+    _installing = true;
+    _installProgress = 0;
+    _errorText = null;
+    notifyListeners();
+
+    try {
+      final file = await service.downloadPreferredAsset(
+        info: info,
+        onProgress: (progress) {
+          _installProgress = progress;
+          notifyListeners();
+        },
+      );
+      await installer.install(file);
+      return true;
+    } catch (error) {
+      _errorText = error.toString();
+      return false;
+    } finally {
+      _installing = false;
+      notifyListeners();
+    }
   }
 
   @override

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 
 const String vioclassCurrentVersion = String.fromEnvironment(
   'VIOCLASS_VERSION',
@@ -41,6 +42,41 @@ class VioClassUpdateService {
         vioclassCurrentVersion,
       ).isNewer,
     );
+  }
+
+  Future<File> downloadPreferredAsset({
+    required VioClassUpdateInfo info,
+    required void Function(double progress) onProgress,
+  }) async {
+    final asset = info.preferredAsset;
+    if (asset == null || asset.downloadUrl.trim().isEmpty) {
+      throw StateError('找不到適合此平台的更新檔。');
+    }
+
+    final directory = await getTemporaryDirectory();
+    final updateDirectory = Directory(
+      '${directory.path}${Platform.pathSeparator}vioclass_updates',
+    );
+    if (!updateDirectory.existsSync()) {
+      updateDirectory.createSync(recursive: true);
+    }
+    final file = File(
+      '${updateDirectory.path}${Platform.pathSeparator}${asset.name}',
+    );
+
+    await _dio.download(
+      asset.downloadUrl,
+      file.path,
+      options: Options(
+        headers: const <String, String>{'Accept': 'application/octet-stream'},
+      ),
+      onReceiveProgress: (received, total) {
+        if (total <= 0) return;
+        onProgress((received / total).clamp(0.0, 1.0));
+      },
+    );
+    onProgress(1);
+    return file;
   }
 
   void dispose() {
@@ -139,11 +175,7 @@ class VioClassRelease {
     }
     if (Platform.isWindows) {
       return _firstAsset(
-        (name) =>
-            name.contains('windows') &&
-            (name.endsWith('.zip') ||
-                name.endsWith('.exe') ||
-                name.endsWith('.msix')),
+        (name) => name.contains('windows') && name.endsWith('.zip'),
       );
     }
     return assets.isEmpty ? null : assets.first;
@@ -153,7 +185,7 @@ class VioClassRelease {
     for (final asset in assets) {
       if (test(asset.name.toLowerCase())) return asset;
     }
-    return assets.isEmpty ? null : assets.first;
+    return null;
   }
 }
 
