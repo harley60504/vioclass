@@ -283,6 +283,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   TwitchM3u8Variant? currentVodQualityVariant;
   String? warmedLiveDvrVideoId;
   String? warmedLiveDvrQualityKey;
+  DateTime? warmedLiveDvrResolvedAt;
   bool preferVodReplayChat = false;
   List<TwitchChannelPanel> aboutPanels = const <TwitchChannelPanel>[];
   List<TwitchChannelSocialLink> aboutSocialLinks =
@@ -578,6 +579,15 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         await preferencesController.applyPlayerVolume();
         final isLowLatencyLive =
             currentPlaybackKind == TwitchWatchPlaybackKind.live;
+        final isLiveDvrReplay =
+            currentPlaybackKind == TwitchWatchPlaybackKind.liveDvr;
+        if (isLiveDvrReplay) {
+          final recovered = await recoverLiveDvrPlaybackAfterForeground(
+            channel: channel,
+            generation: watchLoadGeneration,
+          );
+          if (recovered) return;
+        }
         if (isLowLatencyLive) {
           await playerSession.openOrResume(
             uri: currentUri,

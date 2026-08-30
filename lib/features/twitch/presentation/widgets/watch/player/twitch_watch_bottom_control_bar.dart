@@ -486,7 +486,7 @@ class _WatchPlaybackStrip extends StatelessWidget {
         timelineValue: playerRuntime.usingLiveDvrBridge
             ? playerRuntime.liveDvrBridgeTimelineRatio
             : 1.0,
-        timelineValueAdvancesWithPlayer: playerRuntime.usingLiveDvrBridge,
+        timelineValueAdvancesWithPlayer: false,
         onOpenDvrReplayAt: onOpenDvrReplayAt,
         onReturnToLive: onReturnToLive,
       );

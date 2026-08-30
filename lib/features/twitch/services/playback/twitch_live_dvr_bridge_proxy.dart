@@ -40,7 +40,16 @@ class TwitchLiveDvrBridgeProxy {
   Duration? get latestDuration => _latestDuration;
   bool get isRunning => _server != null;
   bool get isLiveMode => false;
-  double get timelineRatio => _seekRatio;
+  double get timelineRatio {
+    final duration = _latestDuration;
+    if (duration == null || duration.inMilliseconds <= 0) return _seekRatio;
+    final elapsed = DateTime.now().difference(_dvrSeekStartedAt);
+    if (elapsed.isNegative) return _seekRatio;
+    return (_seekRatio + elapsed.inMilliseconds / duration.inMilliseconds)
+        .clamp(0.0, liveEdgeRatio)
+        .toDouble();
+  }
+
   String get playlistPlaybackUrl => '$playlistUrl?v=$_streamGeneration';
   String get streamTsPlaybackUrl => '$streamTsUrl?v=$_streamGeneration';
 

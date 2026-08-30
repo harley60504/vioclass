@@ -16,6 +16,7 @@ import 'twitch_watch_page_relationship.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 const double _liveDvrLiveEdgeRatio = 0.98;
+const Duration _liveDvrWarmTtl = Duration(minutes: 8);
 
 extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   Future<void> loadAuth() async {
@@ -575,7 +576,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       activeGrowingVodVideo = video != null && video.isLikelyGrowingArchive
           ? video
           : null;
-      if (activeGrowingVodVideo == null) warmedLiveDvrVideoId = null;
+      if (activeGrowingVodVideo == null) {
+        warmedLiveDvrVideoId = null;
+        warmedLiveDvrResolvedAt = null;
+      }
       watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
       if (activeGrowingVodVideo != null) {
         markOwnedPlayback(
@@ -595,6 +599,66 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('prepare active growing VOD failed: $error');
       }
+    }
+  }
+
+  Future<bool> recoverLiveDvrPlaybackAfterForeground({
+    required String channel,
+    required int generation,
+  }) async {
+    final currentVideo = activeGrowingVodVideo;
+    if (currentVideo == null) return false;
+
+    final ratio = watchPorts.player.runtime.liveDvrBridgeTimelineRatio ?? 0.92;
+    final freshVideo =
+        await _fetchCurrentDvrVideoSnapshot(
+          channel: channel,
+          generation: generation,
+          currentVideoId: currentVideo.id,
+        ) ??
+        currentVideo;
+    if (!isCurrentWatchTask(generation, channel)) return false;
+
+    if (freshVideo.isLikelyGrowingArchive) {
+      activeGrowingVodVideo = freshVideo;
+      final prepared = await prepareLiveDvrBridgeSource(freshVideo);
+      if (!prepared) return false;
+      await seekLiveDvrBridgePlayback(ratio);
+      return true;
+    }
+
+    return openVodPlayback(
+      channel: channel,
+      generation: generation,
+      video: freshVideo,
+      initialRatio: ratio,
+    );
+  }
+
+  Future<TwitchChannelVideo?> _fetchCurrentDvrVideoSnapshot({
+    required String channel,
+    required int generation,
+    required String currentVideoId,
+  }) async {
+    final fallbackChannel = widget.resolvedInitialOfflineChannel;
+    final discoveryService = widget.initialDiscoveryService;
+    if (fallbackChannel == null || discoveryService == null) return null;
+
+    try {
+      final page = await discoveryService.fetchChannelVideos(
+        userId: fallbackChannel.broadcasterId,
+        first: 5,
+      );
+      if (!isCurrentWatchTask(generation, channel)) return null;
+      for (final video in page.videos) {
+        if (video.id == currentVideoId) return video;
+      }
+      return page.videos.isEmpty ? null : page.videos.first;
+    } catch (error) {
+      if (isCurrentWatchTask(generation, channel)) {
+        debugPrint('refresh active DVR video failed: $error');
+      }
+      return null;
     }
   }
 
@@ -621,6 +685,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       if (warmed) {
         warmedLiveDvrVideoId = video.id;
         warmedLiveDvrQualityKey = playlist.selectedVariant?.adAwareQualityKey;
+        warmedLiveDvrResolvedAt = DateTime.now();
         markOwnedPlayback(
           kind: currentPlaybackKind,
           mediaUri: TwitchMediaKitPlayerHost.currentMediaUri,
@@ -628,6 +693,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       }
     } catch (error) {
       warmedLiveDvrVideoId = null;
+      warmedLiveDvrResolvedAt = null;
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('warm live DVR bridge failed: $error');
       }
@@ -642,10 +708,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
     final preferredQuality = _preferredLiveDvrQuality();
     final preferredQualityKey = _normalizeWatchQualityKey(preferredQuality);
+    final warmedAt = warmedLiveDvrResolvedAt;
+    final hasFreshWarmBridge =
+        warmedAt != null &&
+        DateTime.now().difference(warmedAt) < _liveDvrWarmTtl;
     if (warmedLiveDvrVideoId == video.id &&
         (preferredQualityKey == null ||
             warmedLiveDvrQualityKey == preferredQualityKey) &&
-        watchPorts.player.runtime.hasWarmLiveDvrBridge) {
+        watchPorts.player.runtime.hasWarmLiveDvrBridge &&
+        hasFreshWarmBridge) {
       debugPrint(
         '[LiveDvrBridge] reuse warmed active archive video=${video.id}',
       );
@@ -672,12 +743,14 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       if (warmed) warmedLiveDvrVideoId = video.id;
       if (warmed) {
         warmedLiveDvrQualityKey = playlist.selectedVariant?.adAwareQualityKey;
+        warmedLiveDvrResolvedAt = DateTime.now();
       }
       return warmed;
     } catch (error) {
       watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
       warmedLiveDvrVideoId = null;
       warmedLiveDvrQualityKey = null;
+      warmedLiveDvrResolvedAt = null;
       debugPrint('prepare live DVR bridge failed: $error');
       return false;
     }
@@ -831,6 +904,11 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final playlist = await watchServices.playbackApi.resolveVodPlaylist(
       videoId: video.id,
     );
+    activeGrowingVodVideo = null;
+    warmedLiveDvrVideoId = null;
+    warmedLiveDvrQualityKey = null;
+    warmedLiveDvrResolvedAt = null;
+    watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
     vodQualityVariants = playlist.variants;
     currentVodQualityVariant = playlist.selectedVariant;
     currentVodQualityVideo = video;
@@ -945,6 +1023,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         currentVodQualityVideo = video;
         warmedLiveDvrVideoId = video.id;
         warmedLiveDvrQualityKey = variant.adAwareQualityKey;
+        warmedLiveDvrResolvedAt = DateTime.now();
         final ratio =
             watchPorts.player.runtime.liveDvrBridgeTimelineRatio ?? 0.92;
         await seekLiveDvrBridgePlayback(ratio);
