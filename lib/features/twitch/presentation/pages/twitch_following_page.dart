@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../twitch_follow_status_resolver.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/discovery/twitch_game_filter_grid_sheet.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
@@ -31,6 +32,7 @@ class TwitchFollowingPage extends StatefulWidget {
     List<TwitchFollowedChannel> offlineChannels,
   )?
   onFollowedChannelsChanged;
+  final TwitchFollowStatusResolver? followStatusFor;
 
   const TwitchFollowingPage({
     super.key,
@@ -43,6 +45,7 @@ class TwitchFollowingPage extends StatefulWidget {
     required this.reloadTick,
     required this.onLoginPressed,
     this.onFollowedChannelsChanged,
+    this.followStatusFor,
   });
 
   @override
@@ -231,6 +234,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       identityOf: _streamIdentity,
     );
     final streamsWithProfiles = await _attachProfileImages(reconciled);
+    unawaited(_ensureFollowedGameArtwork(streams: streamsWithProfiles));
 
     return _FollowingRefreshWindow(
       streams: streamsWithProfiles,
@@ -294,6 +298,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         first: _followedPageSize,
       );
       final streamsWithProfiles = await _attachProfileImages(page.streams);
+      unawaited(_ensureFollowedGameArtwork(streams: streamsWithProfiles));
       if (!mounted) return;
 
       setState(() {
@@ -505,8 +510,11 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     return games;
   }
 
-  Future<void> _ensureFollowedGameArtwork() async {
-    final missingGameIds = _gameSourceForCurrentLanguage()
+  Future<void> _ensureFollowedGameArtwork({
+    Iterable<TwitchLiveStream>? streams,
+  }) async {
+    final source = streams ?? _gameSourceForCurrentLanguage();
+    final missingGameIds = source
         .map((stream) => stream.gameId.trim())
         .where((id) => id.isNotEmpty)
         .where((id) => !gameCategoryById.containsKey(id))
@@ -768,6 +776,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
         showSectionCount: false,
+        streamKnownFollowing: true,
+        followStatusFor: widget.followStatusFor,
         extraSliversBeforeFooter: lowerState.slivers,
         footer: lowerState.footer,
       ),
@@ -818,6 +828,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           icon: Icons.video_library_rounded,
           title: '未開台追隨頻道',
           channels: followedOfflineChannels,
+          defaultKnownFollowing: true,
         ),
       );
     }
@@ -861,6 +872,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           streams: searchedLiveStreams,
           discoveryService: widget.discoveryService,
           onReturnFromStream: refreshStreams,
+          followStatusFor: widget.followStatusFor,
         ),
       );
     }
@@ -882,6 +894,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     required IconData icon,
     required String title,
     required List<TwitchFollowedChannel> channels,
+    bool? defaultKnownFollowing,
   }) {
     if (channels.isEmpty) return const <Widget>[];
 
@@ -905,6 +918,12 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
             return TwitchOfflineChannelCard(
               channel: channels[index],
               discoveryService: widget.discoveryService,
+              initialKnownFollowing:
+                  widget.followStatusFor?.call(
+                    broadcasterId: channels[index].broadcasterId,
+                    broadcasterLogin: channels[index].channelLogin,
+                  ) ??
+                  defaultKnownFollowing,
             );
           }, childCount: channels.length),
         ),

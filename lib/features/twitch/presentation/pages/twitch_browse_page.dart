@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../twitch_follow_status_resolver.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/discovery/twitch_game_filter_grid_sheet.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
@@ -26,6 +27,7 @@ class TwitchBrowsePage extends StatefulWidget {
   final String? channelSearchError;
   final int reloadTick;
   final Future<void> Function() onLoginPressed;
+  final TwitchFollowStatusResolver? followStatusFor;
 
   const TwitchBrowsePage({
     super.key,
@@ -37,6 +39,7 @@ class TwitchBrowsePage extends StatefulWidget {
     required this.channelSearchError,
     required this.reloadTick,
     required this.onLoginPressed,
+    this.followStatusFor,
   });
 
   @override
@@ -1032,6 +1035,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         discoveryService: widget.discoveryService,
         onReturnFromStream: refreshStreams,
         showSectionCount: false,
+        followStatusFor: widget.followStatusFor,
         extraSliversAfterHeader: <Widget>[_buildTagFilterSliver()],
         extraSliversBeforeFooter: lowerState.slivers,
         footer: lowerState.footer,
@@ -1084,6 +1088,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           streams: liveStreams,
           discoveryService: widget.discoveryService,
           onReturnFromStream: refreshStreams,
+          followStatusFor: widget.followStatusFor,
         ),
       );
     }
@@ -1130,6 +1135,10 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
             return TwitchOfflineChannelCard(
               channel: channels[index],
               discoveryService: widget.discoveryService,
+              initialKnownFollowing: widget.followStatusFor?.call(
+                broadcasterId: channels[index].broadcasterId,
+                broadcasterLogin: channels[index].channelLogin,
+              ),
             );
           }, childCount: channels.length),
         ),

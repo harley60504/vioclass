@@ -416,7 +416,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required String channel,
     required int generation,
   }) async {
-    final fallbackChannel = widget.initialOfflineChannel;
+    final fallbackChannel = widget.resolvedInitialOfflineChannel;
     final discoveryService = widget.initialDiscoveryService;
     if (!widget.initialOfflineFallbackAllowed) return false;
     if (fallbackChannel == null || discoveryService == null) return false;
@@ -561,7 +561,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required String channel,
     required int generation,
   }) async {
-    final fallbackChannel = widget.initialOfflineChannel;
+    final fallbackChannel = widget.resolvedInitialOfflineChannel;
     final discoveryService = widget.initialDiscoveryService;
     if (fallbackChannel == null || discoveryService == null) return;
 

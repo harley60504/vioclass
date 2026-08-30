@@ -4,6 +4,7 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../api/core/twitch_api_exception.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../auth/twitch_auth_service.dart';
+import 'twitch_channel_snapshot_cache.dart';
 
 typedef TwitchWebTokenProvider = Future<String?> Function();
 
@@ -100,7 +101,12 @@ class TwitchDiscoveryService {
       headers: _helixHeaders(auth),
     );
 
-    return _parseStreamPage(raw);
+    final page = _parseStreamPage(raw);
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(
+      page.streams,
+      isFollowed: true,
+    );
+    return page;
   }
 
   Future<TwitchFollowedChannelPageResult> fetchFollowedChannels({
@@ -127,11 +133,19 @@ class TwitchDiscoveryService {
     );
 
     final page = _parseFollowedChannelPage(raw);
+    TwitchChannelSnapshotCache.instance.rememberFollowedChannels(
+      page.channels,
+      isFollowed: true,
+    );
     if (!attachProfiles || page.channels.isEmpty) return page;
 
     final channels = await _attachFollowedChannelProfiles(
       auth: auth,
       channels: page.channels,
+    );
+    TwitchChannelSnapshotCache.instance.rememberFollowedChannels(
+      channels,
+      isFollowed: true,
     );
     return TwitchFollowedChannelPageResult(
       channels: channels,
@@ -160,7 +174,9 @@ class TwitchDiscoveryService {
       headers: _helixHeaders(auth),
     );
 
-    return _parseStreamPage(raw);
+    final page = _parseStreamPage(raw);
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(page.streams);
+    return page;
   }
 
   Future<TwitchChannelSearchResult> searchChannels({
@@ -200,6 +216,7 @@ class TwitchDiscoveryService {
             auth: auth,
             streams: refreshedLiveStreams,
           );
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(liveStreams);
     if (parsed.offlineChannels.isEmpty) {
       return TwitchChannelSearchResult(
         liveStreams: liveStreams,
@@ -212,6 +229,8 @@ class TwitchDiscoveryService {
       auth: auth,
       channels: parsed.offlineChannels,
     );
+    TwitchChannelSnapshotCache.instance
+        .rememberFollowedChannels(offlineWithProfiles);
     return TwitchChannelSearchResult(
       liveStreams: liveStreams,
       offlineChannels: offlineWithProfiles,
@@ -501,7 +520,7 @@ query ChannelPanels(\$login: String!) {
 
     if (profiles.isEmpty) return channels;
 
-    return channels
+    final updated = channels
         .map((channel) {
           final profile = profiles[channel.broadcasterId];
           if (profile == null) return channel;
@@ -512,6 +531,8 @@ query ChannelPanels(\$login: String!) {
           );
         })
         .toList(growable: false);
+    TwitchChannelSnapshotCache.instance.rememberFollowedChannels(updated);
+    return updated;
   }
 
   Future<List<TwitchLiveStream>> _attachLiveStreamProfiles({
@@ -531,7 +552,7 @@ query ChannelPanels(\$login: String!) {
 
     if (profiles.isEmpty) return streams;
 
-    return streams
+    final updated = streams
         .map(
           (stream) => stream.copyWith(
             profileImageUrl: stream.profileImageUrl.trim().isNotEmpty
@@ -540,6 +561,8 @@ query ChannelPanels(\$login: String!) {
           ),
         )
         .toList(growable: false);
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(updated);
+    return updated;
   }
 
   Future<Map<String, _TwitchChannelProfile>> _fetchChannelProfilesByIds({
@@ -619,6 +642,10 @@ query ChannelPanels(\$login: String!) {
 
         if (login.isNotEmpty && image.isNotEmpty) {
           output[login] = image;
+          TwitchChannelSnapshotCache.instance.rememberProfileImage(
+            login: login,
+            profileImageUrl: image,
+          );
         }
       }
     }

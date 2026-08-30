@@ -12,11 +12,13 @@ import '../shared/twitch_cached_image_layer.dart';
 class TwitchOfflineChannelCard extends StatelessWidget {
   final TwitchFollowedChannel channel;
   final TwitchDiscoveryService discoveryService;
+  final bool? initialKnownFollowing;
 
   const TwitchOfflineChannelCard({
     super.key,
     required this.channel,
     required this.discoveryService,
+    this.initialKnownFollowing,
   });
 
   @override
@@ -145,6 +147,7 @@ class TwitchOfflineChannelCard extends StatelessWidget {
           initialOfflineChannel: channel,
           initialDiscoveryService: discoveryService,
           initialOfflineFallbackAllowed: true,
+          initialKnownFollowing: initialKnownFollowing,
         ),
       ),
     );

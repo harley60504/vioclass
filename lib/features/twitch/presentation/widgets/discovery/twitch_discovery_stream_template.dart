@@ -9,6 +9,7 @@ import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../pages/twitch_watch_route_guard.dart';
+import '../../twitch_follow_status_resolver.dart';
 import 'twitch_stream_card.dart';
 
 class TwitchDiscoveryStreamGrid extends StatelessWidget {
@@ -23,6 +24,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final Future<void> Function()? onReturnFromStream;
   final TwitchDiscoveryService? discoveryService;
   final bool showSectionCount;
+  final bool? streamKnownFollowing;
+  final TwitchFollowStatusResolver? followStatusFor;
 
   const TwitchDiscoveryStreamGrid({
     super.key,
@@ -37,6 +40,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
     this.onReturnFromStream,
     this.discoveryService,
     this.showSectionCount = true,
+    this.streamKnownFollowing,
+    this.followStatusFor,
   });
 
   @override
@@ -146,6 +151,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                 profileImageUrl: stream.profileImageUrl,
               ),
               initialDiscoveryService: discoveryService,
+              initialKnownFollowing: _knownFollowStatusFor(stream),
             ),
           ),
         )
@@ -153,6 +159,15 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
           final callback = onReturnFromStream;
           if (callback != null) unawaited(callback());
         });
+  }
+
+  bool? _knownFollowStatusFor(TwitchLiveStream stream) {
+    final explicitStatus = streamKnownFollowing;
+    if (explicitStatus != null) return explicitStatus;
+    return followStatusFor?.call(
+      broadcasterId: stream.userId,
+      broadcasterLogin: stream.channelLogin,
+    );
   }
 }
 
@@ -162,6 +177,8 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
   final List<TwitchLiveStream> streams;
   final TwitchDiscoveryService? discoveryService;
   final Future<void> Function()? onReturnFromStream;
+  final bool? streamKnownFollowing;
+  final TwitchFollowStatusResolver? followStatusFor;
 
   const TwitchDiscoveryStreamSliverSection({
     super.key,
@@ -170,6 +187,8 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
     required this.streams,
     this.discoveryService,
     this.onReturnFromStream,
+    this.streamKnownFollowing,
+    this.followStatusFor,
   });
 
   @override
@@ -239,6 +258,7 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
                 profileImageUrl: stream.profileImageUrl,
               ),
               initialDiscoveryService: discoveryService,
+              initialKnownFollowing: _knownFollowStatusFor(stream),
             ),
           ),
         )
@@ -246,6 +266,15 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
           final callback = onReturnFromStream;
           if (callback != null) unawaited(callback());
         });
+  }
+
+  bool? _knownFollowStatusFor(TwitchLiveStream stream) {
+    final explicitStatus = streamKnownFollowing;
+    if (explicitStatus != null) return explicitStatus;
+    return followStatusFor?.call(
+      broadcasterId: stream.userId,
+      broadcasterLogin: stream.channelLogin,
+    );
   }
 }
 

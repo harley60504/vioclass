@@ -17,6 +17,7 @@ import '../mini_player/twitch_mini_player_controller.dart';
 import '../mini_player/twitch_mini_player_overlay.dart';
 import '../sheets/twitch_app_settings_sheet.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../twitch_follow_status_resolver.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
@@ -539,6 +540,17 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     return a.containsAll(b);
   }
 
+  bool? knownFollowStatusFor({
+    String? broadcasterId,
+    String? broadcasterLogin,
+  }) {
+    final id = broadcasterId?.trim() ?? '';
+    final login = broadcasterLogin?.trim().toLowerCase() ?? '';
+    if (id.isNotEmpty && followedUserIds.contains(id)) return true;
+    if (login.isNotEmpty && followedLogins.contains(login)) return true;
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -646,8 +658,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               offlineChannels: searchedOfflineChannels,
               videos: searchedVideos,
               clips: searchedClips,
-              followedUserIds: followedUserIds,
-              followedLogins: followedLogins,
+              followStatusFor: knownFollowStatusFor,
               loading: loadingChannelSearch,
               errorText: channelSearchError,
               discoveryService: discoveryService,
@@ -665,6 +676,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               reloadTick: reloadTick,
               onLoginPressed: runLinkedTwitchLoginFlow,
               onFollowedChannelsChanged: rememberFollowedChannels,
+              followStatusFor: knownFollowStatusFor,
             )
           : TwitchBrowsePage(
               key: browsePageKey,
@@ -676,6 +688,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
               channelSearchError: channelSearchError,
               reloadTick: reloadTick,
               onLoginPressed: runLinkedTwitchLoginFlow,
+              followStatusFor: knownFollowStatusFor,
             ),
     );
   }
@@ -687,8 +700,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
   final List<TwitchFollowedChannel> offlineChannels;
   final List<_TwitchSearchVideoResult> videos;
   final List<_TwitchSearchClipResult> clips;
-  final Set<String> followedUserIds;
-  final Set<String> followedLogins;
+  final TwitchFollowStatusResolver followStatusFor;
   final bool loading;
   final String? errorText;
   final TwitchDiscoveryService discoveryService;
@@ -701,8 +713,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
     required this.offlineChannels,
     required this.videos,
     required this.clips,
-    required this.followedUserIds,
-    required this.followedLogins,
+    required this.followStatusFor,
     required this.loading,
     required this.errorText,
     required this.discoveryService,
@@ -809,12 +820,15 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                   streams: followedLiveStreams,
                   discoveryService: discoveryService,
                   onReturnFromStream: onRefresh,
+                  followStatusFor: followStatusFor,
+                  streamKnownFollowing: true,
                 ),
               if (followedOfflineChannels.isNotEmpty)
                 ..._offlineChannelSlivers(
                   icon: Icons.favorite_border_rounded,
                   title: '已追隨 · 未開台',
                   channels: followedOfflineChannels,
+                  knownFollowing: true,
                 ),
             ],
             if (otherLiveStreams.isNotEmpty)
@@ -824,6 +838,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                 streams: otherLiveStreams,
                 discoveryService: discoveryService,
                 onReturnFromStream: onRefresh,
+                followStatusFor: followStatusFor,
               ),
             if (otherOfflineChannels.isNotEmpty)
               ..._offlineChannelSlivers(
@@ -840,6 +855,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                   return _SearchVodCard(
                     discoveryService: discoveryService,
                     result: result,
+                    followStatusFor: followStatusFor,
                   );
                 },
               ),
@@ -852,6 +868,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
                   return _SearchClipCard(
                     discoveryService: discoveryService,
                     result: result,
+                    followStatusFor: followStatusFor,
                   );
                 },
               ),
@@ -865,21 +882,20 @@ class _TwitchChannelSearchPage extends StatelessWidget {
   bool _isFollowedStream(TwitchLiveStream stream) {
     final id = stream.userId.trim();
     final login = stream.channelLogin;
-    if (id.isNotEmpty && followedUserIds.contains(id)) return true;
-    return login.isNotEmpty && followedLogins.contains(login);
+    return followStatusFor(broadcasterId: id, broadcasterLogin: login) == true;
   }
 
   bool _isFollowedChannel(TwitchFollowedChannel channel) {
     final id = channel.broadcasterId.trim();
     final login = channel.channelLogin;
-    if (id.isNotEmpty && followedUserIds.contains(id)) return true;
-    return login.isNotEmpty && followedLogins.contains(login);
+    return followStatusFor(broadcasterId: id, broadcasterLogin: login) == true;
   }
 
   List<Widget> _offlineChannelSlivers({
     required IconData icon,
     required String title,
     required List<TwitchFollowedChannel> channels,
+    bool? knownFollowing,
   }) {
     return <Widget>[
       SliverToBoxAdapter(
@@ -902,6 +918,12 @@ class _TwitchChannelSearchPage extends StatelessWidget {
             return TwitchOfflineChannelCard(
               channel: channels[index],
               discoveryService: discoveryService,
+              initialKnownFollowing:
+                  knownFollowing ??
+                  followStatusFor(
+                    broadcasterId: channels[index].broadcasterId,
+                    broadcasterLogin: channels[index].channelLogin,
+                  ),
             );
           }, childCount: channels.length),
         ),
@@ -971,8 +993,13 @@ class _TwitchSearchClipResult {
 class _SearchVodCard extends StatelessWidget {
   final TwitchDiscoveryService discoveryService;
   final _TwitchSearchVideoResult result;
+  final TwitchFollowStatusResolver followStatusFor;
 
-  const _SearchVodCard({required this.discoveryService, required this.result});
+  const _SearchVodCard({
+    required this.discoveryService,
+    required this.result,
+    required this.followStatusFor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1003,6 +1030,10 @@ class _SearchVodCard extends StatelessWidget {
               initialActiveDvrVideo: isGrowingArchive ? video : null,
               initialVodVideo: isGrowingArchive ? null : video,
               initialVodPlaybackOnly: !isGrowingArchive,
+              initialKnownFollowing: followStatusFor(
+                broadcasterId: channel.broadcasterId,
+                broadcasterLogin: channel.channelLogin,
+              ),
             ),
           ),
         );
@@ -1014,8 +1045,13 @@ class _SearchVodCard extends StatelessWidget {
 class _SearchClipCard extends StatelessWidget {
   final TwitchDiscoveryService discoveryService;
   final _TwitchSearchClipResult result;
+  final TwitchFollowStatusResolver followStatusFor;
 
-  const _SearchClipCard({required this.discoveryService, required this.result});
+  const _SearchClipCard({
+    required this.discoveryService,
+    required this.result,
+    required this.followStatusFor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1043,6 +1079,10 @@ class _SearchClipCard extends StatelessWidget {
               initialOfflineChannel: channel,
               initialDiscoveryService: discoveryService,
               initialClip: clip,
+              initialKnownFollowing: followStatusFor(
+                broadcasterId: channel.broadcasterId,
+                broadcasterLogin: channel.channelLogin,
+              ),
             ),
           ),
         );

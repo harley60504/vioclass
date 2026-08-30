@@ -40,6 +40,7 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   final bool initialPreferVodReplayChat;
   final bool initialReuseCurrentPlayback;
   final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
+  final bool? initialKnownFollowing;
 
   const TwitchWatchRouteGuard({
     super.key,
@@ -63,6 +64,7 @@ class TwitchWatchRouteGuard extends StatefulWidget {
     this.initialPreferVodReplayChat = false,
     this.initialReuseCurrentPlayback = false,
     this.initialPlayerRuntime,
+    this.initialKnownFollowing,
   });
 
   @override
@@ -169,6 +171,7 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         initialPreferVodReplayChat: widget.initialPreferVodReplayChat,
         initialReuseCurrentPlayback: widget.initialReuseCurrentPlayback,
         initialPlayerRuntime: widget.initialPlayerRuntime,
+        initialKnownFollowing: widget.initialKnownFollowing,
       ),
     );
   }

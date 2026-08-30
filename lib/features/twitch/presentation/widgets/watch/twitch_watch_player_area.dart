@@ -272,7 +272,7 @@ class _WatchPlayerAreaState {
       effectiveChatVisible: pip.isInPictureInPictureMode
           ? false
           : widget.chatVisible,
-      effectiveFollowBusy: widget.followBusy || widget.relationshipBusy,
+      effectiveFollowBusy: widget.followBusy,
       overlayLoading:
           !playerReady &&
           (widget.loading ||

@@ -107,6 +107,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   bool _autoScroll = true;
   bool _programmaticScrollActive = false;
   bool _followLatestScheduled = false;
+  bool _followLatestScheduledAnimated = false;
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
   String _lastSourceNewestFingerprint = '';
@@ -312,17 +313,49 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   }
 
   void _scheduleFollowLatest({required bool animated}) {
-    if (_followLatestScheduled) return;
+    if (_followLatestScheduled) {
+      _followLatestScheduledAnimated =
+          _followLatestScheduledAnimated || animated;
+      return;
+    }
     _followLatestScheduled = true;
+    _followLatestScheduledAnimated = animated;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shouldAnimate = _followLatestScheduledAnimated;
       _followLatestScheduled = false;
+      _followLatestScheduledAnimated = false;
       if (!mounted) return;
-      if (animated) {
+      if (shouldAnimate) {
         _animateOrJumpToLatest();
       } else {
         _jumpToLatest();
       }
+    });
+  }
+
+  void _settleLatestFollowState() {
+    if (!mounted || !_scrollController.hasClients || !_isNearLatest) return;
+
+    final sourceMessages = widget.messages;
+    final nextVisibleMessages = _renderMessagesForCurrentMode(sourceMessages);
+    final needsUpdate =
+        !_autoScroll ||
+        _hiddenNewMessageCount != 0 ||
+        _lastSourceMessageCount != sourceMessages.length ||
+        _lastSourceNewestFingerprint != _newestMessageFingerprint(
+          sourceMessages,
+        ) ||
+        _visibleMessages.length != nextVisibleMessages.length;
+
+    if (!needsUpdate) return;
+
+    setState(() {
+      _autoScroll = true;
+      _visibleMessages = nextVisibleMessages;
+      _lastSourceMessageCount = sourceMessages.length;
+      _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
+      _hiddenNewMessageCount = 0;
     });
   }
 
@@ -332,6 +365,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
     _scrollController.jumpTo(0);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _programmaticScrollActive = false;
+      _settleLatestFollowState();
     });
   }
 
@@ -359,9 +393,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
         .whenComplete(() {
           _programmaticScrollActive = false;
           if (!mounted) return;
-          if (_isNearLatest && !_autoScroll) {
-            setState(() => _autoScroll = true);
-          }
+          _settleLatestFollowState();
         });
   }
 

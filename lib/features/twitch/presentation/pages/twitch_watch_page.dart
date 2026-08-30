@@ -21,6 +21,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/chat/twitch_vod_chat_replay_runtime.dart';
+import '../../services/discovery/twitch_channel_snapshot_cache.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/engagement/twitch_hype_train_controller.dart';
@@ -98,6 +99,7 @@ class TwitchWatchPage extends StatefulWidget {
   final bool initialVodPlaybackOnly;
   final bool initialReuseCurrentPlayback;
   final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
+  final bool? initialKnownFollowing;
 
   const TwitchWatchPage({
     super.key,
@@ -121,6 +123,7 @@ class TwitchWatchPage extends StatefulWidget {
     this.initialVodPlaybackOnly = false,
     this.initialReuseCurrentPlayback = false,
     this.initialPlayerRuntime,
+    this.initialKnownFollowing,
   });
 
   TwitchStreamHeaderMetadata get resolvedInitialMetadata {
@@ -134,7 +137,11 @@ class TwitchWatchPage extends StatefulWidget {
         initialViewerCount != null ||
         initialProfileImageUrl != null;
 
-    if (!hasLegacyMetadata) return initialMetadata;
+    if (!hasLegacyMetadata) {
+      return TwitchChannelSnapshotCache.instance.resolveHeaderMetadata(
+        initialMetadata,
+      );
+    }
 
     final legacyLogin = initialChannelLogin?.trim();
     final legacyTitle = initialStreamTitle?.trim();
@@ -142,7 +149,7 @@ class TwitchWatchPage extends StatefulWidget {
     final legacyLanguage = initialLanguage?.trim();
     final legacyProfileImage = initialProfileImageUrl?.trim();
 
-    return initialMetadata.copyWith(
+    final metadata = initialMetadata.copyWith(
       channelLogin: legacyLogin != null && legacyLogin.isNotEmpty
           ? legacyLogin
           : initialMetadata.channelLogin,
@@ -162,6 +169,24 @@ class TwitchWatchPage extends StatefulWidget {
           legacyProfileImage != null && legacyProfileImage.isNotEmpty
           ? legacyProfileImage
           : initialMetadata.profileImageUrl,
+    );
+    return TwitchChannelSnapshotCache.instance.resolveHeaderMetadata(metadata);
+  }
+
+  TwitchFollowedChannel? get resolvedInitialOfflineChannel {
+    return TwitchChannelSnapshotCache.instance.resolveFollowedChannel(
+      channel: initialOfflineChannel,
+      metadata: resolvedInitialMetadata,
+    );
+  }
+
+  bool? get resolvedInitialFollowStatus {
+    if (initialKnownFollowing != null) return initialKnownFollowing;
+
+    final channel = resolvedInitialOfflineChannel;
+    return TwitchChannelSnapshotCache.instance.findKnownFollowStatus(
+      id: channel?.broadcasterId,
+      login: channel?.channelLogin ?? resolvedInitialMetadata.channelLogin,
     );
   }
 
@@ -198,6 +223,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   bool handedOffToMiniPlayer = false;
   bool leavingToMiniPlayer = false;
   bool reuseCurrentPlaybackOnNextLiveLoad = false;
+  bool? _initialKnownFollowStatus;
 
   bool loadingAuth = true;
   bool loadingWatch = false;
@@ -223,6 +249,13 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   bool get checkingRelationship => relationshipController.checkingRelationship;
   bool get followBusy => relationshipController.followBusy;
   bool get isFollowing => relationshipController.isFollowing;
+  bool get effectiveIsFollowing {
+    if (relationshipController.hasResolvedRelationshipStatus) {
+      return relationshipController.isFollowing;
+    }
+    return _initialKnownFollowStatus ?? relationshipController.isFollowing;
+  }
+
   bool get chatVisible => preferencesController.chatVisible;
   bool get loadingSpecialMessages => chatController.loadingSpecialMessages;
   double get chatPanelWidth => preferencesController.chatPanelWidth;
@@ -322,7 +355,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
     final activeChannelId = channelId?.trim();
     final fallbackChannelId =
-        widget.initialOfflineChannel?.broadcasterId.trim() ?? '';
+        widget.resolvedInitialOfflineChannel?.broadcasterId.trim() ?? '';
     final cleanChannelId = activeChannelId != null && activeChannelId.isNotEmpty
         ? activeChannelId
         : fallbackChannelId;
@@ -429,6 +462,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     channelController = TextEditingController(
       text: widget.resolvedInitialMetadata.channelLogin,
     );
+    _initialKnownFollowStatus = widget.resolvedInitialFollowStatus;
     messageController = TextEditingController();
     session = TwitchWatchSessionHandles.create(
       playerTitle: 'Twitch Raw Proxy',
@@ -486,6 +520,13 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onChannelIdResolved: setResolvedChannelId,
       showMessage: showSnack,
     )..addListener(notifyControllerChanged);
+    final knownFollowStatus = _initialKnownFollowStatus;
+    if (knownFollowStatus != null) {
+      relationshipController.seedKnownFollowStatus(
+        knownFollowStatus,
+        resolvedUserId: widget.resolvedInitialOfflineChannel?.broadcasterId,
+      );
+    }
     playbackController = TwitchWatchPlaybackController(
       playerPort: watchPorts.player,
       applyPlayerVolume: applyPlayerVolume,
@@ -566,10 +607,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
     if (!engagementBootstrapping && !loadingEngagement) {
       unawaited(
-        refreshEngagement(
-          showSnackOnError: false,
-          notifyBalanceDelta: false,
-        ),
+        refreshEngagement(showSnackOnError: false, notifyBalanceDelta: false),
       );
     }
 
@@ -687,7 +725,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       return;
     }
 
-    final knownChannel = widget.initialOfflineChannel;
+    final knownChannel = widget.resolvedInitialOfflineChannel;
     final knownChannelId = knownChannel?.broadcasterId.trim().isNotEmpty == true
         ? knownChannel!.broadcasterId.trim()
         : channelId?.trim() ?? '';
@@ -778,10 +816,12 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       loading: loadingPlayer,
       error: playerError,
       showOfflinePlaceholder: showOfflineChannelPlaceholder,
-      offlineImageUrl: widget.initialOfflineChannel?.offlineImageUrl,
-      isFollowing: isFollowing,
+      offlineImageUrl: widget.resolvedInitialOfflineChannel?.offlineImageUrl,
+      isFollowing: effectiveIsFollowing,
       relationshipBusy:
-          checkingRelationship || followBusy || relationshipBootstrapping,
+          checkingRelationship ||
+          followBusy ||
+          (relationshipBootstrapping && _initialKnownFollowStatus == null),
       relationshipError: relationshipError,
       onToggleFollow: toggleFollowChannel,
       onSubscribe: openSubscribePage,
@@ -829,7 +869,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     );
     final belowPlayer = TwitchChannelAboutSection(
       metadata: metadata,
-      description: widget.initialOfflineChannel?.description ?? '',
+      description: widget.resolvedInitialOfflineChannel?.description ?? '',
       panels: aboutPanels,
       socialLinks: aboutSocialLinks,
       loading: loadingAboutPanels,

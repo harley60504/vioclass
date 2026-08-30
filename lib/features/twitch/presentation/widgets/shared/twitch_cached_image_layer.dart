@@ -117,6 +117,12 @@ class TwitchCachedImageLayer extends StatelessWidget {
   }
 
   Widget _fallback() {
+    final safeWidth = width.isFinite && width > 0 ? width : 48.0;
+    final safeHeight = height.isFinite && height > 0 ? height : safeWidth;
+    final iconSize =
+        fallbackIconSize ??
+        (safeWidth < safeHeight ? safeWidth : safeHeight) * 0.55;
+
     return Container(
       width: width,
       height: height,
@@ -125,7 +131,7 @@ class TwitchCachedImageLayer extends StatelessWidget {
       child: Icon(
         fallbackIcon,
         color: fallbackIconColor,
-        size: fallbackIconSize ?? (width < height ? width : height) * 0.55,
+        size: iconSize,
       ),
     );
   }
