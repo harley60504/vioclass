@@ -564,6 +564,15 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       unawaited(runDeferredChatStartup(channel, watchLoadGeneration));
     }
 
+    if (!engagementBootstrapping && !loadingEngagement) {
+      unawaited(
+        refreshEngagement(
+          showSnackOnError: false,
+          notifyBalanceDelta: false,
+        ),
+      );
+    }
+
     if (channelId != null && channelId!.trim().isNotEmpty) {
       unawaited(
         TwitchPredictionHermesGlobalRuntime.ensureConnected(
