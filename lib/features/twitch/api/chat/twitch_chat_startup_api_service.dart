@@ -24,6 +24,16 @@ class TwitchChatStartupApiService {
     final globalBadges = TwitchChatBadge.listFromUnknown(
       globalBadgesData['badges'],
     );
+    final channelId = user['id']?.toString() ?? '';
+    final officialHistory = channelId.isEmpty
+        ? null
+        : await _tryFetchMessageBufferChatHistory(
+            channelLogin: channelLogin,
+            channelId: channelId,
+          );
+    final officialRecentMessages = _extractRecentMessages(
+      officialHistory?.response,
+    );
 
     final channelBadgeSource =
         _firstListValue(chatListBadgesData) ??
@@ -33,7 +43,7 @@ class TwitchChatStartupApiService {
 
     return TwitchChatStartupSnapshot(
       channelLogin: channelLogin.trim().toLowerCase(),
-      channelId: user['id']?.toString() ?? '',
+      channelId: channelId,
       badgeCatalog: TwitchBadgeCatalog(
         globalBadges: globalBadges,
         channelBadges: channelBadges,
@@ -42,10 +52,10 @@ class TwitchChatStartupApiService {
       chatRoomState: _dataMap(byName['ChatRoomState']?.response),
       chatChannelData: _dataMap(byName['Chat_ChannelData']?.response),
       chatInput: _dataMap(byName['ChatInput']?.response),
-      recentMessages: _extractRecentMessages(
-        byName['MessageBuffer_Channel']?.response,
-      ),
-      operations: results
+      recentMessages: officialRecentMessages.isNotEmpty
+          ? officialRecentMessages
+          : _extractRecentMessages(byName['MessageBuffer_Channel']?.response),
+      operations: <TwitchWebGqlPersistedResult>[...results, ?officialHistory]
           .map(
             (result) => TwitchStartupOperationSummary.fromResponse(
               operationName: result.operationName,
@@ -143,6 +153,46 @@ class TwitchChatStartupApiService {
 
     return gql.batch(operations);
   }
+
+  Future<TwitchWebGqlPersistedResult> fetchMessageBufferChatHistory({
+    required String channelLogin,
+    required String channelId,
+  }) {
+    final login = channelLogin.trim().toLowerCase();
+    final id = channelId.trim();
+    if (login.isEmpty || id.isEmpty) {
+      return Future<TwitchWebGqlPersistedResult>.value(
+        TwitchWebGqlPersistedResult(
+          operationName: 'MessageBufferChatHistory',
+          variables: <String, dynamic>{'channelLogin': login, 'channelID': id},
+          response: null,
+        ),
+      );
+    }
+
+    return gql.single(
+      TwitchWebGqlPersistedOperation(
+        operationName: 'MessageBufferChatHistory',
+        variables: <String, dynamic>{'channelLogin': login, 'channelID': id},
+        sha256Hash:
+            '5c638a13b9084d9bdcbe9c06cdd35b3ffdeeeea497bb16abd327c783c44d4398',
+      ),
+    );
+  }
+
+  Future<TwitchWebGqlPersistedResult?> _tryFetchMessageBufferChatHistory({
+    required String channelLogin,
+    required String channelId,
+  }) async {
+    try {
+      return await fetchMessageBufferChatHistory(
+        channelLogin: channelLogin,
+        channelId: channelId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 }
 
 Map<String, dynamic> _dataMap(Object? response) {
@@ -180,6 +230,6 @@ List<Map<String, dynamic>> _extractRecentMessages(Object? response) {
 
   return list
       .whereType<Map<String, dynamic>>()
-      .take(20)
+      .take(700)
       .toList(growable: false);
 }

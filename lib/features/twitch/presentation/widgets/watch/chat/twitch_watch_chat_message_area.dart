@@ -13,6 +13,7 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
   final TwitchOfficialEmoteCacheService officialEmoteCache;
   final Listenable appearanceListenable;
   final double fontScale;
+  final bool showTimestamp;
   final bool compact;
   final ValueChanged<TwitchChatRuntimeMessage> onOpenMessageContext;
 
@@ -23,6 +24,7 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
     required this.officialEmoteCache,
     required this.appearanceListenable,
     required this.fontScale,
+    required this.showTimestamp,
     required this.compact,
     required this.onOpenMessageContext,
   });
@@ -44,6 +46,7 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
           runtime: currentRuntime,
           thirdPartyEmoteCache: thirdPartyEmoteCache,
           officialEmoteCache: officialEmoteCache,
+          showTimestamp: showTimestamp,
           fontScale: fontScale,
           compact: compact,
           onOpenMessageContext: onOpenMessageContext,

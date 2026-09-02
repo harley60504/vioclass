@@ -7,6 +7,7 @@ import '../../../api/chat/twitch_irc_api_service.dart';
 import '../../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
+import '../../../parsers/chat/twitch_recent_message_parser.dart';
 import '../../../services/auth/twitch_auth_service.dart';
 import '../../../services/auth/twitch_drops_auth_service.dart';
 import '../../../services/chat/twitch_badge_cache_service.dart';
@@ -79,11 +80,17 @@ class TwitchWatchChatController extends ChangeNotifier {
       final startup = await chatPort.fetchStartupSnapshot(
         channelLogin: channel,
       );
+      final startupRecentMessages = const TwitchRecentMessageParser()
+          .parseMessagesField(
+            messagesField: startup.recentMessages,
+            channelLogin: channel,
+          );
       final nextRuntime = TwitchChatRuntime(
         ircApi: TwitchIrcApiService(),
         writeIrcApi: TwitchIrcApiService(),
         badgeCache: TwitchBadgeCacheService(),
         recentMessagesApi: recentMessagesApi,
+        maxMessages: 900,
       );
 
       runtime = nextRuntime;
@@ -103,7 +110,8 @@ class TwitchWatchChatController extends ChangeNotifier {
         viewerUserId: validation.userId,
         badgeCatalog: startup.badgeCatalog,
         preloadRecentMessages: true,
-        recentMessageLimit: 100,
+        recentMessageLimit: 700,
+        startupRecentMessages: startupRecentMessages.messages,
       );
     } finally {
       connectingChat = false;

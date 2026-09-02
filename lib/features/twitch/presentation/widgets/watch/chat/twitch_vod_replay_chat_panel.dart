@@ -84,6 +84,8 @@ class _TwitchVodReplayChatPanelState extends State<TwitchVodReplayChatPanel> {
                       thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
                       officialEmoteCache: widget.officialEmoteCache,
                       fontScale: fontScale,
+                      showTimestamp:
+                          _appearanceController.messageTimestampsEnabled,
                     )
                   : widget.liveChat,
             ),
@@ -203,12 +205,14 @@ class _VodReplayMessageList extends StatefulWidget {
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
   final TwitchOfficialEmoteCacheService? officialEmoteCache;
   final double fontScale;
+  final bool showTimestamp;
 
   const _VodReplayMessageList({
     required this.runtime,
     required this.thirdPartyEmoteCache,
     required this.officialEmoteCache,
     required this.fontScale,
+    required this.showTimestamp,
   });
 
   @override
@@ -229,7 +233,7 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
             messages: messages,
             thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
             officialEmoteCache: widget.officialEmoteCache,
-            showTimestamp: true,
+            showTimestamp: widget.showTimestamp,
             fontScale: widget.fontScale,
             compact: true,
             onOpenMessageContext: (message) =>

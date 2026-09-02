@@ -527,6 +527,13 @@ class _ChatSettingsPane extends StatelessWidget {
                     compact: compact,
                   ),
                   const SizedBox(height: 12),
+                  _SettingsSwitchRow(
+                    title: '顯示訊息時間',
+                    subtitle: '在每則聊天室訊息前顯示發送時間',
+                    value: controller.messageTimestampsEnabled,
+                    onChanged: controller.setMessageTimestampsEnabled,
+                  ),
+                  const SizedBox(height: 12),
                   _TrustedDomainsControl(controller: controller),
                 ],
               ),

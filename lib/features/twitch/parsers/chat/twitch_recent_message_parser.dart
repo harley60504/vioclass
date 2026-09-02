@@ -310,6 +310,9 @@ class TwitchRecentMessageParser {
         readTextValue(item['username']) ??
         readTextValue(item['user']) ??
         readTextValue(readNestedValue(item, const <String>['user', 'login'])) ??
+        readTextValue(
+          readNestedValue(item, const <String>['sender', 'login']),
+        ) ??
         parsed?.userLogin ??
         '';
 
@@ -318,6 +321,9 @@ class TwitchRecentMessageParser {
         readTextValue(item['display-name']) ??
         readTextValue(
           readNestedValue(item, const <String>['user', 'displayName']),
+        ) ??
+        readTextValue(
+          readNestedValue(item, const <String>['sender', 'displayName']),
         ) ??
         parsed?.displayName ??
         userLogin;
@@ -328,10 +334,20 @@ class TwitchRecentMessageParser {
         'display-name': displayName.trim(),
       if (!tags.containsKey('id'))
         'id': readTextValue(item['id']) ?? parsed?.tags['id'] ?? '',
+      if (!tags.containsKey('color'))
+        'color':
+            readTextValue(item['color']) ??
+            readTextValue(item['userColor']) ??
+            readTextValue(
+              readNestedValue(item, const <String>['sender', 'color']),
+            ) ??
+            parsed?.tags['color'] ??
+            '',
       if (!tags.containsKey('tmi-sent-ts'))
         'tmi-sent-ts':
-            readTextValue(item['timestamp']) ??
-            readTextValue(item['sentAt']) ??
+            readTimestampMillis(item['timestamp']) ??
+            readTimestampMillis(item['sentAt']) ??
+            readTimestampMillis(item['createdAt']) ??
             parsed?.tags['tmi-sent-ts'] ??
             '',
     }..removeWhere((key, value) => value.trim().isEmpty);
@@ -373,6 +389,7 @@ class TwitchRecentMessageParser {
         'text',
         'body',
         'content',
+        'fragments',
         'message',
         'value',
       ]) {
@@ -383,7 +400,29 @@ class TwitchRecentMessageParser {
       }
     }
 
+    if (value is List) {
+      final text = value
+          .map(readTextValue)
+          .whereType<String>()
+          .where((item) => item.trim().isNotEmpty)
+          .join();
+      return text.trim().isEmpty ? null : text;
+    }
+
     return null;
+  }
+
+  String? readTimestampMillis(Object? value) {
+    final text = readTextValue(value);
+    if (text == null || text.trim().isEmpty) return null;
+
+    final integer = int.tryParse(text.trim());
+    if (integer != null) return integer.toString();
+
+    final parsed = DateTime.tryParse(text.trim());
+    if (parsed == null) return null;
+
+    return parsed.millisecondsSinceEpoch.toString();
   }
 
   Map<String, String> readStringMap(Object? value) {

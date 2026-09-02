@@ -481,6 +481,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                           officialEmoteCache: widget.officialEmoteCache,
                           appearanceListenable: _appearanceController,
                           fontScale: chatFontScale,
+                          showTimestamp:
+                              _appearanceController.messageTimestampsEnabled,
                           compact: metrics.verticalCompact,
                           onOpenMessageContext: (message) =>
                               showTwitchChatMessageContextSheet(

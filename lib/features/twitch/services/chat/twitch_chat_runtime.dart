@@ -106,6 +106,8 @@ class TwitchChatRuntime extends ChangeNotifier {
     TwitchBadgeCatalog? badgeCatalog,
     bool preloadRecentMessages = true,
     int recentMessageLimit = 100,
+    Iterable<TwitchChatMessage> startupRecentMessages =
+        const <TwitchChatMessage>[],
     String? ircNick,
     String? viewerLogin,
     String? viewerDisplayName,
@@ -149,6 +151,8 @@ class TwitchChatRuntime extends ChangeNotifier {
     _ownUserStateTags.clear();
 
     notifyListeners();
+
+    _loadStartupRecentMessages(startupRecentMessages);
 
     if (preloadRecentMessages && recentMessagesApi != null) {
       await _loadRecentMessages(channelLogin: login, limit: recentMessageLimit);
@@ -237,6 +241,8 @@ class TwitchChatRuntime extends ChangeNotifier {
     int maxMessages = 30,
     bool preloadRecentMessages = true,
     int recentMessageLimit = 100,
+    Iterable<TwitchChatMessage> startupRecentMessages =
+        const <TwitchChatMessage>[],
     String? ircNick,
     String? viewerLogin,
     String? viewerDisplayName,
@@ -252,6 +258,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       viewerLogin: viewerLogin,
       viewerDisplayName: viewerDisplayName,
       viewerUserId: viewerUserId,
+      startupRecentMessages: startupRecentMessages,
     );
 
     final completer = Completer<List<TwitchChatRuntimeMessage>>();
@@ -281,6 +288,27 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
   }
 
+  void _loadStartupRecentMessages(Iterable<TwitchChatMessage> messages) {
+    final parsedMessages = messages
+        .where((message) => message.isPrivMsg && message.hasMessageText)
+        .toList(growable: false);
+    if (parsedMessages.isEmpty) return;
+
+    final normalize = normalizer;
+
+    for (final message in parsedMessages) {
+      final runtimeMessage = normalize.normalize(
+        message,
+        receivedAt: normalize.readMessageTimeOrNow(message),
+      );
+
+      _appendRuntimeMessage(runtimeMessage, notify: false);
+    }
+
+    _recentMessageCount += parsedMessages.length;
+    notifyListeners();
+  }
+
   Future<void> _loadRecentMessages({
     required String channelLogin,
     required int limit,
@@ -305,8 +333,8 @@ class TwitchChatRuntime extends ChangeNotifier {
         _appendRuntimeMessage(runtimeMessage, notify: false);
       }
 
-      _recentMessageCount = result.messages.length;
-      _recentParseIssueCount = result.issues.length;
+      _recentMessageCount += result.messages.length;
+      _recentParseIssueCount += result.issues.length;
 
       if (result.emptyMessageCount > 0 || result.issues.isNotEmpty) {
         _error ??=

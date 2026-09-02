@@ -7,16 +7,20 @@ class TwitchChatAppearanceController extends ChangeNotifier {
   static const String _fontScaleKey = 'twitch_chat_font_scale_v1';
   static const String _linkPreviewsEnabledKey =
       'twitch_chat_link_previews_enabled_v1';
+  static const String _messageTimestampsEnabledKey =
+      'twitch_chat_message_timestamps_enabled_v1';
   static const String _trustedPreviewDomainsKey =
       'twitch_chat_trusted_preview_domains_v1';
 
   double _fontScale = 1.0;
   bool _linkPreviewsEnabled = true;
+  bool _messageTimestampsEnabled = false;
   List<String> _trustedPreviewDomains = const <String>[];
   bool _loaded = false;
 
   double get fontScale => _fontScale;
   bool get linkPreviewsEnabled => _linkPreviewsEnabled;
+  bool get messageTimestampsEnabled => _messageTimestampsEnabled;
   List<String> get trustedPreviewDomains => _trustedPreviewDomains;
   bool get loaded => _loaded;
 
@@ -25,6 +29,8 @@ class TwitchChatAppearanceController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _fontScale = (prefs.getDouble(_fontScaleKey) ?? 1.0).clamp(0.82, 1.45);
     _linkPreviewsEnabled = prefs.getBool(_linkPreviewsEnabledKey) ?? true;
+    _messageTimestampsEnabled =
+        prefs.getBool(_messageTimestampsEnabledKey) ?? false;
     _trustedPreviewDomains = _normalizeDomains(
       prefs.getStringList(_trustedPreviewDomainsKey) ?? const <String>[],
     );
@@ -52,6 +58,15 @@ class TwitchChatAppearanceController extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_linkPreviewsEnabledKey, value);
+  }
+
+  Future<void> setMessageTimestampsEnabled(bool value) async {
+    if (_messageTimestampsEnabled == value) return;
+    _messageTimestampsEnabled = value;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_messageTimestampsEnabledKey, value);
   }
 
   Future<void> addTrustedPreviewDomain(String value) async {

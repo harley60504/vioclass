@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../models/chat/twitch_chat_message.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
@@ -111,6 +112,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   int _lastSourceMessageCount = 0;
   int _hiddenNewMessageCount = 0;
   String _lastSourceNewestFingerprint = '';
+  DateTime? _historyBoundaryTimestamp;
 
   Timer? _bufferFlushTimer;
   List<TwitchChatRuntimeMessage>? _pendingBufferedSourceMessages;
@@ -158,6 +160,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
     _lastSourceMessageCount = sourceMessages.length;
     _lastSourceNewestFingerprint = _newestMessageFingerprint(sourceMessages);
     _hiddenNewMessageCount = 0;
+    _historyBoundaryTimestamp = null;
   }
 
   List<TwitchChatRuntimeMessage> _renderMessagesForCurrentMode(
@@ -343,9 +346,8 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
         !_autoScroll ||
         _hiddenNewMessageCount != 0 ||
         _lastSourceMessageCount != sourceMessages.length ||
-        _lastSourceNewestFingerprint != _newestMessageFingerprint(
-          sourceMessages,
-        ) ||
+        _lastSourceNewestFingerprint !=
+            _newestMessageFingerprint(sourceMessages) ||
         _visibleMessages.length != nextVisibleMessages.length;
 
     if (!needsUpdate) return;
@@ -419,6 +421,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   @override
   Widget build(BuildContext context) {
     final visibleMessages = _visibleMessages;
+    final visibleEntries = _visibleEntriesFor(visibleMessages);
 
     if (visibleMessages.isEmpty) {
       return widget.emptyBuilder?.call(context) ??
@@ -441,10 +444,19 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
             reverse: true,
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-            itemCount: visibleMessages.length,
+            itemCount: visibleEntries.length,
             itemBuilder: (context, index) {
-              final chronologicalIndex = visibleMessages.length - 1 - index;
-              final message = visibleMessages[chronologicalIndex];
+              final chronologicalIndex = visibleEntries.length - 1 - index;
+              final entry = visibleEntries[chronologicalIndex];
+              if (entry is _ChatMessageDividerEntry) {
+                return _ChatMessageDivider(
+                  key: ValueKey<String>('divider-${entry.timestampMillis}'),
+                  timestamp: entry.timestamp,
+                  compact: widget.compact,
+                );
+              }
+
+              final message = (entry as _ChatMessageItemEntry).message;
               final messageKey = _messageStableKey(message);
 
               return TwitchRuntimeMessageTile(
@@ -481,6 +493,110 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
         ],
       ),
     );
+  }
+
+  List<_ChatMessageListEntry> _visibleEntriesFor(
+    List<TwitchChatRuntimeMessage> messages,
+  ) {
+    final firstLiveIndex = messages.indexWhere(
+      (message) => !_isHistoryMessage(message),
+    );
+
+    if (firstLiveIndex == 0) {
+      return messages
+          .map<_ChatMessageListEntry>(_ChatMessageItemEntry.new)
+          .toList(growable: false);
+    }
+
+    final entries = <_ChatMessageListEntry>[];
+    for (var index = 0; index < messages.length; index += 1) {
+      if (index == firstLiveIndex) {
+        entries.add(_ChatMessageDividerEntry(messages[index].receivedAt));
+      }
+      entries.add(_ChatMessageItemEntry(messages[index]));
+    }
+
+    if (firstLiveIndex < 0 && messages.any(_isHistoryMessage)) {
+      _historyBoundaryTimestamp ??= DateTime.now();
+      entries.add(_ChatMessageDividerEntry(_historyBoundaryTimestamp!));
+    }
+
+    return entries;
+  }
+
+  bool _isHistoryMessage(TwitchChatRuntimeMessage message) {
+    return switch (message.source.source) {
+      TwitchChatMessageSource.recentRawIrc ||
+      TwitchChatMessageSource.recentObject => true,
+      TwitchChatMessageSource.liveIrc ||
+      TwitchChatMessageSource.synthetic ||
+      TwitchChatMessageSource.localEcho => false,
+    };
+  }
+}
+
+sealed class _ChatMessageListEntry {
+  const _ChatMessageListEntry();
+}
+
+class _ChatMessageItemEntry extends _ChatMessageListEntry {
+  final TwitchChatRuntimeMessage message;
+
+  const _ChatMessageItemEntry(this.message);
+}
+
+class _ChatMessageDividerEntry extends _ChatMessageListEntry {
+  final DateTime timestamp;
+
+  const _ChatMessageDividerEntry(this.timestamp);
+
+  int get timestampMillis => timestamp.millisecondsSinceEpoch;
+}
+
+class _ChatMessageDivider extends StatelessWidget {
+  final DateTime timestamp;
+  final bool compact;
+
+  const _ChatMessageDivider({
+    super.key,
+    required this.timestamp,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final time = _formatTime(timestamp);
+    final verticalPadding = compact ? 6.0 : 8.0;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: verticalPadding),
+      child: Row(
+        children: [
+          const Expanded(child: Divider(color: Color(0x2FFFFFFF), height: 1)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text(
+              '$time 進入直播後',
+              style: twitchChatTextStyle(
+                TextStyle(
+                  color: Colors.white.withValues(alpha: 0.58),
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const Expanded(child: Divider(color: Color(0x2FFFFFFF), height: 1)),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }
 
