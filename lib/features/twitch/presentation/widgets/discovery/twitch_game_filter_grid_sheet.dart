@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../responsive/twitch_responsive_sheet.dart';
 import '../shared/twitch_centered_text_field.dart';
@@ -27,6 +28,7 @@ Future<void> showTwitchGameFilterGridSheet({
   String? paginationError,
   String emptySearchText = '目前找不到這個分類',
 }) async {
+  final l10n = context.vio;
   final searchController = TextEditingController();
   final scrollController = ScrollController();
   String keyword = '';
@@ -64,9 +66,9 @@ Future<void> showTwitchGameFilterGridSheet({
 
   await showTwitchUnifiedSheet<void>(
     context: context,
-    title: '遊戲分類',
+    title: l10n.t('遊戲分類'),
     subtitle: selectedGameName == null || selectedGameName.trim().isEmpty
-        ? '全部分類'
+        ? l10n.t('全部分類')
         : selectedGameName,
     icon: Icons.grid_view_rounded,
     size: TwitchUnifiedSheetSize.large,
@@ -101,7 +103,7 @@ Future<void> showTwitchGameFilterGridSheet({
                   height: 48,
                   radius: 16,
                   controller: searchController,
-                  hintText: '搜尋遊戲分類',
+                  hintText: l10n.t('搜尋遊戲分類'),
                   prefixIcon: Icons.search_rounded,
                   onChanged: (value) => setSheetState(() => keyword = value),
                   fillColor: const Color(0xFF0E0E10),
@@ -157,7 +159,7 @@ Future<void> showTwitchGameFilterGridSheet({
                                 OutlinedButton.icon(
                                   onPressed: () => unawaited(requestMore()),
                                   icon: const Icon(Icons.download_rounded),
-                                  label: const Text('繼續載入更多分類再搜尋'),
+                                  label: Text(l10n.t('繼續載入更多分類再搜尋')),
                                 ),
                               ],
                             ],
@@ -228,12 +230,12 @@ Future<void> showTwitchGameFilterGridSheet({
                   children: [
                     TextButton(
                       onPressed: () => selectGame(sheetContext, null),
-                      child: const Text('全部分類'),
+                      child: Text(l10n.t('全部分類')),
                     ),
                     const SizedBox(width: 8),
                     TextButton(
                       onPressed: () => Navigator.of(sheetContext).maybePop(),
-                      child: const Text('關閉'),
+                      child: Text(l10n.t('關閉')),
                     ),
                   ],
                 ),
@@ -270,6 +272,7 @@ class _GameFilterGridFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     if (loadingMore) {
       return const Padding(
         padding: EdgeInsets.all(14),
@@ -285,7 +288,7 @@ class _GameFilterGridFooter extends StatelessWidget {
         child: OutlinedButton.icon(
           onPressed: () => unawaited(onLoadMore()),
           icon: const Icon(Icons.refresh_rounded),
-          label: const Text('載入分類失敗，重試'),
+          label: Text(l10n.t('載入分類失敗，重試')),
         ),
       );
     }
@@ -296,15 +299,18 @@ class _GameFilterGridFooter extends StatelessWidget {
         child: TextButton.icon(
           onPressed: () => unawaited(onLoadMore()),
           icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          label: const Text('載入更多分類'),
+          label: Text(l10n.t('載入更多分類')),
         ),
       );
     }
 
-    return const Padding(
-      padding: EdgeInsets.all(12),
+    return Padding(
+      padding: const EdgeInsets.all(12),
       child: Center(
-        child: Text('分類已經到底了', style: TextStyle(color: Colors.white38)),
+        child: Text(
+          l10n.t('分類已經到底了'),
+          style: const TextStyle(color: Colors.white38),
+        ),
       ),
     );
   }
@@ -323,6 +329,7 @@ class _GameFilterGridTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final item = game;
     final isAllCategories = item == null;
 
@@ -386,7 +393,7 @@ class _GameFilterGridTile extends StatelessWidget {
                     ],
                     Expanded(
                       child: Text(
-                        item?.name ?? '全部分類',
+                        item?.name ?? l10n.t('全部分類'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,

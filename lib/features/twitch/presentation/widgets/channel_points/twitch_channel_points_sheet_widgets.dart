@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../localization/twitch_reward_localizer.dart';
+import '../../sheets/channel_points/twitch_channel_points_sheet_models.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 import 'twitch_channel_points_sheet_utils.dart';
@@ -27,6 +29,7 @@ class ChannelPointsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
       decoration: BoxDecoration(
@@ -63,7 +66,7 @@ class ChannelPointsHeader extends StatelessWidget {
           IconButton(
             visualDensity: VisualDensity.compact,
             onPressed: loading ? null : onRefresh,
-            tooltip: '重新整理忠誠點數',
+            tooltip: l10n.t('重新整理忠誠點數'),
             icon: loading
                 ? const SizedBox(
                     width: 16,
@@ -74,7 +77,7 @@ class ChannelPointsHeader extends StatelessWidget {
           ),
           IconButton(
             visualDensity: VisualDensity.compact,
-            tooltip: '關閉',
+            tooltip: l10n.t('關閉'),
             onPressed: () => Navigator.of(context).maybePop(),
             icon: const Icon(Icons.close_rounded, size: 20),
           ),
@@ -106,7 +109,7 @@ class ChannelPointsErrorBanner extends StatelessWidget {
         border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.35)),
       ),
       child: Text(
-        '$label 暫時讀取失敗，稍後再試。',
+        '$label ${context.vio.t('暫時讀取失敗，稍後再試。')}',
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
         style: const TextStyle(
@@ -153,7 +156,7 @@ class ChannelPointsEmptyRewards extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                hasSnapshot ? '目前沒有可顯示的忠誠點數獎勵。' : '尚未載入忠誠點數資料。',
+                context.vio.t(hasSnapshot ? '目前沒有可顯示的忠誠點數獎勵。' : '尚未載入忠誠點數資料。'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white70,
@@ -161,16 +164,16 @@ class ChannelPointsEmptyRewards extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                '請重新整理，或確認目前頻道是否有開放忠誠點數獎勵。',
+              Text(
+                context.vio.t('請重新整理，或確認目前頻道是否有開放忠誠點數獎勵。'),
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+                style: const TextStyle(color: Colors.white38, fontSize: 12),
               ),
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: loading ? null : onRefresh,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('重新整理'),
+                label: Text(context.vio.t('重新整理')),
               ),
             ],
           ),
@@ -198,6 +201,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = TwitchRewardLocalizer.title(
       reward['title']?.toString() ?? 'Reward',
+      translateBuiltIns: !context.vio.isEnglish,
     );
     final prompt = reward['prompt']?.toString() ?? '';
     final imageUrl = resolveChannelPointRewardDisplayImageUrl(reward);
@@ -214,7 +218,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: available ? onTap : null,
+          onTap: onTap,
           borderRadius: BorderRadius.circular(18),
           child: Ink(
             decoration: BoxDecoration(
@@ -314,7 +318,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
                                   ),
                                 ),
                         ),
-                        const SizedBox(height: 10),
+                        const SizedBox(height: 9),
                         Text(
                           title,
                           maxLines: 2,
@@ -322,7 +326,7 @@ class ChannelPointsRewardTile extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontWeight: FontWeight.w900,
-                            fontSize: 13,
+                            fontSize: 12.5,
                             height: 1.12,
                           ),
                         ),
@@ -330,12 +334,12 @@ class ChannelPointsRewardTile extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             prompt,
-                            maxLines: 2,
+                            maxLines: 1,
                             textAlign: TextAlign.center,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: Colors.white54,
-                              fontSize: 11,
+                              fontSize: 10.5,
                               fontWeight: FontWeight.w800,
                               height: 1.15,
                             ),
@@ -343,7 +347,10 @@ class ChannelPointsRewardTile extends StatelessWidget {
                         ],
                         if (statusText != null && !available) ...[
                           const SizedBox(height: 6),
-                          _StatusBadge(label: statusText, warning: true),
+                          _StatusBadge(
+                            label: context.vio.t(statusText),
+                            warning: true,
+                          ),
                         ],
                       ],
                     ),
@@ -353,6 +360,438 @@ class ChannelPointsRewardTile extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class ChannelPointsRewardDetailPane extends StatefulWidget {
+  final Map<String, dynamic> reward;
+  final int? balance;
+  final String? pointsIconUrl;
+  final VoidCallback onBack;
+  final Future<void> Function() onRedeem;
+
+  const ChannelPointsRewardDetailPane({
+    super.key,
+    required this.reward,
+    required this.balance,
+    required this.pointsIconUrl,
+    required this.onBack,
+    required this.onRedeem,
+  });
+
+  @override
+  State<ChannelPointsRewardDetailPane> createState() =>
+      _ChannelPointsRewardDetailPaneState();
+}
+
+class _ChannelPointsRewardDetailPaneState
+    extends State<ChannelPointsRewardDetailPane> {
+  bool _redeeming = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.vio;
+    final reward = widget.reward;
+    final title = TwitchRewardLocalizer.title(
+      reward['title']?.toString() ?? 'Reward',
+      translateBuiltIns: !l10n.isEnglish,
+    );
+    final prompt = reward['prompt']?.toString().trim() ?? '';
+    final imageUrl = resolveChannelPointRewardDisplayImageUrl(reward);
+    final cost = readChannelPointInt(reward['cost']);
+    final color = parseChannelPointColor(reward['backgroundColor']?.toString());
+    final available = isChannelPointRewardAvailable(
+      reward,
+      balance: widget.balance,
+    );
+    final statusText = channelPointRewardStatusText(
+      reward,
+      balance: widget.balance,
+    );
+
+    return Material(
+      color: TwitchUiColors.sheet.scrim,
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: TwitchUiColors.sheet.background,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: TwitchUiColors.sheet.cardBorder),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              blurRadius: 22,
+              offset: Offset(0, 10),
+              color: Color(0x99000000),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+              decoration: BoxDecoration(
+                color: TwitchUiColors.sheet.background,
+                border: Border(
+                  bottom: BorderSide(color: TwitchUiColors.sheet.cardBorder),
+                ),
+              ),
+              child: Row(
+                children: <Widget>[
+                  IconButton(
+                    tooltip: l10n.t('返回'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: widget.onBack,
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      l10n.t('獎勵詳情'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                children: <Widget>[
+                  Center(
+                    child: Container(
+                      width: 110,
+                      height: 110,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.82),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.18),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: imageUrl.isEmpty
+                          ? const Center(
+                              child: Icon(
+                                Icons.diamond_outlined,
+                                color: Colors.white,
+                                size: 48,
+                              ),
+                            )
+                          : Image.network(
+                              imageUrl,
+                              width: 106,
+                              height: 106,
+                              cacheWidth: 212,
+                              cacheHeight: 212,
+                              fit: BoxFit.cover,
+                              filterQuality: FilterQuality.medium,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.diamond_outlined,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      height: 1.18,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      _CostChip(
+                        cost: cost,
+                        iconUrl: widget.pointsIconUrl,
+                        enough:
+                            widget.balance == null || widget.balance! >= cost,
+                      ),
+                      if (statusText != null)
+                        _StatusBadge(
+                          label: l10n.t(statusText),
+                          warning: !available,
+                        )
+                      else
+                        _StatusBadge(label: l10n.t('可用'), warning: false),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _DetailSection(
+                    title: l10n.t('說明'),
+                    child: Text(
+                      prompt.isEmpty ? l10n.t('沒有說明') : prompt,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.72),
+                        fontSize: 12.5,
+                        height: 1.42,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: available && !_redeeming
+                      ? () async {
+                          setState(() => _redeeming = true);
+                          try {
+                            await widget.onRedeem();
+                          } finally {
+                            if (mounted) setState(() => _redeeming = false);
+                          }
+                        }
+                      : null,
+                  icon: _redeeming
+                      ? const SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.redeem_rounded),
+                  label: Text(l10n.t('立即兌換')),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ChannelPointsRedeemResultPane extends StatelessWidget {
+  final TwitchChannelPointRedeemUiResult result;
+  final VoidCallback onClose;
+
+  const ChannelPointsRedeemResultPane({
+    super.key,
+    required this.result,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.vio;
+    final emoteName = result.emoteName?.trim() ?? '';
+    final imageUrl = result.emoteImageUrl?.trim() ?? '';
+
+    return Material(
+      color: TwitchUiColors.sheet.scrim,
+      child: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: TwitchUiColors.sheet.background,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: TwitchUiColors.sheet.cardBorder),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              blurRadius: 22,
+              offset: Offset(0, 10),
+              color: Color(0x99000000),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: <Widget>[
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+              decoration: BoxDecoration(
+                color: TwitchUiColors.sheet.background,
+                border: Border(
+                  bottom: BorderSide(color: TwitchUiColors.sheet.cardBorder),
+                ),
+              ),
+              child: Row(
+                children: <Widget>[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.t('兌換完成'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: l10n.t('關閉'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: onClose,
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Container(
+                        width: 118,
+                        height: 118,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: TwitchUiColors.primary.withValues(alpha: 0.20),
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(
+                            color: TwitchUiColors.primarySoft.withValues(
+                              alpha: 0.42,
+                            ),
+                          ),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: TwitchUiColors.primary.withValues(
+                                alpha: 0.20,
+                              ),
+                              blurRadius: 22,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: imageUrl.isEmpty
+                            ? const Icon(
+                                Icons.auto_awesome_rounded,
+                                color: TwitchUiColors.primarySoft,
+                                size: 50,
+                              )
+                            : Image.network(
+                                imageUrl,
+                                width: 112,
+                                height: 112,
+                                cacheWidth: 224,
+                                cacheHeight: 224,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.medium,
+                                errorBuilder: (_, _, _) => const Icon(
+                                  Icons.auto_awesome_rounded,
+                                  color: TwitchUiColors.primarySoft,
+                                  size: 50,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        result.hasEmote ? l10n.t('已解鎖貼圖') : result.title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          height: 1.18,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      if (emoteName.isNotEmpty) ...<Widget>[
+                        const SizedBox(height: 8),
+                        Text(
+                          emoteName,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 13,
+                            height: 1.25,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onClose,
+                  icon: const Icon(Icons.check_rounded),
+                  label: Text(l10n.t('完成')),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailSection extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _DetailSection({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: TwitchUiColors.sheet.cardFill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: TwitchUiColors.sheet.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            title,
+            style: const TextStyle(
+              color: TwitchUiColors.textPrimary,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
       ),
     );
   }
@@ -426,6 +865,8 @@ class _StatusBadge extends StatelessWidget {
       ),
       child: Text(
         label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: color,
           fontSize: 11,

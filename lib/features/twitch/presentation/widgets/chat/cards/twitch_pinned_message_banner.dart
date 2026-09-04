@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../models/engagement/twitch_pinned_chat.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../links/twitch_chat_link_preview.dart';
 import '../twitch_chat_text_style.dart';
@@ -50,9 +51,9 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('已複製置頂留言'),
-        duration: Duration(milliseconds: 1100),
+      SnackBar(
+        content: Text(context.vio.t('已複製置頂留言')),
+        duration: const Duration(milliseconds: 1100),
       ),
     );
   }
@@ -63,14 +64,16 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
     final sender =
         _cleanName(senderUser?.displayName) ??
         _cleanName(widget.fallbackDisplayName) ??
-        '置頂留言';
+        context.vio.t('置頂留言');
     final pinnedBy = _cleanName(message.pinnedBy?.displayName);
     final senderColor =
         _parseUserColor(senderUser?.chatColor) ?? TwitchUiColors.primarySoft;
     final avatarUrl = _resolveAvatarUrl(senderUser);
     final metaText = pinnedBy == null || pinnedBy == sender
-        ? '置頂留言'
-        : '$pinnedBy 置頂';
+        ? context.vio.t('置頂留言')
+        : context.vio.isEnglish
+        ? '${context.vio.t('置頂')} $pinnedBy'
+        : '$pinnedBy ${context.vio.t('置頂')}';
     final cleanText = message.text.trim();
     final previewItems = extractTwitchChatPreviewUrls(cleanText, max: 1);
     final metrics = TwitchChatMessageVisualMetrics(_safeFontScale);
@@ -242,7 +245,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                       if (_expanded) ...[
                         SizedBox(height: 7 * scale),
                         Text(
-                          '點一下收合 · 長按複製',
+                          context.vio.t('點一下收合 · 長按複製'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: twitchChatTextStyle(

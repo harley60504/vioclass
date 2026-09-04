@@ -7,6 +7,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 typedef TwitchProgressiveGridItemBuilder<T> =
@@ -137,7 +138,7 @@ class _TwitchProgressiveGridViewState<T>
         if (index >= visibleCount) {
           return TwitchProgressiveGridLoadMoreTile(
             label:
-                '${widget.loadMoreLabel} $visibleCount/${widget.items.length}',
+                '${context.vio.t(widget.loadMoreLabel)} $visibleCount/${widget.items.length}',
             onTap: _loadMore,
           );
         }

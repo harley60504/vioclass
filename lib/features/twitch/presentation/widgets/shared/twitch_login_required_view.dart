@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchLoginRequiredView extends StatelessWidget {
@@ -18,6 +19,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Container(
       color: const Color(0xFF0E0E10),
       alignment: Alignment.center,
@@ -55,9 +57,9 @@ class TwitchLoginRequiredView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              '需要登入 Twitch',
-              style: TextStyle(
+            Text(
+              l10n.t('需要登入 Twitch'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
@@ -66,7 +68,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               statusText.trim().isEmpty
-                  ? '追隨頁需要 OAuth token。請先完成 Twitch 登入。'
+                  ? l10n.t('追隨頁需要 OAuth token。請先完成 Twitch 登入。')
                   : statusText,
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -96,9 +98,9 @@ class TwitchLoginRequiredView extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.open_in_browser_rounded),
-                  label: const Text(
-                    '用 WebView 登入',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                  label: Text(
+                    l10n.t('用 WebView 登入'),
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
                 OutlinedButton.icon(
@@ -122,7 +124,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
                           ),
                         )
                       : const Icon(Icons.refresh_rounded),
-                  label: const Text('重新檢查'),
+                  label: Text(l10n.t('重新檢查')),
                 ),
               ],
             ),

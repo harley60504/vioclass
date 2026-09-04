@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../settings/twitch_player_settings_controller.dart';
 import 'twitch_player_common_buttons.dart';
 
@@ -56,7 +57,7 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
     if (!entered && mounted) {
       ScaffoldMessenger.maybeOf(
         context,
-      )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援系統子母畫面')));
+      )?.showSnackBar(SnackBar(content: Text(context.vio.t('目前裝置不支援系統子母畫面'))));
     }
   }
 
@@ -67,7 +68,7 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
     }
 
     return PlainIconButton(
-      tooltip: '系統子母畫面',
+      tooltip: context.vio.t('系統子母畫面'),
       icon: Icons.picture_in_picture_alt_rounded,
       size: widget.size,
       dense: widget.dense,

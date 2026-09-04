@@ -5,6 +5,7 @@ import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
 import '../../pages/twitch_channel_page.dart';
 import '../../pages/twitch_watch_page.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../chat/twitch_chat_text_style.dart';
 import '../shared/twitch_cached_image_layer.dart';
@@ -23,6 +24,7 @@ class TwitchOfflineChannelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     const radius = BorderRadius.all(Radius.circular(18));
     final avatarUrl = channel.profileImageUrl.trim();
     final description = channel.description.trim();
@@ -86,7 +88,7 @@ class TwitchOfflineChannelCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     description.isEmpty
-                        ? '目前未開台，點擊後會先播放最新 VOD；沒有 VOD 則顯示關台圖。'
+                        ? l10n.t('目前未開台，點擊後會先播放最新 VOD；沒有 VOD 則顯示關台圖。')
                         : description,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -104,7 +106,7 @@ class TwitchOfflineChannelCard extends StatelessWidget {
                     Expanded(
                       child: _OfflineActionButton(
                         icon: Icons.play_arrow_rounded,
-                        label: '觀看',
+                        label: l10n.t('觀看'),
                         onPressed: () => _openMediaWatchPage(context),
                       ),
                     ),
@@ -112,7 +114,7 @@ class TwitchOfflineChannelCard extends StatelessWidget {
                     Expanded(
                       child: _OfflineActionButton(
                         icon: Icons.video_library_rounded,
-                        label: '媒體庫',
+                        label: l10n.t('媒體庫'),
                         onPressed: () => _openChannelPage(context, 2),
                       ),
                     ),

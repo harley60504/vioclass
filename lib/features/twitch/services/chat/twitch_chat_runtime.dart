@@ -57,6 +57,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   final List<_PendingOutgoingChatMessage> _pendingOutgoingMessages =
       <_PendingOutgoingChatMessage>[];
   final Set<String> _seenMessageIds = <String>{};
+  final Set<String> _seenMessageFingerprints = <String>{};
   final Set<String> _deletedMessageIds = <String>{};
   final Map<String, String> _ownUserStateTags = <String, String>{};
   final TwitchChatRuntimeNotifyBatcher _notifyBatcher;
@@ -147,16 +148,16 @@ class TwitchChatRuntime extends ChangeNotifier {
     _messages.clear();
     _clearPendingOutgoingMessages();
     _seenMessageIds.clear();
+    _seenMessageFingerprints.clear();
     _deletedMessageIds.clear();
     _ownUserStateTags.clear();
 
     notifyListeners();
 
-    _loadStartupRecentMessages(startupRecentMessages);
-
-    if (preloadRecentMessages && recentMessagesApi != null) {
-      await _loadRecentMessages(channelLogin: login, limit: recentMessageLimit);
-    }
+    final recentMessagesFuture =
+        preloadRecentMessages && recentMessagesApi != null
+        ? _fetchRecentMessages(channelLogin: login, limit: recentMessageLimit)
+        : Future<TwitchRecentMessagesResult?>.value();
 
     _messageSubscription = ircApi.messages.listen(
       _handleReadConnectionMessage,
@@ -212,8 +213,18 @@ class TwitchChatRuntime extends ChangeNotifier {
         _ownUserStateTags.addAll(writeUserState);
       }
 
+      final recentMessages = await recentMessagesFuture;
+      _loadInitialRecentMessages(
+        startupMessages: startupRecentMessages,
+        recentMessages: recentMessages,
+      );
       _connected = true;
     } catch (e) {
+      final recentMessages = await recentMessagesFuture;
+      _loadInitialRecentMessages(
+        startupMessages: startupRecentMessages,
+        recentMessages: recentMessages,
+      );
       _error = e;
       _connected = false;
     } finally {
@@ -288,8 +299,15 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
   }
 
-  void _loadStartupRecentMessages(Iterable<TwitchChatMessage> messages) {
-    final parsedMessages = messages
+  void _loadInitialRecentMessages({
+    required Iterable<TwitchChatMessage> startupMessages,
+    required TwitchRecentMessagesResult? recentMessages,
+  }) {
+    final mergedMessages = <TwitchChatMessage>[
+      ...startupMessages,
+      ...?recentMessages?.messages,
+    ];
+    final parsedMessages = mergedMessages
         .where((message) => message.isPrivMsg && message.hasMessageText)
         .toList(growable: false);
     if (parsedMessages.isEmpty) return;
@@ -305,50 +323,39 @@ class TwitchChatRuntime extends ChangeNotifier {
       _appendRuntimeMessage(runtimeMessage, notify: false);
     }
 
-    _recentMessageCount += parsedMessages.length;
+    _recentMessageCount +=
+        recentMessages?.messages.length ?? parsedMessages.length;
+    _recentParseIssueCount += recentMessages?.issues.length ?? 0;
+
+    if (recentMessages != null &&
+        (recentMessages.emptyMessageCount > 0 ||
+            recentMessages.issues.isNotEmpty)) {
+      _error ??=
+          'Recent messages parsed with '
+          '${recentMessages.emptyMessageCount} empty messages and '
+          '${recentMessages.issues.length} parse issues. '
+          'Open Recent Messages API debug to inspect raw items.';
+    }
+
     notifyListeners();
   }
 
-  Future<void> _loadRecentMessages({
+  Future<TwitchRecentMessagesResult?> _fetchRecentMessages({
     required String channelLogin,
     required int limit,
   }) async {
     final api = recentMessagesApi;
-    if (api == null) return;
+    if (api == null) return null;
 
     try {
-      final result = await api.getRecentMessages(
+      return await api.getRecentMessages(
         channelLogin: channelLogin,
         limit: limit,
       );
-
-      final normalize = normalizer;
-
-      for (final message in result.messages) {
-        final runtimeMessage = normalize.normalize(
-          message,
-          receivedAt: normalize.readMessageTimeOrNow(message),
-        );
-
-        _appendRuntimeMessage(runtimeMessage, notify: false);
-      }
-
-      _recentMessageCount += result.messages.length;
-      _recentParseIssueCount += result.issues.length;
-
-      if (result.emptyMessageCount > 0 || result.issues.isNotEmpty) {
-        _error ??=
-            'Recent messages parsed with '
-            '${result.emptyMessageCount} empty messages and '
-            '${result.issues.length} parse issues. '
-            'Open Recent Messages API debug to inspect raw items.';
-      }
-
-      notifyListeners();
     } catch (e) {
       // Recent messages 是輔助資料，失敗不應該阻止 IRC 連線。
       _error ??= e;
-      notifyListeners();
+      return null;
     }
   }
 
@@ -577,7 +584,13 @@ class TwitchChatRuntime extends ChangeNotifier {
       }
     }
 
-    _messages.add(message);
+    final fingerprint = _messageFingerprint(message);
+    if (fingerprint.isNotEmpty &&
+        _seenMessageFingerprints.contains(fingerprint)) {
+      return;
+    }
+
+    _insertRuntimeMessageInTimeOrder(message);
     _markSeen(message);
 
     if (_messages.length > maxMessages) {
@@ -595,11 +608,48 @@ class TwitchChatRuntime extends ChangeNotifier {
     });
   }
 
+  void _insertRuntimeMessageInTimeOrder(TwitchChatRuntimeMessage message) {
+    if (_messages.isEmpty ||
+        !message.receivedAt.isBefore(_messages.last.receivedAt)) {
+      _messages.add(message);
+      return;
+    }
+
+    var insertAt = _messages.length;
+    for (var i = _messages.length - 1; i >= 0; i--) {
+      if (!message.receivedAt.isBefore(_messages[i].receivedAt)) {
+        insertAt = i + 1;
+        break;
+      }
+      insertAt = i;
+    }
+    _messages.insert(insertAt, message);
+  }
+
   void _markSeen(TwitchChatRuntimeMessage message) {
     final id = message.id;
     if (id.isNotEmpty) {
       _seenMessageIds.add(id);
     }
+    final fingerprint = _messageFingerprint(message);
+    if (fingerprint.isNotEmpty) {
+      _seenMessageFingerprints.add(fingerprint);
+    }
+  }
+
+  String _messageFingerprint(TwitchChatRuntimeMessage message) {
+    final source = message.source;
+    final sentAt =
+        source.tags['tmi-sent-ts'] ??
+        source.tags['sent-ts'] ??
+        source.tags['timestamp'] ??
+        message.receivedAt.millisecondsSinceEpoch.toString();
+    final userKey = (source.tags['user-id']?.trim().isNotEmpty ?? false)
+        ? source.tags['user-id']!.trim()
+        : source.userLogin.trim().toLowerCase();
+    final text = source.message.trim();
+    if (userKey.isEmpty && text.isEmpty) return '';
+    return '${source.source.name}|${source.channel.trim().toLowerCase()}|$userKey|$sentAt|$text';
   }
 
   bool _isDeletedMessage(String id) {

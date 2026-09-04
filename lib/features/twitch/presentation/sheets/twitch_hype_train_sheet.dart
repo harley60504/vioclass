@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/engagement/twitch_hype_train.dart';
+import '../localization/vioclass_localizations.dart';
 
 Future<void> showTwitchHypeTrainSheet({
   required BuildContext context,
@@ -21,6 +22,7 @@ class TwitchHypeTrainSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(18, 0, 18, 22),
@@ -29,29 +31,41 @@ class TwitchHypeTrainSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '發燒列車',
+              l10n.t('發燒列車'),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 14),
-            _InfoRow(label: '等級', value: '${snapshot.level}'),
-            _InfoRow(label: '總計', value: '${snapshot.total}'),
+            _InfoRow(label: l10n.t('等級'), value: '${snapshot.level}'),
+            _InfoRow(label: l10n.t('總計'), value: '${snapshot.total}'),
             _InfoRow(
-              label: '進度',
+              label: l10n.t('進度'),
               value: '${snapshot.progress} / ${snapshot.goal}',
             ),
-            _InfoRow(label: '開始', value: _formatDate(snapshot.startedAt)),
-            _InfoRow(label: '到期', value: _formatDate(snapshot.expiresAt)),
-            _InfoRow(label: '結束', value: _formatDate(snapshot.endedAt)),
-            _InfoRow(label: '冷卻', value: _formatDate(snapshot.cooldownEndsAt)),
-            _InfoRow(label: '類型', value: snapshot.type),
-            _InfoRow(label: '共享列車', value: snapshot.isSharedTrain ? '是' : '否'),
+            _InfoRow(
+              label: l10n.t('開始'),
+              value: _formatDate(snapshot.startedAt),
+            ),
+            _InfoRow(
+              label: l10n.t('到期'),
+              value: _formatDate(snapshot.expiresAt),
+            ),
+            _InfoRow(label: l10n.t('結束'), value: _formatDate(snapshot.endedAt)),
+            _InfoRow(
+              label: l10n.t('冷卻'),
+              value: _formatDate(snapshot.cooldownEndsAt),
+            ),
+            _InfoRow(label: l10n.t('類型'), value: snapshot.type),
+            _InfoRow(
+              label: l10n.t('共享列車'),
+              value: snapshot.isSharedTrain ? l10n.t('是') : l10n.t('否'),
+            ),
             const SizedBox(height: 16),
-            _SectionTitle('主要貢獻'),
+            _SectionTitle(l10n.t('主要貢獻')),
             if (snapshot.topContributions.isEmpty)
-              const _EmptyText('目前沒有貢獻資料')
+              _EmptyText(l10n.t('目前沒有貢獻資料'))
             else
               for (final contribution in snapshot.topContributions)
                 _InfoRow(
@@ -61,9 +75,9 @@ class TwitchHypeTrainSheet extends StatelessWidget {
                   value: '${contribution.amount} ${contribution.type}',
                 ),
             const SizedBox(height: 16),
-            _SectionTitle('共享列車參與者'),
+            _SectionTitle(l10n.t('共享列車參與者')),
             if (snapshot.sharedTrainParticipants.isEmpty)
-              const _EmptyText('目前沒有共享列車參與者')
+              _EmptyText(l10n.t('目前沒有共享列車參與者'))
             else
               for (final participant in snapshot.sharedTrainParticipants)
                 _InfoRow(

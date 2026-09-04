@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
@@ -147,7 +148,7 @@ class _PanelSection extends StatelessWidget {
       return OutlinedButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.image_not_supported_outlined, size: 16),
-        label: const Text('關於圖片讀取失敗'),
+        label: Text(context.vio.t('關於圖片讀取失敗')),
         style: OutlinedButton.styleFrom(
           foregroundColor: TwitchUiColors.primarySoft,
           side: BorderSide(
@@ -158,9 +159,9 @@ class _PanelSection extends StatelessWidget {
     }
 
     if (panels.isEmpty && socialLinks.isEmpty) {
-      return const Text(
-        '這個頻道目前沒有關於面板。',
-        style: TextStyle(
+      return Text(
+        context.vio.t('這個頻道目前沒有關於面板。'),
+        style: const TextStyle(
           color: Colors.white38,
           fontSize: 12.5,
           fontWeight: FontWeight.w800,
@@ -185,7 +186,7 @@ class _PanelSection extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                '關於面板',
+                context.vio.t('關於面板'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -229,17 +230,17 @@ class _SocialLinkSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const Row(
+        Row(
           children: <Widget>[
-            Icon(
+            const Icon(
               Icons.hub_outlined,
               color: TwitchUiColors.primarySoft,
               size: 18,
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
-              '社群連結',
-              style: TextStyle(
+              context.vio.t('社群連結'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
@@ -365,7 +366,7 @@ class _PanelCard extends StatelessWidget {
                     children: <Widget>[
                       Expanded(
                         child: Text(
-                          _panelLabel(panel),
+                          _panelLabel(context, panel),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -394,10 +395,10 @@ class _PanelCard extends StatelessWidget {
     );
   }
 
-  String _panelLabel(TwitchChannelPanel panel) {
+  String _panelLabel(BuildContext context, TwitchChannelPanel panel) {
     if (panel.title.isNotEmpty) return panel.title;
     if (panel.description.isNotEmpty) return panel.description;
-    return '開啟連結';
+    return context.vio.t('開啟連結');
   }
 }
 

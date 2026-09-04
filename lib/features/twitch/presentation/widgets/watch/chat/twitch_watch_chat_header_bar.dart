@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 
 const Color _softAccent = Color(0xFF8F7CC0);
@@ -31,6 +32,7 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final headerHeight = compact ? 44.0 : 56.0;
 
     return Container(
@@ -47,7 +49,7 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
           _ConnectionBadge(connected: connected, compact: compact),
           const Spacer(),
           _HeaderToggleButton(
-            tooltip: showPinned ? '隱藏置頂留言' : '顯示置頂留言',
+            tooltip: l10n.t(showPinned ? '隱藏置頂留言' : '顯示置頂留言'),
             icon: Icons.push_pin_rounded,
             active: showPinned && hasPinned,
             enabled: hasPinned,
@@ -56,10 +58,10 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
           const SizedBox(width: 5),
           _HeaderToggleButton(
             tooltip: predictionVisible
-                ? '隱藏賭盤通知'
+                ? l10n.t('隱藏賭盤通知')
                 : hasPrediction
-                ? '顯示賭盤通知'
-                : '沒有賭盤',
+                ? l10n.t('顯示賭盤通知')
+                : l10n.t('沒有賭盤'),
             icon: Icons.how_to_vote_rounded,
             active: predictionVisible,
             enabled: hasPrediction,
@@ -80,7 +82,7 @@ class _ConnectionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = connected ? TwitchUiColors.green : Colors.white38;
-    final label = connected ? '直播' : '離線';
+    final label = context.vio.t(connected ? '直播' : '離線');
 
     return Container(
       height: compact ? 25 : 28,

@@ -2,6 +2,7 @@
 // Shared non-UI helpers for the prediction bet sheet and its widgets.
 
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../localization/vioclass_localizations.dart';
 
 String twitchPredictionViewerChoiceId(TwitchPredictionSnapshot prediction) {
   final direct = prediction.viewerOutcomeId?.trim();
@@ -38,7 +39,10 @@ String twitchPredictionOutcomeIdentity(TwitchPredictionOutcome outcome) {
   return outcome.title.trim();
 }
 
-String? twitchPredictionTimeLabel(TwitchPredictionSnapshot prediction) {
+String? twitchPredictionTimeLabel(
+  TwitchPredictionSnapshot prediction,
+  VioClassLocalizations l10n,
+) {
   final status = prediction.normalizedStatus;
   final now = DateTime.now();
 
@@ -47,9 +51,9 @@ String? twitchPredictionTimeLabel(TwitchPredictionSnapshot prediction) {
     if (locksAt == null) return null;
     final remaining = locksAt.difference(now);
     if (remaining.inSeconds > 0) {
-      return '鎖盤剩 ${twitchPredictionFormatDuration(remaining)}';
+      return '${l10n.t('鎖盤剩')} ${twitchPredictionFormatDuration(remaining)}';
     }
-    return '已鎖盤';
+    return l10n.t('已鎖盤');
   }
 
   if (prediction.isLockedLike) {
@@ -57,15 +61,15 @@ String? twitchPredictionTimeLabel(TwitchPredictionSnapshot prediction) {
     if (endedAt != null) {
       final remaining = endedAt.difference(now);
       if (remaining.inSeconds > 0) {
-        return '結算剩 ${twitchPredictionFormatDuration(remaining)}';
+        return '${l10n.t('結算剩')} ${twitchPredictionFormatDuration(remaining)}';
       }
     }
-    return '等待結算';
+    return l10n.t('等待結算');
   }
 
   final endedAt = prediction.endedAt;
   if (endedAt != null) {
-    return '結算 ${twitchPredictionFormatClock(endedAt)}';
+    return '${l10n.t('結算')} ${twitchPredictionFormatClock(endedAt)}';
   }
 
   return null;

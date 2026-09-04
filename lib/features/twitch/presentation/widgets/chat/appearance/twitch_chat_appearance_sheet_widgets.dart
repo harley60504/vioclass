@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../twitch_chat_text_style.dart';
 
@@ -24,9 +25,9 @@ class TwitchChatAppearanceSizeControl extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Text(
-              '大小',
-              style: TextStyle(
+            Text(
+              context.vio.t('大小'),
+              style: const TextStyle(
                 color: Colors.white70,
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
@@ -50,11 +51,17 @@ class TwitchChatAppearanceSizeControl extends StatelessWidget {
           value: scale,
           onChanged: onChanged,
         ),
-        const Row(
+        Row(
           children: [
-            Text('小', style: TextStyle(color: Colors.white54, fontSize: 10)),
-            Spacer(),
-            Text('大', style: TextStyle(color: Colors.white54, fontSize: 10)),
+            Text(
+              context.vio.t('小'),
+              style: const TextStyle(color: Colors.white54, fontSize: 10),
+            ),
+            const Spacer(),
+            Text(
+              context.vio.t('大'),
+              style: const TextStyle(color: Colors.white54, fontSize: 10),
+            ),
           ],
         ),
       ],
@@ -88,7 +95,7 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '預覽',
+            context.vio.t('預覽'),
             style: twitchChatTextStyle(
               TextStyle(
                 color: Colors.white54,
@@ -114,7 +121,7 @@ class TwitchChatAppearancePreviewCard extends StatelessWidget {
                 ),
               ),
               Text(
-                '這是聊天室訊息預覽',
+                context.vio.t('這是聊天室訊息預覽'),
                 style: twitchChatTextStyle(
                   TextStyle(
                     color: Colors.white,

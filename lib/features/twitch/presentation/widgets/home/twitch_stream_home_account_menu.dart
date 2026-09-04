@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchStreamHomeAccountMenu extends StatelessWidget {
@@ -10,7 +11,7 @@ class TwitchStreamHomeAccountMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: '設定',
+      message: context.vio.t('設定'),
       child: Material(
         color: const Color(0xB8221B32),
         borderRadius: BorderRadius.circular(999),

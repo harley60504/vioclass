@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/special_actions/twitch_pending_special_message.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 
 class TwitchPendingChatActionBanner extends StatelessWidget {
@@ -18,6 +19,12 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _accentForKind(pending.kind);
+    final l10n = context.vio;
+    final title = _localizedPendingText(l10n, pending.title);
+    final subtitle = _localizedPendingText(l10n, pending.subtitle);
+    final costLabel = pending.costLabel == null
+        ? null
+        : _localizedPendingText(l10n, pending.costLabel!);
 
     return Padding(
       padding: EdgeInsets.fromLTRB(10, compact ? 7 : 9, 10, 0),
@@ -55,7 +62,7 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
                     children: <Widget>[
                       Flexible(
                         child: Text(
-                          '已選擇：${pending.title}',
+                          '${l10n.t('已選擇')}：$title',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -68,13 +75,13 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
                       ),
                       if (pending.hasCostLabel) ...<Widget>[
                         const SizedBox(width: 6),
-                        _TinyPill(text: pending.costLabel!, color: accent),
+                        _TinyPill(text: costLabel!, color: accent),
                       ],
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    pending.subtitle,
+                    subtitle,
                     maxLines: compact ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
@@ -89,7 +96,7 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             IconButton(
-              tooltip: '取消',
+              tooltip: l10n.t('取消'),
               onPressed: onCancel,
               visualDensity: VisualDensity.compact,
               icon: const Icon(
@@ -136,6 +143,24 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
       case TwitchPendingSpecialMessageKind.officialSpecialMessage:
         return Icons.verified_rounded;
     }
+  }
+
+  static String _localizedPendingText(VioClassLocalizations l10n, String text) {
+    final clean = text.trim();
+    if (clean.isEmpty) return clean;
+    if (!l10n.isEnglish) return clean;
+
+    final monthsMatch = RegExp(r'^訂閱 (\d+) 個月$').firstMatch(clean);
+    if (monthsMatch != null) {
+      return '${l10n.t('續訂')} ${monthsMatch.group(1)} ${l10n.t('個月')}';
+    }
+
+    final costPointsMatch = RegExp(r'^(\d+) 點$').firstMatch(clean);
+    if (costPointsMatch != null) {
+      return '${costPointsMatch.group(1)} ${l10n.t('點')}';
+    }
+
+    return l10n.t(clean);
   }
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import 'twitch_player_common_buttons.dart';
 import 'twitch_watch_stream_header.dart';
@@ -136,9 +137,9 @@ class _WatchTopActionButtons {
     required this.creatingClip,
   });
 
-  Widget buildBackButton() {
+  Widget buildBackButton(BuildContext context) {
     return RoundIconButton(
-      tooltip: '返回',
+      tooltip: context.vio.t('返回'),
       icon: Icons.arrow_back,
       iconColor: const Color(0xFF93C5FD),
       backgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.20),
@@ -151,9 +152,9 @@ class _WatchTopActionButtons {
     );
   }
 
-  Widget buildHomeButton() {
+  Widget buildHomeButton(BuildContext context) {
     return RoundIconButton(
-      tooltip: '回主畫面',
+      tooltip: context.vio.t('回主畫面'),
       icon: Icons.home_rounded,
       iconColor: const Color(0xFFE9D5FF),
       backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.22),
@@ -220,9 +221,9 @@ class _CompactWatchTopActionContent extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        actions.buildBackButton(),
+        actions.buildBackButton(context),
         SizedBox(width: metrics.actionGap),
-        actions.buildHomeButton(),
+        actions.buildHomeButton(context),
         SizedBox(width: metrics.actionGap),
         WatchCompactAvatarTile(
           metadata: metadata,
@@ -256,9 +257,9 @@ class _WideWatchTopActionContent extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        actions.buildBackButton(),
+        actions.buildBackButton(context),
         const SizedBox(width: 10),
-        actions.buildHomeButton(),
+        actions.buildHomeButton(context),
         const SizedBox(width: 10),
         Expanded(
           child: WatchStreamHeaderCard(

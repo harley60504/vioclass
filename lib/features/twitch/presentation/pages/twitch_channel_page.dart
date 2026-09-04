@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import '../widgets/shared/twitch_cached_image_layer.dart';
@@ -326,6 +327,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -336,7 +338,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
         actions: [
           if (widget.showCloseButton)
             IconButton(
-              tooltip: '關閉',
+              tooltip: l10n.t('關閉'),
               onPressed: () => Navigator.of(context).pop(),
               icon: const Icon(Icons.close_rounded),
             ),
@@ -346,10 +348,16 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
           indicatorColor: TwitchUiColors.primary,
           labelColor: Colors.white,
           unselectedLabelColor: Colors.white54,
-          tabs: const [
-            Tab(icon: Icon(Icons.info_outline_rounded), text: '關於'),
-            Tab(icon: Icon(Icons.movie_filter_rounded), text: '片段'),
-            Tab(icon: Icon(Icons.video_library_rounded), text: 'VOD'),
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.info_outline_rounded),
+              text: l10n.t('關於'),
+            ),
+            Tab(
+              icon: const Icon(Icons.movie_filter_rounded),
+              text: l10n.t('片段'),
+            ),
+            const Tab(icon: Icon(Icons.video_library_rounded), text: 'VOD'),
           ],
         ),
       ),
@@ -516,15 +524,15 @@ class _PanelSection extends StatelessWidget {
     if (panels.isEmpty && error != null && error.isNotEmpty) {
       return _InlineRetry(
         icon: Icons.image_not_supported_outlined,
-        text: '關於圖片讀取失敗',
+        text: context.vio.t('關於圖片讀取失敗'),
         onRetry: onRetry,
       );
     }
 
     if (panels.isEmpty) {
-      return const Text(
-        '這個頻道目前沒有關於圖片面板。',
-        style: TextStyle(
+      return Text(
+        context.vio.t('這個頻道目前沒有關於圖片面板。'),
+        style: const TextStyle(
           color: Colors.white38,
           fontSize: 12.5,
           fontWeight: FontWeight.w800,
@@ -548,7 +556,7 @@ class _PanelSection extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              '關於面板',
+              context.vio.t('關於面板'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
@@ -593,17 +601,17 @@ class _SocialLinkSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Row(
+        Row(
           children: [
-            Icon(
+            const Icon(
               Icons.hub_outlined,
               color: TwitchUiColors.primarySoft,
               size: 18,
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
-              '社群連結',
-              style: TextStyle(
+              context.vio.t('社群連結'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
@@ -729,7 +737,7 @@ class _PanelCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          _panelLabel(panel),
+                          _panelLabel(context, panel),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -758,10 +766,10 @@ class _PanelCard extends StatelessWidget {
     );
   }
 
-  String _panelLabel(TwitchChannelPanel panel) {
+  String _panelLabel(BuildContext context, TwitchChannelPanel panel) {
     if (panel.title.isNotEmpty) return panel.title;
     if (panel.description.isNotEmpty) return panel.description;
-    return '開啟連結';
+    return context.vio.t('開啟連結');
   }
 }
 
@@ -854,6 +862,7 @@ Future<void> _openExternalUrl(String url) async {
 }
 
 Widget _mediaSearchSliver({
+  required BuildContext context,
   required TextEditingController controller,
   required String hintText,
   required ValueChanged<String> onChanged,
@@ -875,7 +884,7 @@ Widget _mediaSearchSliver({
         iconColor: Colors.white54,
         suffixIcon: controller.text.trim().isNotEmpty
             ? IconButton(
-                tooltip: '清空搜尋',
+                tooltip: context.vio.t('清空搜尋'),
                 visualDensity: VisualDensity.compact,
                 onPressed: () {
                   controller.clear();
@@ -924,6 +933,7 @@ class _ClipTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final filteredClips = _filterClips(clips, searchText);
 
     if (loadingFirstPage) {
@@ -936,9 +946,9 @@ class _ClipTab extends StatelessWidget {
     if (clips.isEmpty && error != null && error.isNotEmpty) {
       return _CenteredAction(
         icon: Icons.error_outline_rounded,
-        title: '片段讀取失敗',
-        message: '片段暫時讀取失敗，稍後再試或重新整理。',
-        actionLabel: '重試',
+        title: l10n.t('片段讀取失敗'),
+        message: l10n.t('片段暫時讀取失敗，稍後再試或重新整理。'),
+        actionLabel: l10n.t('重試'),
         onPressed: onRetry,
       );
     }
@@ -946,9 +956,9 @@ class _ClipTab extends StatelessWidget {
     if (clips.isEmpty) {
       return _CenteredAction(
         icon: Icons.movie_filter_outlined,
-        title: '目前沒有片段',
-        message: '這個頻道沒有可顯示的精華片段。',
-        actionLabel: '重新整理',
+        title: l10n.t('目前沒有片段'),
+        message: l10n.t('這個頻道沒有可顯示的精華片段。'),
+        actionLabel: l10n.t('重新整理'),
         onPressed: onRetry,
       );
     }
@@ -957,17 +967,18 @@ class _ClipTab extends StatelessWidget {
       return CustomScrollView(
         slivers: [
           _mediaSearchSliver(
+            context: context,
             controller: searchController,
-            hintText: '搜尋片段',
+            hintText: l10n.t('搜尋片段'),
             onChanged: onSearchChanged,
           ),
           SliverFillRemaining(
             hasScrollBody: false,
             child: _CenteredAction(
               icon: Icons.search_off_rounded,
-              title: '找不到符合的片段',
-              message: '可以換個關鍵字，或清空搜尋回到全部片段。',
-              actionLabel: '清空搜尋',
+              title: l10n.t('找不到符合的片段'),
+              message: l10n.t('可以換個關鍵字，或清空搜尋回到全部片段。'),
+              actionLabel: l10n.t('清空搜尋'),
               onPressed: () {
                 searchController.clear();
                 onSearchChanged('');
@@ -981,8 +992,9 @@ class _ClipTab extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         _mediaSearchSliver(
+          context: context,
           controller: searchController,
-          hintText: '搜尋片段',
+          hintText: l10n.t('搜尋片段'),
           onChanged: onSearchChanged,
         ),
         SliverPadding(
@@ -1020,11 +1032,11 @@ class _ClipTab extends StatelessWidget {
                               ),
                             )
                           : const Icon(Icons.expand_more_rounded),
-                      label: Text(loadingMore ? '載入中' : '載入更多'),
+                      label: Text(l10n.t(loadingMore ? '載入中' : '載入更多')),
                     )
-                  : const Text(
-                      '已顯示目前可讀取的片段',
-                      style: TextStyle(
+                  : Text(
+                      l10n.t('已顯示目前可讀取的片段'),
+                      style: const TextStyle(
                         color: Colors.white38,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -1066,6 +1078,7 @@ class _ClipCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
@@ -1125,7 +1138,9 @@ class _ClipCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            clip.title.trim().isEmpty ? '未命名片段' : clip.title,
+                            clip.title.trim().isEmpty
+                                ? l10n.t('未命名片段')
+                                : clip.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1186,7 +1201,7 @@ class _ClipThumbnail extends StatelessWidget {
         Positioned(
           left: 8,
           top: 8,
-          child: _VodPill(text: _formatClipViews(clip.viewCount)),
+          child: _VodPill(text: _formatClipViews(context, clip.viewCount)),
         ),
         Positioned(
           left: 8,
@@ -1197,7 +1212,13 @@ class _ClipThumbnail extends StatelessWidget {
     );
   }
 
-  String _formatClipViews(int value) {
+  String _formatClipViews(BuildContext context, int value) {
+    if (context.vio.isEnglish && value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    if (context.vio.isEnglish && value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}K';
+    }
     if (value >= 10000) return '${(value / 10000).toStringAsFixed(1)}萬';
     if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
     return value.toString();
@@ -1213,8 +1234,9 @@ class _ClipMetaText extends StatelessWidget {
   Widget build(BuildContext context) {
     final date = _formatDate(clip.createdAt);
     final creator = clip.creatorName.trim();
+    final l10n = context.vio;
     return Text(
-      '${creator.isEmpty ? '已建立片段' : '由 $creator 建立片段'}'
+      '${creator.isEmpty ? l10n.t('已建立片段') : '${l10n.t('由')} $creator ${l10n.t('建立片段-meta')}'}'
       '${date.isEmpty ? '' : ' · $date'}',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -1265,6 +1287,7 @@ class _VodTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final filteredVideos = _filterVideos(videos, searchText);
 
     if (loadingFirstPage) {
@@ -1277,9 +1300,9 @@ class _VodTab extends StatelessWidget {
     if (videos.isEmpty && error != null && error.isNotEmpty) {
       return _CenteredAction(
         icon: Icons.error_outline_rounded,
-        title: 'VOD 讀取失敗',
-        message: 'VOD 暫時讀取失敗，稍後再試或重新整理。',
-        actionLabel: '重試',
+        title: l10n.t('VOD 讀取失敗'),
+        message: l10n.t('VOD 暫時讀取失敗，稍後再試或重新整理。'),
+        actionLabel: l10n.t('重試'),
         onPressed: onRetry,
       );
     }
@@ -1287,9 +1310,9 @@ class _VodTab extends StatelessWidget {
     if (videos.isEmpty) {
       return _CenteredAction(
         icon: Icons.video_library_outlined,
-        title: '目前沒有 VOD',
-        message: '這個頻道沒有可顯示的過去直播。',
-        actionLabel: '重新整理',
+        title: l10n.t('目前沒有 VOD'),
+        message: l10n.t('這個頻道沒有可顯示的過去直播。'),
+        actionLabel: l10n.t('重新整理'),
         onPressed: onRetry,
       );
     }
@@ -1298,17 +1321,18 @@ class _VodTab extends StatelessWidget {
       return CustomScrollView(
         slivers: [
           _mediaSearchSliver(
+            context: context,
             controller: searchController,
-            hintText: '搜尋 VOD',
+            hintText: l10n.t('搜尋 VOD'),
             onChanged: onSearchChanged,
           ),
           SliverFillRemaining(
             hasScrollBody: false,
             child: _CenteredAction(
               icon: Icons.search_off_rounded,
-              title: '找不到符合的 VOD',
-              message: '可以換個關鍵字，或清空搜尋回到全部 VOD。',
-              actionLabel: '清空搜尋',
+              title: l10n.t('找不到符合的 VOD'),
+              message: l10n.t('可以換個關鍵字，或清空搜尋回到全部 VOD。'),
+              actionLabel: l10n.t('清空搜尋'),
               onPressed: () {
                 searchController.clear();
                 onSearchChanged('');
@@ -1322,8 +1346,9 @@ class _VodTab extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         _mediaSearchSliver(
+          context: context,
           controller: searchController,
-          hintText: '搜尋 VOD',
+          hintText: l10n.t('搜尋 VOD'),
           onChanged: onSearchChanged,
         ),
         SliverPadding(
@@ -1361,11 +1386,11 @@ class _VodTab extends StatelessWidget {
                               ),
                             )
                           : const Icon(Icons.expand_more_rounded),
-                      label: Text(loadingMore ? '載入中' : '載入更多'),
+                      label: Text(l10n.t(loadingMore ? '載入中' : '載入更多')),
                     )
-                  : const Text(
-                      '已顯示目前可讀取的 VOD',
-                      style: TextStyle(
+                  : Text(
+                      l10n.t('已顯示目前可讀取的 VOD'),
+                      style: const TextStyle(
                         color: Colors.white38,
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
@@ -1407,6 +1432,7 @@ class _VodCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final thumbnail = video.thumbnail();
     final isGrowingArchive = video.isLikelyGrowingArchive;
     return Material(
@@ -1474,7 +1500,7 @@ class _VodCard extends StatelessWidget {
                         children: [
                           Text(
                             video.title.trim().isEmpty
-                                ? '未命名 VOD'
+                                ? l10n.t('未命名 VOD')
                                 : video.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -1548,7 +1574,11 @@ class _VodThumbnail extends StatelessWidget {
         ),
         Positioned(right: 8, bottom: 8, child: _VodPill(text: video.duration)),
         if (isGrowingArchive)
-          const Positioned(left: 8, top: 8, child: _VodPill(text: '直播存檔中')),
+          Positioned(
+            left: 8,
+            top: 8,
+            child: _VodPill(text: context.vio.t('直播存檔中')),
+          ),
       ],
     );
   }
@@ -1563,10 +1593,13 @@ class _VodMetaText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = _formatDate(video.publishedAt ?? video.createdAt);
-    final views = _formatCount(video.viewCount);
+    final views = _formatCount(context, video.viewCount);
+    final l10n = context.vio;
     return Text(
       isGrowingArchive
-          ? '目前直播中，點擊會進直播觀看頁'
+          ? l10n.t('目前直播中，點擊會進直播觀看頁')
+          : l10n.isEnglish
+          ? '$views ${l10n.t('次觀看')}${date.isEmpty ? '' : ' · $date'}'
           : '$views 次觀看${date.isEmpty ? '' : ' · $date'}',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -1585,7 +1618,13 @@ class _VodMetaText extends StatelessWidget {
         '${local.day.toString().padLeft(2, '0')}';
   }
 
-  String _formatCount(int value) {
+  String _formatCount(BuildContext context, int value) {
+    if (context.vio.isEnglish && value >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    if (context.vio.isEnglish && value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}K';
+    }
     if (value >= 10000) return '${(value / 10000).toStringAsFixed(1)}萬';
     if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}K';
     return value.toString();

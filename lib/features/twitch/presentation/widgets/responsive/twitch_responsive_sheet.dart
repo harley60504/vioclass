@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 enum TwitchUnifiedSheetSize { compact, medium, large, wide }
@@ -337,6 +338,7 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final subtitleText = subtitle?.trim();
     final iconUrl = iconImageUrl?.trim() ?? '';
 
@@ -394,7 +396,7 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
           if (showRefresh) ...[
             const SizedBox(width: 4),
             _SheetHeaderIconButton(
-              tooltip: '重新整理',
+              tooltip: l10n.t('重新整理'),
               loading: loading,
               icon: Icons.refresh_rounded,
               onPressed: loading ? null : onRefresh,
@@ -402,7 +404,7 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
           ],
           if (showClose)
             _SheetHeaderIconButton(
-              tooltip: '關閉',
+              tooltip: l10n.t('關閉'),
               icon: Icons.close_rounded,
               onPressed: onClose ?? () => Navigator.of(context).maybePop(),
             ),
@@ -545,6 +547,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final verticalPadding = compact ? 6.0 : 8.0;
 
     return Padding(
@@ -577,7 +580,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: searchHint,
+                    hintText: l10n.t(searchHint),
                     prefixIcon: const Icon(Icons.search, size: 18),
                     border: const OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(
@@ -592,7 +595,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
             const Spacer(),
           const SizedBox(width: 6),
           IconButton(
-            tooltip: '重新整理',
+            tooltip: l10n.t('重新整理'),
             visualDensity: VisualDensity.compact,
             onPressed: loading ? null : onRefresh,
             icon: loading
@@ -607,7 +610,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                 : Icon(Icons.refresh_rounded, size: compact ? 19 : 21),
           ),
           IconButton(
-            tooltip: '關閉',
+            tooltip: l10n.t('關閉'),
             visualDensity: VisualDensity.compact,
             onPressed: () => Navigator.of(context).maybePop(),
             icon: Icon(Icons.close_rounded, size: compact ? 19 : 21),

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../pages/twitch_watch_route_guard.dart';
 import '../../twitch_follow_status_resolver.dart';
@@ -374,6 +375,7 @@ class TwitchDiscoveryFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     if (loadingMore) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -392,7 +394,7 @@ class TwitchDiscoveryFooter extends StatelessWidget {
               unawaited(onLoadMore());
             },
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('載入更多失敗，重試'),
+            label: Text(l10n.t('載入更多失敗，重試')),
             style: OutlinedButton.styleFrom(
               foregroundColor: TwitchUiColors.primarySoft,
               side: const BorderSide(color: TwitchUiColors.primary),
@@ -411,7 +413,7 @@ class TwitchDiscoveryFooter extends StatelessWidget {
               unawaited(onLoadMore());
             },
             icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            label: const Text('載入更多'),
+            label: Text(l10n.t('載入更多')),
             style: TextButton.styleFrom(
               foregroundColor: TwitchUiColors.primarySoft,
             ),
@@ -420,12 +422,12 @@ class TwitchDiscoveryFooter extends StatelessWidget {
       );
     }
 
-    return const Padding(
-      padding: EdgeInsets.fromLTRB(16, 6, 16, 26),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 26),
       child: Center(
         child: Text(
-          '已經到底了',
-          style: TextStyle(
+          l10n.t('已經到底了'),
+          style: const TextStyle(
             color: Colors.white38,
             fontSize: 12.5,
             fontWeight: FontWeight.w800,
@@ -516,6 +518,7 @@ class TwitchDiscoveryEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -549,7 +552,7 @@ class TwitchDiscoveryEmptyState extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
-                label: const Text('重新整理'),
+                label: Text(l10n.t('重新整理')),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: TwitchUiColors.primarySoft,
                   side: const BorderSide(color: TwitchUiColors.primary),

@@ -6,6 +6,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
@@ -33,7 +34,11 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
       padding: const EdgeInsets.only(left: 2, bottom: 3),
       child: Text.rich(
         TextSpan(
-          children: _buildPreviewSpans(name: name, body: body),
+          children: _buildPreviewSpans(
+            context: context,
+            name: name,
+            body: body,
+          ),
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -43,6 +48,7 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
   }
 
   List<InlineSpan> _buildPreviewSpans({
+    required BuildContext context,
     required String name,
     required String body,
   }) {
@@ -50,7 +56,9 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
     final cleanBody = body.trim();
 
     if (cleanName.isEmpty && cleanBody.isEmpty) {
-      return <InlineSpan>[TextSpan(text: '回覆', style: _baseStyle())];
+      return <InlineSpan>[
+        TextSpan(text: context.vio.t('回覆'), style: _baseStyle()),
+      ];
     }
 
     final spans = <InlineSpan>[];

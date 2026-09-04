@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../dialogs/twitch_channel_points_text_input_dialog.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../widgets/channel_points/twitch_channel_points_emote_overlay.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import 'twitch_channel_points_sheet_models.dart';
@@ -22,6 +23,7 @@ Future<String?> buildTwitchChannelPointRedeemPayload({
   required Map<String, dynamic> reward,
   required TwitchChannelPointEmoteOverlayOpener openEmoteOverlay,
 }) async {
+  final l10n = context.vio;
   if (requiresChannelPointModifiedEmoteSelection(reward)) {
     final selection = await openEmoteOverlay(
       context: context,
@@ -49,9 +51,9 @@ Future<String?> buildTwitchChannelPointRedeemPayload({
     final text = await askChannelPointTextInput(
       context: context,
       title: channelPointRewardTitle(reward),
-      label: '聊天室訊息',
-      hintText: '輸入要送出的訊息',
-      confirmLabel: '送出兌換',
+      label: l10n.t('聊天室訊息'),
+      hintText: l10n.t('輸入要送出的訊息'),
+      confirmLabel: l10n.t('送出兌換'),
       minLines: 2,
       maxLines: 4,
     );
@@ -66,9 +68,9 @@ Future<String?> buildTwitchChannelPointRedeemPayload({
     final text = await askChannelPointTextInput(
       context: context,
       title: channelPointRewardTitle(reward),
-      label: prompt == null || prompt.isEmpty ? '兌換內容' : prompt,
-      hintText: '輸入兌換內容',
-      confirmLabel: '送出兌換',
+      label: prompt == null || prompt.isEmpty ? l10n.t('兌換內容') : prompt,
+      hintText: l10n.t('輸入兌換內容'),
+      confirmLabel: l10n.t('送出兌換'),
       minLines: 2,
       maxLines: 4,
     );

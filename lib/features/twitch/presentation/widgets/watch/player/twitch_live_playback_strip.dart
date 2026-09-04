@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../../localization/vioclass_localizations.dart';
+
+const double _liveEdgeSnapRatio = 0.995;
 
 class TwitchLivePlaybackStrip extends StatefulWidget {
   final Player player;
@@ -97,7 +100,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         ? dvrTimelineDuration
                         : duration;
                     final previewPosition = displayDuration.inMilliseconds > 500
-                        ? value >= 0.985 && !_dragging
+                        ? value >= _liveEdgeSnapRatio && !_dragging
                               ? displayDuration
                               : Duration(
                                   milliseconds:
@@ -106,11 +109,11 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                 )
                         : position;
                     final positionText = _formatDuration(previewPosition);
-                    const durationText = '直播';
+                    final durationText = context.vio.t('直播');
                     final timeColor = buffering
                         ? Colors.orangeAccent
                         : Colors.white60;
-                    final liveLabelActive = value >= 0.985;
+                    final liveLabelActive = value >= _liveEdgeSnapRatio;
 
                     return Row(
                       children: [
@@ -131,7 +134,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                       setState(() {
                                         _dragging = true;
                                         _dragValue = next;
-                                        _livePinned = next >= 0.985;
+                                        _livePinned =
+                                            next >= _liveEdgeSnapRatio;
                                       });
                                     }
                                   : null,
@@ -139,7 +143,8 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                   ? (next) {
                                       setState(() {
                                         _dragValue = next;
-                                        _livePinned = next >= 0.985;
+                                        _livePinned =
+                                            next >= _liveEdgeSnapRatio;
                                       });
                                     }
                                   : null,
@@ -148,10 +153,11 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                       setState(() {
                                         _dragging = false;
                                         _dragValue = null;
-                                        _livePinned = next >= 0.985;
+                                        _livePinned =
+                                            next >= _liveEdgeSnapRatio;
                                       });
 
-                                      if (next < 0.985 &&
+                                      if (next < _liveEdgeSnapRatio &&
                                           widget.onOpenDvrReplayAt != null) {
                                         widget.onOpenDvrReplayAt!(next);
                                         return;
@@ -164,11 +170,12 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         SizedBox(width: compact ? 6 : 8),
                         Tooltip(
                           message: _timeStatusTooltip(
+                            context: context,
                             position: previewPosition,
                             duration: duration,
                             buffering: buffering,
                             playing: playing,
-                            livePinned: value >= 0.985,
+                            livePinned: value >= _liveEdgeSnapRatio,
                           ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
@@ -205,6 +212,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
   }
 
   static String _timeStatusTooltip({
+    required BuildContext context,
     required Duration position,
     required Duration duration,
     required bool buffering,
@@ -215,13 +223,14 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
     final dur = duration.inMilliseconds > 0
         ? _formatDuration(duration)
         : '--:--';
+    final l10n = context.vio;
     final state = buffering
-        ? '緩衝中'
+        ? l10n.t('緩衝中')
         : livePinned
-        ? '直播最新'
+        ? l10n.t('直播最新')
         : playing
-        ? '播放中'
-        : '已暫停';
+        ? l10n.t('播放中')
+        : l10n.t('已暫停');
 
     return '$state · $pos / $dur';
   }

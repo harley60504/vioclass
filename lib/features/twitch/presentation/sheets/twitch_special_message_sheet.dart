@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
+import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/twitch_chat_text_style.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -78,10 +79,11 @@ class _TwitchSpecialMessageSheetStage251State
   @override
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
+    final l10n = context.vio;
 
     return TwitchUnifiedSheetScaffold(
-      title: '特殊訊息',
-      subtitle: '連續觀看、續訂與聊天室身分',
+      title: l10n.t('特殊訊息'),
+      subtitle: l10n.t('連續觀看、續訂與聊天室身分'),
       icon: Icons.auto_awesome_rounded,
       loading: _loading,
       onRefresh: _loading ? null : _refresh,
@@ -144,7 +146,7 @@ class _TwitchSpecialMessageSheetStage251State
       setState(() => _snapshot = snapshot);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = '特殊訊息暫時載入失敗，稍後再試。');
+      setState(() => _errorText = context.vio.t('特殊訊息暫時載入失敗，稍後再試。'));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -165,7 +167,7 @@ class _TwitchSpecialMessageSheetStage251State
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = '聊天室身分更新失敗，稍後再試。');
+      setState(() => _errorText = context.vio.t('聊天室身分更新失敗，稍後再試。'));
     } finally {
       if (mounted) setState(() => _selectingBadgeId = null);
     }
@@ -186,18 +188,19 @@ class _ShareSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final watchStreak = snapshot?.watchStreak;
     final resub = snapshot?.resub;
 
     return _Section(
-      title: '可分享訊息',
+      title: l10n.t('可分享訊息'),
       children: <Widget>[
         _ActionTile(
           icon: Icons.local_fire_department_rounded,
-          title: _watchStreakTitle(watchStreak),
+          title: _watchStreakTitle(watchStreak, l10n),
           subtitle: watchStreak?.canShare == true
-              ? '可以分享你的連續觀看訊息'
-              : '目前沒有可分享的連續觀看訊息',
+              ? l10n.t('可以分享你的連續觀看訊息')
+              : l10n.t('目前沒有可分享的連續觀看訊息'),
           value: watchStreak?.streakCount == null
               ? null
               : '${watchStreak!.streakCount}${watchStreak.unitLabel}',
@@ -209,11 +212,11 @@ class _ShareSection extends StatelessWidget {
         const SizedBox(height: 8),
         _ActionTile(
           icon: Icons.workspace_premium_rounded,
-          title: _resubTitle(resub),
-          subtitle: _resubSubtitle(resub),
+          title: _resubTitle(resub, l10n),
+          subtitle: _resubSubtitle(resub, l10n),
           value: resub?.cumulativeMonths == null
               ? null
-              : '${resub!.cumulativeMonths} 個月',
+              : '${resub!.cumulativeMonths} ${l10n.t('個月')}',
           enabled: resub?.canShare ?? false,
           onTap: resub == null ? null : () => onShareResub(resub),
         ),
@@ -221,31 +224,46 @@ class _ShareSection extends StatelessWidget {
     );
   }
 
-  String _watchStreakTitle(TwitchWatchStreakStatusStage251? status) {
+  String _watchStreakTitle(
+    TwitchWatchStreakStatusStage251? status,
+    VioClassLocalizations l10n,
+  ) {
     final count = status?.streakCount;
     if (count != null && count > 0) {
-      return '連續觀看 $count${status!.unitLabel}';
+      return '${l10n.t('連續觀看')} $count${status!.unitLabel}';
     }
-    return '連續觀看';
+    return l10n.t('連續觀看');
   }
 
-  String _resubTitle(TwitchResubNotificationStage251? resub) {
+  String _resubTitle(
+    TwitchResubNotificationStage251? resub,
+    VioClassLocalizations l10n,
+  ) {
     final months = resub?.cumulativeMonths;
-    if (months != null && months > 0) return '續訂 $months 個月';
-    return '續訂訊息';
+    if (months != null && months > 0) {
+      return '${l10n.t('續訂')} $months ${l10n.t('個月')}';
+    }
+    return l10n.t('續訂訊息');
   }
 
-  String _resubSubtitle(TwitchResubNotificationStage251? resub) {
-    if (resub == null) return '目前沒有可分享的續訂訊息';
+  String _resubSubtitle(
+    TwitchResubNotificationStage251? resub,
+    VioClassLocalizations l10n,
+  ) {
+    if (resub == null) return l10n.t('目前沒有可分享的續訂訊息');
     final parts = <String>[];
     final streak = resub.streakMonths;
     final duration = resub.durationMonths;
-    if (streak != null && streak > 0) parts.add('連續 $streak 個月');
-    if (duration != null && duration > 0) parts.add('本次 $duration 個月');
+    if (streak != null && streak > 0) {
+      parts.add('${l10n.t('連續')} $streak ${l10n.t('個月')}');
+    }
+    if (duration != null && duration > 0) {
+      parts.add('${l10n.t('本次')} $duration ${l10n.t('個月')}');
+    }
     final plan = resub.subPlan?.trim();
     if (plan != null && plan.isNotEmpty) parts.add(plan);
     if (parts.isNotEmpty) return parts.join(' / ');
-    return resub.canShare ? '可以分享你的續訂訊息' : '目前沒有可分享的續訂訊息';
+    return resub.canShare ? l10n.t('可以分享你的續訂訊息') : l10n.t('目前沒有可分享的續訂訊息');
   }
 }
 
@@ -267,11 +285,11 @@ class _BadgeSection extends StatelessWidget {
         const <TwitchChatIdentityBadgeStage251>[];
 
     return _Section(
-      title: '聊天室身分徽章',
+      title: context.vio.t('聊天室身分徽章'),
       children: <Widget>[
         if (badges.isEmpty)
           Text(
-            '目前沒有可切換的徽章',
+            context.vio.t('目前沒有可切換的徽章'),
             style: TextStyle(
               color: TwitchUiColors.textSecondary,
               fontSize: 12.5,
@@ -305,7 +323,7 @@ class _IssuesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return _Section(
-      title: '系統提示',
+      title: context.vio.t('系統提示'),
       children: snapshot.issues
           .map(
             (issue) => Text(

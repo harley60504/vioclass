@@ -3,6 +3,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
@@ -59,7 +60,7 @@ class TwitchChatFirstMessageChip extends StatelessWidget {
         ),
       ),
       child: Text(
-        '首聊',
+        context.vio.t('首聊'),
         style: twitchChatTextStyle(
           TextStyle(
             color: TwitchUiColors.primarySoft,

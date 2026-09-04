@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_stream_home_models.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
@@ -23,6 +24,7 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Container(
       width: 132,
       decoration: BoxDecoration(
@@ -42,8 +44,8 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Text(
-                  'Twitch',
+                Text(
+                  l10n.t('Twitch'),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 21,
@@ -75,7 +77,7 @@ class TwitchStreamHomeSidebar extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    loadingLoginState ? '檢查中' : loginStatus,
+                    loadingLoginState ? l10n.t('檢查中') : loginStatus,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -155,7 +157,7 @@ class _SidebarButton extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  section.label,
+                  section.localizedLabel(context),
                   style: TextStyle(
                     color: selected ? Colors.white : Colors.white70,
                     fontSize: 15,

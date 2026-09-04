@@ -7,6 +7,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import '../../api/clips/twitch_clip_api_service.dart';
 import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
+import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
@@ -160,7 +161,7 @@ class _TwitchClipEditorDialogBodyState
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _errorText = _clipEditorErrorText(error);
+        _errorText = _clipEditorErrorText(context, error);
       });
     }
   }
@@ -177,12 +178,12 @@ class _TwitchClipEditorDialogBodyState
     if (session == null || _creating) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      setState(() => _errorText = '請先輸入片段標題。');
+      setState(() => _errorText = context.vio.t('請先輸入片段標題。'));
       return;
     }
     final length = _end - _start;
     if (length < _minClipLength || length > _maxClipLength) {
-      setState(() => _errorText = '片段長度需介於 5 到 60 秒。');
+      setState(() => _errorText = context.vio.t('片段長度需介於 5 到 60 秒。'));
       return;
     }
     setState(() {
@@ -210,7 +211,7 @@ class _TwitchClipEditorDialogBodyState
       if (!mounted) return;
       setState(() {
         _creating = false;
-        _errorText = _clipEditorErrorText(error);
+        _errorText = _clipEditorErrorText(context, error);
       });
     }
   }
@@ -308,11 +309,11 @@ class _TwitchClipEditorDialogBodyState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text(
-                      '剪輯片段',
+                    Text(
+                      context.vio.t('剪輯片段'),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w900,
@@ -348,16 +349,19 @@ class _TwitchClipEditorDialogBodyState
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(
+            const CircularProgressIndicator(
               strokeWidth: 2.4,
               color: TwitchUiColors.primarySoft,
             ),
-            SizedBox(height: 12),
-            Text('正在準備可剪輯片段...', style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 12),
+            Text(
+              context.vio.t('正在準備可剪輯片段...'),
+              style: const TextStyle(color: Colors.white70),
+            ),
           ],
         ),
       );
@@ -472,23 +476,23 @@ class _TwitchClipEditorDialogBodyState
                             enabled: !_creating,
                             maxLength: 100,
                             style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               counterText: '',
-                              hintText: '片段標題',
-                              hintStyle: TextStyle(color: Colors.white38),
+                              hintText: context.vio.t('片段標題'),
+                              hintStyle: const TextStyle(color: Colors.white38),
                               filled: true,
-                              fillColor: Color(0xFF202027),
-                              border: OutlineInputBorder(
+                              fillColor: const Color(0xFF202027),
+                              border: const OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Color(0xFF393944),
                                 ),
                               ),
-                              enabledBorder: OutlineInputBorder(
+                              enabledBorder: const OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: Color(0xFF393944),
                                 ),
                               ),
-                              focusedBorder: OutlineInputBorder(
+                              focusedBorder: const OutlineInputBorder(
                                 borderSide: BorderSide(
                                   color: TwitchUiColors.primary,
                                 ),
@@ -516,7 +520,9 @@ class _TwitchClipEditorDialogBodyState
                                   ),
                                 )
                               : const Icon(Icons.movie_creation_outlined),
-                          label: Text(_creating ? '建立中' : '建立片段'),
+                          label: Text(
+                            context.vio.t(_creating ? '建立中' : '建立片段'),
+                          ),
                         ),
                       ],
                     ),
@@ -539,7 +545,7 @@ class _TwitchClipEditorDialogBodyState
                   ],
                 )
               : _CreatedClipControls(
-                  title: _createdClipTitle ?? '片段',
+                  title: _createdClipTitle ?? context.vio.t('片段'),
                   onClose: () => Navigator.of(context).pop(),
                 ),
         ),
@@ -565,11 +571,11 @@ class _CreatedClipControls extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '片段已建立',
+              Text(
+                context.vio.t('片段已建立'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 14,
                   fontWeight: FontWeight.w900,
@@ -590,7 +596,7 @@ class _CreatedClipControls extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        FilledButton(onPressed: onClose, child: const Text('關閉')),
+        FilledButton(onPressed: onClose, child: Text(context.vio.t('關閉'))),
       ],
     );
   }
@@ -613,14 +619,14 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.error_outline, color: Colors.redAccent, size: 32),
             const SizedBox(height: 10),
             Text(
-              errorText ?? '片段準備失敗。',
+              errorText ?? context.vio.t('片段準備失敗。'),
               textAlign: TextAlign.center,
               style: const TextStyle(color: Colors.white70),
             ),
             const SizedBox(height: 14),
             FilledButton(
               onPressed: () => unawaited(onRetry()),
-              child: const Text('重試'),
+              child: Text(context.vio.t('重試')),
             ),
           ],
         ),
@@ -636,11 +642,11 @@ String _formatSeconds(double value) {
   return '$minutes:${seconds.toString().padLeft(2, '0')}';
 }
 
-String _clipEditorErrorText(Object error) {
+String _clipEditorErrorText(BuildContext context, Object error) {
   final message = error.toString();
   final lower = message.toLowerCase();
   if (lower.contains('drops / android token')) {
-    return '請先補 Drops / Android 授權。';
+    return context.vio.t('請先補 Drops / Android 授權。');
   }
   if (lower.contains('disabled') ||
       lower.contains('forbidden') ||
@@ -652,7 +658,7 @@ String _clipEditorErrorText(Object error) {
       lower.contains('clip finalize') ||
       lower.contains('沒有回傳 raw media') ||
       lower.contains('一直沒有完成處理')) {
-    return '這個實況主可能沒有開放片段。';
+    return context.vio.t('這個實況主可能沒有開放片段。');
   }
-  return '片段剪輯暫時失敗，請稍後再試。';
+  return context.vio.t('片段剪輯暫時失敗，請稍後再試。');
 }

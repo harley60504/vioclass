@@ -15,7 +15,7 @@ import 'twitch_watch_page_relationship.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
-const double _liveDvrLiveEdgeRatio = 0.98;
+const double _liveDvrLiveEdgeRatio = 0.995;
 const Duration _liveDvrWarmTtl = Duration(minutes: 8);
 
 extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
@@ -797,7 +797,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     }
     if (!watchPorts.player.runtime.usingExternalVodPlayback) return;
 
-    offlineVodFallbackVideo = null;
+    _clearExternalReplaySelection();
     await switchToLowLatencyLivePlayback();
   }
 
@@ -882,6 +882,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       await loadPlayer(channelLogin, forceOpen: true);
     }
     await preferencesController.applyPlayerVolume();
+  }
+
+  void _clearExternalReplaySelection() {
+    offlineVodFallbackVideo = null;
+    currentVodQualityVideo = null;
+    currentClipQualityClip = null;
+    vodQualityVariants = const <TwitchM3u8Variant>[];
+    currentVodQualityVariant = null;
+    preferVodReplayChat = false;
   }
 
   Future<bool> openVodPlayback({

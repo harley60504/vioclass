@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../services/chat/twitch_vod_chat_replay_runtime.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../settings/twitch_chat_appearance_controller.dart';
 import '../../../sheets/twitch_chat_message_context_sheet.dart';
 import '../../../theme/twitch_ui_tokens.dart';
@@ -148,10 +149,10 @@ class _ChatModeBadge extends StatelessWidget {
         : live
         ? TwitchUiColors.green
         : const Color(0xFFC084FC);
-    final label = live ? '直播' : 'VOD';
+    final label = live ? context.vio.t('直播') : 'VOD';
 
     return Tooltip(
-      message: live ? '切換到 VOD 聊天回放' : '切換到直播聊天室',
+      message: context.vio.t(live ? '切換到 VOD 聊天回放' : '切換到直播聊天室'),
       child: InkWell(
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
         onTap: onTap,
@@ -276,11 +277,13 @@ class _VodReplayEmptyState extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          error == null
-              ? fetching
-                    ? '正在讀取 VOD 聊天...'
-                    : '等待影片時間軸上的聊天...'
-              : 'VOD 聊天暫時讀取失敗，稍後再試。',
+          context.vio.t(
+            error == null
+                ? fetching
+                      ? '正在讀取 VOD 聊天...'
+                      : '等待影片時間軸上的聊天...'
+                : 'VOD 聊天暫時讀取失敗，稍後再試。',
+          ),
           textAlign: TextAlign.center,
           style: twitchChatTextStyle(
             TextStyle(

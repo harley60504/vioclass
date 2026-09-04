@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../sheets/twitch_special_message_sheet.dart';
 import '../twitch_watch_page.dart';
 
@@ -119,6 +120,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
         }
       },
       onSelectBadge: (badge) async {
+        final badgeAppliedLabel = context.vio.t('已套用徽章');
         final result = await watchServices.specialMessagesStage251.runtime
             .updateChatIdentity(
               channelLogin: channelLogin,
@@ -130,7 +132,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
           showSnack('聊天身分暫時無法更新，請稍後再試。');
           return false;
         }
-        showSnack('已套用徽章 ${badge.title}');
+        showSnack('$badgeAppliedLabel ${badge.title}');
         await refreshSpecialMessages(
           autoSelectPending: false,
           showSnackOnError: false,

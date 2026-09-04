@@ -710,7 +710,6 @@ mutation RedeemCommunityPointsCustomReward($input: RedeemCommunityPointsCustomRe
       input: <String, dynamic>{
         'channelID': channelId,
         'cost': reward.redeemCost,
-        'rewardID': reward.id.trim(),
         'transactionID': transactionId,
       },
     );

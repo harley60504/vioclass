@@ -22,6 +22,7 @@ import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_feature_services.dart';
 import '../../services/watch/twitch_watch_services.dart';
+import '../sheets/channel_points/twitch_channel_points_sheet_models.dart';
 
 class TwitchWatchPlayerPort {
   final TwitchWatchPlayerServices services;
@@ -197,8 +198,142 @@ class TwitchWatchEngagementSnapshot {
 
 class TwitchWatchRewardRedeemResult {
   final String title;
+  final TwitchChannelPointRedeemUiResult? displayResult;
 
-  const TwitchWatchRewardRedeemResult({required this.title});
+  const TwitchWatchRewardRedeemResult({
+    required this.title,
+    this.displayResult,
+  });
+}
+
+TwitchChannelPointRedeemUiResult _randomEmoteResult({
+  required String title,
+  required dynamic raw,
+}) {
+  final emote = _findRedeemedEmote(raw);
+  return TwitchChannelPointRedeemUiResult(
+    title: title,
+    emoteName: emote?._name,
+    emoteImageUrl: emote?._imageUrl,
+  );
+}
+
+_RedeemedEmote? _findRedeemedEmote(dynamic raw) {
+  final candidates = <_RedeemedEmote>[];
+
+  void visit(dynamic value, {bool nearEmote = false}) {
+    if (value is Map) {
+      final map = value.cast<dynamic, dynamic>();
+      final hasEmoteKey = map.keys.any(
+        (key) => key.toString().toLowerCase().contains('emote'),
+      );
+      final candidate = _readRedeemedEmote(map);
+      if (candidate != null && (nearEmote || hasEmoteKey)) {
+        candidates.add(candidate);
+      }
+      for (final entry in map.entries) {
+        visit(entry.value, nearEmote: nearEmote || hasEmoteKey);
+      }
+      return;
+    }
+
+    if (value is Iterable) {
+      for (final item in value) {
+        visit(item, nearEmote: nearEmote);
+      }
+    }
+  }
+
+  visit(raw);
+  if (candidates.isEmpty) return null;
+  return candidates.firstWhere(
+    (item) => item._imageUrl.isNotEmpty,
+    orElse: () => candidates.first,
+  );
+}
+
+_RedeemedEmote? _readRedeemedEmote(Map<dynamic, dynamic> map) {
+  final name = _firstRedeemString(map, const <String>[
+    'token',
+    'name',
+    'displayName',
+    'emoteName',
+  ]);
+  final id = _firstRedeemString(map, const <String>[
+    'id',
+    'emoteID',
+    'emoteId',
+  ]);
+  final imageUrl = _firstRedeemString(map, const <String>[
+    'imageUrl',
+    'url',
+    'url4x',
+    'url2x',
+    'url1x',
+  ]);
+  final nestedImageUrl =
+      _firstRedeemString(_asRedeemMap(map['image']), const <String>[
+        'url4x',
+        'url2x',
+        'url1x',
+        'url',
+      ]) ??
+      _firstRedeemString(_asRedeemMap(map['images']), const <String>[
+        'url4x',
+        'url2x',
+        'url1x',
+        'url',
+      ]);
+
+  final resolvedName = name ?? id ?? '';
+  final normalizedImageUrl = _normalizeRedeemedEmoteImageUrl(
+    nestedImageUrl ?? imageUrl ?? '',
+  );
+  final resolvedImageUrl = normalizedImageUrl.isNotEmpty
+      ? normalizedImageUrl
+      : _redeemedEmoteCdnUrlFromId(id);
+
+  if (resolvedName.isEmpty && resolvedImageUrl.isEmpty) return null;
+  return _RedeemedEmote(name: resolvedName, imageUrl: resolvedImageUrl);
+}
+
+Map<dynamic, dynamic> _asRedeemMap(dynamic value) {
+  return value is Map
+      ? value.cast<dynamic, dynamic>()
+      : const <dynamic, dynamic>{};
+}
+
+String? _firstRedeemString(Map<dynamic, dynamic> map, List<String> keys) {
+  for (final key in keys) {
+    final value = map[key]?.toString().trim();
+    if (value != null && value.isNotEmpty) return value;
+  }
+  return null;
+}
+
+String _normalizeRedeemedEmoteImageUrl(String raw) {
+  final clean = raw.trim();
+  if (clean.isEmpty) return clean;
+  return clean
+      .replaceAll('{{theme_mode}}', 'dark')
+      .replaceAll('{{themeMode}}', 'dark')
+      .replaceAll('{{scale}}', '3.0');
+}
+
+String _redeemedEmoteCdnUrlFromId(String? id) {
+  final clean = id?.trim() ?? '';
+  if (clean.isEmpty) return '';
+  final encoded = Uri.encodeComponent(clean);
+  return 'https://static-cdn.jtvnw.net/emoticons/v2/$encoded/default/dark/3.0';
+}
+
+class _RedeemedEmote {
+  final String _name;
+  final String _imageUrl;
+
+  const _RedeemedEmote({required String name, required String imageUrl})
+    : _name = name,
+      _imageUrl = imageUrl;
 }
 
 class TwitchWatchPredictionBetResult {
@@ -348,11 +483,12 @@ class TwitchWatchEngagementPort {
     required Map<String, dynamic> reward,
   }) async {
     final title = reward['title']?.toString() ?? 'Random Emote Unlock';
-    await services.channelPointsRuntimeService.unlockRandomSubscriberEmote(
-      channelId: channelId,
-      reward: reward,
+    final result = await services.channelPointsRuntimeService
+        .unlockRandomSubscriberEmote(channelId: channelId, reward: reward);
+    return TwitchWatchRewardRedeemResult(
+      title: title,
+      displayResult: _randomEmoteResult(title: title, raw: result.raw),
     );
-    return TwitchWatchRewardRedeemResult(title: title);
   }
 
   Future<TwitchWatchRewardRedeemResult> unlockChosenSubscriberEmote({

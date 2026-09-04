@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_widgets.dart';
@@ -27,6 +28,7 @@ class TwitchChannelPointsSheetBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final current = snapshot;
     final balance = current?.balance;
     final claimId = current?.availableClaimId;
@@ -41,12 +43,12 @@ class TwitchChannelPointsSheetBody extends StatelessWidget {
         if (current != null && current.contextError != null)
           ChannelPointsErrorBanner(
             message: current.contextError!,
-            label: '點數餘額',
+            label: l10n.t('點數餘額'),
           ),
         if (current != null && current.rewardsError != null)
           ChannelPointsErrorBanner(
             message: current.rewardsError!,
-            label: '獎勵清單',
+            label: l10n.t('獎勵清單'),
           ),
         if (claimId != null && claimId.isNotEmpty)
           TwitchChannelPointsClaimButton(
@@ -97,7 +99,11 @@ class TwitchChannelPointsClaimButton extends StatelessWidget {
         child: ElevatedButton.icon(
           onPressed: loading ? null : () async => onClaim(claimId),
           icon: const Icon(Icons.card_giftcard_rounded),
-          label: Text(claimPoints > 0 ? '領取 $claimPoints 點忠誠點數' : '領取可用忠誠點數獎勵'),
+          label: Text(
+            claimPoints > 0
+                ? '${context.vio.t('領取')} $claimPoints ${context.vio.t('點忠誠點數')}'
+                : context.vio.t('領取可用忠誠點數獎勵'),
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: TwitchUiColors.primary,
             foregroundColor: Colors.white,

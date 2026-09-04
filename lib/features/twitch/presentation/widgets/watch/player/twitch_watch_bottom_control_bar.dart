@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../../watch/twitch_watch_playback_kind.dart';
 import '../../shared/twitch_glass.dart';
@@ -516,7 +517,7 @@ class _PlayPauseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
-      tooltip: playing ? '暫停' : '播放',
+      tooltip: context.vio.t(playing ? '暫停' : '播放'),
       icon: playing ? Icons.pause : Icons.play_arrow,
       size: size,
       dense: dense,
@@ -542,11 +543,12 @@ class _WideVolumeControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         PlainIconButton(
-          tooltip: muted ? '取消靜音' : '靜音',
+          tooltip: l10n.t(muted ? '取消靜音' : '靜音'),
           icon: muted || volume <= 0 ? Icons.volume_off : Icons.volume_up,
           size: 24,
           onPressed: onToggleMute,
@@ -581,7 +583,7 @@ class _ChatToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
-      tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
+      tooltip: context.vio.t(chatVisible ? '隱藏聊天室' : '顯示聊天室'),
       icon: chatVisible ? Icons.chat_bubble : Icons.chat_bubble_outline,
       size: size,
       active: chatVisible,
@@ -607,7 +609,7 @@ class _FullscreenToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
-      tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
+      tooltip: context.vio.t(fullscreen ? '離開全螢幕' : '全螢幕'),
       icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
       size: size,
       active: fullscreen,
@@ -641,6 +643,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
   });
 
   void _showPlaybackSheet(BuildContext context) {
+    final l10n = context.vio;
     showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
@@ -690,12 +693,12 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                             size: 17,
                           ),
                           const SizedBox(width: 7),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              '播放進度',
+                              l10n.t('播放進度'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w900,
@@ -742,7 +745,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
-      tooltip: '打開播放進度',
+      tooltip: context.vio.t('打開播放進度'),
       icon: Icons.timeline_rounded,
       size: 22,
       dense: true,

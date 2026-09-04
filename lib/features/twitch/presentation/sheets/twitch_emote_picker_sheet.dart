@@ -4,6 +4,7 @@ import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/emotes/twitch_official_emote_pages.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -71,6 +72,7 @@ class _TwitchUnifiedEmotePickerSheetState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final official = _official;
 
     return AnimatedBuilder(
@@ -82,9 +84,9 @@ class _TwitchUnifiedEmotePickerSheetState
             (official?.loading ?? false);
 
         final tabs = <_OuterTab>[
-          _recentTab(),
-          _favoriteTab(),
-          _officialTab(),
+          _recentTab(l10n),
+          _favoriteTab(l10n),
+          _officialTab(l10n),
           _thirdPartyTab('7TV', TwitchThirdPartyEmoteProvider.sevenTv),
           _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
           _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
@@ -92,8 +94,8 @@ class _TwitchUnifiedEmotePickerSheetState
 
         return SafeArea(
           child: TwitchUnifiedSheetScaffold(
-            title: '貼圖',
-            subtitle: '最近 / 最愛 / Twitch / 7TV / BTTV / FFZ｜長按收藏',
+            title: l10n.t('貼圖'),
+            subtitle: l10n.t('最近 / 最愛 / Twitch / 7TV / BTTV / FFZ｜長按收藏'),
             icon: Icons.emoji_emotions_rounded,
             loading: loading,
             onRefresh: widget.onRefresh,
@@ -137,13 +139,13 @@ class _TwitchUnifiedEmotePickerSheetState
     );
   }
 
-  _OuterTab _recentTab() {
+  _OuterTab _recentTab(VioClassLocalizations l10n) {
     final official = _official;
     return _OuterTab(
-      label: '最近',
+      label: l10n.t('最近'),
       pages: [
         _InnerPage(
-          label: '最近',
+          label: l10n.t('最近'),
           entries: <_EmoteEntry>[
             ...widget.cache.recentEmotes.map(_thirdPartyEntry),
             ...(official?.recentEmotes ?? const <TwitchOfficialEmote>[]).map(
@@ -155,13 +157,13 @@ class _TwitchUnifiedEmotePickerSheetState
     );
   }
 
-  _OuterTab _favoriteTab() {
+  _OuterTab _favoriteTab(VioClassLocalizations l10n) {
     final official = _official;
     return _OuterTab(
-      label: '最愛',
+      label: l10n.t('最愛'),
       pages: [
         _InnerPage(
-          label: '最愛',
+          label: l10n.t('最愛'),
           entries: <_EmoteEntry>[
             ...widget.cache.favoriteEmotes.map(_thirdPartyEntry),
             ...(official?.favoriteEmotes ?? const <TwitchOfficialEmote>[]).map(
@@ -173,16 +175,16 @@ class _TwitchUnifiedEmotePickerSheetState
     );
   }
 
-  _OuterTab _officialTab() {
+  _OuterTab _officialTab(VioClassLocalizations l10n) {
     final official = _official;
 
     if (official == null) {
-      return const _OuterTab(
+      return _OuterTab(
         label: 'Twitch',
         pages: [
-          _InnerPage(label: '頻道', entries: <_EmoteEntry>[]),
-          _InnerPage(label: '全域', entries: <_EmoteEntry>[]),
-          _InnerPage(label: '已解鎖', entries: <_EmoteEntry>[]),
+          _InnerPage(label: l10n.t('頻道'), entries: <_EmoteEntry>[]),
+          _InnerPage(label: l10n.t('全域'), entries: <_EmoteEntry>[]),
+          _InnerPage(label: l10n.t('已解鎖'), entries: <_EmoteEntry>[]),
         ],
       );
     }
@@ -194,7 +196,7 @@ class _TwitchUnifiedEmotePickerSheetState
       pages: [
         for (final page in officialPages)
           _InnerPage(
-            label: page.label,
+            label: l10n.t(page.label),
             entries: page.emotes.map(_officialEntry).toList(growable: false),
           ),
       ],
@@ -205,6 +207,7 @@ class _TwitchUnifiedEmotePickerSheetState
     String label,
     TwitchThirdPartyEmoteProvider provider,
   ) {
+    final l10n = context.vio;
     final source = widget.cache.emotesForProvider(provider);
     final channel = source
         .where((emote) => emote.scope == TwitchThirdPartyEmoteScope.channel)
@@ -231,10 +234,10 @@ class _TwitchUnifiedEmotePickerSheetState
       label: label,
       pages: [
         _InnerPage(
-          label: '頻道',
+          label: l10n.t('頻道'),
           entries: <_EmoteEntry>[...channel, ...shared, ...other],
         ),
-        _InnerPage(label: '全域', entries: global),
+        _InnerPage(label: l10n.t('全域'), entries: global),
         if (zeroWidth.isNotEmpty) _InnerPage(label: 'ZW', entries: zeroWidth),
       ],
     );
@@ -322,7 +325,7 @@ class _SearchBar extends StatelessWidget {
           cursorColor: TwitchUiColors.sheet.backplate.foreground,
           decoration: InputDecoration(
             isDense: true,
-            hintText: '搜尋貼圖名稱',
+            hintText: context.vio.t('搜尋貼圖名稱'),
             hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
             prefixIcon: const Icon(
               Icons.search_rounded,
@@ -442,7 +445,9 @@ class _ProviderPageState extends State<_ProviderPage>
                     ),
                     entries: page.entries,
                     query: widget.query,
-                    emptyText: widget.loading ? '正在載入貼圖...' : '沒有可用貼圖',
+                    emptyText: widget.loading
+                        ? context.vio.t('正在載入貼圖...')
+                        : context.vio.t('沒有可用貼圖'),
                     onSelect: widget.onSelect,
                     onLongPress: widget.onLongPress,
                   ),
@@ -563,7 +568,7 @@ class _EmoteTile extends StatelessWidget {
 
     return RepaintBoundary(
       child: Tooltip(
-        message: entry.favorite ? '長按取消收藏' : '長按加入收藏',
+        message: context.vio.t(entry.favorite ? '長按取消收藏' : '長按加入收藏'),
         waitDuration: const Duration(milliseconds: 650),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),

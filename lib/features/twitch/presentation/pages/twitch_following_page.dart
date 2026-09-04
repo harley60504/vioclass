@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../twitch_follow_status_resolver.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/discovery/twitch_game_filter_grid_sheet.dart';
@@ -535,6 +536,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   }
 
   Future<void> showGameMenu(BuildContext context) async {
+    final l10n = context.vio;
     await _ensureFollowedGameArtwork();
 
     if (!context.mounted) return;
@@ -546,7 +548,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       selectedGameName: selectedGameName,
       loading: loadingFirstPage,
       loadingProvider: () => loadingFirstPage,
-      emptySearchText: '目前追隨直播中找不到這個分類',
+      emptySearchText: l10n.t('目前追隨直播中找不到這個分類'),
       onSelected: (game) {
         setState(() {
           selectedGameId = game?.id;
@@ -557,13 +559,14 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   }
 
   Future<void> showLanguageMenu(BuildContext context) async {
+    final l10n = context.vio;
     final searchController = TextEditingController();
     String keyword = '';
 
     await showTwitchUnifiedSheet<void>(
       context: context,
-      title: '語言篩選',
-      subtitle: currentLanguage.isEmpty ? '全部語言' : currentLanguage,
+      title: l10n.t('語言篩選'),
+      subtitle: currentLanguage.isEmpty ? l10n.t('全部語言') : currentLanguage,
       icon: Icons.language_rounded,
       size: TwitchUnifiedSheetSize.medium,
       showRefresh: false,
@@ -594,7 +597,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                   child: TextField(
                     controller: searchController,
                     decoration: InputDecoration(
-                      hintText: '搜尋語言或代碼，例如 zh / en / ja',
+                      hintText: l10n.t('搜尋語言或代碼，例如 zh / en / ja'),
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: keyword.isNotEmpty
                           ? IconButton(
@@ -622,7 +625,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                     itemBuilder: (context, index) {
                       final item = filteredLanguages[index];
                       final value = item['value'] ?? '';
-                      final label = item['label'] ?? value;
+                      final label = l10n.t(item['label'] ?? value);
                       final selected = currentLanguage == value;
                       return ListTile(
                         selected: selected,
@@ -659,12 +662,12 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                     children: [
                       TextButton(
                         onPressed: () => selectLanguage(''),
-                        child: const Text('全部語言'),
+                        child: Text(l10n.t('全部語言')),
                       ),
                       const SizedBox(width: 8),
                       TextButton(
                         onPressed: () => Navigator.of(sheetContext).maybePop(),
-                        child: const Text('關閉'),
+                        child: Text(l10n.t('關閉')),
                       ),
                     ],
                   ),
@@ -685,6 +688,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final filtered = _filteredStreams();
     final filteredOffline = _filteredOfflineChannels();
     final filteredSearchLive = _filteredSearchLiveStreams();
@@ -698,7 +702,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           message.contains('授權');
       if (needsLogin) {
         return TwitchLoginRequiredView(
-          statusText: '需要先完成 Twitch 登入授權，才能讀取追隨直播。',
+          statusText: l10n.t('需要先完成 Twitch 登入授權，才能讀取追隨直播。'),
           loading: loadingFirstPage,
           onLoginPressed: () => unawaited(widget.onLoginPressed()),
           onRetryPressed: () => unawaited(refreshStreams(clearExisting: true)),
@@ -707,8 +711,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
       return TwitchDiscoveryEmptyState(
         icon: Icons.error_outline_rounded,
-        title: '追隨直播讀取失敗',
-        message: '追隨直播暫時讀取失敗，稍後再試或重新整理。',
+        title: l10n.t('追隨直播讀取失敗'),
+        message: l10n.t('追隨直播暫時讀取失敗，稍後再試或重新整理。'),
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
@@ -736,18 +740,18 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           !widget.loadingChannelSearch,
       emptyState: TwitchDiscoveryEmptyState(
         icon: Icons.favorite_border_rounded,
-        title: '目前追隨頻道沒有直播',
+        title: l10n.t('目前追隨頻道沒有直播'),
         message: offlineError?.trim().isNotEmpty == true
-            ? '直播清單為空，離線追隨頻道也暫時讀取失敗。'
-            : '稍後重新整理，或切到瀏覽頁探索其他直播。',
+            ? l10n.t('直播清單為空，離線追隨頻道也暫時讀取失敗。')
+            : l10n.t('稍後重新整理，或切到瀏覽頁探索其他直播。'),
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       ),
       filteredEmptyState: TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
-        title: '找不到符合條件的頻道',
+        title: l10n.t('找不到符合條件的頻道'),
         message: widget.channelSearchError?.trim().isNotEmpty == true
-            ? '已載入的追隨清單沒有結果，Twitch 頻道搜尋暫時失敗。'
-            : '可以清除搜尋文字、遊戲分類或語言篩選。',
+            ? l10n.t('已載入的追隨清單沒有結果，Twitch 頻道搜尋暫時失敗。')
+            : l10n.t('可以清除搜尋文字、遊戲分類或語言篩選。'),
       ),
       contentSlivers: _extraSearchAndOfflineSlivers(
         followedOfflineChannels: filteredOffline,
@@ -769,8 +773,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         controller: scrollController,
         sectionIcon: Icons.favorite_rounded,
         sectionTitle: selectedGameName == null || selectedGameName!.isEmpty
-            ? '追隨中的直播'
-            : '追隨中的直播 · $selectedGameName',
+            ? l10n.t('追隨中的直播')
+            : '${l10n.t('追隨中的直播')} · $selectedGameName',
         streamCount: filtered.length,
         streams: filtered,
         discoveryService: widget.discoveryService,
@@ -790,15 +794,16 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     required List<TwitchFollowedChannel> searchedOfflineChannels,
   }) {
     final slivers = <Widget>[];
+    final l10n = context.vio;
 
     if (loadingOfflineChannels) {
       slivers.add(
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(26, 0, 26, 24),
+            padding: const EdgeInsets.fromLTRB(26, 0, 26, 24),
             child: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -806,10 +811,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                     strokeWidth: 2.4,
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Text(
-                  '正在整理未開台的追隨頻道...',
-                  style: TextStyle(
+                  l10n.t('正在整理未開台的追隨頻道...'),
+                  style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
@@ -826,7 +831,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       slivers.addAll(
         _offlineChannelSlivers(
           icon: Icons.video_library_rounded,
-          title: '未開台追隨頻道',
+          title: l10n.t('未開台追隨頻道'),
           channels: followedOfflineChannels,
           defaultKnownFollowing: true,
         ),
@@ -850,7 +855,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                 ),
                 SizedBox(width: 10),
                 Text(
-                  '正在搜尋更多頻道...',
+                  l10n.t('正在搜尋更多頻道...'),
                   style: TextStyle(
                     color: Colors.white54,
                     fontSize: 12.5,
@@ -868,7 +873,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       slivers.add(
         TwitchDiscoveryStreamSliverSection(
           icon: Icons.search_rounded,
-          title: '搜尋到的直播',
+          title: l10n.t('搜尋到的直播'),
           streams: searchedLiveStreams,
           discoveryService: widget.discoveryService,
           onReturnFromStream: refreshStreams,
@@ -881,7 +886,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       slivers.addAll(
         _offlineChannelSlivers(
           icon: Icons.search_off_rounded,
-          title: '搜尋到的未開台頻道',
+          title: l10n.t('搜尋到的未開台頻道'),
           channels: searchedOfflineChannels,
         ),
       );

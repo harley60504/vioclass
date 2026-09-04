@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../twitch_follow_status_resolver.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/discovery/twitch_game_filter_grid_sheet.dart';
@@ -516,7 +517,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }
 
   String _sectionTitle() {
-    final parts = <String>['探索直播'];
+    final parts = <String>[context.vio.t('探索直播')];
     final gameName = selectedGameName?.trim();
     if (gameName != null && gameName.isNotEmpty) parts.add(gameName);
     if (selectedTags.isNotEmpty) parts.add(_selectedTagText());
@@ -569,7 +570,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       if (!mounted || generation != _tagSuggestionGeneration) return;
       setState(() {
         tagSuggestions = const <TwitchTagSuggestion>[];
-        tagSuggestionError = '標籤建議暫時不可用';
+        tagSuggestionError = context.vio.t('標籤建議暫時不可用');
         loadingTagSuggestions = false;
       });
     }
@@ -637,6 +638,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }
 
   Widget _buildTagFilterSliver() {
+    final l10n = context.vio;
     final hasTags = selectedTags.isNotEmpty;
     final hasTypedTag = tagSearchText.trim().isNotEmpty;
 
@@ -664,7 +666,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   fontWeight: FontWeight.w800,
                 ),
                 decoration: InputDecoration(
-                  hintText: '輸入標籤篩選',
+                  hintText: l10n.t('輸入標籤篩選'),
                   hintStyle: const TextStyle(
                     color: Colors.white38,
                     fontWeight: FontWeight.w800,
@@ -691,7 +693,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                         ),
                       if (hasTypedTag)
                         IconButton(
-                          tooltip: '加入標籤',
+                          tooltip: l10n.t('加入標籤'),
                           visualDensity: VisualDensity.compact,
                           onPressed: () => _addSelectedTag(tagSearchText),
                           icon: const Icon(
@@ -702,7 +704,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                         ),
                       if (hasTags || hasTypedTag)
                         IconButton(
-                          tooltip: '清除標籤',
+                          tooltip: l10n.t('清除標籤'),
                           visualDensity: VisualDensity.compact,
                           onPressed: _clearSelectedTags,
                           icon: const Icon(
@@ -795,6 +797,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }
 
   Future<void> showGameMenu(BuildContext context) async {
+    final l10n = context.vio;
     if (games.isEmpty && !loadingGames) {
       unawaited(loadGames());
     }
@@ -814,7 +817,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       hasMoreProvider: () => hasMoreGames,
       paginationError: gamePaginationError,
       paginationErrorProvider: () => gamePaginationError,
-      emptySearchText: '目前已載入分類中找不到結果',
+      emptySearchText: l10n.t('目前已載入分類中找不到結果'),
       onSelected: (game) {
         setState(() {
           selectedGameId = game?.id;
@@ -826,13 +829,14 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }
 
   Future<void> showLanguageMenu(BuildContext context) async {
+    final l10n = context.vio;
     final searchController = TextEditingController();
     String keyword = '';
 
     await showTwitchUnifiedSheet<void>(
       context: context,
-      title: '語言篩選',
-      subtitle: currentLanguage.isEmpty ? '全部語言' : currentLanguage,
+      title: l10n.t('語言篩選'),
+      subtitle: currentLanguage.isEmpty ? l10n.t('全部語言') : currentLanguage,
       icon: Icons.language_rounded,
       size: TwitchUnifiedSheetSize.medium,
       showRefresh: false,
@@ -864,7 +868,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   child: TextField(
                     controller: searchController,
                     decoration: InputDecoration(
-                      hintText: '搜尋語言或代碼，例如 zh / en / ja',
+                      hintText: l10n.t('搜尋語言或代碼，例如 zh / en / ja'),
                       prefixIcon: const Icon(Icons.search_rounded),
                       suffixIcon: keyword.isNotEmpty
                           ? IconButton(
@@ -892,7 +896,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                     itemBuilder: (context, index) {
                       final item = filteredLanguages[index];
                       final value = item['value'] ?? '';
-                      final label = item['label'] ?? value;
+                      final label = l10n.t(item['label'] ?? value);
                       final selected = currentLanguage == value;
                       return ListTile(
                         selected: selected,
@@ -929,12 +933,12 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                     children: [
                       TextButton(
                         onPressed: () => selectLanguage(''),
-                        child: const Text('全部語言'),
+                        child: Text(l10n.t('全部語言')),
                       ),
                       const SizedBox(width: 8),
                       TextButton(
                         onPressed: () => Navigator.of(sheetContext).maybePop(),
-                        child: const Text('關閉'),
+                        child: Text(l10n.t('關閉')),
                       ),
                     ],
                   ),
@@ -955,6 +959,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final filtered = _filteredStreams();
     final filteredSearchLive = _filteredSearchLiveStreams();
     final filteredSearchOffline = _filteredSearchOfflineChannels();
@@ -967,7 +972,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           message.contains('授權');
       if (needsLogin) {
         return TwitchLoginRequiredView(
-          statusText: '需要先完成 Twitch 登入授權，才能讀取探索直播。',
+          statusText: l10n.t('需要先完成 Twitch 登入授權，才能讀取探索直播。'),
           loading: loadingFirstPage,
           onLoginPressed: () => unawaited(widget.onLoginPressed()),
           onRetryPressed: () => unawaited(refreshStreams(clearExisting: true)),
@@ -976,8 +981,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
 
       return TwitchDiscoveryEmptyState(
         icon: Icons.error_outline_rounded,
-        title: '探索直播讀取失敗',
-        message: '探索直播暫時讀取失敗，稍後再試或重新整理。',
+        title: l10n.t('探索直播讀取失敗'),
+        message: l10n.t('探索直播暫時讀取失敗，稍後再試或重新整理。'),
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       );
     }
@@ -1000,16 +1005,16 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           !widget.loadingChannelSearch,
       emptyState: TwitchDiscoveryEmptyState(
         icon: Icons.explore_off_rounded,
-        title: '目前沒有可顯示直播',
-        message: '可以清除分類、語言或標籤篩選後重新整理。',
+        title: l10n.t('目前沒有可顯示直播'),
+        message: l10n.t('可以清除分類、語言或標籤篩選後重新整理。'),
         onRetry: () => unawaited(refreshStreams(clearExisting: true)),
       ),
       filteredEmptyState: TwitchDiscoveryEmptyState(
         icon: Icons.search_off_rounded,
-        title: '找不到符合條件的頻道',
+        title: l10n.t('找不到符合條件的頻道'),
         message: widget.channelSearchError?.trim().isNotEmpty == true
-            ? '已載入的直播沒有結果，Twitch 頻道搜尋暫時失敗。'
-            : '可以清除搜尋文字、分類、語言或標籤篩選。',
+            ? l10n.t('已載入的直播沒有結果，Twitch 頻道搜尋暫時失敗。')
+            : l10n.t('可以清除搜尋文字、分類、語言或標籤篩選。'),
       ),
       contentSlivers: _searchResultSlivers(
         liveStreams: filteredSearchLive,
@@ -1049,14 +1054,16 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }) {
     final slivers = <Widget>[];
 
+    final l10n = context.vio;
+
     if (widget.loadingChannelSearch) {
       slivers.add(
-        const SliverToBoxAdapter(
+        SliverToBoxAdapter(
           child: Padding(
-            padding: EdgeInsets.fromLTRB(26, 0, 26, 24),
+            padding: const EdgeInsets.fromLTRB(26, 0, 26, 24),
             child: Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -1064,10 +1071,10 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                     strokeWidth: 2.4,
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Text(
-                  '正在搜尋更多頻道...',
-                  style: TextStyle(
+                  l10n.t('正在搜尋更多頻道...'),
+                  style: const TextStyle(
                     color: Colors.white54,
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
@@ -1084,7 +1091,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       slivers.add(
         TwitchDiscoveryStreamSliverSection(
           icon: Icons.search_rounded,
-          title: '搜尋到的直播',
+          title: l10n.t('搜尋到的直播'),
           streams: liveStreams,
           discoveryService: widget.discoveryService,
           onReturnFromStream: refreshStreams,
@@ -1097,7 +1104,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       slivers.addAll(
         _offlineChannelSlivers(
           icon: Icons.search_off_rounded,
-          title: '搜尋到的未開台頻道',
+          title: l10n.t('搜尋到的未開台頻道'),
           channels: offlineChannels,
         ),
       );

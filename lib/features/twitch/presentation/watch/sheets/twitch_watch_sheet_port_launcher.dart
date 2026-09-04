@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../api/core/twitch_api_exception.dart';
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../sheets/twitch_channel_points_sheet.dart';
+import '../../sheets/channel_points/twitch_channel_points_sheet_models.dart';
 import '../../sheets/twitch_emote_picker_sheet.dart';
 import '../../sheets/twitch_prediction_bet_sheet.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
@@ -144,27 +146,57 @@ class TwitchWatchSheetPortLauncher {
     }
   }
 
-  Future<void> redeemChannelPointReward(
+  Future<TwitchChannelPointRedeemUiResult?> redeemChannelPointReward(
     Map<String, dynamic> reward,
     String textInput,
   ) async {
     final resolvedChannelId = channelPointsSnapshot()?.channelId ?? channelId();
     if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
       showMessage('找不到頻道資訊，暫時不能兌換忠誠點數獎勵。');
-      return;
+      return null;
     }
 
     try {
-      final result = await engagement.redeemReward(
-        channelId: resolvedChannelId,
-        reward: reward,
-        textInput: textInput,
-      );
-      showMessage('已兌換：${result.title}');
+      final result = _isRandomEmoteUnlockReward(reward)
+          ? await engagement.unlockRandomSubscriberEmote(
+              channelId: resolvedChannelId,
+              reward: reward,
+            )
+          : await engagement.redeemReward(
+              channelId: resolvedChannelId,
+              reward: reward,
+              textInput: textInput,
+            );
       await refreshEngagement(showSnackOnError: false);
+      return result.displayResult;
     } catch (error) {
-      showMessage('忠誠點數兌換失敗，稍後再試。');
+      debugPrint('[ChannelPointsRedeem] failed: $error');
+      final reason = _channelPointRedeemFailureReason(error);
+      showMessage(reason == null ? '忠誠點數兌換失敗，稍後再試。' : '忠誠點數兌換失敗：$reason');
+      return null;
     }
+  }
+
+  bool _isRandomEmoteUnlockReward(Map<String, dynamic> reward) {
+    final type = channelPointRewardTypeKey(reward);
+    if (type == 'RANDOM_SUB_EMOTE_UNLOCK') return true;
+    return channelPointRewardTitle(reward).trim().toLowerCase() ==
+        'unlock a random sub emote';
+  }
+
+  String? _channelPointRedeemFailureReason(Object error) {
+    if (error is TwitchApiException) {
+      final message = error.message.trim();
+      if (message.isEmpty) return null;
+      return message
+          .replaceFirst('UnlockRandomSubscriberEmote failed: ', '')
+          .replaceFirst('RedeemCommunityPointsCustomReward failed: ', '');
+    }
+
+    final text = error.toString().trim();
+    if (text.isEmpty) return null;
+    if (text.length > 80) return '${text.substring(0, 80)}...';
+    return text;
   }
 
   Future<void> openPredictionBetSheet(BuildContext context) async {

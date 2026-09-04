@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
@@ -252,9 +253,9 @@ class _LiveBadge extends StatelessWidget {
           ),
         ],
       ),
-      child: const Text(
-        '直播',
-        style: TextStyle(
+      child: Text(
+        context.vio.t('直播'),
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 10.5,
           fontWeight: FontWeight.w900,
@@ -288,7 +289,9 @@ class _ViewerBadge extends StatelessWidget {
         ],
       ),
       child: Text(
-        '${_formatViewerCount(viewerCount)} 位觀眾',
+        context.vio.isEnglish
+            ? '${_formatViewerCount(context, viewerCount)} ${context.vio.t('位觀眾-card')}'
+            : '${_formatViewerCount(context, viewerCount)} 位觀眾',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 11,
@@ -356,7 +359,7 @@ class _StreamInfo extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              title.isEmpty ? '未命名直播' : title,
+              title.isEmpty ? context.vio.t('未命名直播') : title,
               maxLines: titleMaxLines,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -378,7 +381,9 @@ class _StreamInfo extends StatelessWidget {
               children: [
                 Expanded(
                   child: _GameBadge(
-                    gameName: gameName.isEmpty ? '未分類' : gameName,
+                    gameName: gameName.isEmpty
+                        ? context.vio.t('未分類')
+                        : gameName,
                     colors: colors,
                     compact: compact,
                   ),
@@ -539,7 +544,7 @@ class _StreamerFooter extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                displayName.isEmpty ? '未知實況主' : displayName,
+                displayName.isEmpty ? context.vio.t('未知實況主') : displayName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -770,7 +775,21 @@ int _readInt(Object object, List<String> keys) {
   return 0;
 }
 
-String _formatViewerCount(int count) {
+String _formatViewerCount(BuildContext context, int count) {
+  if (context.vio.isEnglish) {
+    if (count >= 1000000) {
+      final value = count / 1000000;
+      return '${value.toStringAsFixed(value >= 10 ? 0 : 1).replaceFirst(RegExp(r'\.0$'), '')}M';
+    }
+
+    if (count >= 1000) {
+      final value = count / 1000;
+      return '${value.toStringAsFixed(value >= 10 ? 0 : 1).replaceFirst(RegExp(r'\.0$'), '')}K';
+    }
+
+    return count.toString();
+  }
+
   if (count >= 10000) {
     final value = count / 10000;
     return '${value.toStringAsFixed(value >= 10 ? 0 : 1)}萬';

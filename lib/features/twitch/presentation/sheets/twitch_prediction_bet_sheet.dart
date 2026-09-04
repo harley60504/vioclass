@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../models/engagement/twitch_prediction.dart';
 import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'prediction_bet/twitch_prediction_bet_helpers.dart';
 import 'prediction_bet/twitch_prediction_bet_sheet_widgets.dart';
@@ -182,6 +183,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final prediction = _visiblePrediction;
     final status = prediction.status.toUpperCase();
     final isActive = status == 'ACTIVE' || status == 'OPEN';
@@ -196,18 +198,18 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     final totalUsers = prediction.totalUsers > 0
         ? prediction.totalUsers
         : prediction.outcomes.fold<int>(0, (sum, item) => sum + item.users);
-    final timeLabel = twitchPredictionTimeLabel(prediction);
+    final timeLabel = twitchPredictionTimeLabel(prediction, l10n);
     final helperText = !isActive
-        ? '這個賭盤目前不能下注'
+        ? l10n.t('這個賭盤目前不能下注')
         : hasViewerChoice
-        ? '已下注「${viewerChoice?.title ?? viewerChoiceId}」，只能繼續加注同一邊，另一邊已鎖住'
-        : '選擇下方選項送出下注';
+        ? '${l10n.t('已下注')}「${viewerChoice?.title ?? viewerChoiceId}」，${l10n.t('只能繼續加注同一邊，另一邊已鎖住')}'
+        : l10n.t('選擇下方選項送出下注');
 
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
-        title: prediction.title.isEmpty ? '賭盤預測' : prediction.title,
+        title: prediction.title.isEmpty ? l10n.t('賭盤預測') : prediction.title,
         subtitle:
-            '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${twitchPredictionFormatCompact(totalPoints)} 點 · ${twitchPredictionFormatCompact(totalUsers)} 人${timeLabel == null ? '' : ' · $timeLabel'}',
+            '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${twitchPredictionFormatCompact(totalPoints)} ${l10n.t('點')} · ${twitchPredictionFormatCompact(totalUsers)} ${l10n.t('人')}${timeLabel == null ? '' : ' · $timeLabel'}',
         icon: Icons.how_to_vote_rounded,
         showRefresh: false,
         child: Padding(
@@ -239,7 +241,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                 decoration: InputDecoration(
                   isDense: true,
                   border: const OutlineInputBorder(),
-                  labelText: '下注點數',
+                  labelText: l10n.t('下注點數'),
                   helperText: helperText,
                   helperMaxLines: 2,
                   helperStyle: TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/playback/twitch_m3u8_variant.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchQualityOverlayMenu extends StatelessWidget {
@@ -21,7 +22,8 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final groups = _groupVariants(variants);
+    final l10n = context.vio;
+    final groups = _groupVariants(variants, l10n);
 
     return Material(
       color: Colors.transparent,
@@ -58,17 +60,17 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
                     color: TwitchUiColors.primarySoft,
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '畫質',
-                      style: TextStyle(
+                      l10n.t('畫質'),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: '關閉',
+                    tooltip: l10n.t('關閉'),
                     onPressed: onClose,
                     icon: const Icon(
                       Icons.close_rounded,
@@ -81,11 +83,11 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
             ),
             Flexible(
               child: variants.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.all(18),
+                  ? Padding(
+                      padding: const EdgeInsets.all(18),
                       child: Text(
-                        '尚未載入畫質清單',
-                        style: TextStyle(color: Colors.white54),
+                        l10n.t('尚未載入畫質清單'),
+                        style: const TextStyle(color: Colors.white54),
                       ),
                     )
                   : ListView(
@@ -124,7 +126,10 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
     );
   }
 
-  static List<_QualityGroup> _groupVariants(List<TwitchM3u8Variant> variants) {
+  static List<_QualityGroup> _groupVariants(
+    List<TwitchM3u8Variant> variants,
+    VioClassLocalizations l10n,
+  ) {
     final source = <TwitchM3u8Variant>[];
     final high = <TwitchM3u8Variant>[];
     final medium = <TwitchM3u8Variant>[];
@@ -170,12 +175,12 @@ class TwitchQualityOverlayMenu extends StatelessWidget {
     }
 
     return <_QualityGroup>[
-      _QualityGroup('自動 / 原始', source),
-      _QualityGroup('高畫質', high),
-      _QualityGroup('中畫質', medium),
-      _QualityGroup('低畫質', low),
-      _QualityGroup('音訊', audio),
-      _QualityGroup('其他', other),
+      _QualityGroup(l10n.t('自動 / 原始'), source),
+      _QualityGroup(l10n.t('高畫質'), high),
+      _QualityGroup(l10n.t('中畫質'), medium),
+      _QualityGroup(l10n.t('低畫質'), low),
+      _QualityGroup(l10n.t('音訊'), audio),
+      _QualityGroup(l10n.t('其他'), other),
     ];
   }
 }
@@ -195,11 +200,12 @@ class _QualityRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final subtitle = [
       if (variant.resolution != null) variant.resolution!,
       if (variant.frameRate != null) '${variant.frameRate!.round()} fps',
       if (variant.bandwidth != null) _formatBitrate(variant.bandwidth!),
-      if (variant.isAudioOnly) '純音訊',
+      if (variant.isAudioOnly) l10n.t('純音訊'),
     ].join(' · ');
 
     return InkWell(

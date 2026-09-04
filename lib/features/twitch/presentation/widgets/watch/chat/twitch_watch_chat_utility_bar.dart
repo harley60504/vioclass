@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../channel_points/twitch_channel_points_sheet_utils.dart';
 import '../../shared/twitch_cached_image_layer.dart';
@@ -26,6 +27,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final balance = channelPoints?.balance;
     final pointsIconUrl = channelPoints?.pointsIconUrl;
     final hasClaim = (channelPoints?.availableClaimId ?? '').isNotEmpty;
@@ -43,7 +45,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
           ),
           if (!compact) const Spacer() else const SizedBox(width: 6),
           _UtilityButton(
-            tooltip: '特殊訊息',
+            tooltip: l10n.t('特殊訊息'),
             icon: Icons.auto_awesome_rounded,
             active: false,
             compact: compact,
@@ -51,7 +53,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           _UtilityButton(
-            tooltip: loadingEmotes ? '貼圖載入中' : '貼圖',
+            tooltip: l10n.t(loadingEmotes ? '貼圖載入中' : '貼圖'),
             icon: loadingEmotes ? Icons.sync_rounded : Icons.tag_faces_rounded,
             active: loadingEmotes,
             compact: compact,
@@ -89,7 +91,9 @@ class _ChannelPointsCompactButton extends StatelessWidget {
     final palette = TwitchUiColors.sheet.backplate;
 
     return Tooltip(
-      message: hasClaim ? '忠誠點數 $fullLabel · 有可領獎勵' : '忠誠點數 $fullLabel',
+      message: hasClaim
+          ? '${context.vio.t('忠誠點數')} $fullLabel · ${context.vio.t('有可領獎勵')}'
+          : '${context.vio.t('忠誠點數')} $fullLabel',
       child: InkWell(
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
         onTap: onTap,

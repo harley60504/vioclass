@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../widgets/chat/twitch_chat_text_style.dart';
 import '../../widgets/chat/twitch_runtime_message_tile.dart';
@@ -103,7 +104,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
     if (!context.mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已複製這則聊天室訊息')));
+    ).showSnackBar(SnackBar(content: Text(context.vio.t('已複製這則聊天室訊息'))));
   }
 
   String _copyText(TwitchChatRuntimeMessage message) {
@@ -177,10 +178,11 @@ class _EntryKindChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
+    final l10n = context.vio;
     final label = switch (kind) {
-      TwitchReplyThreadEntryKind.ancestor => '上文',
-      TwitchReplyThreadEntryKind.selected => '目前',
-      TwitchReplyThreadEntryKind.directReply => '回覆',
+      TwitchReplyThreadEntryKind.ancestor => l10n.t('上文'),
+      TwitchReplyThreadEntryKind.selected => l10n.t('目前'),
+      TwitchReplyThreadEntryKind.directReply => l10n.t('回覆'),
     };
 
     final color = switch (kind) {
@@ -226,6 +228,7 @@ class _RelationLine extends StatelessWidget {
       chips.add(
         _RelationChip(
           label: '回覆 @${_stripAt(reply)}',
+          prefix: context.vio.t('回覆'),
           type: _RelationChipType.reply,
           fontScale: fontScale,
         ),
@@ -238,6 +241,7 @@ class _RelationLine extends StatelessWidget {
       chips.add(
         _RelationChip(
           label: '提及 @${_stripAt(text)}',
+          prefix: context.vio.t('提及'),
           type: _RelationChipType.tag,
           fontScale: fontScale,
         ),
@@ -254,11 +258,13 @@ enum _RelationChipType { reply, tag }
 
 class _RelationChip extends StatelessWidget {
   final String label;
+  final String prefix;
   final _RelationChipType type;
   final double fontScale;
 
   const _RelationChip({
     required this.label,
+    required this.prefix,
     required this.type,
     required this.fontScale,
   });
@@ -289,7 +295,7 @@ class _RelationChip extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: borderOpacity)),
       ),
       child: Text(
-        label,
+        label.replaceFirst(RegExp(r'^[^@]+'), '$prefix '),
         style: twitchChatTextStyle(
           TextStyle(
             color: color,

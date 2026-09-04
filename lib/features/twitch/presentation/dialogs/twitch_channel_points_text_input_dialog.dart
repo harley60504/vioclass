@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
@@ -83,7 +84,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('取消'),
+                child: Text(context.vio.t('取消')),
               ),
               const SizedBox(width: 8),
               ElevatedButton(

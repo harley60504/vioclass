@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 const int _channelPointEmoteGridCacheSize = 112;
@@ -46,6 +47,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final base = selectedBaseEmote;
     final choosingModifier =
         mode == ChannelPointEmoteOverlayMode.modify && base != null;
@@ -80,7 +82,9 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       isDense: true,
-                      hintText: choosingModifier ? '選擇修改效果' : '搜尋貼圖名稱',
+                      hintText: l10n.t(
+                        choosingModifier ? '選擇修改效果' : '搜尋貼圖名稱',
+                      ),
                       hintStyle: const TextStyle(
                         color: Colors.white38,
                         fontSize: 13,
@@ -112,7 +116,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: '重新載入',
+                      tooltip: l10n.t('重新載入'),
                       visualDensity: VisualDensity.compact,
                       onPressed: loading ? null : onReload,
                       icon: loading
@@ -131,7 +135,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                             ),
                     ),
                     IconButton(
-                      tooltip: '關閉',
+                      tooltip: l10n.t('關閉'),
                       visualDensity: VisualDensity.compact,
                       onPressed: onClose,
                       icon: const Icon(
@@ -161,7 +165,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                               children: [
                                 if (onBack != null)
                                   IconButton(
-                                    tooltip: '返回',
+                                    tooltip: l10n.t('返回'),
                                     visualDensity: VisualDensity.compact,
                                     onPressed: onBack,
                                     icon: const Icon(
@@ -172,7 +176,9 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                                   ),
                                 Expanded(
                                   child: Text(
-                                    rewardTitle.isEmpty ? '選擇貼圖' : rewardTitle,
+                                    rewardTitle.isEmpty
+                                        ? l10n.t('選擇貼圖')
+                                        : rewardTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -193,7 +199,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                           children: [
                             if (onBack != null)
                               IconButton(
-                                tooltip: '返回',
+                                tooltip: l10n.t('返回'),
                                 visualDensity: VisualDensity.compact,
                                 onPressed: onBack,
                                 icon: const Icon(
@@ -212,11 +218,11 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
             ),
             Expanded(
               child: loading
-                  ? const _OverlayLoadingMessage(message: '正在讀取貼圖清單...')
+                  ? _OverlayLoadingMessage(message: l10n.t('正在讀取貼圖清單...'))
                   : error != null
                   ? _OverlayMessage(
                       icon: Icons.error_outline_rounded,
-                      message: '貼圖清單暫時載入失敗，稍後再試。',
+                      message: l10n.t('貼圖清單暫時載入失敗，稍後再試。'),
                     )
                   : choosingModifier
                   ? _ModifierGrid(
@@ -323,14 +329,16 @@ class _EmoteEmptyMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasQuery = query.trim().isNotEmpty;
     if (mode == ChannelPointEmoteOverlayMode.modify && !hasQuery) {
-      return const _OverlayMessage(
+      return _OverlayMessage(
         icon: Icons.auto_fix_off_rounded,
-        message: '這個頻道目前沒有可修改的訂閱貼圖。',
+        message: context.vio.t('這個頻道目前沒有可修改的訂閱貼圖。'),
       );
     }
     return _OverlayMessage(
       icon: Icons.search_off_rounded,
-      message: hasQuery ? '沒有符合搜尋條件的貼圖' : '沒有符合的 Channel Points 貼圖',
+      message: context.vio.t(
+        hasQuery ? '沒有符合搜尋條件的貼圖' : '沒有符合的 Channel Points 貼圖',
+      ),
     );
   }
 }
@@ -354,9 +362,9 @@ class _ModifierGrid extends StatelessWidget {
     final preview = selectedModifier;
 
     if (modifications.isEmpty) {
-      return const _OverlayMessage(
+      return _OverlayMessage(
         icon: Icons.auto_fix_off_rounded,
-        message: '這個貼圖沒有可用的修改效果。',
+        message: context.vio.t('這個貼圖沒有可用的修改效果。'),
       );
     }
 
@@ -415,7 +423,7 @@ class _ModifierGrid extends StatelessWidget {
                 width: double.infinity,
                 child: FilledButton(
                   onPressed: preview == null ? null : () => onConfirm(preview),
-                  child: const Text('選擇'),
+                  child: Text(context.vio.t('選擇')),
                 ),
               ),
             ],
@@ -440,7 +448,7 @@ class _ModifierActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: _modifierLabel(_modifierKey(modifier)),
+      message: context.vio.t(_modifierLabel(_modifierKey(modifier))),
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: () => onSelected(modifier),

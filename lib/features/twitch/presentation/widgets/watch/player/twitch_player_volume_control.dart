@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../localization/vioclass_localizations.dart';
 import 'twitch_player_common_buttons.dart';
 
 class CompactInlineVolumeControl extends StatelessWidget {
@@ -24,7 +25,7 @@ class CompactInlineVolumeControl extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         PlainIconButton(
-          tooltip: muted ? '取消靜音' : '靜音',
+          tooltip: context.vio.t(muted ? '取消靜音' : '靜音'),
           icon: muted || volume <= 0 ? Icons.volume_off : Icons.volume_up,
           size: 21,
           dense: true,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../models/engagement/twitch_hype_train.dart';
 import '../../../../services/engagement/twitch_hype_train_controller.dart';
+import '../../../localization/vioclass_localizations.dart';
 
 class TwitchHypeTrainBanner extends StatefulWidget {
   final TwitchHypeTrainController controller;
@@ -173,6 +174,7 @@ class _HypeTrainBannerBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.vio;
     final remaining = _formatRemaining(snapshot.remainingDuration);
     final glow = ending ? (1 - endingProgress).clamp(0.0, 1.0) : 0.0;
 
@@ -217,8 +219,8 @@ class _HypeTrainBannerBody extends StatelessWidget {
                   Expanded(
                     child: Text(
                       ending
-                          ? '發燒列車結束 / Hype Train Complete'
-                          : '發燒列車 / Hype Train Lv.${snapshot.level}',
+                          ? l10n.t('發燒列車結束')
+                          : '${l10n.t('發燒列車')} Lv.${snapshot.level}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.labelLarge?.copyWith(
@@ -254,7 +256,7 @@ class _HypeTrainBannerBody extends StatelessWidget {
                   Expanded(
                     child: Text(
                       ending
-                          ? '感謝大家的支援'
+                          ? l10n.t('感謝大家的支援')
                           : '${snapshot.progress} / ${snapshot.goal}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

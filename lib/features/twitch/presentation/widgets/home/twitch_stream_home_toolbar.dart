@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../pages/twitch_stream_home_models.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_centered_text_field.dart';
 import 'twitch_stream_home_account_menu.dart';
@@ -35,27 +36,28 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final actions = <Widget>[
       TwitchStreamHomeToolbarIconButton(
-        tooltip: '遊戲分類',
+        tooltip: l10n.t('遊戲分類'),
         icon: Icons.sports_esports_rounded,
         onPressed: onShowGameMenu,
       ),
       const SizedBox(width: 4),
       TwitchStreamHomeToolbarIconButton(
-        tooltip: '語言篩選',
+        tooltip: l10n.t('語言篩選'),
         icon: Icons.tune_rounded,
         onPressed: onShowLanguageMenu,
       ),
       const SizedBox(width: 4),
       TwitchStreamHomeToolbarIconButton(
-        tooltip: '重新整理',
+        tooltip: l10n.t('重新整理'),
         icon: Icons.refresh_rounded,
         onPressed: () => onRefresh(),
       ),
       const SizedBox(width: 4),
       TwitchStreamHomeToolbarIconButton(
-        tooltip: 'Drops 連接',
+        tooltip: l10n.t('Drops 連接'),
         icon: Icons.card_giftcard_rounded,
         onPressed: () => onOpenDropsConnector(),
       ),
@@ -77,7 +79,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         ),
         child: Column(
           children: <Widget>[
-            SizedBox(height: 50, child: _buildSearchField()),
+            SizedBox(height: 50, child: _buildSearchField(context)),
             const SizedBox(height: 8),
             SizedBox(
               height: 46,
@@ -104,7 +106,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Expanded(child: _buildSearchField()),
+          Expanded(child: _buildSearchField(context)),
           const SizedBox(width: 8),
           ...actions,
         ],
@@ -112,12 +114,13 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
     );
   }
 
-  Widget _buildSearchField() {
+  Widget _buildSearchField(BuildContext context) {
+    final l10n = context.vio;
     return TwitchCenteredTextField(
       height: 50,
       radius: 18,
       controller: searchController,
-      hintText: '搜尋直播、遊戲或實況主',
+      hintText: l10n.t('搜尋直播、遊戲或實況主'),
       prefixIcon: Icons.search_rounded,
       onChanged: onSearchChanged,
       fontSize: 14.5,
@@ -127,7 +130,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
       iconColor: Colors.white54,
       suffixIcon: searchController.text.isNotEmpty
           ? IconButton(
-              tooltip: '清除搜尋',
+              tooltip: l10n.t('清除搜尋'),
               visualDensity: VisualDensity.compact,
               onPressed: onClearSearch,
               icon: const Icon(

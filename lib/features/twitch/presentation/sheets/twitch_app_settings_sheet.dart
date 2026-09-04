@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../design/twitch_breakpoints.dart';
 import '../design/twitch_typography.dart';
+import '../localization/vioclass_localizations.dart';
 import '../settings/twitch_app_font_controller.dart';
+import '../settings/twitch_app_language_controller.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import '../settings/vioclass_update_controller.dart';
@@ -24,10 +26,11 @@ Future<void> showTwitchAppSettingsSheet({
   required Future<void> Function() onRefreshLogin,
   required Future<void> Function() onLogout,
 }) {
+  final l10n = context.vio;
   return showTwitchUnifiedSheet<void>(
     context: context,
-    title: '設定',
-    subtitle: '聊天室與播放器偏好',
+    title: l10n.settingsTitle,
+    subtitle: l10n.settingsSubtitle,
     icon: Icons.settings_rounded,
     size: TwitchUnifiedSheetSize.wide,
     showRefresh: false,
@@ -50,10 +53,11 @@ Future<void> showVioClassUpdateSheet({
   required VioClassUpdateController controller,
   bool startupPrompt = false,
 }) {
+  final l10n = context.vio;
   return showTwitchUnifiedSheet<void>(
     context: context,
-    title: 'VioClass 更新',
-    subtitle: startupPrompt ? '有新版本可以安裝' : '檢查與安裝更新',
+    title: l10n.updateTitle,
+    subtitle: startupPrompt ? l10n.updateStartupSubtitle : l10n.updateSubtitle,
     icon: Icons.system_update_rounded,
     size: TwitchUnifiedSheetSize.medium,
     showRefresh: false,
@@ -165,36 +169,37 @@ class _SettingsTabSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final items = <_SettingsTabMeta>[
-      const _SettingsTabMeta(
+      _SettingsTabMeta(
         tab: _TwitchSettingsTab.account,
         icon: Icons.person_rounded,
-        label: '帳號',
-        description: '登入與帳號',
+        label: l10n.accountTab,
+        description: l10n.accountTabDescription,
       ),
-      const _SettingsTabMeta(
+      _SettingsTabMeta(
         tab: _TwitchSettingsTab.chat,
         icon: Icons.chat_bubble_rounded,
-        label: '聊天',
-        description: '聊天室顯示',
+        label: l10n.chatTab,
+        description: l10n.chatTabDescription,
       ),
-      const _SettingsTabMeta(
+      _SettingsTabMeta(
         tab: _TwitchSettingsTab.player,
         icon: Icons.play_circle_rounded,
-        label: '播放器',
-        description: '播放預設',
+        label: l10n.playerTab,
+        description: l10n.playerTabDescription,
       ),
-      const _SettingsTabMeta(
+      _SettingsTabMeta(
         tab: _TwitchSettingsTab.appearance,
         icon: Icons.palette_rounded,
-        label: '外觀',
-        description: '字體與外觀',
+        label: l10n.appearanceTab,
+        description: l10n.appearanceTabDescription,
       ),
-      const _SettingsTabMeta(
+      _SettingsTabMeta(
         tab: _TwitchSettingsTab.updates,
         icon: Icons.system_update_rounded,
-        label: '更新',
-        description: '版本檢查',
+        label: l10n.updatesTab,
+        description: l10n.updatesTabDescription,
       ),
     ];
 
@@ -368,6 +373,7 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final loading = widget.loadingLoginState() || _busy;
     final label = widget.viewerLabel();
     final status = widget.loginStatus();
@@ -376,8 +382,8 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
       children: [
         _SettingsSection(
-          title: 'Twitch 帳號',
-          subtitle: '登入狀態與權限檢查',
+          title: l10n.t('Twitch 帳號'),
+          subtitle: l10n.t('登入狀態與權限檢查'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -460,19 +466,19 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
                   FilledButton.icon(
                     onPressed: loading ? null : () => _run(widget.onLogin),
                     icon: const Icon(Icons.login_rounded, size: 18),
-                    label: const Text('完整登入 / 修復登入'),
+                    label: Text(l10n.t('完整登入 / 修復登入')),
                   ),
                   OutlinedButton.icon(
                     onPressed: loading
                         ? null
                         : () => _run(widget.onRefreshLogin),
                     icon: const Icon(Icons.refresh_rounded, size: 18),
-                    label: const Text('重新檢查'),
+                    label: Text(l10n.t('重新檢查')),
                   ),
                   OutlinedButton.icon(
                     onPressed: loading ? null : () => _run(widget.onLogout),
                     icon: const Icon(Icons.logout_rounded, size: 18),
-                    label: const Text('登出'),
+                    label: Text(l10n.t('登出')),
                   ),
                 ],
               ),
@@ -492,6 +498,7 @@ class _ChatSettingsPane extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final compact = TwitchBreakpoints.isCompactVertical(context);
+    final l10n = context.vio;
 
     return AnimatedBuilder(
       animation: controller,
@@ -507,12 +514,12 @@ class _ChatSettingsPane extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
           children: [
             _SettingsSection(
-              title: '聊天室字體',
-              subtitle: '直播聊天室與 VOD 聊天回放共用',
+              title: l10n.t('聊天室字體'),
+              subtitle: l10n.t('直播聊天室與 VOD 聊天回放共用'),
               trailing: TextButton.icon(
                 onPressed: controller.reset,
                 icon: const Icon(Icons.restart_alt_rounded, size: 17),
-                label: const Text('重設'),
+                label: Text(l10n.t('重設')),
               ),
               child: Column(
                 children: [
@@ -528,8 +535,8 @@ class _ChatSettingsPane extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   _SettingsSwitchRow(
-                    title: '顯示訊息時間',
-                    subtitle: '在每則聊天室訊息前顯示發送時間',
+                    title: l10n.t('顯示訊息時間'),
+                    subtitle: l10n.t('在每則聊天室訊息前顯示發送時間'),
                     value: controller.messageTimestampsEnabled,
                     onChanged: controller.setMessageTimestampsEnabled,
                   ),
@@ -572,14 +579,15 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final domains = widget.controller.trustedPreviewDomains;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SettingsSwitchRow(
-          title: '自動載入連結預覽',
-          subtitle: '只會自動載入內建可信網域和你加入的網域',
+          title: l10n.t('自動載入連結預覽'),
+          subtitle: l10n.t('只會自動載入內建可信網域和你加入的網域'),
           value: widget.controller.linkPreviewsEnabled,
           onChanged: widget.controller.setLinkPreviewsEnabled,
         ),
@@ -600,7 +608,7 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
                 ),
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: '新增可信網域，例如 example.com',
+                  hintText: l10n.t('新增可信網域，例如 example.com'),
                   hintStyle: TextStyle(
                     color: Colors.white.withValues(alpha: 0.36),
                     fontSize: 12,
@@ -637,7 +645,7 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
             FilledButton.icon(
               onPressed: _addDomain,
               icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('加入'),
+              label: Text(l10n.t('加入')),
             ),
           ],
         ),
@@ -682,6 +690,7 @@ class _PlayerSettingsPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
@@ -689,17 +698,17 @@ class _PlayerSettingsPane extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
           children: [
             _SettingsSection(
-              title: '播放預設',
-              subtitle: '下一次進入直播或 VOD 頁面時套用',
+              title: l10n.t('播放預設'),
+              subtitle: l10n.t('下一次進入直播或 VOD 頁面時套用'),
               trailing: TextButton.icon(
                 onPressed: controller.resetPlayback,
                 icon: const Icon(Icons.restart_alt_rounded, size: 17),
-                label: const Text('重設'),
+                label: Text(l10n.t('重設')),
               ),
               child: Column(
                 children: [
                   _SettingsSliderRow(
-                    title: '預設音量',
+                    title: l10n.t('預設音量'),
                     valueLabel: '${controller.volume.round()}%',
                     value: controller.volume,
                     min: 0,
@@ -708,26 +717,26 @@ class _PlayerSettingsPane extends StatelessWidget {
                     onChanged: controller.setVolume,
                   ),
                   _SettingsSwitchRow(
-                    title: '開始時靜音',
-                    subtitle: '播放器會保留音量值，但進頁面時先以靜音套用',
+                    title: l10n.t('開始時靜音'),
+                    subtitle: l10n.t('播放器會保留音量值，但進頁面時先以靜音套用'),
                     value: controller.muted,
                     onChanged: controller.setMuted,
                   ),
                   _SettingsSwitchRow(
-                    title: '預設顯示聊天室',
-                    subtitle: '新開觀看頁時先顯示右側聊天欄',
+                    title: l10n.t('預設顯示聊天室'),
+                    subtitle: l10n.t('新開觀看頁時先顯示右側聊天欄'),
                     value: controller.chatVisible,
                     onChanged: controller.setChatVisible,
                   ),
                   _SettingsSwitchRow(
-                    title: '允許 Android 子母畫面',
-                    subtitle: '離開 App 或手動開啟時，才會進入系統子母畫面',
+                    title: l10n.t('允許 Android 子母畫面'),
+                    subtitle: l10n.t('離開 App 或手動開啟時，才會進入系統子母畫面'),
                     value: controller.androidPipEnabled,
                     onChanged: controller.setAndroidPipEnabled,
                   ),
                   _SettingsSwitchRow(
-                    title: '離開觀看頁保留小窗',
-                    subtitle: '從直播、VOD 或片段回主畫面時保留 App 內小窗',
+                    title: l10n.t('離開觀看頁保留小窗'),
+                    subtitle: l10n.t('從直播、VOD 或片段回主畫面時保留 App 內小窗'),
                     value: controller.homeKeepsMiniPlayer,
                     onChanged: controller.setHomeKeepsMiniPlayer,
                   ),
@@ -746,9 +755,15 @@ class _AppearanceSettingsPane extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final listenable = Listenable.merge([
+      twitchAppFontController,
+      twitchAppLanguageController,
+    ]);
+
     return AnimatedBuilder(
-      animation: twitchAppFontController,
+      animation: listenable,
       builder: (context, _) {
+        final l10n = context.vio;
         final controller = twitchAppFontController;
         final choices = controller.choices;
 
@@ -756,8 +771,25 @@ class _AppearanceSettingsPane extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
           children: [
             _SettingsSection(
-              title: 'App 字體',
-              subtitle: 'Windows 和 Android 會套用同一個選擇',
+              title: l10n.appLanguageTitle,
+              subtitle: l10n.appLanguageSubtitle,
+              child: Column(
+                children: [
+                  for (final mode in TwitchAppLanguageMode.values) ...[
+                    _SettingsLanguageChoiceRow(
+                      mode: mode,
+                      selected: mode == twitchAppLanguageController.mode,
+                      onTap: () => twitchAppLanguageController.select(mode),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            _SettingsSection(
+              title: l10n.appFontTitle,
+              subtitle: l10n.appFontSubtitle,
               trailing: TextButton.icon(
                 onPressed: controller.picking
                     ? null
@@ -772,7 +804,9 @@ class _AppearanceSettingsPane extends StatelessWidget {
                         ),
                       )
                     : const Icon(Icons.upload_file_rounded, size: 17),
-                label: Text(controller.picking ? '匯入中' : '匯入字體'),
+                label: Text(
+                  controller.picking ? l10n.importingFont : l10n.importFont,
+                ),
               ),
               child: Column(
                 children: [
@@ -798,7 +832,7 @@ class _AppearanceSettingsPane extends StatelessWidget {
                       ),
                     ),
                     child: Text(
-                      '預覽：聊天室中文字體、標題和按鈕會一起套用。',
+                      l10n.fontPreview,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.82),
                         fontSize: 14,
@@ -832,34 +866,35 @@ class _UpdateSettingsPane extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
+        final l10n = context.vio;
         final latest = controller.latest;
         final asset = latest?.preferredAsset;
         final release = latest?.release;
         final status = controller.checking
-            ? '正在檢查 GitHub 最新版本...'
+            ? l10n.t('正在檢查 GitHub 最新版本...')
             : controller.installing
-            ? '正在下載並準備更新...'
+            ? l10n.t('正在下載並準備更新...')
             : controller.errorText?.trim().isNotEmpty == true
-            ? '更新檢查失敗，稍後再試。'
+            ? l10n.t('更新檢查失敗，稍後再試。')
             : latest == null
-            ? '尚未檢查更新。'
+            ? l10n.t('尚未檢查更新。')
             : latest.updateAvailable
-            ? '找到新版 ${release?.tagName ?? ''}'
-            : '目前已是最新版本。';
+            ? '${l10n.t('找到新版')} ${release?.tagName ?? ''}'
+            : l10n.t('目前已是最新版本。');
 
         return ListView(
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
           children: [
             _SettingsSection(
-              title: 'App 更新',
-              subtitle: '讓 VioClass 維持在最新版',
+              title: l10n.t('App 更新'),
+              subtitle: l10n.t('讓 VioClass 維持在最新版'),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (showAutoCheck) ...[
                     _SettingsSwitchRow(
-                      title: '開啟 App 時檢查更新',
-                      subtitle: '有新版本時提醒你安裝',
+                      title: l10n.t('開啟 App 時檢查更新'),
+                      subtitle: l10n.t('有新版本時提醒你安裝'),
                       value: controller.autoCheckEnabled,
                       onChanged: controller.setAutoCheckEnabled,
                     ),
@@ -883,7 +918,7 @@ class _UpdateSettingsPane extends StatelessWidget {
                       if (showLaterAction)
                         TextButton(
                           onPressed: () => Navigator.of(context).maybePop(),
-                          child: const Text('稍後'),
+                          child: Text(l10n.t('稍後')),
                         ),
                       FilledButton.icon(
                         onPressed: controller.checking || controller.installing
@@ -899,7 +934,9 @@ class _UpdateSettingsPane extends StatelessWidget {
                                 ),
                               )
                             : const Icon(Icons.refresh_rounded, size: 18),
-                        label: Text(controller.checking ? '檢查中' : '立即檢查'),
+                        label: Text(
+                          l10n.t(controller.checking ? '檢查中' : '立即檢查'),
+                        ),
                       ),
                       OutlinedButton.icon(
                         onPressed:
@@ -913,10 +950,10 @@ class _UpdateSettingsPane extends StatelessWidget {
                         icon: const Icon(Icons.download_rounded, size: 18),
                         label: Text(
                           controller.installing
-                              ? '安裝中'
+                              ? l10n.t('安裝中')
                               : asset == null
-                              ? '開啟下載頁'
-                              : '下載並安裝',
+                              ? l10n.t('開啟下載頁')
+                              : l10n.t('下載並安裝'),
                         ),
                       ),
                     ],
@@ -950,6 +987,7 @@ class _UpdateStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final accent = hasUpdate
         ? TwitchUiColors.primarySoft
         : Colors.white.withValues(alpha: 0.42);
@@ -1002,8 +1040,10 @@ class _UpdateStatusCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   [
-                    if (currentVersion != null) '目前版本 $currentVersion',
-                    if (latestVersion != null) '最新版本 $latestVersion',
+                    if (currentVersion != null)
+                      '${l10n.t('目前版本')} $currentVersion',
+                    if (latestVersion != null)
+                      '${l10n.t('最新版本')} $latestVersion',
                   ].join(' · '),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -1047,11 +1087,13 @@ class _SettingsFontChoiceRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final accent = selected ? TwitchUiColors.primarySoft : Colors.white38;
+    final label = _fontChoiceLabel(choice, l10n);
     final subtitle = switch (choice.kind) {
-      TwitchAppFontKind.vioClass => '內建 Noto Sans TC，跨平台一致',
-      TwitchAppFontKind.system => '使用裝置預設字體',
-      TwitchAppFontKind.custom => '自訂匯入字體',
+      TwitchAppFontKind.vioClass => l10n.builtInFontDescription,
+      TwitchAppFontKind.system => l10n.systemFontDescription,
+      TwitchAppFontKind.custom => l10n.customFontDescription,
     };
 
     return Material(
@@ -1083,7 +1125,7 @@ class _SettingsFontChoiceRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      choice.label,
+                      label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -1111,10 +1153,98 @@ class _SettingsFontChoiceRow extends StatelessWidget {
               ),
               if (onDelete != null)
                 IconButton(
-                  tooltip: '移除字體',
+                  tooltip: l10n.removeFontTooltip,
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline_rounded, size: 19),
                 ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _fontChoiceLabel(
+    TwitchAppFontChoice choice,
+    VioClassLocalizations l10n,
+  ) {
+    return switch (choice.kind) {
+      TwitchAppFontKind.vioClass =>
+        l10n.isEnglish ? 'VioClass font' : choice.label,
+      TwitchAppFontKind.system => l10n.isEnglish ? 'System font' : choice.label,
+      TwitchAppFontKind.custom => choice.label,
+    };
+  }
+}
+
+class _SettingsLanguageChoiceRow extends StatelessWidget {
+  final TwitchAppLanguageMode mode;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SettingsLanguageChoiceRow({
+    required this.mode,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.vio;
+    final accent = selected ? TwitchUiColors.primarySoft : Colors.white38;
+
+    return Material(
+      color: selected
+          ? TwitchUiColors.primary.withValues(alpha: 0.16)
+          : Colors.white.withValues(alpha: 0.04),
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: accent.withValues(alpha: 0.35)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: accent,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.languageModeLabel(mode),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.languageModeDescription(mode),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.45),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),

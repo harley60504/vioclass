@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 
+import '../localization/vioclass_localizations.dart';
 import '../widgets/channel_points/twitch_channel_points_emote_overlay.dart';
 import '../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
+import '../widgets/channel_points/twitch_channel_points_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'channel_points/twitch_channel_points_emote_overlay_state.dart';
 import 'channel_points/twitch_channel_points_redeem_payload_builder.dart';
@@ -19,7 +21,10 @@ Future<void> showTwitchChannelPointsSheet({
   required Future<void> Function(String claimId) onClaim,
   Future<void> Function(Map<String, dynamic> reward)? onRewardTap,
   Future<void> Function(Map<String, dynamic> reward)? onPrepareTextReward,
-  Future<void> Function(Map<String, dynamic> reward, String textInput)?
+  Future<TwitchChannelPointRedeemUiResult?> Function(
+    Map<String, dynamic> reward,
+    String textInput,
+  )?
   onRedeemReward,
   TwitchChannelPointEmoteLoader? onLoadChannelPointEmotes,
 }) {
@@ -65,7 +70,10 @@ class TwitchChannelPointsSheet extends StatefulWidget {
   /// - Choose / Gigantify: emote id
   /// - Modify: JSON string with {emoteId, modifierId}; emoteId is the final
   ///   modified emote id, Twitch-style.
-  final Future<void> Function(Map<String, dynamic> reward, String textInput)?
+  final Future<TwitchChannelPointRedeemUiResult?> Function(
+    Map<String, dynamic> reward,
+    String textInput,
+  )?
   onRedeemReward;
 
   /// Twitch-style source for Choose / Modify emote menus.
@@ -94,9 +102,12 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
   TwitchChannelPointsEmoteOverlayState _emoteOverlay =
       const TwitchChannelPointsEmoteOverlayState.hidden();
   TwitchChannelPointEmoteCompleter? _emoteCompleter;
+  Map<String, dynamic>? _detailReward;
+  TwitchChannelPointRedeemUiResult? _redeemResult;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final current = widget.snapshot;
     final balance = current?.balance;
     final rewards = sortChannelPointRewards(
@@ -114,10 +125,10 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
       child: Stack(
         children: [
           TwitchUnifiedSheetScaffold(
-            title: current?.pointsName ?? '忠誠點數',
+            title: current?.pointsName ?? l10n.t('忠誠點數'),
             subtitle: balance == null
-                ? '讀取點數與可兌換項目 · $availableCount/${rewards.length} 可用'
-                : '${formatChannelPointFullNumber(balance)} 點 · $availableCount/${rewards.length} 可用',
+                ? '${l10n.t('讀取點數與可兌換項目')} · $availableCount/${rewards.length} ${l10n.t('可用')}'
+                : '${formatChannelPointFullNumber(balance)} ${l10n.t('點')} · $availableCount/${rewards.length} ${l10n.t('可用')}',
             icon: Icons.stars_rounded,
             iconImageUrl: current?.pointsIconUrl,
             loading: widget.loading,
@@ -130,6 +141,30 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
               onRewardTap: (reward) => _handleRewardTap(context, reward),
             ),
           ),
+          if (_detailReward case final reward?)
+            Positioned.fill(
+              child: ChannelPointsRewardDetailPane(
+                reward: reward,
+                balance: balance,
+                pointsIconUrl: current?.pointsIconUrl,
+                onBack: () => setState(() => _detailReward = null),
+                onRedeem: () async {
+                  final result = await _redeemReward(context, reward);
+                  if (!mounted) return;
+                  setState(() {
+                    _detailReward = null;
+                    if (result != null) _redeemResult = result;
+                  });
+                },
+              ),
+            ),
+          if (_redeemResult case final result?)
+            Positioned.fill(
+              child: ChannelPointsRedeemResultPane(
+                result: result,
+                onClose: () => setState(() => _redeemResult = null),
+              ),
+            ),
           if (_emoteOverlay.isVisible)
             Positioned.fill(
               child: ChannelPointEmoteMenuOverlay(
@@ -171,26 +206,38 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
     BuildContext context,
     Map<String, dynamic> reward,
   ) async {
+    if (requiresChannelPointOfficialEmoteSelection(reward) ||
+        requiresChannelPointModifiedEmoteSelection(reward)) {
+      await _redeemReward(context, reward);
+      return;
+    }
+    setState(() => _detailReward = reward);
+  }
+
+  Future<TwitchChannelPointRedeemUiResult?> _redeemReward(
+    BuildContext context,
+    Map<String, dynamic> reward,
+  ) async {
     final prepareTextReward = widget.onPrepareTextReward;
     if (prepareTextReward != null && requiresChannelPointMessageInput(reward)) {
       await prepareTextReward(reward);
       if (context.mounted) Navigator.of(context).maybePop();
-      return;
+      return null;
     }
 
     if (widget.onRedeemReward == null) {
       final legacyTap = widget.onRewardTap;
       if (legacyTap != null) {
         await legacyTap(reward);
-        return;
+        return null;
       }
 
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('目前無法兌換這個獎勵，請稍後再試。')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.vio.t('目前無法兌換這個獎勵，請稍後再試。'))),
+        );
       }
-      return;
+      return null;
     }
 
     final payload = await buildTwitchChannelPointRedeemPayload(
@@ -198,9 +245,9 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
       reward: reward,
       openEmoteOverlay: _openEmoteOverlay,
     );
-    if (payload == null) return;
+    if (payload == null) return null;
 
-    await widget.onRedeemReward!(reward, payload);
+    return widget.onRedeemReward!(reward, payload);
   }
 
   Future<Object?> _openEmoteOverlay({
@@ -210,7 +257,10 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
   }) async {
     final loader = widget.onLoadChannelPointEmotes;
     if (loader == null) {
-      showChannelPointsSnack(context, 'Channel Points emote menu 目前先暫時關閉。');
+      showChannelPointsSnack(
+        context,
+        context.vio.t('Channel Points emote menu 目前先暫時關閉。'),
+      );
       return null;
     }
 

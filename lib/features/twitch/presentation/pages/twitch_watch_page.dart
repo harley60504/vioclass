@@ -577,8 +577,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         await playerSession.ensureReady();
         if (!mounted) return;
         await preferencesController.applyPlayerVolume();
-        final isLowLatencyLive =
-            currentPlaybackKind == TwitchWatchPlaybackKind.live;
         final isLiveDvrReplay =
             currentPlaybackKind == TwitchWatchPlaybackKind.liveDvr;
         if (isLiveDvrReplay) {
@@ -587,13 +585,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
             generation: watchLoadGeneration,
           );
           if (recovered) return;
-        }
-        if (isLowLatencyLive) {
-          await playerSession.openOrResume(
-            uri: currentUri,
-            play: true,
-            forceOpen: true,
-          );
         }
         final player = playerSession.playerOrNull;
         if (player != null && !player.state.playing) {

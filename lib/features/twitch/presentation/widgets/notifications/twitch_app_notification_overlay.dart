@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../../services/notifications/twitch_app_notification_service.dart';
 
 class TwitchAppNotificationOverlay extends StatelessWidget {
@@ -168,7 +169,7 @@ class _TwitchAppNotificationCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Semantics(
                         button: true,
-                        label: '關閉通知',
+                        label: context.vio.t('關閉通知'),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(999),
                           onTap: onDismiss,

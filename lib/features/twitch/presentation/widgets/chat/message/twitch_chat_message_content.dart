@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_author.dart';
 import 'twitch_chat_message_badges.dart';
@@ -124,7 +125,7 @@ class TwitchChatMessageContent extends StatelessWidget {
     if (segments.isEmpty) {
       spans.add(
         TextSpan(
-          text: '〔空訊息〕',
+          text: context.vio.t('〔空訊息〕'),
           style: twitchChatTextStyle(
             TextStyle(
               color: Colors.white38,
@@ -169,7 +170,10 @@ class TwitchChatMessageContent extends StatelessWidget {
           alignment: PlaceholderAlignment.middle,
           child: Padding(
             padding: const EdgeInsets.only(left: 4),
-            child: TwitchChatSmallChip(label: '獎勵', metrics: metrics),
+            child: TwitchChatSmallChip(
+              label: context.vio.t('獎勵'),
+              metrics: metrics,
+            ),
           ),
         ),
       );

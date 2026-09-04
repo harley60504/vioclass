@@ -7,6 +7,7 @@ import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
 import 'twitch_chat_text_style.dart';
 import 'twitch_runtime_message_tile.dart';
@@ -427,7 +428,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
       return widget.emptyBuilder?.call(context) ??
           Center(
             child: Text(
-              '等待聊天室訊息...',
+              context.vio.t('等待聊天室訊息...'),
               style: twitchChatTextStyle(
                 const TextStyle(color: Colors.white54),
               ),
@@ -576,7 +577,9 @@ class _ChatMessageDivider extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Text(
-              '$time 進入直播後',
+              context.vio.isEnglish
+                  ? '${context.vio.t('進入直播後')} $time'
+                  : '$time ${context.vio.t('進入直播後')}',
               style: twitchChatTextStyle(
                 TextStyle(
                   color: Colors.white.withValues(alpha: 0.58),
@@ -612,8 +615,8 @@ class _ScrollResumePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = hiddenNewMessageCount > 0
-        ? '$hiddenNewMessageCount 則新訊息'
-        : '回到最新訊息';
+        ? '$hiddenNewMessageCount ${context.vio.t('則新訊息')}'
+        : context.vio.t('回到最新訊息');
 
     return Material(
       color: Colors.transparent,

@@ -7,6 +7,7 @@ import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../localization/vioclass_localizations.dart';
 import 'player/twitch_media_kit_video_surface.dart';
 import 'player/twitch_player_common_buttons.dart';
 import 'player/twitch_watch_controls_overlay.dart';
@@ -491,7 +492,7 @@ class _WatchOfflineBottomControlBar extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '目前未開台',
+                  context.vio.t('目前未開台'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -502,7 +503,7 @@ class _WatchOfflineBottomControlBar extends StatelessWidget {
                 ),
               ),
               PlainIconButton(
-                tooltip: chatVisible ? '隱藏聊天室' : '顯示聊天室',
+                tooltip: context.vio.t(chatVisible ? '隱藏聊天室' : '顯示聊天室'),
                 icon: chatVisible
                     ? Icons.chat_bubble
                     : Icons.chat_bubble_outline,
@@ -513,7 +514,7 @@ class _WatchOfflineBottomControlBar extends StatelessWidget {
               ),
               if (showFullscreenButton)
                 PlainIconButton(
-                  tooltip: fullscreen ? '離開全螢幕' : '全螢幕',
+                  tooltip: context.vio.t(fullscreen ? '離開全螢幕' : '全螢幕'),
                   icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
                   size: 25,
                   active: fullscreen,

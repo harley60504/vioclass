@@ -24,6 +24,23 @@ class TwitchChannelPointsModifiedEmoteSelection {
   }
 }
 
+class TwitchChannelPointRedeemUiResult {
+  final String title;
+  final String? emoteName;
+  final String? emoteImageUrl;
+
+  const TwitchChannelPointRedeemUiResult({
+    required this.title,
+    this.emoteName,
+    this.emoteImageUrl,
+  });
+
+  bool get hasEmote {
+    return (emoteName?.trim().isNotEmpty ?? false) ||
+        (emoteImageUrl?.trim().isNotEmpty ?? false);
+  }
+}
+
 typedef TwitchChannelPointEmoteLoader =
     Future<List<TwitchChannelPointEmoteOption>> Function(
       Map<String, dynamic> reward,

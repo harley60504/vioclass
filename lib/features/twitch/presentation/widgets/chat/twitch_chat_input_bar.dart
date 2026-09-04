@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import 'twitch_chat_text_style.dart';
 
@@ -129,6 +130,7 @@ class _SelfDrawnInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final textStyle = twitchChatTextStyle(
       TextStyle(
         color: enabled ? Colors.white : Colors.white38,
@@ -178,7 +180,7 @@ class _SelfDrawnInputField extends StatelessWidget {
           cursorColor: TwitchUiColors.primarySoft,
           decoration: InputDecoration(
             isCollapsed: true,
-            hintText: '輸入聊天室訊息...',
+            hintText: l10n.t('輸入聊天室訊息...'),
             hintStyle: textStyle.copyWith(color: Colors.white38),
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
@@ -214,6 +216,7 @@ class _SelfDrawnSendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final foreground = enabled ? Colors.white : Colors.white38;
     final background = enabled
         ? TwitchUiColors.primary.withValues(alpha: 0.38)
@@ -268,7 +271,7 @@ class _SelfDrawnSendButton extends StatelessWidget {
                     if (!compact) ...[
                       const SizedBox(width: 7),
                       Text(
-                        '送出',
+                        l10n.t('送出'),
                         textAlign: TextAlign.center,
                         style: twitchChatTextStyle(
                           TextStyle(

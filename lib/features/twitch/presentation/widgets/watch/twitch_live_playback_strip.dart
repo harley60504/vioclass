@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../localization/vioclass_localizations.dart';
 
 class TwitchLivePlaybackStrip extends StatefulWidget {
   final Player player;
@@ -315,7 +316,7 @@ class _LiveEdgeButton extends StatelessWidget {
         : const Color(0xFF18181B).withValues(alpha: 0.86);
 
     return Tooltip(
-      message: active ? '目前在直播最新位置' : '跳到直播最新位置',
+      message: context.vio.t(active ? '目前在直播最新位置' : '跳到直播最新位置'),
       child: Material(
         color: background,
         borderRadius: BorderRadius.circular(999),
@@ -344,7 +345,7 @@ class _LiveEdgeButton extends StatelessWidget {
                 ),
                 SizedBox(width: compact ? 4 : 5),
                 Text(
-                  '直播',
+                  context.vio.t('直播'),
                   style: TextStyle(
                     color: enabled ? foreground : Colors.white24,
                     fontSize: compact ? 10 : 11,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/window/twitch_fullscreen_controller.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../twitch_watch_page.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
@@ -29,6 +30,6 @@ extension TwitchWatchPageUiMethods on TwitchWatchPageState {
     if (!mounted) return;
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ).showSnackBar(SnackBar(content: Text(context.vio.t(message))));
   }
 }

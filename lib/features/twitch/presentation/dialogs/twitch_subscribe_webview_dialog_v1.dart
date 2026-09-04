@@ -5,6 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
@@ -138,7 +139,7 @@ class _TwitchSubscribeWebViewDialogBodyState
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      '訂閱 $titleLogin',
+                      '${context.vio.t('訂閱')} $titleLogin',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -248,7 +249,7 @@ class _TwitchSubscribeWebViewDialogBodyState
                   onReceivedError: (controller, request, error) {
                     if (!mounted) return;
                     setState(() {
-                      _errorText = '訂閱頁暫時載入失敗，請稍後重試。';
+                      _errorText = context.vio.t('訂閱頁暫時載入失敗，請稍後重試。');
                     });
                   },
                   onCreateWindow: (controller, createWindowAction) async {

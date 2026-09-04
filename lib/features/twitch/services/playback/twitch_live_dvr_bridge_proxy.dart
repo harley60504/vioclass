@@ -11,7 +11,7 @@ import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
 class TwitchLiveDvrBridgeProxy {
-  static const double liveEdgeRatio = 0.98;
+  static const double liveEdgeRatio = 0.995;
 
   final Dio _dio;
   final HttpClient _client = HttpClient()
@@ -434,7 +434,8 @@ class TwitchLiveDvrBridgeProxy {
       (total, item) => total + item.duration,
     );
     if (duration.inMilliseconds <= 0) return 0;
-    final targetMs = (duration.inMilliseconds * ratio.clamp(0.0, 0.98)).round();
+    final targetMs = (duration.inMilliseconds * ratio.clamp(0.0, liveEdgeRatio))
+        .round();
     var cursor = 0;
     for (var i = 0; i < items.length; i++) {
       cursor += items[i].duration.inMilliseconds;

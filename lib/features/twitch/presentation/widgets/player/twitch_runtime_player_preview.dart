@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/bootstrap/twitch_api_bootstrap.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchRuntimePlayerPreview extends StatelessWidget {
@@ -19,9 +20,10 @@ class TwitchRuntimePlayerPreview extends StatelessWidget {
     return AnimatedBuilder(
       animation: playerRuntime,
       builder: (context, _) {
+        final l10n = context.vio;
         final stream = snapshot?.stream;
         final user = snapshot?.user;
-        final title = stream?['title']?.toString() ?? '尚未載入直播';
+        final title = stream?['title']?.toString() ?? l10n.t('尚未載入直播');
         final gameName = stream?['gameName']?.toString() ?? '';
         final viewerCount = stream?['viewerCount']?.toString() ?? '';
         final displayName = user?['displayName']?.toString() ?? '';
@@ -63,9 +65,12 @@ class TwitchRuntimePlayerPreview extends StatelessWidget {
                         color: Colors.redAccent.withValues(alpha: 0.35),
                       ),
                     ),
-                    child: const Text(
-                      '播放器暫時無法載入，請稍後再試。',
-                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                    child: Text(
+                      l10n.t('播放器暫時無法載入，請稍後再試。'),
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -94,6 +99,7 @@ class _InfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -124,13 +130,13 @@ class _InfoCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  displayName.isEmpty ? '播放器預覽' : displayName,
+                  displayName.isEmpty ? l10n.t('播放器預覽') : displayName,
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
               if (viewerCount.isNotEmpty)
                 Text(
-                  '$viewerCount 位觀眾',
+                  '$viewerCount ${l10n.t('位觀眾')}',
                   style: const TextStyle(color: Colors.white70, fontSize: 12),
                 ),
             ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchLoginRequiredView extends StatelessWidget {
@@ -55,9 +56,9 @@ class TwitchLoginRequiredView extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              '需要登入 Twitch',
-              style: TextStyle(
+            Text(
+              context.vio.t('需要登入 Twitch'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
                 fontWeight: FontWeight.w900,
@@ -66,7 +67,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               statusText.trim().isEmpty
-                  ? '追隨頁、聊天室發言、官方貼圖與部分互動功能需要 OAuth token。'
+                  ? context.vio.t('追隨頁、聊天室發言、官方貼圖與部分互動功能需要 OAuth token。')
                   : statusText,
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -94,9 +95,9 @@ class TwitchLoginRequiredView extends StatelessWidget {
                     ),
                   ),
                   icon: const Icon(Icons.open_in_browser_rounded),
-                  label: const Text(
-                    '用 WebView 登入',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                  label: Text(
+                    context.vio.t('用 WebView 登入'),
+                    style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -121,7 +122,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
                           ),
                         )
                       : const Icon(Icons.refresh_rounded),
-                  label: const Text('重新檢查'),
+                  label: Text(context.vio.t('重新檢查')),
                 ),
               ],
             ),

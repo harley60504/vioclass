@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/playback/twitch_m3u8_variant.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 
 class QualityButton extends StatelessWidget {
@@ -17,18 +18,22 @@ class QualityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return PopupMenuButton<TwitchM3u8Variant>(
       tooltip:
-          '畫質：${currentVariant?.displayName ?? currentVariant?.name ?? '自動'}',
+          '${l10n.t('畫質：')}${currentVariant?.displayName ?? currentVariant?.name ?? l10n.t('自動')}',
       color: const Color(0xFF18181B),
       icon: const Icon(Icons.settings, color: Colors.white, size: 24),
       onSelected: onChanged,
       itemBuilder: (context) {
         if (variants.isEmpty) {
-          return const [
+          return [
             PopupMenuItem<TwitchM3u8Variant>(
               enabled: false,
-              child: Text('尚未取得畫質', style: TextStyle(color: Colors.white54)),
+              child: Text(
+                l10n.t('尚未取得畫質'),
+                style: const TextStyle(color: Colors.white54),
+              ),
             ),
           ];
         }

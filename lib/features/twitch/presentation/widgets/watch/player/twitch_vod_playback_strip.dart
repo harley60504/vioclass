@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../../../localization/vioclass_localizations.dart';
+
+const double _liveEdgeSnapRatio = 0.995;
+
 class TwitchVodPlaybackStrip extends StatefulWidget {
   final Player player;
   final bool compact;
@@ -85,12 +89,12 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
             final externalValue = widget.timelineValue?.clamp(0.0, 1.0);
             final baseValue = _dragging
                 ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
-                : manualValue != null &&
-                      (widget.forceLiveEdge || widget.showLiveEdgeLabel)
-                ? manualValue.clamp(0.0, 1.0).toDouble()
                 : externalValue != null &&
                       (widget.forceLiveEdge || widget.showLiveEdgeLabel)
                 ? externalValue.toDouble()
+                : manualValue != null &&
+                      (widget.forceLiveEdge || widget.showLiveEdgeLabel)
+                ? manualValue.clamp(0.0, 1.0).toDouble()
                 : widget.showLiveEdgeLabel || widget.forceLiveEdge
                 ? 1.0
                 : streamValue;
@@ -112,9 +116,10 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                         .round(),
                   )
                 : position;
-            final liveTailActive = widget.showLiveEdgeLabel && value >= 0.98;
+            final liveTailActive =
+                widget.showLiveEdgeLabel && value >= _liveEdgeSnapRatio;
             final tailText = widget.showLiveEdgeLabel
-                ? '直播'
+                ? context.vio.t('直播')
                 : hasDuration
                 ? _formatDuration(displayDuration)
                 : '--:--';
@@ -151,7 +156,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                       onChangeEnd: hasDuration
                           ? (next) {
                               if (widget.showLiveEdgeLabel &&
-                                  next >= 0.98 &&
+                                  next >= _liveEdgeSnapRatio &&
                                   widget.onReturnToLive != null) {
                                 setState(() {
                                   _dragging = false;
@@ -165,13 +170,12 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                               setState(() {
                                 _dragging = false;
                                 _dragValue = null;
-                                _scrubbedTimelineValue = next < 0.98
-                                    ? next
-                                    : null;
+                                _scrubbedTimelineValue =
+                                    next < _liveEdgeSnapRatio ? next : null;
                               });
 
                               if (widget.forceLiveEdge &&
-                                  next < 0.98 &&
+                                  next < _liveEdgeSnapRatio &&
                                   widget.onOpenDvrReplayAt != null) {
                                 widget.onOpenDvrReplayAt!(next);
                                 return;

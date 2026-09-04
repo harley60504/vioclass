@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../responsive/twitch_responsive_layout.dart';
 import 'player/twitch_player_only_surface.dart';
 import 'twitch_watch_chat_resize_handle.dart';
@@ -399,10 +400,10 @@ class _WatchPlayerDisabledPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
-        '播放器已停用',
-        style: TextStyle(
+        context.vio.t('播放器已停用'),
+        style: const TextStyle(
           color: Colors.white54,
           fontSize: 13,
           fontWeight: FontWeight.w800,

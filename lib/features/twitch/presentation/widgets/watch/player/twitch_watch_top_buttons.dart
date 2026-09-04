@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
 
@@ -38,7 +39,7 @@ class FollowButton extends StatelessWidget {
         : 20.0;
 
     return Tooltip(
-      message: followed ? '取消追隨' : '追隨',
+      message: context.vio.t(followed ? '取消追隨' : '追隨'),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
@@ -102,6 +103,7 @@ class SubscribeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final visualHeight =
         height ??
         (tiny
@@ -141,19 +143,19 @@ class SubscribeButton extends StatelessWidget {
                         color: Colors.white,
                         size: tiny ? 19 : 22,
                       )
-                    : const Row(
+                    : Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '訂閱',
-                            style: TextStyle(
+                            l10n.t('訂閱'),
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Icon(
+                          const SizedBox(width: 8),
+                          const Icon(
                             Icons.auto_awesome,
                             color: Colors.white,
                             size: 19,
@@ -199,7 +201,7 @@ class ChannelLibraryButton extends StatelessWidget {
         : 20.0;
 
     return Tooltip(
-      message: '關於 / VOD',
+      message: context.vio.t('關於 / VOD'),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),
@@ -226,18 +228,18 @@ class ChannelLibraryButton extends StatelessWidget {
                           color: TwitchUiColors.primarySoft,
                           size: tiny ? 18 : 21,
                         )
-                      : const Row(
+                      : Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.video_library_rounded,
                               color: TwitchUiColors.primarySoft,
                               size: 19,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
-                              '關於 / VOD',
-                              style: TextStyle(
+                              context.vio.t('關於 / VOD'),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w900,
@@ -287,7 +289,7 @@ class CreateClipButton extends StatelessWidget {
         : 20.0;
 
     return Tooltip(
-      message: '建立片段',
+      message: context.vio.t('建立片段'),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(radius),

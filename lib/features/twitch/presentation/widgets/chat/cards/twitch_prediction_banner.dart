@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../models/engagement/twitch_prediction.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../twitch_chat_text_style.dart';
 
@@ -107,7 +108,9 @@ class TwitchPredictionBanner extends StatelessWidget {
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
-                      prediction.title.isEmpty ? '賭盤預測' : prediction.title,
+                      prediction.title.isEmpty
+                          ? context.vio.t('賭盤預測')
+                          : prediction.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: twitchChatTextStyle(
@@ -237,8 +240,8 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
             !widget.canceled &&
             remaining != null
         ? remaining.inSeconds > 0
-              ? '關盤 ${_formatLockCountdown(remaining)}'
-              : '即將關盤'
+              ? '${context.vio.t('關盤')} ${_formatLockCountdown(remaining)}'
+              : context.vio.t('即將關盤')
         : widget.label;
     final urgent =
         widget.active &&

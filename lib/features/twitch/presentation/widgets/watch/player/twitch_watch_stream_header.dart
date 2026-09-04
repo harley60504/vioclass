@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
 
@@ -208,7 +209,7 @@ class _WatchStreamHeaderMainRow extends StatelessWidget {
           SizedBox(width: compact ? 5 : 7),
           _WatchInfoPill(
             icon: Icons.visibility_rounded,
-            label: _formatViewerCount(data.viewerCount!),
+            label: _formatViewerCount(context, data.viewerCount!),
             compact: compact,
           ),
         ],
@@ -404,7 +405,20 @@ class _WatchLiveStatusDot extends StatelessWidget {
   }
 }
 
-String _formatViewerCount(int value) {
+String _formatViewerCount(BuildContext context, int value) {
+  final l10n = context.vio;
+  if (l10n.isEnglish) {
+    if (value >= 1000000) {
+      final text = (value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1);
+      return '${text.replaceFirst(RegExp(r'\.0$'), '')}M viewers';
+    }
+    if (value >= 1000) {
+      final text = (value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1);
+      return '${text.replaceFirst(RegExp(r'\.0$'), '')}k viewers';
+    }
+    return '$value viewers';
+  }
+
   if (value >= 10000) {
     final text = (value / 10000).toStringAsFixed(value >= 100000 ? 0 : 1);
     return '${text.replaceFirst(RegExp(r'\.0$'), '')}萬人';
@@ -436,7 +450,7 @@ class _WatchInfoPill extends StatelessWidget {
     final canCopy = copyText != null && copyText!.trim().isNotEmpty;
 
     return Tooltip(
-      message: canCopy ? '點擊複製：$label' : label,
+      message: canCopy ? '${context.vio.t('點擊複製：')}$label' : label,
       child: Material(
         color: Colors.white.withValues(alpha: 0.075),
         borderRadius: BorderRadius.circular(999),
@@ -448,9 +462,9 @@ class _WatchInfoPill extends StatelessWidget {
                     ClipboardData(text: copyText!.trim()),
                   );
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('已複製：$label')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${context.vio.t('已複製：')}$label')),
+                  );
                 }
               : null,
           child: Container(

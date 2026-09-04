@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import 'twitch_prediction_bet_helpers.dart';
 
@@ -28,6 +29,7 @@ class TwitchPredictionBetMetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final choice = viewerChoice;
 
     return Container(
@@ -51,20 +53,23 @@ class TwitchPredictionBetMetaRow extends StatelessWidget {
               color: Colors.orangeAccent,
             ),
           TwitchPredictionBetChip(
-            label: '${twitchPredictionFormatCompact(totalPoints)} 點',
+            label:
+                '${twitchPredictionFormatCompact(totalPoints)} ${l10n.t('點')}',
           ),
           TwitchPredictionBetChip(
-            label: '${twitchPredictionFormatCompact(totalUsers)} 人',
+            label:
+                '${twitchPredictionFormatCompact(totalUsers)} ${l10n.t('人')}',
           ),
           if (choice != null)
             TwitchPredictionBetChip(
-              label: '已下注 ${choice.title.isEmpty ? '此邊' : choice.title}',
+              label:
+                  '${l10n.t('已下注')} ${choice.title.isEmpty ? l10n.t('此邊') : choice.title}',
               color: Colors.greenAccent,
             ),
           if (refreshingGqlFallback)
-            const TwitchPredictionBetChip(
-              label: '同步中',
-              color: Color(0xFF8AB4F8),
+            TwitchPredictionBetChip(
+              label: l10n.t('同步中'),
+              color: const Color(0xFF8AB4F8),
             ),
         ],
       ),
@@ -96,6 +101,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     final total = totalPoints <= 0 ? outcome.points : totalPoints;
     final percent = total <= 0 ? 0.0 : (outcome.points / total).clamp(0.0, 1.0);
     final odds = outcome.points <= 0 || total <= 0
@@ -160,7 +166,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        outcome.title.isEmpty ? '選項' : outcome.title,
+                        outcome.title.isEmpty ? l10n.t('選項') : outcome.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -171,18 +177,18 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                       ),
                     ),
                     if (outcome.isWinner)
-                      const TwitchPredictionBetChip(
-                        label: '勝出',
+                      TwitchPredictionBetChip(
+                        label: l10n.t('勝出'),
                         color: Colors.greenAccent,
                       ),
                     if (selectedByViewer)
-                      const TwitchPredictionBetChip(
-                        label: '已下注',
+                      TwitchPredictionBetChip(
+                        label: l10n.t('已下注'),
                         color: Colors.greenAccent,
                       ),
                     if (lockedByViewerChoice)
-                      const TwitchPredictionBetChip(
-                        label: '已鎖住',
+                      TwitchPredictionBetChip(
+                        label: l10n.t('已鎖住'),
                         color: Colors.white54,
                       ),
                     const SizedBox(width: 8),
@@ -225,22 +231,22 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                     ),
                     TwitchPredictionBetChip(
                       label:
-                          '${twitchPredictionFormatCompact(outcome.points)} 點',
+                          '${twitchPredictionFormatCompact(outcome.points)} ${l10n.t('點')}',
                     ),
                     TwitchPredictionBetChip(
                       label:
-                          '${twitchPredictionFormatCompact(outcome.users)} 人',
+                          '${twitchPredictionFormatCompact(outcome.users)} ${l10n.t('人')}',
                     ),
                     if (outcome.viewerPoints > 0)
                       TwitchPredictionBetChip(
                         label:
-                            '我的 ${twitchPredictionFormatCompact(outcome.viewerPoints)} 點',
+                            '${l10n.t('我的')} ${twitchPredictionFormatCompact(outcome.viewerPoints)} ${l10n.t('點')}',
                         color: Colors.greenAccent,
                       ),
                     if (odds != null)
                       TwitchPredictionBetChip(
                         label:
-                            '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x 賠率',
+                            '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x ${l10n.t('賠率')}',
                         color: TwitchUiColors.sheet.backplate.foreground,
                       ),
                   ],

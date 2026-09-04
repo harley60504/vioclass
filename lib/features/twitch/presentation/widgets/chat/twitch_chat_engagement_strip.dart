@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../localization/vioclass_localizations.dart';
 import 'cards/twitch_pinned_message_banner.dart';
 import 'cards/twitch_prediction_banner.dart';
 import 'twitch_chat_text_style.dart';
@@ -94,7 +95,7 @@ class TwitchChatEngagementStrip extends StatelessWidget {
                 ),
               ),
               child: Text(
-                '聊天室活動暫時讀取失敗，稍後再試。',
+                context.vio.t('聊天室活動暫時讀取失敗，稍後再試。'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: twitchChatTextStyle(

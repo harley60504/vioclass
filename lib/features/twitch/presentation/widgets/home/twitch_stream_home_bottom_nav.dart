@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_stream_home_models.dart';
 
 class TwitchStreamHomeBottomNavigation extends StatelessWidget {
@@ -14,6 +15,7 @@ class TwitchStreamHomeBottomNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return SafeArea(
       top: false,
       child: NavigationBar(
@@ -23,16 +25,16 @@ class TwitchStreamHomeBottomNavigation extends StatelessWidget {
             index == 0 ? TwitchHomeSection.following : TwitchHomeSection.browse,
           );
         },
-        destinations: const <NavigationDestination>[
+        destinations: <NavigationDestination>[
           NavigationDestination(
-            icon: Icon(Icons.favorite_border_rounded),
-            selectedIcon: Icon(Icons.favorite_rounded),
-            label: '追隨',
+            icon: const Icon(Icons.favorite_border_rounded),
+            selectedIcon: const Icon(Icons.favorite_rounded),
+            label: l10n.t('追隨'),
           ),
           NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore_rounded),
-            label: '瀏覽',
+            icon: const Icon(Icons.explore_outlined),
+            selectedIcon: const Icon(Icons.explore_rounded),
+            label: l10n.t('瀏覽'),
           ),
         ],
       ),

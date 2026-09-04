@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../localization/vioclass_localizations.dart';
 import '../pages/twitch_watch_route_guard.dart';
 import '../widgets/watch/player/twitch_player_only_surface.dart';
 import '../widgets/watch/player/twitch_media_kit_video_surface.dart';
@@ -261,7 +262,7 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard> {
                       children: [
                         video,
                         _MiniPlayerFooter(
-                          title: title.isEmpty ? '直播小窗' : title,
+                          title: title.isEmpty ? context.vio.t('直播小窗') : title,
                           subtitle: subtitle,
                           playbackKind: widget.entry.kind,
                           androidPipEnabled: widget.androidPipEnabled,
@@ -297,6 +298,7 @@ class _MiniPlayerFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.vio;
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 2, 8, 8),
       child: Row(
@@ -341,7 +343,7 @@ class _MiniPlayerFooter extends StatelessWidget {
           ),
           if (androidPipEnabled && Platform.isAndroid)
             IconButton(
-              tooltip: '子母畫面',
+              tooltip: l10n.t('子母畫面'),
               onPressed: () async {
                 final entered = await TwitchAndroidPipController.instance
                     .enterPictureInPicture(
@@ -351,13 +353,13 @@ class _MiniPlayerFooter extends StatelessWidget {
                 if (entered || !context.mounted) return;
                 ScaffoldMessenger.maybeOf(
                   context,
-                )?.showSnackBar(const SnackBar(content: Text('目前裝置不支援子母畫面')));
+                )?.showSnackBar(SnackBar(content: Text(l10n.t('目前裝置不支援子母畫面'))));
               },
               icon: const Icon(Icons.picture_in_picture_alt_rounded),
               color: Colors.white70,
             ),
           IconButton(
-            tooltip: '關閉',
+            tooltip: l10n.t('關閉'),
             onPressed: onClose,
             icon: const Icon(Icons.close_rounded),
             color: Colors.white70,
@@ -376,11 +378,11 @@ class _MiniPlaybackKindBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = switch (kind) {
-      TwitchWatchPlaybackKind.live => '直播',
+      TwitchWatchPlaybackKind.live => context.vio.t('直播'),
       TwitchWatchPlaybackKind.liveDvr => 'DVR',
       TwitchWatchPlaybackKind.vod => 'VOD',
-      TwitchWatchPlaybackKind.clip => '片段',
-      TwitchWatchPlaybackKind.none => '播放',
+      TwitchWatchPlaybackKind.clip => context.vio.t('片段'),
+      TwitchWatchPlaybackKind.none => context.vio.t('播放'),
     };
 
     return DecoratedBox(

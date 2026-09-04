@@ -12,9 +12,10 @@ class TwitchRewardLocalizer {
     'First-Time Chatter Highlight': '醒目顯示首次發言',
   };
 
-  static String title(String rawTitle) {
+  static String title(String rawTitle, {bool translateBuiltIns = true}) {
     final clean = rawTitle.trim();
     if (clean.isEmpty) return clean;
+    if (!translateBuiltIns) return clean;
     return _titles[clean] ?? clean;
   }
 

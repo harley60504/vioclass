@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../localization/vioclass_localizations.dart';
 import '../widgets/chat/twitch_chat_text_style.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'chat_message_context/twitch_reply_thread_builder.dart';
@@ -20,6 +21,7 @@ Future<void> showTwitchChatMessageContextSheet({
   TwitchOfficialEmoteCacheService? officialEmotes,
   double fontScale = 1.0,
 }) {
+  final l10n = context.vio;
   final entries = TwitchReplyThreadBuilder.build(
     selectedMessage: selectedMessage,
     messages: messages,
@@ -27,8 +29,8 @@ Future<void> showTwitchChatMessageContextSheet({
 
   return showTwitchUnifiedSheet<void>(
     context: context,
-    title: '回覆串 · ${entries.length}',
-    subtitle: '依回覆關係顯示；提及標記不聚集',
+    title: '${l10n.t('回覆串')} · ${entries.length}',
+    subtitle: l10n.t('依回覆關係顯示；提及標記不聚集'),
     icon: Icons.reply_rounded,
     size: TwitchUnifiedSheetSize.medium,
     showRefresh: false,
