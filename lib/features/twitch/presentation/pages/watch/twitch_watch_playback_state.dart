@@ -48,10 +48,20 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
           : null,
       preferVodReplayChat: preferVodReplayChat,
     );
+    ownedPlaybackForVisibleRoute =
+        TwitchPlaybackSessionController.instance.playableState;
+    TwitchPlaybackSessionController.instance.setRoutePlayback(
+      playbackRouteOwner,
+      ownedPlaybackForVisibleRoute,
+    );
   }
 
   void clearOwnedPlayback() {
     TwitchPlaybackSessionController.instance.clear();
+    ownedPlaybackForVisibleRoute = null;
+    TwitchPlaybackSessionController.instance.clearRoutePlayback(
+      playbackRouteOwner,
+    );
   }
 
   TwitchPlaybackSessionState? buildPlaybackSnapshot() {
@@ -71,6 +81,41 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     }
 
     return state;
+  }
+
+  Future<void> reconcileVisibleRoutePlayback() async {
+    final owned = ownedPlaybackForVisibleRoute;
+    if (owned == null || !owned.playable) return;
+
+    var ownedUri = owned.mediaUri.trim();
+    final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+
+    TwitchPlaybackSessionController.instance.restorePlayback(owned);
+
+    if (owned.kind == TwitchWatchPlaybackKind.live) {
+      final preparedUri = await watchPorts.player.runtime
+          .prepareLowLatencyLiveFromWarmUpstream();
+      if (preparedUri != null) {
+        ownedUri = preparedUri.toString();
+        markOwnedPlayback(
+          kind: TwitchWatchPlaybackKind.live,
+          mediaUri: ownedUri,
+        );
+      }
+    }
+
+    debugPrint(
+      '[WatchPlaybackState] restore visible route playback '
+      'kind=${owned.kind} uri=$ownedUri current=$currentUri',
+    );
+    await TwitchMediaKitPlayerHost.restoreSharedMedia(
+      uri: ownedUri,
+      play: true,
+      forceOpen: true,
+    );
+
+    await preferencesController.applyPlayerVolume();
+    if (mounted) setState(() {});
   }
 
   TwitchWatchPlaybackKind get currentPlaybackKind {

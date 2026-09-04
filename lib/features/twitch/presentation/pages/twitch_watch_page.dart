@@ -196,6 +196,8 @@ class TwitchWatchPage extends StatefulWidget {
 
 class TwitchWatchPageState extends State<TwitchWatchPage>
     with WidgetsBindingObserver {
+  final Object playbackRouteOwner = Object();
+
   late final TextEditingController channelController;
   late final TextEditingController messageController;
   late final TwitchWatchSessionHandles session;
@@ -220,6 +222,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   StreamSubscription<double>? playerVolumeSubscription;
   int watchLoadGeneration = 0;
   TwitchPlaybackSessionState? restorePlaybackOnDispose;
+  TwitchPlaybackSessionState? ownedPlaybackForVisibleRoute;
   bool handedOffToMiniPlayer = false;
   bool leavingToMiniPlayer = false;
   bool reuseCurrentPlaybackOnNextLiveLoad = false;
@@ -458,6 +461,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    TwitchPlaybackSessionController.instance.registerRouteOwner(
+      playbackRouteOwner,
+      onRestore: reconcileVisibleRoutePlayback,
+    );
     reuseCurrentPlaybackOnNextLiveLoad = widget.initialReuseCurrentPlayback;
 
     channelController = TextEditingController(
@@ -648,6 +655,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   @override
   void dispose() {
     watchLoadGeneration++;
+    unawaited(
+      TwitchPlaybackSessionController.instance.restoreAfterUnregisterRouteOwner(
+        playbackRouteOwner,
+      ),
+    );
     WidgetsBinding.instance.removeObserver(this);
     if (!handedOffToMiniPlayer) {
       unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
@@ -683,13 +695,15 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     final restorePlayback = restorePlaybackOnDispose;
     if (handedOffToMiniPlayer) {
       // The shared player is now owned by the in-app mini player.
-    } else if (restorePlayback != null &&
+    } else if (!isPushedMediaPlayback &&
+        restorePlayback != null &&
         restorePlayback.mediaUri.trim().isNotEmpty) {
       TwitchPlaybackSessionController.instance.restorePlayback(restorePlayback);
       unawaited(
         TwitchMediaKitPlayerHost.restoreSharedMedia(
           uri: restorePlayback.mediaUri,
           play: true,
+          forceOpen: true,
         ).catchError((_) {}),
       );
     } else {

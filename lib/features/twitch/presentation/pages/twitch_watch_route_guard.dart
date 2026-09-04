@@ -18,6 +18,7 @@ import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../navigation/twitch_route_observer.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
 import 'twitch_watch_page.dart';
+import 'watch/twitch_watch_playback_state.dart';
 
 class TwitchWatchRouteGuard extends StatefulWidget {
   final TwitchStreamHeaderMetadata initialMetadata;
@@ -73,6 +74,8 @@ class TwitchWatchRouteGuard extends StatefulWidget {
 
 class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
     with RouteAware {
+  final GlobalKey<TwitchWatchPageState> _watchKey =
+      GlobalKey<TwitchWatchPageState>();
   PageRoute<dynamic>? _subscribedRoute;
   bool _pauseIssuedForCurrentLeave = false;
 
@@ -106,9 +109,11 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
 
   @override
   void didPopNext() {
-    // WatchPage became visible again after a route above it was popped.
-    // Do not auto-play here; user/player state decides whether to resume.
     _pauseIssuedForCurrentLeave = false;
+    final watchState = _watchKey.currentState;
+    if (watchState != null) {
+      unawaited(watchState.reconcileVisibleRoutePlayback());
+    }
   }
 
   @override
@@ -151,6 +156,7 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         }
       },
       child: TwitchWatchPage(
+        key: _watchKey,
         initialMetadata: widget.initialMetadata,
         initialChannelLogin: widget.initialChannelLogin,
         initialStreamTitle: widget.initialStreamTitle,

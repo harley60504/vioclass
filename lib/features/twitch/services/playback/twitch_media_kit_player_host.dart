@@ -178,6 +178,7 @@ class TwitchMediaKitPlayerHost {
   static Future<void> restoreSharedMedia({
     required String uri,
     bool play = true,
+    bool forceOpen = false,
   }) async {
     final player = _player;
     if (player == null) return;
@@ -185,7 +186,7 @@ class TwitchMediaKitPlayerHost {
     final safeUri = uri.trim();
     if (safeUri.isEmpty) return;
 
-    if (_currentMediaUri == safeUri) {
+    if (!forceOpen && _currentMediaUri == safeUri) {
       if (play && !player.state.playing) {
         await player.play();
       }

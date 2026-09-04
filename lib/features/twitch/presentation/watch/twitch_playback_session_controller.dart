@@ -52,6 +52,11 @@ class TwitchPlaybackSessionController extends ChangeNotifier {
 
   int _revision = 0;
   TwitchPlaybackSessionState? _state;
+  final List<Object> _routeOwners = <Object>[];
+  final Map<Object, TwitchPlaybackSessionState> _routePlayback =
+      <Object, TwitchPlaybackSessionState>{};
+  final Map<Object, Future<void> Function()> _routeRestoreCallbacks =
+      <Object, Future<void> Function()>{};
 
   TwitchPlaybackSessionState? get state => _state;
 
@@ -67,6 +72,48 @@ class TwitchPlaybackSessionController extends ChangeNotifier {
     final safeUri = mediaUri?.trim();
     if (safeUri == null || safeUri.isEmpty) return null;
     return current.mediaUri.trim() == safeUri ? current : null;
+  }
+
+  void registerRouteOwner(Object owner, {Future<void> Function()? onRestore}) {
+    _routeOwners.removeWhere((candidate) => identical(candidate, owner));
+    _routeOwners.add(owner);
+    if (onRestore != null) {
+      _routeRestoreCallbacks[owner] = onRestore;
+    }
+  }
+
+  void setRoutePlayback(Object owner, TwitchPlaybackSessionState? playback) {
+    registerRouteOwner(owner);
+    if (playback == null || !playback.playable) {
+      _routePlayback.remove(owner);
+    } else {
+      _routePlayback[owner] = playback;
+    }
+  }
+
+  void clearRoutePlayback(Object owner) {
+    _routePlayback.remove(owner);
+  }
+
+  Future<void> restoreAfterUnregisterRouteOwner(Object owner) async {
+    final wasTop =
+        _routeOwners.isNotEmpty && identical(_routeOwners.last, owner);
+    _routeOwners.removeWhere((candidate) => identical(candidate, owner));
+    _routePlayback.remove(owner);
+    _routeRestoreCallbacks.remove(owner);
+    if (!wasTop) return;
+
+    for (final candidate in _routeOwners.reversed) {
+      final playback = _routePlayback[candidate];
+      if (playback == null || !playback.playable) continue;
+      final callback = _routeRestoreCallbacks[candidate];
+      if (callback != null) {
+        await callback();
+        return;
+      }
+      restorePlayback(playback);
+      return;
+    }
   }
 
   void setPlayback({

@@ -115,6 +115,11 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     if (!isCurrentWatchTask(generation, channel)) return false;
     await preferencesController.applyPlayerVolume();
     playbackController.setError(null);
+    ownedPlaybackForVisibleRoute = state;
+    TwitchPlaybackSessionController.instance.setRoutePlayback(
+      playbackRouteOwner,
+      state,
+    );
 
     activeGrowingVodVideo = state.activeDvrVideo;
     currentVodQualityVideo = state.kind == TwitchWatchPlaybackKind.clip

@@ -162,12 +162,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     await router.waitUntilPrewarmed();
 
     _proxy = router;
-    _proxyUrl = router.streamTsUrl;
+    _sharedProxyRevision++;
+    _proxyUrl = _routerStreamTsPlaybackUrl(router);
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
-    _sharedProxyRevision++;
     notifyListeners();
-    return Uri.parse(router.streamTsUrl);
+    return Uri.parse(_proxyUrl!);
   }
 
   /// Stable playback URL for media_kit.
@@ -185,7 +185,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
     final router = _proxy ?? _sharedProxy;
     if (router == null || !router.isRunning) return null;
-    return router.streamTsUrl;
+    return _routerStreamTsPlaybackUrl(router);
   }
 
   Future<Uri?> loadLivePlaylist({
@@ -450,15 +450,15 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _upstreamPlaylistUri = upstreamUri;
       _usingDvrPlaylist = true;
       _usingExternalVodPlayback = false;
-      _proxyUrl = router.streamTsUrl;
+      _proxyUrl = _routerStreamTsPlaybackUrl(router);
       _proxyMpvUrl = _proxyUrl;
       _proxyLiveStatus = null;
       _adAwareStatus = '${_adAwareStatus.trim()} dvr=bridge'.trim();
       debugPrint(
-        '[LiveDvrBridge] routed player=${router.streamTsUrl} '
+        '[LiveDvrBridge] routed player=$_proxyUrl '
         'upstream=${router.upstreamPlaylistUrl}',
       );
-      return Uri.parse(router.streamTsUrl);
+      return Uri.parse(_proxyUrl!);
     }
 
     debugPrint('[LiveDvrBridge] fallback live proxy useDvr=$useDvrPlaylist');
@@ -482,16 +482,18 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
     await router.waitUntilPrewarmed();
 
-    // Keep the player-facing URL stable. Quality/source switching happens
-    // inside TwitchStableHlsProxyRouter.switchUpstream(). This avoids forcing
-    // media_kit to reopen a new local URL and keeps the VideoController surface
-    // attached.
     _usingDvrPlaylist = useDvrPlaylist;
     _currentVariant = probedVariant;
-    _proxyUrl = useDvrPlaylist ? router.playlistUrl : router.streamTsUrl;
+    _proxyUrl = useDvrPlaylist
+        ? router.playlistUrl
+        : _routerStreamTsPlaybackUrl(router);
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
+  }
+
+  String _routerStreamTsPlaybackUrl(TwitchStableHlsProxyRouter router) {
+    return '${router.streamTsUrl}?v=$_sharedProxyRevision';
   }
 
   TwitchStableHlsProxyRouter _createStableRouter() {
