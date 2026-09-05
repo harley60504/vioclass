@@ -73,10 +73,100 @@ class TwitchPredictionHermesRealtimeBus {
   }
 
   static void publishPrediction(TwitchPredictionSnapshot? prediction) {
+    if (prediction != null) {
+      final current = _latestPrediction;
+      if (current != null &&
+          current.hasPrediction &&
+          prediction.hasPrediction &&
+          _samePredictionFamily(current, prediction) &&
+          _isStalePredictionUpdate(current: current, incoming: prediction)) {
+        if (!_predictionController.isClosed) {
+          _predictionController.add(current);
+        }
+        return;
+      }
+    }
+
     _latestPrediction = prediction;
     if (!_predictionController.isClosed) {
       _predictionController.add(prediction);
     }
+  }
+
+  static bool _samePredictionFamily(
+    TwitchPredictionSnapshot current,
+    TwitchPredictionSnapshot incoming,
+  ) {
+    final currentId = current.id.trim();
+    final incomingId = incoming.id.trim();
+    if (currentId.isNotEmpty && incomingId.isNotEmpty) {
+      return currentId == incomingId;
+    }
+
+    final currentTitle = current.title.trim();
+    final incomingTitle = incoming.title.trim();
+    if (currentTitle.isNotEmpty && incomingTitle.isNotEmpty) {
+      return currentTitle == incomingTitle;
+    }
+
+    return true;
+  }
+
+  static bool _isStalePredictionUpdate({
+    required TwitchPredictionSnapshot current,
+    required TwitchPredictionSnapshot incoming,
+  }) {
+    final currentRank = _predictionStatusRank(current);
+    final incomingRank = _predictionStatusRank(incoming);
+    if (incomingRank < currentRank) return true;
+    if (incomingRank > currentRank) return false;
+
+    final currentPoints = _predictionPointTotal(current);
+    final incomingPoints = _predictionPointTotal(incoming);
+    if (incomingPoints < currentPoints) return true;
+    if (incomingPoints > currentPoints) return false;
+
+    final currentUsers = _predictionUserTotal(current);
+    final incomingUsers = _predictionUserTotal(incoming);
+    if (incomingUsers < currentUsers) return true;
+    if (incomingUsers > currentUsers) return false;
+
+    final currentEndedAt = current.endedAt;
+    final incomingEndedAt = incoming.endedAt;
+    if (currentEndedAt != null && incomingEndedAt == null) return true;
+    if (currentEndedAt != null &&
+        incomingEndedAt != null &&
+        incomingEndedAt.isBefore(currentEndedAt)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static int _predictionStatusRank(TwitchPredictionSnapshot prediction) {
+    final status = prediction.normalizedStatus;
+    if (status.contains('RESOLVED') ||
+        status.contains('CANCELED') ||
+        status.contains('CANCELLED') ||
+        status.contains('REFUNDED')) {
+      return 4;
+    }
+    if (status.contains('ENDED')) return 3;
+    if (status.contains('LOCKED') || status.contains('RESOLVE_PENDING')) {
+      return 2;
+    }
+    if (status == 'ACTIVE' || status == 'OPEN' || status.isEmpty) return 1;
+    return 0;
+  }
+
+  static int _predictionPointTotal(TwitchPredictionSnapshot prediction) {
+    if (prediction.totalPoints > 0) return prediction.totalPoints;
+    return prediction.outcomes.fold<int>(0, (sum, item) => sum + item.points);
+  }
+
+  static int _predictionUserTotal(TwitchPredictionSnapshot prediction) {
+    if (prediction.totalUsers > 0) return prediction.totalUsers;
+    return prediction.outcomes.fold<int>(0, (sum, item) => sum + item.users);
   }
 
   static void publishRedemption(TwitchCommunityRedemptionEvent redemption) {

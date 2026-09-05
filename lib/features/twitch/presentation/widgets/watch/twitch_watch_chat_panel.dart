@@ -252,6 +252,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       if (!_hasObservedPredictionThisSession) {
         _hasObservedPredictionThisSession = true;
         if (_shouldSuppressFirstPredictionObservation(
+          prediction: prediction,
           sourceRealtime: sourceRealtime,
         )) {
           _setShowPrediction(false, persist: true, rebuild: false);
@@ -290,8 +291,10 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   }
 
   bool _shouldSuppressFirstPredictionObservation({
+    required TwitchPredictionSnapshot? prediction,
     required bool sourceRealtime,
   }) {
+    if (!_shouldAutoHidePredictionBanner(prediction)) return false;
     if (!sourceRealtime) return true;
     final age = DateTime.now().difference(_predictionPanelMountedAt);
     return age <= _initialPredictionSuppressWindow;
@@ -313,8 +316,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
       _hasObservedPredictionThisSession = false;
     }
 
-    showPrediction = false;
-    _showPredictionByChannel[key] = false;
+    showPrediction =
+        prediction != null && !_shouldAutoHidePredictionBanner(prediction);
+    _showPredictionByChannel[key] = showPrediction;
   }
 
   String _keyForWidget(TwitchWatchChatPanel widget) {

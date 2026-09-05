@@ -34,6 +34,8 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   TwitchPredictionSnapshot? prediction;
   List<dynamic> pinnedMessages = const <dynamic>[];
   bool _disposed = false;
+  late final StreamSubscription<TwitchPredictionSnapshot?>
+  _predictionSubscription;
 
   TwitchWatchEngagementController({
     required this.emotesPort,
@@ -51,7 +53,10 @@ class TwitchWatchEngagementController extends ChangeNotifier {
                  const TwitchHypeTrainApiService(),
              isCurrentChannel: (login) =>
                  login.trim().toLowerCase() == channelLogin(),
-           );
+           ) {
+    _predictionSubscription = TwitchPredictionHermesRealtimeBus.predictionStream
+        .listen(_handleRealtimePrediction);
+  }
 
   void ensureChannelPointPolling({
     required int generation,
@@ -133,7 +138,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     if (snapshot.channelPoints != null) {
       channelPointsSnapshot = snapshot.channelPoints;
     }
-    if (snapshot.prediction != null) prediction = snapshot.prediction;
+    _applyPrediction(snapshot.prediction, notify: false);
     final realtimeChannelId =
         snapshot.channelPoints?.channelId ?? currentChannelId;
     if (realtimeChannelId != null && realtimeChannelId.trim().isNotEmpty) {
@@ -320,6 +325,64 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     _notifyListenersIfAlive();
   }
 
+  void _handleRealtimePrediction(TwitchPredictionSnapshot? snapshot) {
+    _applyPrediction(snapshot);
+  }
+
+  void _applyPrediction(
+    TwitchPredictionSnapshot? snapshot, {
+    bool notify = true,
+  }) {
+    if (_disposed || snapshot == null || !snapshot.hasPrediction) return;
+
+    final current = prediction;
+    if (current != null &&
+        current.hasPrediction &&
+        !_shouldAcceptPrediction(snapshot, current: current)) {
+      return;
+    }
+
+    prediction = snapshot;
+    if (notify) _notifyListenersIfAlive();
+  }
+
+  bool _shouldAcceptPrediction(
+    TwitchPredictionSnapshot snapshot, {
+    required TwitchPredictionSnapshot current,
+  }) {
+    if (_samePredictionFamily(current, snapshot)) return true;
+
+    final currentCreatedAt = current.createdAt;
+    final nextCreatedAt = snapshot.createdAt;
+    if (currentCreatedAt != null &&
+        nextCreatedAt != null &&
+        nextCreatedAt.isBefore(currentCreatedAt)) {
+      return false;
+    }
+
+    final status = snapshot.normalizedStatus;
+    return status == 'ACTIVE' || status == 'OPEN';
+  }
+
+  bool _samePredictionFamily(
+    TwitchPredictionSnapshot current,
+    TwitchPredictionSnapshot next,
+  ) {
+    final currentId = current.id.trim();
+    final nextId = next.id.trim();
+    if (currentId.isNotEmpty && nextId.isNotEmpty) {
+      return currentId == nextId;
+    }
+
+    final currentTitle = current.title.trim();
+    final nextTitle = next.title.trim();
+    if (currentTitle.isNotEmpty && nextTitle.isNotEmpty) {
+      return currentTitle == nextTitle;
+    }
+
+    return true;
+  }
+
   void _notifyListenersIfAlive() {
     if (_disposed) return;
     notifyListeners();
@@ -331,6 +394,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     for (final timer in _channelPointPollingTimerByState.values) {
       timer.cancel();
     }
+    _predictionSubscription.cancel();
     hypeTrainController.dispose();
     super.dispose();
   }

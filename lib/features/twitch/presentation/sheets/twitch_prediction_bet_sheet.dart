@@ -360,10 +360,17 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
       final merged = _mergeIncomingPrediction(refreshed);
       _rememberViewerPredictionFrom(merged);
       TwitchPredictionHermesRealtimeBus.publishPrediction(merged);
+      final latest = TwitchPredictionHermesRealtimeBus.latestPrediction;
+      final visible =
+          latest != null &&
+              latest.hasPrediction &&
+              _samePredictionFamily(merged, latest)
+          ? _mergeIncomingPrediction(latest)
+          : merged;
 
       if (mounted) {
         setState(() {
-          _visiblePrediction = merged;
+          _visiblePrediction = visible;
         });
       }
     } catch (_) {
