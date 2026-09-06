@@ -614,6 +614,23 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final currentVideo = activeGrowingVodVideo;
     if (currentVideo == null) return false;
 
+    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+      final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+      final runtimeUri = watchPorts.player.runtime.proxyMpvUrl?.trim();
+      if (currentUri != null &&
+          currentUri.isNotEmpty &&
+          runtimeUri != null &&
+          runtimeUri.isNotEmpty &&
+          currentUri == runtimeUri) {
+        debugPrint('[LiveDvrBridge] foreground keeps current dvr playback');
+        final player = playerSession.playerOrNull;
+        if (player != null && !player.state.playing) {
+          await player.play();
+        }
+        return true;
+      }
+    }
+
     final ratio = watchPorts.player.runtime.liveDvrBridgeTimelineRatio ?? 0.92;
     final freshVideo =
         await _fetchCurrentDvrVideoSnapshot(
@@ -795,13 +812,17 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }
 
   Future<void> returnToLivePlayback() async {
-    debugPrint('[LiveDvrBridge] return to low-latency live requested');
     if (watchPorts.player.runtime.usingLiveDvrBridge) {
+      debugPrint('[LiveDvrBridge] return to low-latency live requested');
       await switchToLowLatencyLivePlayback();
       return;
     }
-    if (!watchPorts.player.runtime.usingExternalVodPlayback) return;
+    if (!watchPorts.player.runtime.usingExternalVodPlayback) {
+      debugPrint('[LiveDvrBridge] return to low-latency live ignored');
+      return;
+    }
 
+    debugPrint('[LiveDvrBridge] return external replay to low-latency live');
     _clearExternalReplaySelection();
     await switchToLowLatencyLivePlayback();
   }

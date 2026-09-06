@@ -111,7 +111,7 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     await TwitchMediaKitPlayerHost.restoreSharedMedia(
       uri: ownedUri,
       play: true,
-      forceOpen: true,
+      forceOpen: currentUri != ownedUri,
     );
 
     await preferencesController.applyPlayerVolume();

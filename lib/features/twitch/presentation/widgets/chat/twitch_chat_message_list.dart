@@ -126,7 +126,6 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
     super.initState();
     _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
     _scrollController.addListener(_handleScrollChanged);
-    _scheduleFollowLatest(animated: false);
   }
 
   @override
@@ -139,7 +138,6 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
       _bufferFlushTimer?.cancel();
       _pendingBufferedSourceMessages = null;
       _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
-      _scheduleFollowLatest(animated: false);
       return;
     }
 
@@ -200,7 +198,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
     _lastSourceNewestFingerprint = sourceNewestFingerprint;
 
     final nearLatest = _isNearLatest;
-    final shouldAutoFollow = _autoScroll || nearLatest;
+    final shouldAutoFollow = nearLatest;
 
     if (shouldAutoFollow) {
       _autoScroll = true;
@@ -229,8 +227,6 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
         _hiddenNewMessageCount = 0;
         _visibleMessages = _renderMessagesForCurrentMode(sourceMessages);
       });
-
-      _scheduleFollowLatest(animated: false);
     });
   }
 
@@ -302,7 +298,6 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
         );
         _hiddenNewMessageCount = 0;
       });
-      _scheduleFollowLatest(animated: false);
       return;
     }
 

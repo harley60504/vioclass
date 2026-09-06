@@ -3,6 +3,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../../localization/vioclass_localizations.dart';
+import 'twitch_time_jump_sheet.dart';
 
 const double _liveEdgeSnapRatio = 0.995;
 
@@ -114,6 +115,34 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         ? Colors.orangeAccent
                         : Colors.white60;
                     final liveLabelActive = value >= _liveEdgeSnapRatio;
+                    final canJumpByTime =
+                        canScrubTimeline &&
+                        displayDuration.inMilliseconds > 500;
+
+                    Future<void> openTimeJumpSheet() async {
+                      final target = await showTwitchTimeJumpSheet(
+                        context: context,
+                        current: previewPosition,
+                        duration: displayDuration,
+                        liveTail: true,
+                      );
+                      if (target == null || !context.mounted) return;
+
+                      final next =
+                          target.inMilliseconds /
+                          displayDuration.inMilliseconds;
+                      final ratio = next.clamp(0.0, 1.0).toDouble();
+                      setState(() {
+                        _dragging = false;
+                        _dragValue = null;
+                        _livePinned = ratio >= _liveEdgeSnapRatio;
+                      });
+
+                      if (ratio < _liveEdgeSnapRatio &&
+                          widget.onOpenDvrReplayAt != null) {
+                        widget.onOpenDvrReplayAt!(ratio);
+                      }
+                    }
 
                     return Row(
                       children: [
@@ -182,19 +211,28 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                               minWidth: compact ? 82 : 108,
                               maxWidth: compact ? 104 : 136,
                             ),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: compact ? 4 : 6,
-                                vertical: compact ? 5 : 6,
-                              ),
-                              child: _TimelineTimeText(
-                                positionText: positionText,
-                                tailText: durationText,
-                                liveTail: true,
-                                liveTailActive: liveLabelActive,
-                                textAlign: TextAlign.right,
-                                color: timeColor,
-                                fontSize: compact ? 11 : 12,
+                            child: MouseRegion(
+                              cursor: canJumpByTime
+                                  ? SystemMouseCursors.click
+                                  : MouseCursor.defer,
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: canJumpByTime ? openTimeJumpSheet : null,
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: compact ? 4 : 6,
+                                    vertical: compact ? 5 : 6,
+                                  ),
+                                  child: _TimelineTimeText(
+                                    positionText: positionText,
+                                    tailText: durationText,
+                                    liveTail: true,
+                                    liveTailActive: liveLabelActive,
+                                    textAlign: TextAlign.right,
+                                    color: timeColor,
+                                    fontSize: compact ? 11 : 12,
+                                  ),
+                                ),
                               ),
                             ),
                           ),

@@ -12,6 +12,7 @@ import 'twitch_playlist_player_runtime.dart';
 
 class TwitchLiveDvrBridgeProxy {
   static const double liveEdgeRatio = 0.995;
+  static const double maxReplayRatio = liveEdgeRatio - 0.01;
 
   final Dio _dio;
   final HttpClient _client = HttpClient()
@@ -85,19 +86,20 @@ class TwitchLiveDvrBridgeProxy {
   }
 
   String seekToRatio(double ratio) {
-    _seekRatio = ratio.clamp(0.0, liveEdgeRatio - 0.01).toDouble();
+    _seekRatio = ratio.clamp(0.0, maxReplayRatio).toDouble();
     _dvrSeekStartIndex = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
     debugPrint(
       '[LiveDvrBridge] seek ratio=${ratio.toStringAsFixed(3)} '
+      'stored=${_seekRatio.toStringAsFixed(3)} '
       'generation=$_streamGeneration',
     );
     return streamTsPlaybackUrl;
   }
 
   void updateTimelineRatio(double ratio) {
-    _seekRatio = ratio.clamp(0.0, liveEdgeRatio - 0.01).toDouble();
+    _seekRatio = ratio.clamp(0.0, maxReplayRatio).toDouble();
   }
 
   Future<void> close() async {

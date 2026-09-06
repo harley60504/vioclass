@@ -569,20 +569,19 @@ class _PanelSection extends StatelessWidget {
         LayoutBuilder(
           builder: (context, constraints) {
             final columns = (constraints.maxWidth / 330).floor().clamp(1, 3);
-            final panelHeight = columns == 1 ? 340.0 : 314.0;
-            return GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: panels.length,
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: columns,
-                mainAxisExtent: panelHeight,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-              ),
-              itemBuilder: (context, index) {
-                return _PanelCard(panel: panels[index]);
-              },
+            final cardWidth =
+                (constraints.maxWidth - (columns - 1) * 14) / columns;
+            return Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: panels
+                  .map(
+                    (panel) => SizedBox(
+                      width: cardWidth,
+                      child: _PanelCard(panel: panel),
+                    ),
+                  )
+                  .toList(growable: false),
             );
           },
         ),
@@ -712,20 +711,19 @@ class _PanelCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              AspectRatio(
+                aspectRatio: 16 / 9,
                 child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return TwitchCachedImageLayer(
-                      imageUrl: imageUrl,
-                      width: constraints.maxWidth,
-                      height: constraints.maxHeight,
-                      fit: BoxFit.contain,
-                      fallbackColor: Colors.white.withValues(alpha: 0.045),
-                      fallbackIcon: Icons.article_outlined,
-                      fallbackIconColor: Colors.white38,
-                      fallbackIconSize: 34,
-                    );
-                  },
+                  builder: (context, constraints) => TwitchCachedImageLayer(
+                    imageUrl: imageUrl,
+                    width: constraints.maxWidth,
+                    height: constraints.maxHeight,
+                    fit: BoxFit.contain,
+                    fallbackColor: Colors.white.withValues(alpha: 0.045),
+                    fallbackIcon: Icons.article_outlined,
+                    fallbackIconColor: Colors.white38,
+                    fallbackIconSize: 34,
+                  ),
                 ),
               ),
               if (panel.title.isNotEmpty ||
@@ -738,8 +736,6 @@ class _PanelCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           _panelLabel(context, panel),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 12,

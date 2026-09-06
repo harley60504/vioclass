@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/playback/twitch_playback_api_service.dart';
@@ -15,6 +16,7 @@ import 'twitch_stable_hls_proxy_router.dart';
 class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   final TwitchPlaybackApiService playbackApi;
   final Dio _dio;
+  bool _disposed = false;
 
   static const Map<String, String> defaultUpstreamHeaders = <String, String>{
     'Accept': 'application/x-mpegURL, application/vnd.apple.mpegurl, */*',
@@ -791,8 +793,15 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingExternalVodPlayback = false;
     _liveDvrPlaylistOverride = null;
     debugPrint('[LiveDvrBridge] stream seek player=$playbackUrl');
-    notifyListeners();
+    _notifyListenersAfterFrame();
     return playbackUrl;
+  }
+
+  void _notifyListenersAfterFrame() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (_disposed || !hasListeners) return;
+      notifyListeners();
+    });
   }
 
   Future<void> _stopProxy({bool notify = true, bool closeShared = true}) async {
@@ -1079,6 +1088,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _dio.close(force: true);
     unawaited(_stopProxy(notify: false, closeShared: false));
     super.dispose();
