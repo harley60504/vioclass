@@ -123,13 +123,9 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
             final liveTailActive =
                 widget.showLiveEdgeLabel && value >= _liveEdgeSnapRatio;
             final durationText = hasDuration
-                ? widget.showLiveEdgeLabel
-                      ? _formatCoarseDuration(displayDuration)
-                      : _formatDuration(displayDuration)
+                ? _formatDuration(displayDuration)
                 : '--:--';
-            final positionText = widget.showLiveEdgeLabel
-                ? _formatCoarseDuration(previewPosition)
-                : _formatDuration(previewPosition);
+            final positionText = _formatDuration(previewPosition);
             final tailText = widget.showLiveEdgeLabel
                 ? context.vio.t('直播')
                 : durationText;
@@ -304,7 +300,6 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                               : null,
                           liveActive: liveTailActive,
                           canReturnToLive: canTapLiveTail,
-                          hideSeconds: widget.showLiveEdgeLabel,
                           onJump: jumpToTarget,
                           onReturnToLive: () {
                             setState(() {
@@ -363,23 +358,12 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
   }
 }
 
-String _formatCoarseDuration(Duration duration) {
-  final totalMinutes = (duration.inSeconds / 60).floor();
-  final hours = totalMinutes ~/ 60;
-  final minutes = totalMinutes % 60;
-  if (hours > 0) {
-    return '$hours:${minutes.toString().padLeft(2, '0')}';
-  }
-  return '$minutes分';
-}
-
 class _InlineTimelineTimeControls extends StatefulWidget {
   final Duration current;
   final Duration duration;
   final String? liveText;
   final bool liveActive;
   final bool canReturnToLive;
-  final bool hideSeconds;
   final ValueChanged<Duration> onJump;
   final VoidCallback onReturnToLive;
 
@@ -389,7 +373,6 @@ class _InlineTimelineTimeControls extends StatefulWidget {
     required this.liveText,
     required this.liveActive,
     required this.canReturnToLive,
-    required this.hideSeconds,
     required this.onJump,
     required this.onReturnToLive,
   });
@@ -521,20 +504,12 @@ class _InlineTimelineTimeControlsState
             controller: _controller,
             focusNode: _focusNode,
             style: textStyle,
-            displayText: widget.hideSeconds
-                ? _formatCoarseDuration(widget.current)
-                : null,
             onTap: _startEditing,
             onSubmitted: _submit,
             onEditingComplete: _submit,
           ),
           Text(' / ', style: textStyle),
-          Text(
-            widget.hideSeconds
-                ? _formatCoarseDuration(widget.duration)
-                : _formatTimeline(widget.duration),
-            style: textStyle,
-          ),
+          Text(_formatTimeline(widget.duration), style: textStyle),
           if (widget.liveText != null) ...[
             const SizedBox(width: 8),
             _InlineLiveButton(
@@ -560,7 +535,6 @@ class _InlineTimeValue extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final TextStyle style;
-  final String? displayText;
   final VoidCallback onTap;
   final VoidCallback onSubmitted;
   final VoidCallback onEditingComplete;
@@ -570,7 +544,6 @@ class _InlineTimeValue extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.style,
-    this.displayText,
     required this.onTap,
     required this.onSubmitted,
     required this.onEditingComplete,
@@ -607,7 +580,7 @@ class _InlineTimeValue extends StatelessWidget {
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
-          child: Text(displayText ?? controller.text, style: style),
+          child: Text(controller.text, style: style),
         ),
       ),
     );
