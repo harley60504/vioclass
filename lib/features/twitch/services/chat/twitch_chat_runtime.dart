@@ -70,6 +70,8 @@ class TwitchChatRuntime extends ChangeNotifier {
   String _viewerLogin = '';
   String _viewerDisplayName = '';
   String _viewerUserId = '';
+  String? _accessToken;
+  String? _ircNick;
   bool _connecting = false;
   bool _connected = false;
   Object? _error;
@@ -113,6 +115,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     String? viewerLogin,
     String? viewerDisplayName,
     String? viewerUserId,
+    bool preserveMessages = false,
   }) async {
     final login = channelLogin.trim().toLowerCase();
     if (login.isEmpty) {
@@ -134,6 +137,8 @@ class TwitchChatRuntime extends ChangeNotifier {
     _viewerDisplayName = (viewerDisplayName ?? viewerLogin ?? ircNick ?? '')
         .trim();
     _viewerUserId = (viewerUserId ?? '').trim();
+    _accessToken = accessToken;
+    _ircNick = ircNick;
 
     _connecting = true;
     _connected = false;
@@ -145,11 +150,13 @@ class TwitchChatRuntime extends ChangeNotifier {
     _rejectedOutgoingCount = 0;
 
     _notifyBatcher.cancel();
-    _messages.clear();
+    if (!preserveMessages) {
+      _messages.clear();
+      _seenMessageIds.clear();
+      _seenMessageFingerprints.clear();
+      _deletedMessageIds.clear();
+    }
     _clearPendingOutgoingMessages();
-    _seenMessageIds.clear();
-    _seenMessageFingerprints.clear();
-    _deletedMessageIds.clear();
     _ownUserStateTags.clear();
 
     notifyListeners();
@@ -231,6 +238,21 @@ class TwitchChatRuntime extends ChangeNotifier {
       _connecting = false;
       notifyListeners();
     }
+  }
+
+  Future<void> reconnect() async {
+    if (_connecting || _channelLogin.isEmpty) return;
+
+    await connect(
+      channelLogin: _channelLogin,
+      accessToken: _accessToken,
+      preloadRecentMessages: false,
+      ircNick: _ircNick,
+      viewerLogin: _viewerLogin,
+      viewerDisplayName: _viewerDisplayName,
+      viewerUserId: _viewerUserId,
+      preserveMessages: true,
+    );
   }
 
   String _resolveIrcNick(String? ircNick) {

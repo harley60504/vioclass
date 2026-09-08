@@ -126,7 +126,7 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     return state;
   }
 
-  Future<void> reconcileVisibleRoutePlayback() async {
+  Future<void> reconcileVisibleRoutePlayback({bool forceOpen = false}) async {
     final session = TwitchPlaybackSessionController.instance;
     if (!session.isTopRouteOwner(playbackRouteOwner)) return;
 
@@ -137,6 +137,7 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
 
     var ownedUri = owned.mediaUri.trim();
     final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+    final previousPosition = playerSession.playerOrNull?.state.position;
 
     ownedPlaybackForVisibleRoute = owned;
     applyPlaybackSessionStateToPage(owned);
@@ -161,8 +162,14 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     await TwitchMediaKitPlayerHost.restoreSharedMedia(
       uri: ownedUri,
       play: true,
-      forceOpen: currentUri != ownedUri,
+      forceOpen: forceOpen || currentUri != ownedUri,
     );
+    if (forceOpen &&
+        owned.kind != TwitchWatchPlaybackKind.live &&
+        previousPosition != null &&
+        previousPosition > Duration.zero) {
+      await playerSession.player.seek(previousPosition);
+    }
 
     await preferencesController.applyPlayerVolume();
     if (mounted) setState(() {});

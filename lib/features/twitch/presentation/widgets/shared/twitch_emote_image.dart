@@ -282,6 +282,15 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
       ]);
     }
 
+    if (!widget.isAnimated) {
+      return uniqueUrls(<String>[
+        widget.imageUrl,
+        staticUrl,
+        TwitchEmoteImage.officialDefaultEmoteUrl(widget.id),
+        TwitchEmoteImage.officialStaticEmoteUrl(widget.id),
+      ]);
+    }
+
     return uniqueUrls(<String>[
       TwitchEmoteImage.officialAnimatedEmoteUrl(widget.id),
       widget.imageUrl,

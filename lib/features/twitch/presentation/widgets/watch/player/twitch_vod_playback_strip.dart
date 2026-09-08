@@ -16,7 +16,6 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
   final Duration? liveTimelineDuration;
   final DateTime? liveTimelineStartedAt;
   final Duration? timelinePosition;
-  final bool timelinePositionAdvancesWithPlayer;
   final bool timelineEnabled;
   final TwitchPlaybackTimelineController? timelineController;
   final TwitchWatchPlaybackKind playbackKind;
@@ -32,7 +31,6 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
     this.liveTimelineDuration,
     this.liveTimelineStartedAt,
     this.timelinePosition,
-    this.timelinePositionAdvancesWithPlayer = false,
     this.timelineEnabled = true,
     this.timelineController,
     this.playbackKind = TwitchWatchPlaybackKind.vod,
@@ -48,83 +46,9 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
   bool _dragging = false;
   double? _dragValue;
   double? _scrubbedTimelineValue;
-  Timer? _timelineClock;
-  Duration? _timelineClockBase;
-  Duration _timelineClockElapsed = Duration.zero;
-  DateTime? _timelineClockLastTickAt;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncTimelineClock();
-  }
-
-  @override
-  void didUpdateWidget(covariant TwitchVodPlaybackStrip oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.timelinePosition != widget.timelinePosition ||
-        oldWidget.timelinePositionAdvancesWithPlayer !=
-            widget.timelinePositionAdvancesWithPlayer ||
-        oldWidget.showLiveEdgeLabel != widget.showLiveEdgeLabel ||
-        oldWidget.forceLiveEdge != widget.forceLiveEdge) {
-      _syncTimelineClock();
-    }
-  }
-
-  @override
-  void dispose() {
-    _timelineClock?.cancel();
-    super.dispose();
-  }
-
-  void _syncTimelineClock() {
-    final shouldTick =
-        widget.timelinePositionAdvancesWithPlayer &&
-        widget.timelinePosition != null &&
-        (widget.showLiveEdgeLabel || widget.forceLiveEdge);
-    if (!shouldTick) {
-      _timelineClock?.cancel();
-      _timelineClock = null;
-      _timelineClockBase = null;
-      _timelineClockElapsed = Duration.zero;
-      _timelineClockLastTickAt = null;
-      return;
-    }
-
-    _timelineClockBase = widget.timelinePosition;
-    _timelineClockElapsed = Duration.zero;
-    _timelineClockLastTickAt = DateTime.now();
-    _timelineClock ??= Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      if (_dragging) return;
-      final now = DateTime.now();
-      if (player.state.playing) {
-        final lastTick = _timelineClockLastTickAt ?? now;
-        final delta = now.difference(lastTick);
-        if (!delta.isNegative) {
-          _timelineClockElapsed += delta;
-        }
-      }
-      _timelineClockLastTickAt = now;
-      setState(() {});
-    });
-  }
-
-  Duration? _advancedTimelinePosition(Duration displayDuration) {
-    final base = _timelineClockBase ?? widget.timelinePosition;
-    if (base == null || displayDuration.inMilliseconds <= 0) return null;
-    final elapsed = widget.timelinePositionAdvancesWithPlayer
-        ? _timelineClockElapsed
-        : Duration.zero;
-    return Duration(
-      milliseconds: (base.inMilliseconds + elapsed.inMilliseconds)
-          .clamp(0, displayDuration.inMilliseconds)
-          .toInt(),
-    );
-  }
 
   Duration? _effectiveLiveTimelineDuration() {
     final base = widget.liveTimelineDuration;
@@ -179,8 +103,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                 final controlledPosition = widget.timelineController
                     ?.positionFor(displayDuration);
                 final advancedExternalPosition = !_dragging && hasDuration
-                    ? controlledPosition ??
-                          _advancedTimelinePosition(displayDuration)
+                    ? controlledPosition ?? widget.timelinePosition
                     : widget.timelinePosition;
                 final externalValue =
                     advancedExternalPosition != null &&

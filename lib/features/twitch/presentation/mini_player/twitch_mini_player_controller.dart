@@ -34,6 +34,7 @@ class TwitchMiniPlayerController extends ChangeNotifier {
 
   TwitchMiniPlayerEntry? _entry;
   TwitchMediaKitPlayerSession? _activeSession;
+  bool _wasPlayingBeforeNetworkLoss = false;
 
   TwitchMiniPlayerEntry? get entry => _entry;
   bool get isActive => _entry != null;
@@ -115,5 +116,35 @@ class TwitchMiniPlayerController extends ChangeNotifier {
       unawaited(TwitchMediaKitPlayerHost.pauseShared().catchError((_) {}));
     }
     notifyListeners();
+  }
+
+  void rememberNetworkLoss() {
+    _wasPlayingBeforeNetworkLoss =
+        _entry != null &&
+        (_activeSession?.playerOrNull?.state.playing ?? false);
+  }
+
+  Future<void> recoverAfterNetworkRestored() async {
+    final activeEntry = _entry;
+    final session = _activeSession;
+    final player = session?.playerOrNull;
+    final shouldResume = _wasPlayingBeforeNetworkLoss;
+    _wasPlayingBeforeNetworkLoss = false;
+    if (!shouldResume ||
+        activeEntry == null ||
+        session == null ||
+        player == null) {
+      return;
+    }
+
+    final position = player.state.position;
+    await TwitchMediaKitPlayerHost.restoreSharedMedia(
+      uri: activeEntry.mediaUri,
+      forceOpen: true,
+    );
+    if (activeEntry.kind != TwitchWatchPlaybackKind.live &&
+        position > Duration.zero) {
+      await player.seek(position);
+    }
   }
 }

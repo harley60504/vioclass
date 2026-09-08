@@ -179,6 +179,22 @@ class TwitchDiscoveryService {
     return page;
   }
 
+  Future<TwitchLiveStream?> fetchLiveStream({required String login}) async {
+    final cleanLogin = login.trim().toLowerCase();
+    if (cleanLogin.isEmpty) return null;
+
+    final auth = await resolveViewerAuth();
+    final raw = await client.getJson<Map<String, dynamic>>(
+      '${TwitchApiConstants.helixBaseUrl}/streams',
+      queryParameters: <String, dynamic>{'user_login': cleanLogin, 'first': 1},
+      headers: _helixHeaders(auth),
+    );
+    final streams = _parseStreamPage(raw).streams;
+    if (streams.isEmpty) return null;
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(streams);
+    return streams.first;
+  }
+
   Future<TwitchChannelSearchResult> searchChannels({
     required String query,
     int first = 40,
@@ -229,8 +245,9 @@ class TwitchDiscoveryService {
       auth: auth,
       channels: parsed.offlineChannels,
     );
-    TwitchChannelSnapshotCache.instance
-        .rememberFollowedChannels(offlineWithProfiles);
+    TwitchChannelSnapshotCache.instance.rememberFollowedChannels(
+      offlineWithProfiles,
+    );
     return TwitchChannelSearchResult(
       liveStreams: liveStreams,
       offlineChannels: offlineWithProfiles,

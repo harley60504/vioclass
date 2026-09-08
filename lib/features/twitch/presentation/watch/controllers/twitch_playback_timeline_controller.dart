@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../services/connectivity/vioclass_connectivity_service.dart';
+
 enum TwitchPlaybackTimelineMode { live, liveDvr, vod, clip }
 
 class TwitchPlaybackTimelineSnapshot {
@@ -23,21 +25,19 @@ class TwitchPlaybackTimelineSnapshot {
 }
 
 class TwitchPlaybackTimelineController extends ChangeNotifier {
-  static const Duration _tickInterval = Duration(milliseconds: 500);
   static const Duration _seekCommitDelay = Duration(milliseconds: 420);
+  static const Duration _playbackTickInterval = Duration(milliseconds: 250);
 
-  Timer? _timer;
   Timer? _pendingSeekTimer;
+  Timer? _playbackTimer;
   TwitchPlaybackTimelineMode? _mode;
   Duration? _position;
   Duration? _duration;
   Duration? _pendingSeekTarget;
-  bool _advancesWithPlayback = false;
-  bool _playing = false;
+  DateTime? _lastPlaybackTickAt;
   bool _dragging = false;
   bool _timelineEnabled = true;
-  DateTime? _lastTickAt;
-  DateTime? _liveStartedAt;
+  bool _advancing = false;
 
   TwitchPlaybackTimelineSnapshot get snapshot {
     final mode = _mode ?? TwitchPlaybackTimelineMode.live;
@@ -58,36 +58,40 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
   void configure({
     required TwitchPlaybackTimelineMode mode,
-    required bool playing,
-    required bool advancesWithPlayback,
     required bool timelineEnabled,
+    required bool advancing,
     Duration? position,
     Duration? duration,
-    DateTime? liveStartedAt,
   }) {
-    final effectiveDuration = _effectiveLiveDuration(duration, liveStartedAt);
     final previousMode = _mode;
     final modeChanged = previousMode != mode;
 
     _mode = mode;
-    _playing = playing;
-    _advancesWithPlayback = advancesWithPlayback;
     _timelineEnabled = timelineEnabled;
-    _liveStartedAt = liveStartedAt;
-    _duration = effectiveDuration;
+    _advancing = advancing;
 
-    if (!_dragging) {
-      if (modeChanged || !advancesWithPlayback || _position == null) {
+    if (mode == TwitchPlaybackTimelineMode.liveDvr) {
+      if (modeChanged) {
+        _duration = duration;
         _position = _clampPosition(
           position ?? _fallbackPosition(mode),
           _duration,
         );
-      } else if (position != null && _shouldAcceptExternalPosition(position)) {
-        _position = _clampPosition(position, _duration);
+      } else if (duration != null &&
+          (_duration == null || duration > _duration!)) {
+        _duration = duration;
+      }
+    } else {
+      _duration = duration;
+      if (!_dragging && _pendingSeekTarget == null) {
+        _position = _clampPosition(
+          position ?? _fallbackPosition(mode),
+          _duration,
+        );
       }
     }
 
-    _syncTimer();
+    _syncPlaybackTimer();
   }
 
   Duration positionFor(Duration displayDuration) {
@@ -97,6 +101,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   void beginDrag(Duration position) {
     _dragging = true;
     _position = _clampPosition(position, _duration);
+    _syncPlaybackTimer();
     notifyListeners();
   }
 
@@ -110,7 +115,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _pendingSeekTarget = null;
     _dragging = false;
     _position = _clampPosition(position, _duration);
-    _lastTickAt = DateTime.now();
+    _syncPlaybackTimer();
     notifyListeners();
   }
 
@@ -128,7 +133,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final target = _clampPosition(base + delta, duration);
     _pendingSeekTarget = target;
     _position = target;
-    _lastTickAt = DateTime.now();
+    _syncPlaybackTimer();
     notifyListeners();
 
     _pendingSeekTimer?.cancel();
@@ -137,6 +142,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       _pendingSeekTarget = null;
       if (committedTarget == null) return;
       onCommit(committedTarget);
+      _syncPlaybackTimer();
     });
     return target;
   }
@@ -152,10 +158,42 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _pendingSeekTimer?.cancel();
     _pendingSeekTarget = null;
     _dragging = false;
-    _refreshLiveDuration();
     _position = _duration;
-    _lastTickAt = DateTime.now();
+    _syncPlaybackTimer();
     notifyListeners();
+  }
+
+  void _syncPlaybackTimer() {
+    final shouldTick =
+        _mode == TwitchPlaybackTimelineMode.liveDvr &&
+        !_dragging &&
+        _pendingSeekTarget == null;
+    if (!shouldTick) {
+      _playbackTimer?.cancel();
+      _playbackTimer = null;
+      _lastPlaybackTickAt = null;
+      return;
+    }
+    if (_playbackTimer != null) return;
+
+    _lastPlaybackTickAt = DateTime.now();
+    _playbackTimer = Timer.periodic(_playbackTickInterval, (_) {
+      final now = DateTime.now();
+      final previous = _lastPlaybackTickAt ?? now;
+      _lastPlaybackTickAt = now;
+      final elapsed = now.difference(previous);
+      _duration = (_duration ?? Duration.zero) + elapsed;
+      final connectivity = VioClassConnectivityService.instance;
+      final hasNetwork =
+          !connectivity.initialized || connectivity.hasInternetAccess;
+      if (_advancing && hasNetwork) {
+        _position = _clampPosition(
+          (_position ?? Duration.zero) + elapsed,
+          _duration,
+        );
+      }
+      notifyListeners();
+    });
   }
 
   Duration _fallbackPosition(TwitchPlaybackTimelineMode mode) {
@@ -163,26 +201,6 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       return _duration ?? Duration.zero;
     }
     return Duration.zero;
-  }
-
-  bool _shouldAcceptExternalPosition(Duration position) {
-    final current = _position;
-    if (current == null) return true;
-    final delta = (position - current).abs();
-    return delta > const Duration(seconds: 3);
-  }
-
-  Duration? _effectiveLiveDuration(Duration? base, DateTime? startedAt) {
-    final elapsed = startedAt == null
-        ? null
-        : DateTime.now().toUtc().difference(startedAt.toUtc());
-    final positiveElapsed = elapsed == null || elapsed.isNegative
-        ? null
-        : elapsed;
-
-    if (base == null) return positiveElapsed;
-    if (positiveElapsed == null) return base;
-    return positiveElapsed > base ? positiveElapsed : base;
   }
 
   Duration _clampPosition(Duration position, Duration? duration) {
@@ -195,59 +213,10 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     );
   }
 
-  void _syncTimer() {
-    final shouldTick =
-        _timelineEnabled &&
-        (_advancesWithPlayback || _liveStartedAt != null) &&
-        _position != null;
-    if (!shouldTick) {
-      _timer?.cancel();
-      _timer = null;
-      _lastTickAt = null;
-      return;
-    }
-
-    _lastTickAt ??= DateTime.now();
-    _timer ??= Timer.periodic(_tickInterval, (_) => _tick());
-  }
-
-  void _tick() {
-    final wasAtLiveEdge = snapshot.isAtLiveEdge;
-    _refreshLiveDuration();
-    if (!_advancesWithPlayback || _dragging) {
-      if (!_dragging && wasAtLiveEdge) {
-        _position = _duration;
-      }
-      _lastTickAt = DateTime.now();
-      notifyListeners();
-      return;
-    }
-    final now = DateTime.now();
-    final last = _lastTickAt ?? now;
-    _lastTickAt = now;
-    if (!_playing) return;
-
-    final delta = now.difference(last);
-    if (delta.isNegative || delta == Duration.zero) return;
-    _position = _clampPosition((_position ?? Duration.zero) + delta, _duration);
-    notifyListeners();
-  }
-
-  void _refreshLiveDuration() {
-    final startedAt = _liveStartedAt;
-    if (startedAt == null) return;
-    final elapsed = DateTime.now().toUtc().difference(startedAt.toUtc());
-    if (elapsed.isNegative) return;
-    final current = _duration;
-    if (current == null || elapsed > current) {
-      _duration = elapsed;
-    }
-  }
-
   @override
   void dispose() {
-    _timer?.cancel();
     _pendingSeekTimer?.cancel();
+    _playbackTimer?.cancel();
     super.dispose();
   }
 }

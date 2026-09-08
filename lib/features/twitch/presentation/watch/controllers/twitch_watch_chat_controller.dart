@@ -380,6 +380,25 @@ class TwitchWatchChatController extends ChangeNotifier {
     await runtime?.disconnect();
   }
 
+  Future<void> reconnectAfterNetworkRestored() async {
+    final activeRuntime = runtime;
+    if (activeRuntime == null ||
+        activeRuntime.connected ||
+        activeRuntime.connecting ||
+        connectingChat) {
+      return;
+    }
+
+    connectingChat = true;
+    notifyListeners();
+    try {
+      await activeRuntime.reconnect();
+    } finally {
+      connectingChat = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> disposeRuntime() async {
     final activeRuntime = runtime;
     runtime = null;

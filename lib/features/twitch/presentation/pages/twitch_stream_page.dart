@@ -10,6 +10,7 @@ import '../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/connectivity/vioclass_connectivity_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../platform/android_pip/twitch_android_pip_controller.dart';
@@ -85,6 +86,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   bool _loginStateLoadRunning = false;
   int _channelSearchGeneration = 0;
   Timer? _channelSearchDebounce;
+  StreamSubscription<VioClassConnectivitySnapshot>?
+  _networkRestoredSubscription;
+  StreamSubscription<VioClassConnectivitySnapshot>? _networkLostSubscription;
 
   @override
   void initState() {
@@ -115,8 +119,23 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     TwitchAndroidPipController.instance.addListener(
       _handleRootPlaybackPolicyChanged,
     );
+    _networkRestoredSubscription = VioClassConnectivityService
+        .instance
+        .onNetworkRestored
+        .listen(
+          (_) => unawaited(
+            TwitchMiniPlayerController.instance.recoverAfterNetworkRestored(),
+          ),
+        );
+    _networkLostSubscription = VioClassConnectivityService
+        .instance
+        .onNetworkLost
+        .listen(
+          (_) => TwitchMiniPlayerController.instance.rememberNetworkLoss(),
+        );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(VioClassConnectivityService.instance.start());
       unawaited(_loadLoginState());
       unawaited(chatAppearanceController.load());
       unawaited(playerSettingsController.load());
@@ -139,6 +158,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     );
     unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
     _channelSearchDebounce?.cancel();
+    unawaited(_networkRestoredSubscription?.cancel());
+    unawaited(_networkLostSubscription?.cancel());
     searchController.dispose();
     updateController.dispose();
     playerSettingsController.dispose();

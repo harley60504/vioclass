@@ -21,6 +21,7 @@ class TwitchLiveDvrBridgeProxy {
   Uri? _dvrPlaylistUri;
   Duration? _latestDuration;
   Duration? _seekPosition;
+  Duration? _timelinePosition;
   int _streamGeneration = 0;
   int? _dvrSeekStartIndex;
   DateTime _dvrSeekStartedAt = DateTime.now();
@@ -38,16 +39,7 @@ class TwitchLiveDvrBridgeProxy {
   Duration? get latestDuration => _latestDuration;
   bool get isRunning => _server != null;
   bool get isLiveMode => false;
-  Duration? get timelinePosition {
-    final duration = _latestDuration;
-    if (duration == null || duration.inMilliseconds <= 0) {
-      return _seekPosition;
-    }
-    final baseMs = _seekPosition?.inMilliseconds ?? 0;
-    return Duration(
-      milliseconds: baseMs.clamp(0, duration.inMilliseconds).toInt(),
-    );
-  }
+  Duration? get timelinePosition => _timelinePosition ?? _seekPosition;
 
   String get playlistPlaybackUrl => '$playlistUrl?v=$_streamGeneration';
   String get streamTsPlaybackUrl => '$streamTsUrl?v=$_streamGeneration';
@@ -76,6 +68,7 @@ class TwitchLiveDvrBridgeProxy {
     await _validatePlaylist(dvrPlaylistUri);
     _dvrPlaylistUri = dvrPlaylistUri;
     _seekPosition = null;
+    _timelinePosition = null;
     _dvrSeekStartIndex = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
@@ -91,6 +84,7 @@ class TwitchLiveDvrBridgeProxy {
     );
     final positionMs = position.inMilliseconds.clamp(0, maxMs).toInt();
     _seekPosition = Duration(milliseconds: positionMs);
+    _timelinePosition = _seekPosition;
     _dvrSeekStartIndex = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
@@ -106,6 +100,7 @@ class TwitchLiveDvrBridgeProxy {
     _server = null;
     _dvrPlaylistUri = null;
     _latestDuration = null;
+    _timelinePosition = null;
     await server?.close(force: true);
     _client.close(force: true);
   }
@@ -293,6 +288,9 @@ class TwitchLiveDvrBridgeProxy {
       0,
       items.length - 1,
     );
+    _timelinePosition = items
+        .take(current + 1)
+        .fold<Duration>(Duration.zero, (total, item) => total + item.duration);
     final windowStart = math.max(0, current - 3);
     final window = items.sublist(windowStart, current + 1);
     debugPrint(
@@ -375,6 +373,12 @@ class TwitchLiveDvrBridgeProxy {
       final start = nextSequence == null
           ? _indexForCurrentSeek(items)
           : _indexForSequence(items, nextSequence);
+      var timelineCursor = items
+          .take(start)
+          .fold<Duration>(
+            Duration.zero,
+            (total, item) => total + item.duration,
+          );
       debugPrint(
         '[LiveDvrBridge] dvr items=${items.length} start=$start '
         'position=${_seekPosition?.inSeconds ?? 0}s generation=$generation',
@@ -387,6 +391,8 @@ class TwitchLiveDvrBridgeProxy {
           debugPrint('[LiveDvrBridge] write dvr ${item.label}');
         }
         await _writeSegment(response, Uri.parse(item.url), generation);
+        timelineCursor += item.duration;
+        _timelinePosition = timelineCursor;
         nextSequence = item.sequence + 1;
       }
 

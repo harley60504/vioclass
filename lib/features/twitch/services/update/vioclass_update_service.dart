@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
-const String vioclassCurrentVersion = String.fromEnvironment(
+const String _vioclassVersionOverride = String.fromEnvironment(
   'VIOCLASS_VERSION',
-  defaultValue: '1.1.0',
 );
 
 class VioClassUpdateService {
@@ -31,17 +31,26 @@ class VioClassUpdateService {
       _closeDioOnDispose = dio == null;
 
   Future<VioClassUpdateInfo> checkLatest() async {
+    final currentVersion = await _currentVersion();
     final response = await _dio.get<Map<String, dynamic>>(latestReleaseUrl);
     final raw = response.data ?? const <String, dynamic>{};
     final release = VioClassRelease.fromGithubJson(raw);
     return VioClassUpdateInfo(
-      currentVersion: vioclassCurrentVersion,
+      currentVersion: currentVersion,
       release: release,
       updateAvailable: _compareVersions(
         release.version,
-        vioclassCurrentVersion,
+        currentVersion,
       ).isNewer,
     );
+  }
+
+  Future<String> _currentVersion() async {
+    final override = _vioclassVersionOverride.trim();
+    if (override.isNotEmpty) return override;
+
+    final packageInfo = await PackageInfo.fromPlatform();
+    return packageInfo.version.trim();
   }
 
   Future<File> downloadPreferredAsset({

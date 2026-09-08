@@ -21,6 +21,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
 import '../../services/chat/twitch_vod_chat_replay_runtime.dart';
+import '../../services/connectivity/vioclass_connectivity_service.dart';
 import '../../services/discovery/twitch_channel_snapshot_cache.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
@@ -222,6 +223,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   TwitchMediaKitPlayerSession get playerSession => session.playerSession;
 
   StreamSubscription<double>? playerVolumeSubscription;
+  StreamSubscription<VioClassConnectivitySnapshot>? networkRestoredSubscription;
+  StreamSubscription<VioClassConnectivitySnapshot>? networkLostSubscription;
+  bool wasPlayingBeforeNetworkLoss = false;
   int watchLoadGeneration = 0;
   TwitchPlaybackSessionState? restorePlaybackOnDispose;
   TwitchPlaybackSessionState? ownedPlaybackForVisibleRoute;
@@ -555,6 +559,18 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         badgeCache: TwitchBadgeCacheService(),
       ),
     )..addListener(notifyControllerChanged);
+    networkRestoredSubscription = VioClassConnectivityService
+        .instance
+        .onNetworkRestored
+        .listen((_) => unawaited(recoverWatchAfterNetworkRestored()));
+    networkLostSubscription = VioClassConnectivityService.instance.onNetworkLost
+        .listen((_) {
+          wasPlayingBeforeNetworkLoss =
+              TwitchPlaybackSessionController.instance.isTopRouteOwner(
+                playbackRouteOwner,
+              ) &&
+              (playerSession.playerOrNull?.state.playing ?? false);
+        });
 
     if (widget.initialReuseCurrentPlayback) {
       unawaited(primeReusedPlaybackSurface());
@@ -640,6 +656,51 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     }
   }
 
+  Future<void> recoverWatchAfterNetworkRestored() async {
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!mounted || !VioClassConnectivityService.instance.hasInternetAccess) {
+      return;
+    }
+
+    unawaited(chatController.reconnectAfterNetworkRestored());
+    await refreshLiveTimelineStartedAt();
+
+    final shouldResumePlayback = wasPlayingBeforeNetworkLoss;
+    wasPlayingBeforeNetworkLoss = false;
+    if (!shouldResumePlayback) return;
+    if (!TwitchPlaybackSessionController.instance.isTopRouteOwner(
+      playbackRouteOwner,
+    )) {
+      return;
+    }
+    await reconcileVisibleRoutePlayback(forceOpen: true);
+  }
+
+  Future<void> refreshLiveTimelineStartedAt() async {
+    if (currentPlaybackKind != TwitchWatchPlaybackKind.live &&
+        currentPlaybackKind != TwitchWatchPlaybackKind.liveDvr) {
+      return;
+    }
+
+    final login = channelLogin;
+    try {
+      final discoveryService =
+          widget.initialDiscoveryService ??
+          TwitchDiscoveryService(
+            client: watchServices.apiClient,
+            authService: authService,
+            authApi: authApi,
+          );
+      final stream = await discoveryService.fetchLiveStream(login: login);
+      final startedAt = stream?.startedAt;
+      if (!mounted || channelLogin != login || startedAt == null) return;
+      if (liveTimelineStartedAt == startedAt) return;
+      setState(() => liveTimelineStartedAt = startedAt);
+    } catch (error) {
+      debugPrint('[WatchTimeline] refresh started_at failed: $error');
+    }
+  }
+
   Future<void> primeReusedPlaybackSurface() async {
     try {
       final moved = TwitchMiniPlayerController.instance.moveActiveSurfaceInto(
@@ -705,6 +766,14 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     final volumeSubscriptionCancel = playerVolumeSubscription?.cancel();
     if (volumeSubscriptionCancel != null) {
       unawaited(volumeSubscriptionCancel);
+    }
+    final networkSubscriptionCancel = networkRestoredSubscription?.cancel();
+    if (networkSubscriptionCancel != null) {
+      unawaited(networkSubscriptionCancel);
+    }
+    final networkLostSubscriptionCancel = networkLostSubscription?.cancel();
+    if (networkLostSubscriptionCancel != null) {
+      unawaited(networkLostSubscriptionCancel);
     }
 
     if (handedOffToMiniPlayer) {
