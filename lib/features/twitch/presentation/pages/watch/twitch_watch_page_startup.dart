@@ -1243,6 +1243,8 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         if (selectedUri == null) {
           throw StateError('VOD 畫質 URL 無效。');
         }
+        final timelinePosition =
+            currentLiveTimelinePosition() ?? defaultLiveDvrReplayPosition();
         final warmed = await watchPorts.player.runtime.warmLiveDvrBridge(
           dvrPlaylistUri: selectedUri,
         );
@@ -1252,9 +1254,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         warmedLiveDvrVideoId = video.id;
         warmedLiveDvrQualityKey = variant.adAwareQualityKey;
         warmedLiveDvrResolvedAt = DateTime.now();
-        await seekLiveDvrBridgePlaybackAt(
-          currentLiveTimelinePosition() ?? defaultLiveDvrReplayPosition(),
-        );
+        await seekLiveDvrBridgePlaybackAt(timelinePosition);
         return;
       }
 
