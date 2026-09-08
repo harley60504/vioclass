@@ -51,6 +51,7 @@ class TwitchStableHlsProxyRouter {
   int _switchGeneration = 0;
   int _directStreamGeneration = 0;
   int _streamClientGeneration = 0;
+  StreamIterator<List<int>>? _activeUpstreamIterator;
 
   int? get port => _server?.port;
 
@@ -134,7 +135,6 @@ class TwitchStableHlsProxyRouter {
 
     _switching = true;
     final previous = _inner;
-    _inner = null;
     _directStreamUri = null;
     _switchGeneration++;
 
@@ -162,10 +162,7 @@ class TwitchStableHlsProxyRouter {
       _upstreamPlaylistUrl = safeUrl;
       _switchGeneration++;
 
-      // Close the old inner proxy after the new one is ready. Existing outer
-      // `/stream.ts` clients keep their HTTP response open; when the old inner
-      // stream ends, the stream loop below immediately attaches to the new
-      // inner stream instead of requiring media_kit Player.open().
+      await _interruptActiveUpstream();
       await previous?.close();
     } catch (_) {
       _inner = previous;
@@ -197,6 +194,7 @@ class TwitchStableHlsProxyRouter {
     _switchGeneration++;
 
     try {
+      await _interruptActiveUpstream();
       await previous?.close();
     } finally {
       _switching = false;
@@ -214,6 +212,7 @@ class TwitchStableHlsProxyRouter {
     _directStreamUri = replayUri;
     _directStreamGeneration++;
     _switchGeneration++;
+    await _interruptActiveUpstream();
     _switching = false;
     _switchGeneration++;
   }
@@ -240,6 +239,7 @@ class TwitchStableHlsProxyRouter {
     _upstreamPlaylistUrl = null;
     _directStreamUri = null;
     _directStreamGeneration++;
+    await _interruptActiveUpstream();
 
     await inner?.close();
     await server?.close(force: true);
@@ -350,6 +350,7 @@ class TwitchStableHlsProxyRouter {
     // reported the previous socket as closed. Keep only the newest stream pump
     // so stale local clients cannot multiply loopback traffic indefinitely.
     final streamClientGeneration = ++_streamClientGeneration;
+    await _interruptActiveUpstream();
 
     final response = request.response;
     response.statusCode = HttpStatus.ok;
@@ -382,13 +383,23 @@ class TwitchStableHlsProxyRouter {
           upstreamRequest.maxRedirects = 4;
           final upstreamResponse = await upstreamRequest.close();
 
-          await for (final chunk in upstreamResponse) {
-            if (_server == null ||
-                streamClientGeneration != _streamClientGeneration) {
-              break;
+          final iterator = StreamIterator<List<int>>(upstreamResponse);
+          _activeUpstreamIterator = iterator;
+          try {
+            while (await iterator.moveNext()) {
+              final chunk = iterator.current;
+              if (_server == null ||
+                  streamClientGeneration != _streamClientGeneration) {
+                break;
+              }
+              response.add(chunk);
+              await response.flush();
             }
-            response.add(chunk);
-            await response.flush();
+          } finally {
+            if (identical(_activeUpstreamIterator, iterator)) {
+              _activeUpstreamIterator = null;
+            }
+            await iterator.cancel();
           }
         } catch (_) {
           // media_kit closes the old HTTP response when the same stable URL is
@@ -414,6 +425,15 @@ class TwitchStableHlsProxyRouter {
         await response.close();
       } catch (_) {}
     }
+  }
+
+  Future<void> _interruptActiveUpstream() async {
+    final iterator = _activeUpstreamIterator;
+    _activeUpstreamIterator = null;
+    if (iterator == null) return;
+    try {
+      await iterator.cancel();
+    } catch (_) {}
   }
 
   void _applyStreamHeaders(HttpResponse response) {

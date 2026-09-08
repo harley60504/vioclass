@@ -157,7 +157,9 @@ class TwitchWatchPlayerArea extends StatelessWidget {
 
         return _WatchPlayerShell(
           inPipMode: state.inPipMode,
-          video: child ?? stableVideoStage,
+          video: state.effectiveCurrentVariant?.isAudioOnly == true
+              ? const ColoredBox(color: Colors.black)
+              : child ?? stableVideoStage,
           overlay: showOfflineControls
               ? RepaintBoundary(
                   child: _WatchOfflineControlsOverlay(
@@ -368,9 +370,7 @@ class _WatchPlayerVideoStage extends StatelessWidget {
 
     final controller = this.controller;
     if (controller == null) return const TwitchMediaKitVideoWaitingSurface();
-    return TwitchMediaKitVideoSurface(
-      controller: controller,
-    );
+    return TwitchMediaKitVideoSurface(controller: controller);
   }
 }
 

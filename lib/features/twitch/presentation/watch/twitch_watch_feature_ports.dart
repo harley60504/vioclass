@@ -78,13 +78,11 @@ class TwitchWatchPlayerPort {
       throw StateError('切換畫質失敗：runtime 沒有回傳 playlist uri。');
     }
 
-    // Seamless mode: TwitchStableHlsProxyRouter keeps the same /stream.ts HTTP
-    // response open and re-attaches it to the new inner upstream. Do not call
-    // Player.open here, otherwise media_kit will blink/rebuffer like a full
-    // reconnect.
-    if (wasPlaying || play) {
-      await player.play();
-    }
+    await services.playerSession.openOrResume(
+      uri: uri.toString(),
+      play: wasPlaying || play,
+      forceOpen: true,
+    );
   }
 
   Future<void> pause() {

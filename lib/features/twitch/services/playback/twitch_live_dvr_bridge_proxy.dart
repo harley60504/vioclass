@@ -67,6 +67,7 @@ class TwitchLiveDvrBridgeProxy {
 
     await _validatePlaylist(dvrPlaylistUri);
     _dvrPlaylistUri = dvrPlaylistUri;
+    _latestDuration = null;
     _seekPosition = null;
     _timelinePosition = null;
     _dvrSeekStartIndex = null;

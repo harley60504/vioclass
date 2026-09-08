@@ -333,7 +333,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     try {
       _currentVariant = variant;
       _upstreamPlaylistUri = Uri.tryParse(variant.url);
-      _playlistUri = await _startProxyForVariant(variant);
+      _playlistUri = await _startProxyForVariant(variant, probeDvr: false);
       await _savePreferredQualityName(_channelLogin, variant);
       return _playlistUri;
     } catch (e) {

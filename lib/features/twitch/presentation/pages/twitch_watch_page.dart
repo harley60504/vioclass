@@ -673,7 +673,25 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     )) {
       return;
     }
-    await reconcileVisibleRoutePlayback(forceOpen: true);
+
+    await reconcileVisibleRoutePlayback();
+    final player = playerSession.playerOrNull;
+    if (player == null) return;
+    final positionBeforeRecovery = player.state.position;
+    if (!player.state.playing) await player.play();
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    if (!mounted ||
+        !TwitchPlaybackSessionController.instance.isTopRouteOwner(
+          playbackRouteOwner,
+        )) {
+      return;
+    }
+    final playbackAdvanced =
+        player.state.position - positionBeforeRecovery >=
+        const Duration(milliseconds: 500);
+    if (!playbackAdvanced) {
+      await reconcileVisibleRoutePlayback(forceOpen: true);
+    }
   }
 
   Future<void> refreshLiveTimelineStartedAt() async {
