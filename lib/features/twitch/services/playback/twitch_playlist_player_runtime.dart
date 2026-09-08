@@ -159,6 +159,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<Uri?> prepareLowLatencyLiveFromWarmUpstream() async {
+    (_bridgeProxy ?? _sharedBridgeProxy)?.stopStreaming();
     _liveDvrPlaylistOverride = null;
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = false;

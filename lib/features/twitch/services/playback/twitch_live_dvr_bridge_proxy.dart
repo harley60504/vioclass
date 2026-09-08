@@ -95,6 +95,13 @@ class TwitchLiveDvrBridgeProxy {
     return streamTsPlaybackUrl;
   }
 
+  void stopStreaming() {
+    _streamGeneration++;
+    _seekPosition = null;
+    _timelinePosition = null;
+    _dvrSeekStartIndex = null;
+  }
+
   Future<void> close() async {
     final server = _server;
     _server = null;
