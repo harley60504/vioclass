@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
@@ -858,7 +859,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
         child: CustomScrollView(
           key: const PageStorageKey<String>('twitch_channel_search_page'),
           physics: const AlwaysScrollableScrollPhysics(),
-          cacheExtent: 840,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(840),
           slivers: <Widget>[
             SliverToBoxAdapter(
               child: TwitchDiscoverySectionHeader(

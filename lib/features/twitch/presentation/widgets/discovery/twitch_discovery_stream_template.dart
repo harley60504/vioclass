@@ -3,6 +3,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
@@ -86,7 +87,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                   'twitch_discovery_grid_$sectionTitle',
                 ),
                 controller: controller,
-                cacheExtent: 840,
+                scrollCacheExtent: const ScrollCacheExtent.pixels(840),
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: <Widget>[
                   SliverToBoxAdapter(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
@@ -510,7 +511,7 @@ class _EmoteSectionState extends State<_EmoteSection>
         addAutomaticKeepAlives: false,
         addRepaintBoundaries: true,
         addSemanticIndexes: false,
-        cacheExtent: 360,
+        scrollCacheExtent: const ScrollCacheExtent.pixels(360),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
           maxCrossAxisExtent: _cardMaxExtent,
           mainAxisSpacing: 10,

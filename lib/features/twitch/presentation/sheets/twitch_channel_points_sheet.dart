@@ -272,12 +272,12 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
 
     try {
       final loaded = await loader(reward);
-      if (!mounted || completer.isCompleted) return completer.future;
+      if (!mounted || completer.isCompleted) return await completer.future;
       setState(() {
         _emoteOverlay = _emoteOverlay.loaded(loaded);
       });
     } catch (error) {
-      if (!mounted || completer.isCompleted) return completer.future;
+      if (!mounted || completer.isCompleted) return await completer.future;
       setState(() {
         _emoteOverlay = _emoteOverlay.failed(error);
       });

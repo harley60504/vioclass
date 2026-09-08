@@ -124,7 +124,7 @@ class _TwitchHypeTrainBannerState extends State<TwitchHypeTrainBanner>
               curve: const Interval(0.68, 1, curve: Curves.easeInCubic),
             ),
           ),
-          axisAlignment: -1,
+          alignment: Alignment.topCenter,
           child: FadeTransition(
             opacity: Tween<double>(begin: 1, end: 0).animate(
               CurvedAnimation(

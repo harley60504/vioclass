@@ -446,7 +446,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       final video = page.videos.first;
       if (video.isLikelyGrowingArchive) return false;
       showOfflineChannelPlaceholder = false;
-      return openVodPlayback(
+      return await openVodPlayback(
         channel: channel,
         generation: generation,
         video: video,
@@ -482,7 +482,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         if (mounted) setState(() {});
         return true;
       }
-      return openVodPlayback(
+      return await openVodPlayback(
         channel: channel,
         generation: generation,
         video: video,
