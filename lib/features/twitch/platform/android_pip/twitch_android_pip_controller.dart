@@ -27,11 +27,15 @@ class TwitchAndroidPipController extends ChangeNotifier {
   bool _isInPictureInPictureMode = false;
   bool _isPreparingPictureInPicture = false;
   bool _lastKnownAvailable = Platform.isAndroid;
+  bool _isActivityStarted = !Platform.isAndroid;
+  bool _stoppedOutsidePictureInPicture = false;
   Timer? _prepareTimeout;
 
   bool get isAndroid => Platform.isAndroid;
   bool get isInPictureInPictureMode => _isInPictureInPictureMode;
   bool get isPreparingPictureInPicture => _isPreparingPictureInPicture;
+  bool get isActivityStarted => _isActivityStarted;
+  bool get stoppedOutsidePictureInPicture => _stoppedOutsidePictureInPicture;
   bool get shouldRenderPlayerOnly =>
       _isInPictureInPictureMode || _isPreparingPictureInPicture;
   bool get lastKnownAvailable => _lastKnownAvailable;
@@ -119,7 +123,46 @@ class TwitchAndroidPipController extends ChangeNotifier {
           _setPreparingPictureInPicture(false);
         }
         return null;
+      case 'onActivityStarted':
+        final args = call.arguments;
+        final inPip = args is Map ? args['isInPip'] == true : false;
+        _setActivityStarted(true, inPictureInPicture: inPip);
+        return null;
+      case 'onActivityStopped':
+        final args = call.arguments;
+        final inPip = args is Map ? args['isInPip'] == true : false;
+        _setActivityStarted(false, inPictureInPicture: inPip);
+        return null;
     }
+  }
+
+  void acknowledgeStoppedOutsidePictureInPicture() {
+    if (!_stoppedOutsidePictureInPicture) return;
+    _stoppedOutsidePictureInPicture = false;
+    notifyListeners();
+  }
+
+  void _setActivityStarted(bool started, {required bool inPictureInPicture}) {
+    var changed = false;
+    if (_isActivityStarted != started) {
+      _isActivityStarted = started;
+      changed = true;
+    }
+    if (_isInPictureInPictureMode != inPictureInPicture) {
+      _isInPictureInPictureMode = inPictureInPicture;
+      changed = true;
+    }
+    final stoppedOutsidePip = !started && !inPictureInPicture;
+    if (_stoppedOutsidePictureInPicture != stoppedOutsidePip) {
+      _stoppedOutsidePictureInPicture = stoppedOutsidePip;
+      changed = true;
+    }
+    if (started) {
+      _setPreparingPictureInPicture(false);
+    } else if (stoppedOutsidePip) {
+      _setPreparingPictureInPicture(false);
+    }
+    if (changed) notifyListeners();
   }
 
   void _setPictureInPictureMode(bool value) {

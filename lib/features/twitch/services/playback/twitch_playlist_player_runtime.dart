@@ -41,18 +41,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   // startup quality when no preference exists yet.
   static const int _firstRunMobileFallbackHeight = 1080;
   static const int _firstRunMobileFallbackMaxFps = 60;
-  static const bool _directDvrPlaybackEnabled = bool.fromEnvironment(
-    'TWITCH_DVR_DIRECT_PLAYBACK',
-    defaultValue: false,
-  );
-  static const bool _forceDvrDirectPlaybackEnabled = bool.fromEnvironment(
-    'TWITCH_FORCE_DVR_DIRECT_PLAYBACK',
-    defaultValue: false,
-  );
-
   static TwitchStableHlsProxyRouter? _sharedProxy;
   static TwitchLiveDvrBridgeProxy? _sharedBridgeProxy;
-  static int _sharedProxyRevision = 0;
   static int _sharedBridgeSeekRequestId = 0;
 
   TwitchPlaylistPlayerRuntime({required this.playbackApi, Dio? dio})
@@ -85,6 +75,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   final bool _dvrProbeEnabled = true;
   bool _usingDvrPlaylist = false;
   bool _usingExternalVodPlayback = false;
+  bool _usingLiveDvrReplay = false;
+  bool _usingLiveBufferReplay = false;
+  Duration? _liveBufferReplayDuration;
+  Duration? _liveBufferReplayFromLive;
   Uri? _liveDvrPlaylistOverride;
   String? _lastLiveUpstreamPlaylistUrl;
 
@@ -110,13 +104,33 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   String? get lastPreferredQualityName => _lastPreferredQualityName;
   bool get dvrProbeEnabled => _dvrProbeEnabled;
   bool get usingDvrPlaylist => _usingDvrPlaylist;
-  bool get usingLiveDvrBridge => _bridgeProxy?.isRunning ?? false;
+  bool get usingLiveDvrBridge =>
+      _usingLiveDvrReplay && (_bridgeProxy?.isRunning ?? false);
+  bool get usingLiveBufferReplay => _usingLiveBufferReplay;
+  bool get usingLiveTimelineReplay =>
+      usingLiveDvrBridge || _usingLiveBufferReplay;
   bool get liveDvrBridgeAtLiveEdge =>
       (_bridgeProxy ?? _sharedBridgeProxy)?.isLiveMode ?? false;
-  double? get liveDvrBridgeTimelineRatio =>
-      (_bridgeProxy ?? _sharedBridgeProxy)?.timelineRatio;
+  Duration? get liveDvrBridgeTimelinePosition {
+    final bridgePosition = usingLiveDvrBridge
+        ? _bridgeProxy?.timelinePosition
+        : null;
+    if (bridgePosition != null) return bridgePosition;
+    if (!_usingLiveBufferReplay) return null;
+    final duration = _liveBufferReplayDuration;
+    final fromLive = _liveBufferReplayFromLive;
+    if (duration == null || duration.inMilliseconds <= 0 || fromLive == null) {
+      return null;
+    }
+    final positionMs = duration.inMilliseconds - fromLive.inMilliseconds;
+    return Duration(
+      milliseconds: positionMs.clamp(0, duration.inMilliseconds).toInt(),
+    );
+  }
+
   Duration? get liveDvrBridgeDuration =>
-      (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration;
+      (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration ??
+      _liveBufferReplayDuration;
   bool get usingExternalVodPlayback => _usingExternalVodPlayback;
   bool get hasWarmLiveDvrBridge => _sharedBridgeProxy?.isRunning ?? false;
 
@@ -148,6 +162,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _liveDvrPlaylistOverride = null;
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = false;
+    _usingLiveDvrReplay = false;
+    _clearLiveBufferReplay();
     _bridgeProxy = null;
 
     final router = _proxy ?? _sharedProxy;
@@ -164,7 +180,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     await router.waitUntilPrewarmed();
 
     _proxy = router;
-    _sharedProxyRevision++;
     _proxyUrl = _routerStreamTsPlaybackUrl(router);
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
@@ -179,12 +194,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   /// this URL once and stay attached; quality changes should not recreate
   /// Player / VideoController or call Player.open with a different local URL.
   String? get stableProxyPlaybackUrl {
-    if (_usingDvrPlaylist && _proxyUrl?.trim().isNotEmpty == true) {
-      return _proxyUrl;
-    }
-    if (usingLiveDvrBridge && _proxyUrl?.trim().isNotEmpty == true) {
-      return _proxyUrl;
-    }
+    if (_usingExternalVodPlayback) return null;
     final router = _proxy ?? _sharedProxy;
     if (router == null || !router.isRunning) return null;
     return _routerStreamTsPlaybackUrl(router);
@@ -216,6 +226,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _adAwareStatus = 'probing playback sources...';
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = false;
+    _usingLiveDvrReplay = false;
+    _clearLiveBufferReplay();
     notifyListeners();
 
     try {
@@ -295,20 +307,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         return base.masterUri;
       }
 
-      final playbackVariant = _forceDvrDirectPlaybackEnabled
-          ? await _findFirstDvrVariant(
-              _orderedDvrProbeVariants(
-                selected: selected,
-                web: web,
-                merged: merged,
-              ),
-            )
-          : selected;
-      if (_forceDvrDirectPlaybackEnabled && playbackVariant == null) {
-        throw StateError('DVR direct 測試失敗：所有候選畫質都找不到可用的 index-dvr.m3u8。');
-      }
-
-      final variantToOpen = playbackVariant ?? selected;
+      final variantToOpen = selected;
       _currentVariant = variantToOpen;
       _upstreamPlaylistUri = Uri.tryParse(variantToOpen.url) ?? base.masterUri;
       _playlistUri = await _startProxyForVariant(
@@ -359,6 +358,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _adAwareStatus = 'vod-fallback';
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = true;
+    _usingLiveDvrReplay = false;
+    _clearLiveBufferReplay();
     _liveDvrPlaylistOverride = null;
     notifyListeners();
   }
@@ -394,23 +395,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     if (upstreamUri == null) {
       throw StateError('Invalid variant URL: ${probedVariant.url}');
     }
-    if (_forceDvrDirectPlaybackEnabled && !useDvrPlaylist) {
-      throw StateError('DVR direct 測試失敗：找不到可用的 index-dvr.m3u8。');
-    }
-    if (useDvrPlaylist &&
-        (_directDvrPlaybackEnabled || _forceDvrDirectPlaybackEnabled)) {
-      await _stopProxy(notify: false, closeShared: true);
-      _currentVariant = probedVariant;
-      _upstreamPlaylistUri = upstreamUri;
-      _usingDvrPlaylist = true;
-      _proxyUrl = probedVariant.url;
-      _proxyMpvUrl = _proxyUrl;
-      _proxyLiveStatus = null;
-      _adAwareStatus = '${_adAwareStatus.trim()} dvr=direct'.trim();
-      return upstreamUri;
-    }
-
-    if (useDvrPlaylist && !_forceDvrDirectPlaybackEnabled) {
+    if (useDvrPlaylist) {
       var bridge = _sharedBridgeProxy;
       if (bridge == null || !bridge.isRunning) {
         bridge = TwitchLiveDvrBridgeProxy();
@@ -430,19 +415,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         '[LiveDvrBridge] started dvr=$upstreamUri '
         'playlist=${bridge.playlistPlaybackUrl}',
       );
-      final bridgePlaylistUrl = bridge.playlistPlaybackUrl;
       var router = _sharedProxy;
-      final previousUpstream = router?.upstreamPlaylistUrl;
+      final bridgePlaylistUrl = bridge.playlistPlaybackUrl;
       if (router == null || !router.isRunning) {
         router = _createStableRouter();
         _sharedProxy = router;
         await router.start(upstreamPlaylistUrl: bridgePlaylistUrl);
-        _sharedProxyRevision++;
       } else {
         await router.switchUpstream(bridgePlaylistUrl);
-        if (previousUpstream != bridgePlaylistUrl) {
-          _sharedProxyRevision++;
-        }
       }
       await router.waitUntilPrewarmed();
 
@@ -452,6 +432,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _upstreamPlaylistUri = upstreamUri;
       _usingDvrPlaylist = true;
       _usingExternalVodPlayback = false;
+      _usingLiveDvrReplay = false;
+      _clearLiveBufferReplay();
       _proxyUrl = _routerStreamTsPlaybackUrl(router);
       _proxyMpvUrl = _proxyUrl;
       _proxyLiveStatus = null;
@@ -465,37 +447,32 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
     debugPrint('[LiveDvrBridge] fallback live proxy useDvr=$useDvrPlaylist');
     _bridgeProxy = null;
+    _usingLiveDvrReplay = false;
+    _clearLiveBufferReplay();
 
     var router = _sharedProxy;
-    final previousUpstream = router?.upstreamPlaylistUrl;
     if (router == null || !router.isRunning) {
       router = _createStableRouter();
       _sharedProxy = router;
       _proxy = router;
       await router.start(upstreamPlaylistUrl: probedVariant.url);
-      _sharedProxyRevision++;
     } else {
       _proxy = router;
       await router.switchUpstream(probedVariant.url);
-      if (previousUpstream != probedVariant.url) {
-        _sharedProxyRevision++;
-      }
     }
 
     await router.waitUntilPrewarmed();
 
     _usingDvrPlaylist = useDvrPlaylist;
     _currentVariant = probedVariant;
-    _proxyUrl = useDvrPlaylist
-        ? router.playlistUrl
-        : _routerStreamTsPlaybackUrl(router);
+    _proxyUrl = _routerStreamTsPlaybackUrl(router);
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
     return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
   }
 
   String _routerStreamTsPlaybackUrl(TwitchStableHlsProxyRouter router) {
-    return '${router.streamTsUrl}?v=$_sharedProxyRevision';
+    return router.streamTsUrl;
   }
 
   TwitchStableHlsProxyRouter _createStableRouter() {
@@ -561,51 +538,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
   }
 
-  Future<TwitchM3u8Variant?> _findFirstDvrVariant(
-    List<TwitchM3u8Variant> variants,
-  ) async {
-    for (final variant in variants) {
-      final probed = await _probeDvrVariant(variant);
-      if (probed.sourceTag.contains('+dvr') || probed.sourceTag == 'dvr') {
-        return probed;
-      }
-    }
-    return null;
-  }
-
-  List<TwitchM3u8Variant> _orderedDvrProbeVariants({
-    required TwitchM3u8Variant selected,
-    required _PlaybackCandidate? web,
-    required List<TwitchM3u8Variant> merged,
-  }) {
-    final ordered = <TwitchM3u8Variant>[];
-    final seen = <String>{};
-
-    void add(TwitchM3u8Variant variant) {
-      if (variant.isAudioOnly) return;
-      if (!seen.add(variant.url)) return;
-      ordered.add(variant);
-    }
-
-    add(selected);
-    for (final variant in _sortVariants(
-      (web?.variants ?? const <TwitchM3u8Variant>[])
-          .where(_isSourceLikeVariant)
-          .toList(),
-    )) {
-      add(variant);
-    }
-    for (final variant in _sortVariants(web?.variants ?? const [])) {
-      add(variant);
-    }
-    for (final variant in _sortVariants(merged)) {
-      add(variant);
-    }
-    return ordered;
-  }
-
   void _debugDvr(String message) {
-    if (!_forceDvrDirectPlaybackEnabled) return;
+    if (!kDebugMode) return;
     debugPrint('[TwitchDvrDirect] $message');
   }
 
@@ -770,29 +704,77 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return status;
   }
 
-  Future<String?> seekLiveDvrBridgeRatio(double ratio) async {
+  Future<String?> seekLiveDvrBridgePosition(Duration position) async {
     final requestId = ++_sharedBridgeSeekRequestId;
     final bridge = _bridgeProxy ?? _sharedBridgeProxy;
     if (bridge == null || !bridge.isRunning) {
       debugPrint('[LiveDvrBridge] seek ignored: bridge not running');
       return null;
     }
-    debugPrint('[LiveDvrBridge] runtime seek ratio=$ratio');
-    bridge.seekToRatio(ratio);
+    debugPrint('[LiveDvrBridge] runtime seek position=${position.inSeconds}s');
+    bridge.seekToPosition(position);
 
     if (requestId != _sharedBridgeSeekRequestId) {
       debugPrint('[LiveDvrBridge] stale seek ignored request=$requestId');
       return null;
     }
 
-    final playbackUrl = bridge.streamTsPlaybackUrl;
+    final bridgePlaybackUrl = bridge.streamTsPlaybackUrl;
+    var router = _proxy ?? _sharedProxy;
+    if (router == null || !router.isRunning) {
+      router = _createStableRouter();
+      _sharedProxy = router;
+      await router.startDirectStream(streamUrl: bridgePlaybackUrl);
+    } else {
+      await router.switchDirectStream(bridgePlaybackUrl);
+    }
+    final playbackUrl = _routerStreamTsPlaybackUrl(router);
+    _proxy = router;
     _bridgeProxy = bridge;
     _proxyUrl = playbackUrl;
     _proxyMpvUrl = playbackUrl;
     _usingDvrPlaylist = true;
     _usingExternalVodPlayback = false;
+    _usingLiveDvrReplay = true;
+    _clearLiveBufferReplay();
     _liveDvrPlaylistOverride = null;
     debugPrint('[LiveDvrBridge] stream seek player=$playbackUrl');
+    _notifyListenersAfterFrame();
+    return playbackUrl;
+  }
+
+  Future<String?> seekLiveBufferReplay({
+    required Duration fromLive,
+    required Duration timelineDuration,
+  }) async {
+    final router = _proxy ?? _sharedProxy;
+    if (router == null || !router.isRunning) {
+      debugPrint('[LiveBufferReplay] seek ignored: live router not running');
+      return null;
+    }
+
+    final safeFromLive = Duration(
+      seconds: fromLive.inSeconds.clamp(1, 20).toInt(),
+    );
+    await router.switchLiveReplayStream(fromLive: safeFromLive);
+    final playbackUrl = _routerStreamTsPlaybackUrl(router);
+
+    _proxy = router;
+    _proxyUrl = playbackUrl;
+    _proxyMpvUrl = playbackUrl;
+    _proxyLiveStatus = null;
+    _usingDvrPlaylist = false;
+    _usingExternalVodPlayback = false;
+    _usingLiveDvrReplay = false;
+    _usingLiveBufferReplay = true;
+    _liveBufferReplayDuration = timelineDuration;
+    _liveBufferReplayFromLive = safeFromLive;
+    _bridgeProxy = null;
+    _liveDvrPlaylistOverride = null;
+    debugPrint(
+      '[LiveBufferReplay] seek fromLive=${safeFromLive.inSeconds}s '
+      'player=$playbackUrl',
+    );
     _notifyListenersAfterFrame();
     return playbackUrl;
   }
@@ -812,6 +794,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _proxyUrl = null;
     _proxyMpvUrl = null;
     _proxyLiveStatus = null;
+    _usingLiveDvrReplay = false;
 
     if (closeShared && router != null) {
       if (identical(_sharedProxy, router)) _sharedProxy = null;
@@ -1083,7 +1066,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _variants = const <TwitchM3u8Variant>[];
     _currentVariant = null;
     _adAwareStatus = '';
+    _clearLiveBufferReplay();
     notifyListeners();
+  }
+
+  void _clearLiveBufferReplay() {
+    _usingLiveBufferReplay = false;
+    _liveBufferReplayDuration = null;
+    _liveBufferReplayFromLive = null;
   }
 
   @override
@@ -1116,7 +1106,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'proxyRunning': router?.isRunning ?? false,
       'proxyStablePort': router?.port,
       'proxyStableUpstream': router?.upstreamPlaylistUrl,
-      'proxySourceRevision': _sharedProxyRevision,
       'error': error?.toString(),
     };
   }

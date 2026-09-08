@@ -35,6 +35,16 @@ class MainActivity : FlutterActivity() {
         super.onCreate(savedInstanceState)
     }
 
+    override fun onStart() {
+        super.onStart()
+        pipBridge?.notifyActivityStarted()
+    }
+
+    override fun onStop() {
+        pipBridge?.notifyActivityStopped()
+        super.onStop()
+    }
+
     override fun onUserLeaveHint() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && isInPictureInPictureMode) {
             super.onUserLeaveHint()

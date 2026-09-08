@@ -10,6 +10,8 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import '../settings/vioclass_update_controller.dart';
@@ -18,6 +20,7 @@ import '../mini_player/twitch_mini_player_overlay.dart';
 import '../sheets/twitch_app_settings_sheet.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../twitch_follow_status_resolver.dart';
+import '../watch/twitch_playback_session_controller.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
@@ -41,7 +44,8 @@ class TwitchStreamPage extends StatefulWidget {
   State<TwitchStreamPage> createState() => _TwitchStreamPageState();
 }
 
-class _TwitchStreamPageState extends State<TwitchStreamPage> {
+class _TwitchStreamPageState extends State<TwitchStreamPage>
+    with WidgetsBindingObserver {
   final TextEditingController searchController = TextEditingController();
 
   final GlobalKey<TwitchFollowingPageState> followingPageKey =
@@ -84,6 +88,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
 
     apiClient = TwitchApiClient();
     authService = TwitchAuthService(apiClient: apiClient);
@@ -99,6 +104,16 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
     chatAppearanceController = twitchChatAppearanceController;
     playerSettingsController = TwitchPlayerSettingsController();
     updateController = VioClassUpdateController();
+    playerSettingsController.addListener(_handleRootPlaybackPolicyChanged);
+    TwitchPlaybackSessionController.instance.addListener(
+      _handleRootPlaybackPolicyChanged,
+    );
+    TwitchMiniPlayerController.instance.addListener(
+      _handleRootPlaybackPolicyChanged,
+    );
+    TwitchAndroidPipController.instance.addListener(
+      _handleRootPlaybackPolicyChanged,
+    );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_loadLoginState());
@@ -110,12 +125,76 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    playerSettingsController.removeListener(_handleRootPlaybackPolicyChanged);
+    TwitchPlaybackSessionController.instance.removeListener(
+      _handleRootPlaybackPolicyChanged,
+    );
+    TwitchMiniPlayerController.instance.removeListener(
+      _handleRootPlaybackPolicyChanged,
+    );
+    TwitchAndroidPipController.instance.removeListener(
+      _handleRootPlaybackPolicyChanged,
+    );
+    unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
     _channelSearchDebounce?.cancel();
     searchController.dispose();
     updateController.dispose();
     playerSettingsController.dispose();
     apiClient.close(force: true);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _syncRootAutoPip();
+    }
+  }
+
+  void _handleRootPlaybackPolicyChanged() {
+    if (TwitchAndroidPipController.instance.stoppedOutsidePictureInPicture) {
+      unawaited(_suspendPlaybackOutsidePictureInPicture());
+    }
+    _syncRootAutoPip();
+    if (mounted) setState(() {});
+  }
+
+  void _syncRootAutoPip() {
+    final pip = TwitchAndroidPipController.instance;
+    final hasPlayback =
+        TwitchPlaybackSessionController.instance.playableState != null ||
+        TwitchMiniPlayerController.instance.isActive;
+    final enabled =
+        playerSettingsController.androidPipEnabled &&
+        hasPlayback &&
+        !pip.stoppedOutsidePictureInPicture;
+    unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(enabled));
+  }
+
+  Future<void> _suspendPlaybackOutsidePictureInPicture() async {
+    TwitchAndroidPipController.instance
+        .acknowledgeStoppedOutsidePictureInPicture();
+    TwitchMiniPlayerController.instance.close(pausePlayback: true);
+    TwitchPlaybackSessionController.instance.clear();
+    await TwitchMediaKitPlayerHost.pauseShared();
+    TwitchMediaKitPlayerHost.keepPlayingWithoutSession(null);
+  }
+
+  bool get _shouldBackEnterPictureInPicture {
+    if (!TwitchAndroidPipController.instance.isAndroid) return false;
+    if (!playerSettingsController.androidPipEnabled) return false;
+    return TwitchPlaybackSessionController.instance.playableState != null ||
+        TwitchMiniPlayerController.instance.isActive;
+  }
+
+  Future<void> _enterPictureInPictureFromRootBack() async {
+    if (!_shouldBackEnterPictureInPicture) return;
+    await TwitchAndroidPipController.instance.enterPictureInPicture(
+      aspectRatioWidth: 16,
+      aspectRatioHeight: 9,
+    );
   }
 
   Future<void> _loadUpdateSettingsAndCheck() async {
@@ -553,46 +632,53 @@ class _TwitchStreamPageState extends State<TwitchStreamPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _kBackground,
-      body: AnimatedBuilder(
-        animation: playerSettingsController,
-        builder: (context, _) {
-          return Stack(
-            children: <Widget>[
-              DecoratedBox(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: <Color>[
-                      Color(0xFF25113C),
-                      Color(0xFF11111A),
-                      Color(0xFF07070B),
-                    ],
+    return PopScope<Object?>(
+      canPop: !_shouldBackEnterPictureInPicture,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        unawaited(_enterPictureInPictureFromRootBack());
+      },
+      child: Scaffold(
+        backgroundColor: _kBackground,
+        body: AnimatedBuilder(
+          animation: playerSettingsController,
+          builder: (context, _) {
+            return Stack(
+              children: <Widget>[
+                DecoratedBox(
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: <Color>[
+                        Color(0xFF25113C),
+                        Color(0xFF11111A),
+                        Color(0xFF07070B),
+                      ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final layout = TwitchResponsiveLayout.fromConstraints(
+                          constraints,
+                        );
+                        return layout.shouldUseBottomHomeNavigation
+                            ? _buildMobileShell(layout)
+                            : _buildDesktopShell(layout);
+                      },
+                    ),
                   ),
                 ),
-                child: SafeArea(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final layout = TwitchResponsiveLayout.fromConstraints(
-                        constraints,
-                      );
-                      return layout.shouldUseBottomHomeNavigation
-                          ? _buildMobileShell(layout)
-                          : _buildDesktopShell(layout);
-                    },
-                  ),
+                TwitchMiniPlayerOverlay(
+                  controller: TwitchMiniPlayerController.instance,
+                  discoveryService: discoveryService,
+                  androidPipEnabled: playerSettingsController.androidPipEnabled,
                 ),
-              ),
-              TwitchMiniPlayerOverlay(
-                controller: TwitchMiniPlayerController.instance,
-                discoveryService: discoveryService,
-                androidPipEnabled: playerSettingsController.androidPipEnabled,
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }

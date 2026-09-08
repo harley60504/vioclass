@@ -5,7 +5,7 @@ import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../../localization/vioclass_localizations.dart';
 import 'twitch_time_jump_sheet.dart';
 
-const double _liveEdgeSnapRatio = 0.995;
+const double _liveEdgeRatio = 1.0;
 
 class TwitchLivePlaybackStrip extends StatefulWidget {
   final Player player;
@@ -13,7 +13,8 @@ class TwitchLivePlaybackStrip extends StatefulWidget {
   final bool compact;
   final Duration? dvrTimelineDuration;
   final DateTime? dvrTimelineStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
+  final bool timelineEnabled;
 
   const TwitchLivePlaybackStrip({
     super.key,
@@ -22,7 +23,8 @@ class TwitchLivePlaybackStrip extends StatefulWidget {
     this.compact = false,
     this.dvrTimelineDuration,
     this.dvrTimelineStartedAt,
-    this.onOpenDvrReplayAt,
+    this.onOpenDvrReplayAtPosition,
+    this.timelineEnabled = true,
   });
 
   @override
@@ -82,8 +84,9 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         dvrTimelineDuration.inMilliseconds > 500;
                     final hasSeekableDuration = duration.inMilliseconds > 500;
                     final canScrubTimeline =
+                        widget.timelineEnabled &&
                         (hasSeekableDuration || hasDvrTimeline) &&
-                        widget.onOpenDvrReplayAt != null;
+                        widget.onOpenDvrReplayAtPosition != null;
                     final rawPlayerValue = hasSeekableDuration
                         ? position.inMilliseconds / duration.inMilliseconds
                         : 1.0;
@@ -101,7 +104,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                         ? dvrTimelineDuration
                         : duration;
                     final previewPosition = displayDuration.inMilliseconds > 500
-                        ? value >= _liveEdgeSnapRatio && !_dragging
+                        ? value >= _liveEdgeRatio && !_dragging
                               ? displayDuration
                               : Duration(
                                   milliseconds:
@@ -114,8 +117,9 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                     final timeColor = buffering
                         ? Colors.orangeAccent
                         : Colors.white60;
-                    final liveLabelActive = value >= _liveEdgeSnapRatio;
+                    final liveLabelActive = value >= _liveEdgeRatio;
                     final canJumpByTime =
+                        widget.timelineEnabled &&
                         canScrubTimeline &&
                         displayDuration.inMilliseconds > 500;
 
@@ -135,12 +139,18 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                       setState(() {
                         _dragging = false;
                         _dragValue = null;
-                        _livePinned = ratio >= _liveEdgeSnapRatio;
+                        _livePinned = ratio >= _liveEdgeRatio;
                       });
 
-                      if (ratio < _liveEdgeSnapRatio &&
-                          widget.onOpenDvrReplayAt != null) {
-                        widget.onOpenDvrReplayAt!(ratio);
+                      if (ratio < _liveEdgeRatio &&
+                          widget.onOpenDvrReplayAtPosition != null) {
+                        widget.onOpenDvrReplayAtPosition!(
+                          Duration(
+                            milliseconds:
+                                (displayDuration.inMilliseconds * ratio)
+                                    .round(),
+                          ),
+                        );
                       }
                     }
 
@@ -163,8 +173,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                       setState(() {
                                         _dragging = true;
                                         _dragValue = next;
-                                        _livePinned =
-                                            next >= _liveEdgeSnapRatio;
+                                        _livePinned = next >= _liveEdgeRatio;
                                       });
                                     }
                                   : null,
@@ -172,8 +181,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                   ? (next) {
                                       setState(() {
                                         _dragValue = next;
-                                        _livePinned =
-                                            next >= _liveEdgeSnapRatio;
+                                        _livePinned = next >= _liveEdgeRatio;
                                       });
                                     }
                                   : null,
@@ -182,13 +190,21 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                                       setState(() {
                                         _dragging = false;
                                         _dragValue = null;
-                                        _livePinned =
-                                            next >= _liveEdgeSnapRatio;
+                                        _livePinned = next >= _liveEdgeRatio;
                                       });
 
-                                      if (next < _liveEdgeSnapRatio &&
-                                          widget.onOpenDvrReplayAt != null) {
-                                        widget.onOpenDvrReplayAt!(next);
+                                      if (next < _liveEdgeRatio &&
+                                          widget.onOpenDvrReplayAtPosition !=
+                                              null) {
+                                        widget.onOpenDvrReplayAtPosition!(
+                                          Duration(
+                                            milliseconds:
+                                                (displayDuration
+                                                            .inMilliseconds *
+                                                        next)
+                                                    .round(),
+                                          ),
+                                        );
                                         return;
                                       }
                                     }
@@ -204,7 +220,7 @@ class _TwitchLivePlaybackStripState extends State<TwitchLivePlaybackStrip> {
                             duration: duration,
                             buffering: buffering,
                             playing: playing,
-                            livePinned: value >= _liveEdgeSnapRatio,
+                            livePinned: value >= _liveEdgeRatio,
                           ),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(

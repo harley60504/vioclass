@@ -111,6 +111,7 @@ class TwitchMiniPlayerController extends ChangeNotifier {
     _entry = null;
     TwitchMediaKitPlayerHost.keepPlayingWithoutSession(null);
     if (pausePlayback) {
+      TwitchPlaybackSessionController.instance.clear();
       unawaited(TwitchMediaKitPlayerHost.pauseShared().catchError((_) {}));
     }
     notifyListeners();

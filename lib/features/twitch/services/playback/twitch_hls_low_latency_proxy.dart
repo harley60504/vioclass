@@ -116,6 +116,13 @@ class TwitchDartHlsLowLatencyProxy {
     return value;
   }
 
+  String liveReplayUrl({required Duration fromLive}) {
+    final p = port;
+    if (p == null) throw StateError('Proxy has not started.');
+    final seconds = fromLive.inSeconds.clamp(1, 20).toInt();
+    return 'http://127.0.0.1:$p/live-replay.ts?seconds=$seconds';
+  }
+
   TwitchHlsLiveStatus? get liveStatus => _liveStatus;
 
   Future<void> start() async {
@@ -618,6 +625,8 @@ class _TwitchDartHlsLowLatencyProxyCore {
 
       if (path == '/' || path == '/stream' || path == '/stream.ts') {
         await _handleStream(request, upstreamPlaylistUrl);
+      } else if (path == '/live-replay.ts') {
+        await _handleLiveReplay(request, _readReplayDuration(request));
       } else if (path == '/playlist.m3u8') {
         await _handlePlaylist(request, upstreamPlaylistUrl);
       } else if (path == '/hls.m3u8') {
@@ -705,6 +714,39 @@ class _TwitchDartHlsLowLatencyProxyCore {
     }
   }
 
+  Future<void> _handleLiveReplay(HttpRequest request, Duration fromLive) async {
+    if (request.method == 'HEAD') {
+      request.response.statusCode = HttpStatus.ok;
+      _applyStreamlinkLikeHeaders(request.response);
+      await request.response.close();
+      return;
+    }
+
+    request.response.statusCode = HttpStatus.ok;
+    _applyStreamlinkLikeHeaders(request.response);
+    request.response.bufferOutput = false;
+
+    final engine = _takePrewarmedEngine(upstreamPlaylistUrl);
+    engine.startPrewarm();
+
+    try {
+      await engine.pipeReplayToResponse(
+        response: request.response,
+        fromLive: fromLive,
+      );
+    } catch (_) {
+      try {
+        await request.response.close();
+      } catch (_) {}
+    } finally {
+      if (server != null && identical(_prewarmEngine, engine)) {
+        engine.scheduleIdleStop();
+      } else if (!identical(_prewarmEngine, engine)) {
+        engine.stop();
+      }
+    }
+  }
+
   _TwitchHlsLowLatencyEngine _takePrewarmedEngine(String url) {
     final engine = _prewarmEngine;
 
@@ -764,6 +806,11 @@ class _TwitchDartHlsLowLatencyProxyCore {
     final raw = request.uri.queryParameters['u'];
     if (raw == null || raw.isEmpty) return null;
     return _decodeUrl(raw);
+  }
+
+  Duration _readReplayDuration(HttpRequest request) {
+    final raw = int.tryParse(request.uri.queryParameters['seconds'] ?? '');
+    return Duration(seconds: (raw ?? 10).clamp(1, 20).toInt());
   }
 
   Future<void> _badRequest(HttpRequest request, String message) async {
@@ -1368,6 +1415,8 @@ class _TwitchHlsLowLatencyEngine {
     // trimming inside the current segment unless an emergency hard limit is hit.
     maxReplayBytes: 4 * 1024 * 1024,
   );
+  final LinkedHashMap<String, TwitchHlsSegmentItem> _recentWrittenItemHistory =
+      LinkedHashMap<String, TwitchHlsSegmentItem>();
 
   bool _stopped = false;
   bool _pollerStarted = false;
@@ -1501,6 +1550,89 @@ class _TwitchHlsLowLatencyEngine {
       if (_activeClientCount <= 0) {
         scheduleIdleStop();
       }
+    }
+  }
+
+  Future<void> pipeReplayToResponse({
+    required HttpResponse response,
+    required Duration fromLive,
+  }) async {
+    cancelIdleStop();
+    startPrewarm();
+    _ensurePersistentWriterStarted();
+
+    _activeClientCount++;
+
+    try {
+      await waitForSnapshot(timeout: const Duration(milliseconds: 900));
+      final replayItems = _recentReplayItems(fromLive);
+      final sink = _TwitchHlsResponseByteSink(response);
+
+      for (final item in replayItems) {
+        if (_stopped || owner.server == null) return;
+        await owner._pipeSegmentToOutputBuffer(output: sink, item: item);
+      }
+
+      await owner._pipeEngineOutputToResponse(
+        response: response,
+        stream: _liveBus.createClientStream(includeReplay: false),
+      );
+    } catch (_) {
+      // Silent by design.
+    } finally {
+      _activeClientCount = math.max(0, _activeClientCount - 1);
+
+      try {
+        await response.close();
+      } catch (_) {}
+
+      if (_activeClientCount <= 0) {
+        scheduleIdleStop();
+      }
+    }
+  }
+
+  List<TwitchHlsSegmentItem> _recentReplayItems(Duration fromLive) {
+    final items =
+        _recentWrittenItemHistory.values
+            .where((item) => item.duration.inMilliseconds > 0)
+            .toList()
+          ..sort((a, b) => a.sequence.compareTo(b.sequence));
+    if (items.isEmpty) return const <TwitchHlsSegmentItem>[];
+
+    final target = fromLive <= Duration.zero
+        ? const Duration(seconds: 1)
+        : fromLive;
+    var total = Duration.zero;
+    var start = items.length - 1;
+
+    for (var i = items.length - 1; i >= 0; i--) {
+      total += items[i].duration;
+      start = i;
+      if (total >= target) break;
+    }
+
+    return items.sublist(start);
+  }
+
+  void rememberWrittenItem(TwitchHlsSegmentItem item) {
+    if (item.duration.inMilliseconds <= 0) return;
+    _recentWrittenItemHistory['${item.sequence}:${item.url}'] = item;
+    _trimRecentWrittenItemHistory();
+  }
+
+  void _trimRecentWrittenItemHistory() {
+    var total = Duration.zero;
+    for (final item in _recentWrittenItemHistory.values.toList().reversed) {
+      total += item.duration;
+    }
+
+    while (_recentWrittenItemHistory.length > 1 &&
+        total > const Duration(seconds: 20)) {
+      final firstKey = _recentWrittenItemHistory.keys.first;
+      final removed = _recentWrittenItemHistory.remove(firstKey);
+      if (removed == null) break;
+      total -= removed.duration;
     }
   }
 
@@ -2384,6 +2516,7 @@ class _TwitchHlsPersistentWriter {
     _lastWrittenDuration = item.duration;
     _lastWrittenWasPrefetch = item.isPrefetch;
     _lastWrittenAt = DateTime.now();
+    engine.rememberWrittenItem(item);
   }
 }
 
@@ -2393,6 +2526,26 @@ abstract class TwitchHlsByteSink {
   Future<void> addStream(Stream<List<int>> stream);
 
   void close();
+}
+
+class _TwitchHlsResponseByteSink implements TwitchHlsByteSink {
+  final HttpResponse response;
+
+  _TwitchHlsResponseByteSink(this.response);
+
+  @override
+  int get bufferedBytes => 0;
+
+  @override
+  Future<void> addStream(Stream<List<int>> stream) async {
+    await for (final chunk in stream) {
+      response.add(chunk);
+      await response.flush();
+    }
+  }
+
+  @override
+  void close() {}
 }
 
 class TwitchHlsLiveByteBus implements TwitchHlsByteSink {

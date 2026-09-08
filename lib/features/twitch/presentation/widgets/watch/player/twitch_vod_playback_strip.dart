@@ -4,12 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../../localization/vioclass_localizations.dart';
+import '../../../watch/controllers/twitch_playback_timeline_controller.dart';
+import '../../../watch/twitch_watch_playback_kind.dart';
 import 'twitch_time_jump_sheet.dart';
-
-const double _liveEdgeSnapRatio = 0.995;
-const double _liveEdgeExactRatio = 0.9999;
-const double _maxLiveDvrReplayRatio = _liveEdgeSnapRatio - 0.01;
-const Duration _seekButtonDebounce = Duration(milliseconds: 520);
 
 class TwitchVodPlaybackStrip extends StatefulWidget {
   final Player player;
@@ -18,9 +15,12 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
   final bool forceLiveEdge;
   final Duration? liveTimelineDuration;
   final DateTime? liveTimelineStartedAt;
-  final double? timelineValue;
-  final bool timelineValueAdvancesWithPlayer;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final Duration? timelinePosition;
+  final bool timelinePositionAdvancesWithPlayer;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? timelineController;
+  final TwitchWatchPlaybackKind playbackKind;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
 
   const TwitchVodPlaybackStrip({
@@ -31,9 +31,12 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
     this.forceLiveEdge = false,
     this.liveTimelineDuration,
     this.liveTimelineStartedAt,
-    this.timelineValue,
-    this.timelineValueAdvancesWithPlayer = false,
-    this.onOpenDvrReplayAt,
+    this.timelinePosition,
+    this.timelinePositionAdvancesWithPlayer = false,
+    this.timelineEnabled = true,
+    this.timelineController,
+    this.playbackKind = TwitchWatchPlaybackKind.vod,
+    this.onOpenDvrReplayAtPosition,
     this.onReturnToLive,
   });
 
@@ -45,9 +48,83 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
   bool _dragging = false;
   double? _dragValue;
   double? _scrubbedTimelineValue;
+  Timer? _timelineClock;
+  Duration? _timelineClockBase;
+  Duration _timelineClockElapsed = Duration.zero;
+  DateTime? _timelineClockLastTickAt;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTimelineClock();
+  }
+
+  @override
+  void didUpdateWidget(covariant TwitchVodPlaybackStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.timelinePosition != widget.timelinePosition ||
+        oldWidget.timelinePositionAdvancesWithPlayer !=
+            widget.timelinePositionAdvancesWithPlayer ||
+        oldWidget.showLiveEdgeLabel != widget.showLiveEdgeLabel ||
+        oldWidget.forceLiveEdge != widget.forceLiveEdge) {
+      _syncTimelineClock();
+    }
+  }
+
+  @override
+  void dispose() {
+    _timelineClock?.cancel();
+    super.dispose();
+  }
+
+  void _syncTimelineClock() {
+    final shouldTick =
+        widget.timelinePositionAdvancesWithPlayer &&
+        widget.timelinePosition != null &&
+        (widget.showLiveEdgeLabel || widget.forceLiveEdge);
+    if (!shouldTick) {
+      _timelineClock?.cancel();
+      _timelineClock = null;
+      _timelineClockBase = null;
+      _timelineClockElapsed = Duration.zero;
+      _timelineClockLastTickAt = null;
+      return;
+    }
+
+    _timelineClockBase = widget.timelinePosition;
+    _timelineClockElapsed = Duration.zero;
+    _timelineClockLastTickAt = DateTime.now();
+    _timelineClock ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      if (_dragging) return;
+      final now = DateTime.now();
+      if (player.state.playing) {
+        final lastTick = _timelineClockLastTickAt ?? now;
+        final delta = now.difference(lastTick);
+        if (!delta.isNegative) {
+          _timelineClockElapsed += delta;
+        }
+      }
+      _timelineClockLastTickAt = now;
+      setState(() {});
+    });
+  }
+
+  Duration? _advancedTimelinePosition(Duration displayDuration) {
+    final base = _timelineClockBase ?? widget.timelinePosition;
+    if (base == null || displayDuration.inMilliseconds <= 0) return null;
+    final elapsed = widget.timelinePositionAdvancesWithPlayer
+        ? _timelineClockElapsed
+        : Duration.zero;
+    return Duration(
+      milliseconds: (base.inMilliseconds + elapsed.inMilliseconds)
+          .clamp(0, displayDuration.inMilliseconds)
+          .toInt(),
+    );
+  }
 
   Duration? _effectiveLiveTimelineDuration() {
     final base = widget.liveTimelineDuration;
@@ -74,270 +151,299 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
           stream: player.stream.duration,
           initialData: player.state.duration,
           builder: (context, durationSnapshot) {
-            final position = positionSnapshot.data ?? Duration.zero;
-            final duration = durationSnapshot.data ?? Duration.zero;
-            final liveDuration = _effectiveLiveTimelineDuration();
-            final displayDuration =
-                liveDuration != null && liveDuration.inMilliseconds > 500
-                ? liveDuration
-                : duration;
-            final hasDuration = displayDuration.inMilliseconds > 500;
-            final hasPlayerDuration = duration.inMilliseconds > 500;
-            final rawValue = hasPlayerDuration
-                ? position.inMilliseconds / duration.inMilliseconds
-                : widget.forceLiveEdge
-                ? 1.0
-                : 0.0;
-            final streamValue = rawValue.clamp(0.0, 1.0).toDouble();
-            final manualValue = _scrubbedTimelineValue;
-            final externalValue = widget.timelineValue?.clamp(0.0, 1.0);
-            final baseValue = _dragging
-                ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
-                : externalValue != null &&
-                      (widget.forceLiveEdge || widget.showLiveEdgeLabel)
-                ? externalValue.toDouble()
-                : manualValue != null &&
-                      (widget.forceLiveEdge || widget.showLiveEdgeLabel)
-                ? manualValue.clamp(0.0, 1.0).toDouble()
-                : widget.showLiveEdgeLabel || widget.forceLiveEdge
-                ? 1.0
-                : streamValue;
-            final advancedValue =
-                !_dragging &&
-                    widget.timelineValueAdvancesWithPlayer &&
-                    externalValue != null &&
-                    hasDuration
-                ? (externalValue +
-                          position.inMilliseconds /
+            return StreamBuilder<bool>(
+              stream: player.stream.playing,
+              initialData: player.state.playing,
+              builder: (context, playingSnapshot) {
+                final position = positionSnapshot.data ?? Duration.zero;
+                final duration = durationSnapshot.data ?? Duration.zero;
+                final liveDuration = _effectiveLiveTimelineDuration();
+                final isLiveTimeline =
+                    widget.forceLiveEdge || widget.showLiveEdgeLabel;
+                final displayDuration =
+                    liveDuration != null && liveDuration.inMilliseconds > 500
+                    ? liveDuration
+                    : isLiveTimeline
+                    ? Duration.zero
+                    : duration;
+                final hasDuration = displayDuration.inMilliseconds > 500;
+                final canScrubTimeline = widget.timelineEnabled && hasDuration;
+                final hasPlayerDuration = duration.inMilliseconds > 500;
+                final rawValue = hasPlayerDuration
+                    ? position.inMilliseconds / duration.inMilliseconds
+                    : widget.forceLiveEdge
+                    ? 1.0
+                    : 0.0;
+                final streamValue = rawValue.clamp(0.0, 1.0).toDouble();
+                final manualValue = _scrubbedTimelineValue;
+                final controlledPosition = widget.timelineController
+                    ?.positionFor(displayDuration);
+                final advancedExternalPosition = !_dragging && hasDuration
+                    ? controlledPosition ??
+                          _advancedTimelinePosition(displayDuration)
+                    : widget.timelinePosition;
+                final externalValue =
+                    advancedExternalPosition != null &&
+                        displayDuration.inMilliseconds > 0
+                    ? (advancedExternalPosition.inMilliseconds /
                               displayDuration.inMilliseconds)
-                      .clamp(0.0, 1.0)
-                      .toDouble()
-                : baseValue;
-            final value = advancedValue;
-            final previewPosition = hasDuration
-                ? Duration(
-                    milliseconds: (displayDuration.inMilliseconds * value)
-                        .round(),
-                  )
-                : position;
-            final liveTailActive =
-                widget.showLiveEdgeLabel && value >= _liveEdgeSnapRatio;
-            final durationText = hasDuration
-                ? _formatDuration(displayDuration)
-                : '--:--';
-            final positionText = _formatDuration(previewPosition);
-            final tailText = widget.showLiveEdgeLabel
-                ? context.vio.t('直播')
-                : durationText;
-            final canTapLiveTail =
-                widget.showLiveEdgeLabel && widget.onReturnToLive != null;
-            final canJumpByTime = hasDuration;
-            final media = MediaQuery.of(context);
-            final physicalShortestSide =
-                media.size.shortestSide * media.devicePixelRatio;
-            final useInlineTimeJump =
-                hasDuration &&
-                !compact &&
-                (media.size.width >= 760 || physicalShortestSide >= 1400);
-            final isLiveTimeline =
-                widget.forceLiveEdge || widget.showLiveEdgeLabel;
+                          .clamp(0.0, 1.0)
+                          .toDouble()
+                    : null;
+                final baseValue = _dragging
+                    ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
+                    : externalValue != null &&
+                          (widget.forceLiveEdge || widget.showLiveEdgeLabel)
+                    ? externalValue.toDouble()
+                    : manualValue != null &&
+                          (widget.forceLiveEdge || widget.showLiveEdgeLabel)
+                    ? manualValue.clamp(0.0, 1.0).toDouble()
+                    : widget.showLiveEdgeLabel || widget.forceLiveEdge
+                    ? 1.0
+                    : streamValue;
+                final value = baseValue;
+                final previewPosition = hasDuration
+                    ? Duration(
+                        milliseconds: (displayDuration.inMilliseconds * value)
+                            .round(),
+                      )
+                    : position;
+                final liveTailActive =
+                    widget.showLiveEdgeLabel &&
+                    (widget.forceLiveEdge ||
+                        (hasDuration &&
+                            previewPosition >=
+                                displayDuration - const Duration(seconds: 1)));
+                final durationText = hasDuration
+                    ? _formatDuration(displayDuration)
+                    : '--:--';
+                final positionText = _formatDuration(previewPosition);
+                final tailText = widget.showLiveEdgeLabel
+                    ? context.vio.t('直播')
+                    : durationText;
+                final canTapLiveTail =
+                    widget.showLiveEdgeLabel && widget.onReturnToLive != null;
+                final canJumpByTime = widget.timelineEnabled && hasDuration;
+                final media = MediaQuery.of(context);
+                final physicalShortestSide =
+                    media.size.shortestSide * media.devicePixelRatio;
+                final useInlineTimeJump =
+                    hasDuration &&
+                    !compact &&
+                    (media.size.width >= 760 || physicalShortestSide >= 1400);
+                void jumpToTarget(Duration target) {
+                  final next = displayDuration.inMilliseconds <= 0
+                      ? 0.0
+                      : target.inMilliseconds / displayDuration.inMilliseconds;
+                  final ratio = next.clamp(0.0, 1.0).toDouble();
+                  final exactLiveEdge =
+                      isLiveTimeline &&
+                      widget.onReturnToLive != null &&
+                      target >= displayDuration;
 
-            double replayRatioFor(double ratio) {
-              if (!isLiveTimeline) return ratio.clamp(0.0, 1.0).toDouble();
-              return ratio.clamp(0.0, _maxLiveDvrReplayRatio).toDouble();
-            }
+                  if (exactLiveEdge) {
+                    setState(() {
+                      _dragging = false;
+                      _dragValue = null;
+                      _scrubbedTimelineValue = null;
+                    });
+                    widget.timelineController?.returnToLive();
+                    widget.onReturnToLive!();
+                    return;
+                  }
 
-            void jumpToTarget(Duration target) {
-              final next = displayDuration.inMilliseconds <= 0
-                  ? 0.0
-                  : target.inMilliseconds / displayDuration.inMilliseconds;
-              final ratio = next.clamp(0.0, 1.0).toDouble();
-              final exactLiveEdge =
-                  isLiveTimeline &&
-                  widget.onReturnToLive != null &&
-                  ratio >= _liveEdgeExactRatio;
+                  setState(() {
+                    _dragging = false;
+                    _dragValue = null;
+                    _scrubbedTimelineValue = ratio;
+                  });
+                  widget.timelineController?.commitPosition(target);
 
-              if (exactLiveEdge) {
-                setState(() {
-                  _dragging = false;
-                  _dragValue = null;
-                  _scrubbedTimelineValue = null;
-                });
-                widget.onReturnToLive!();
-                return;
-              }
+                  if (isLiveTimeline &&
+                      widget.onOpenDvrReplayAtPosition != null) {
+                    widget.onOpenDvrReplayAtPosition!(target);
+                    return;
+                  }
 
-              setState(() {
-                _dragging = false;
-                _dragValue = null;
-                _scrubbedTimelineValue = isLiveTimeline
-                    ? replayRatioFor(ratio)
-                    : ratio;
-              });
+                  unawaited(player.seek(target));
+                }
 
-              if (isLiveTimeline && widget.onOpenDvrReplayAt != null) {
-                widget.onOpenDvrReplayAt!(replayRatioFor(ratio));
-                return;
-              }
+                Future<void> openTimeJumpSheet() async {
+                  final target = await showTwitchTimeJumpSheet(
+                    context: context,
+                    current: previewPosition,
+                    duration: displayDuration,
+                    liveTail: widget.showLiveEdgeLabel,
+                  );
+                  if (target == null || !context.mounted) return;
+                  jumpToTarget(target);
+                }
 
-              unawaited(player.seek(target));
-            }
+                return Row(
+                  children: [
+                    Expanded(
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: compact ? 4 : 5,
+                          thumbShape: RoundSliderThumbShape(
+                            enabledThumbRadius: compact ? 6 : 7,
+                          ),
+                        ),
+                        child: Slider(
+                          value: value,
+                          min: 0,
+                          max: 1,
+                          onChangeStart: canScrubTimeline
+                              ? (next) {
+                                  setState(() {
+                                    _dragging = true;
+                                    _dragValue = next;
+                                  });
+                                  widget.timelineController?.beginDrag(
+                                    Duration(
+                                      milliseconds:
+                                          (displayDuration.inMilliseconds *
+                                                  next)
+                                              .round(),
+                                    ),
+                                  );
+                                }
+                              : null,
+                          onChanged: canScrubTimeline
+                              ? (next) {
+                                  setState(() => _dragValue = next);
+                                  widget.timelineController?.updateDrag(
+                                    Duration(
+                                      milliseconds:
+                                          (displayDuration.inMilliseconds *
+                                                  next)
+                                              .round(),
+                                    ),
+                                  );
+                                }
+                              : null,
+                          onChangeEnd: canScrubTimeline
+                              ? (next) {
+                                  final exactLiveEdge =
+                                      isLiveTimeline &&
+                                      widget.onReturnToLive != null &&
+                                      next >= 1.0;
+                                  if (exactLiveEdge) {
+                                    setState(() {
+                                      _dragging = false;
+                                      _dragValue = null;
+                                      _scrubbedTimelineValue = null;
+                                    });
+                                    widget.timelineController?.returnToLive();
+                                    widget.onReturnToLive!();
+                                    return;
+                                  }
 
-            Future<void> openTimeJumpSheet() async {
-              final target = await showTwitchTimeJumpSheet(
-                context: context,
-                current: previewPosition,
-                duration: displayDuration,
-                liveTail: widget.showLiveEdgeLabel,
-              );
-              if (target == null || !context.mounted) return;
-              jumpToTarget(target);
-            }
+                                  setState(() {
+                                    _dragging = false;
+                                    _dragValue = null;
+                                    _scrubbedTimelineValue = next;
+                                  });
+                                  final target = Duration(
+                                    milliseconds:
+                                        (displayDuration.inMilliseconds * next)
+                                            .round()
+                                            .clamp(
+                                              0,
+                                              displayDuration.inMilliseconds,
+                                            )
+                                            .toInt(),
+                                  );
+                                  widget.timelineController?.commitPosition(
+                                    target,
+                                  );
 
-            return Row(
-              children: [
-                Expanded(
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: compact ? 4 : 5,
-                      thumbShape: RoundSliderThumbShape(
-                        enabledThumbRadius: compact ? 6 : 7,
+                                  if (isLiveTimeline &&
+                                      widget.onOpenDvrReplayAtPosition !=
+                                          null) {
+                                    widget.onOpenDvrReplayAtPosition!(target);
+                                    return;
+                                  }
+
+                                  unawaited(player.seek(target));
+                                }
+                              : null,
+                        ),
                       ),
                     ),
-                    child: Slider(
-                      value: value,
-                      min: 0,
-                      max: 1,
-                      onChangeStart: hasDuration
-                          ? (next) {
-                              setState(() {
-                                _dragging = true;
-                                _dragValue = next;
-                              });
-                            }
-                          : null,
-                      onChanged: hasDuration
-                          ? (next) {
-                              setState(() => _dragValue = next);
-                            }
-                          : null,
-                      onChangeEnd: hasDuration
-                          ? (next) {
-                              final exactLiveEdge =
-                                  isLiveTimeline &&
-                                  widget.onReturnToLive != null &&
-                                  next >= _liveEdgeExactRatio;
-                              if (exactLiveEdge) {
+                    SizedBox(width: compact ? 6 : 8),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minWidth: widget.showLiveEdgeLabel
+                            ? compact
+                                  ? 132
+                                  : 154
+                            : compact
+                            ? 82
+                            : 108,
+                        maxWidth: widget.showLiveEdgeLabel
+                            ? compact
+                                  ? 178
+                                  : useInlineTimeJump
+                                  ? 340
+                                  : 220
+                            : compact
+                            ? 104
+                            : useInlineTimeJump
+                            ? 260
+                            : 136,
+                      ),
+                      child: useInlineTimeJump
+                          ? _InlineTimelineTimeControls(
+                              current: previewPosition,
+                              duration: displayDuration,
+                              liveText: widget.showLiveEdgeLabel
+                                  ? context.vio.t('直播')
+                                  : null,
+                              liveActive: liveTailActive,
+                              canReturnToLive: canTapLiveTail,
+                              timelineController: widget.timelineController,
+                              onJump: jumpToTarget,
+                              onReturnToLive: () {
+                                setState(() {
+                                  _dragging = false;
+                                  _dragValue = null;
+                                  _scrubbedTimelineValue = null;
+                                });
+                                widget.timelineController?.returnToLive();
+                                widget.onReturnToLive!();
+                              },
+                            )
+                          : widget.showLiveEdgeLabel
+                          ? _LiveTimelineTimeControls(
+                              positionText: positionText,
+                              durationText: durationText,
+                              liveText: tailText,
+                              liveActive: liveTailActive,
+                              compact: compact,
+                              canJumpByTime: canJumpByTime,
+                              canReturnToLive: canTapLiveTail,
+                              onOpenTimeJump: openTimeJumpSheet,
+                              onReturnToLive: () {
                                 setState(() {
                                   _dragging = false;
                                   _dragValue = null;
                                   _scrubbedTimelineValue = null;
                                 });
                                 widget.onReturnToLive!();
-                                return;
-                              }
-
-                              setState(() {
-                                _dragging = false;
-                                _dragValue = null;
-                                _scrubbedTimelineValue = isLiveTimeline
-                                    ? replayRatioFor(next)
-                                    : next;
-                              });
-
-                              if (widget.forceLiveEdge &&
-                                  next < _liveEdgeSnapRatio &&
-                                  widget.onOpenDvrReplayAt != null) {
-                                widget.onOpenDvrReplayAt!(replayRatioFor(next));
-                                return;
-                              }
-
-                              if (widget.forceLiveEdge &&
-                                  widget.onOpenDvrReplayAt != null) {
-                                widget.onOpenDvrReplayAt!(replayRatioFor(next));
-                                return;
-                              }
-
-                              final target = Duration(
-                                milliseconds:
-                                    (displayDuration.inMilliseconds * next)
-                                        .round(),
-                              );
-                              unawaited(player.seek(target));
-                            }
-                          : null,
+                              },
+                            )
+                          : _VodTimelineTimeControls(
+                              positionText: positionText,
+                              tailText: tailText,
+                              compact: compact,
+                              canJumpByTime: canJumpByTime,
+                              onOpenTimeJump: openTimeJumpSheet,
+                            ),
                     ),
-                  ),
-                ),
-                SizedBox(width: compact ? 6 : 8),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minWidth: widget.showLiveEdgeLabel
-                        ? compact
-                              ? 132
-                              : 154
-                        : compact
-                        ? 82
-                        : 108,
-                    maxWidth: widget.showLiveEdgeLabel
-                        ? compact
-                              ? 178
-                              : useInlineTimeJump
-                              ? 340
-                              : 220
-                        : compact
-                        ? 104
-                        : useInlineTimeJump
-                        ? 260
-                        : 136,
-                  ),
-                  child: useInlineTimeJump
-                      ? _InlineTimelineTimeControls(
-                          current: previewPosition,
-                          duration: displayDuration,
-                          liveText: widget.showLiveEdgeLabel
-                              ? context.vio.t('直播')
-                              : null,
-                          liveActive: liveTailActive,
-                          canReturnToLive: canTapLiveTail,
-                          onJump: jumpToTarget,
-                          onReturnToLive: () {
-                            setState(() {
-                              _dragging = false;
-                              _dragValue = null;
-                              _scrubbedTimelineValue = null;
-                            });
-                            widget.onReturnToLive!();
-                          },
-                        )
-                      : widget.showLiveEdgeLabel
-                      ? _LiveTimelineTimeControls(
-                          positionText: positionText,
-                          durationText: durationText,
-                          liveText: tailText,
-                          liveActive: liveTailActive,
-                          compact: compact,
-                          canJumpByTime: canJumpByTime,
-                          canReturnToLive: canTapLiveTail,
-                          onOpenTimeJump: openTimeJumpSheet,
-                          onReturnToLive: () {
-                            setState(() {
-                              _dragging = false;
-                              _dragValue = null;
-                              _scrubbedTimelineValue = null;
-                            });
-                            widget.onReturnToLive!();
-                          },
-                        )
-                      : _VodTimelineTimeControls(
-                          positionText: positionText,
-                          tailText: tailText,
-                          compact: compact,
-                          canJumpByTime: canJumpByTime,
-                          onOpenTimeJump: openTimeJumpSheet,
-                        ),
-                ),
-              ],
+                  ],
+                );
+              },
             );
           },
         );
@@ -364,6 +470,7 @@ class _InlineTimelineTimeControls extends StatefulWidget {
   final String? liveText;
   final bool liveActive;
   final bool canReturnToLive;
+  final TwitchPlaybackTimelineController? timelineController;
   final ValueChanged<Duration> onJump;
   final VoidCallback onReturnToLive;
 
@@ -373,6 +480,7 @@ class _InlineTimelineTimeControls extends StatefulWidget {
     required this.liveText,
     required this.liveActive,
     required this.canReturnToLive,
+    required this.timelineController,
     required this.onJump,
     required this.onReturnToLive,
   });
@@ -387,21 +495,17 @@ class _InlineTimelineTimeControlsState
   late final TextEditingController _controller;
   late final FocusNode _focusNode;
   bool _editing = false;
-  Timer? _pendingSeekTimer;
-  Duration? _pendingSeekBase;
-  Duration _pendingSeekDelta = Duration.zero;
 
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode()..addListener(_handleFocusChanged);
     _controller = TextEditingController(text: _formatTimeline(widget.current));
-    _focusNode = FocusNode();
   }
 
   @override
   void didUpdateWidget(covariant _InlineTimelineTimeControls oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_pendingSeekTimer?.isActive ?? false) return;
     if (_focusNode.hasFocus) return;
     final next = _formatTimeline(widget.current);
     if (_controller.text == next) return;
@@ -410,38 +514,17 @@ class _InlineTimelineTimeControlsState
 
   @override
   void dispose() {
-    _pendingSeekTimer?.cancel();
+    _focusNode.removeListener(_handleFocusChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
-  void _jumpBy(Duration delta) {
-    final liveDvrTail = Duration(
-      milliseconds: (widget.duration.inMilliseconds * _maxLiveDvrReplayRatio)
-          .round(),
-    );
-    final liveDvrTailStepBase = liveDvrTail + delta.abs();
-    final base =
-        _pendingSeekBase ??
-        (widget.liveText != null && widget.liveActive && delta.isNegative
-            ? liveDvrTailStepBase
-            : widget.current);
-    _pendingSeekBase = base;
-    _pendingSeekDelta += delta;
-
-    final next = Duration(
-      milliseconds: (base.inMilliseconds + _pendingSeekDelta.inMilliseconds)
-          .clamp(0, widget.duration.inMilliseconds)
-          .toInt(),
-    );
-    setState(() => _controller.text = _formatTimeline(next));
-
-    _pendingSeekTimer?.cancel();
-    _pendingSeekTimer = Timer(_seekButtonDebounce, () {
-      _pendingSeekBase = null;
-      _pendingSeekDelta = Duration.zero;
-      widget.onJump(next);
+  void _handleFocusChanged() {
+    if (_focusNode.hasFocus || !_editing || !mounted) return;
+    setState(() {
+      _editing = false;
+      _controller.text = _formatTimeline(widget.current);
     });
   }
 
@@ -462,7 +545,21 @@ class _InlineTimelineTimeControlsState
     );
     setState(() => _editing = false);
     _focusNode.unfocus();
-    widget.onJump(next);
+    final controller = widget.timelineController;
+    if (controller == null) {
+      widget.onJump(next);
+    } else {
+      controller.seekTo(next, widget.onJump);
+    }
+  }
+
+  void _cancelEditing() {
+    if (!_editing) return;
+    setState(() {
+      _editing = false;
+      _controller.text = _formatTimeline(widget.current);
+    });
+    _focusNode.unfocus();
   }
 
   void _startEditing() {
@@ -495,10 +592,6 @@ class _InlineTimelineTimeControlsState
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _InlineSeekButton(
-            icon: Icons.replay_10_rounded,
-            onPressed: () => _jumpBy(const Duration(seconds: -10)),
-          ),
           _InlineTimeValue(
             editing: _editing,
             controller: _controller,
@@ -507,6 +600,7 @@ class _InlineTimelineTimeControlsState
             onTap: _startEditing,
             onSubmitted: _submit,
             onEditingComplete: _submit,
+            onTapOutside: _cancelEditing,
           ),
           Text(' / ', style: textStyle),
           Text(_formatTimeline(widget.duration), style: textStyle),
@@ -520,10 +614,6 @@ class _InlineTimelineTimeControlsState
               onPressed: widget.onReturnToLive,
             ),
           ],
-          _InlineSeekButton(
-            icon: Icons.forward_10_rounded,
-            onPressed: () => _jumpBy(const Duration(seconds: 10)),
-          ),
         ],
       ),
     );
@@ -538,6 +628,7 @@ class _InlineTimeValue extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onSubmitted;
   final VoidCallback onEditingComplete;
+  final VoidCallback onTapOutside;
 
   const _InlineTimeValue({
     required this.editing,
@@ -547,27 +638,32 @@ class _InlineTimeValue extends StatelessWidget {
     required this.onTap,
     required this.onSubmitted,
     required this.onEditingComplete,
+    required this.onTapOutside,
   });
 
   @override
   Widget build(BuildContext context) {
     if (editing) {
-      return SizedBox(
-        width: 66,
-        height: 28,
-        child: TextField(
-          controller: controller,
-          focusNode: focusNode,
-          textAlign: TextAlign.center,
-          keyboardType: TextInputType.text,
-          textInputAction: TextInputAction.done,
-          onSubmitted: (_) => onSubmitted(),
-          onEditingComplete: onEditingComplete,
-          style: style,
-          decoration: const InputDecoration(
-            isDense: true,
-            border: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+      return TapRegion(
+        onTapOutside: (_) => onTapOutside(),
+        child: SizedBox(
+          width: 66,
+          height: 28,
+          child: TextField(
+            controller: controller,
+            focusNode: focusNode,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => onSubmitted(),
+            onEditingComplete: onEditingComplete,
+            onTapOutside: (_) => onTapOutside(),
+            style: style,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
+            ),
           ),
         ),
       );
@@ -622,24 +718,6 @@ class _InlineLiveButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _InlineSeekButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onPressed;
-
-  const _InlineSeekButton({required this.icon, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
-      icon: Icon(icon, color: Colors.white70, size: 19),
-      onPressed: onPressed,
     );
   }
 }

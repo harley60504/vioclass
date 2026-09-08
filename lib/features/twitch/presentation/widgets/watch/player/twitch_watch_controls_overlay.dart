@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../../../watch/twitch_watch_playback_kind.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import 'twitch_player_error_card.dart';
@@ -44,9 +45,11 @@ class WatchControlsOverlay extends StatefulWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const WatchControlsOverlay({
     super.key,
@@ -81,9 +84,11 @@ class WatchControlsOverlay extends StatefulWidget {
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
-    this.onOpenDvrReplayAt,
+    this.onOpenDvrReplayAtPosition,
     this.onReturnToLive,
     this.playbackKind = TwitchWatchPlaybackKind.live,
+    this.timelineEnabled = true,
+    this.playbackTimelineController,
   });
 
   @override
@@ -93,19 +98,13 @@ class WatchControlsOverlay extends StatefulWidget {
 class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   static const Duration _fadeDuration = Duration(milliseconds: 180);
   static const Duration _autoHideDelay = Duration(seconds: 3);
-  static const Duration _unmountDelay = Duration(milliseconds: 220);
 
   bool _visible = true;
-  bool _controlsMounted = true;
   Timer? _hideTimer;
-  Timer? _unmountTimer;
 
   bool get _hasError =>
       (widget.error != null && widget.error!.trim().isNotEmpty) ||
       widget.runtimeError != null;
-
-  bool get _shouldKeepControlsMounted =>
-      _controlsMounted || _visible || widget.loading || _hasError;
 
   @override
   void initState() {
@@ -124,7 +123,6 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   @override
   void dispose() {
     _hideTimer?.cancel();
-    _unmountTimer?.cancel();
     super.dispose();
   }
 
@@ -135,27 +133,14 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
     _hideTimer = Timer(_autoHideDelay, () {
       if (!mounted) return;
       setState(() => _visible = false);
-      _scheduleUnmountControls();
-    });
-  }
-
-  void _scheduleUnmountControls() {
-    _unmountTimer?.cancel();
-    _unmountTimer = Timer(_unmountDelay, () {
-      if (!mounted || _visible) return;
-      setState(() => _controlsMounted = false);
     });
   }
 
   void _showAndRestartAutoHide() {
     _hideTimer?.cancel();
-    _unmountTimer?.cancel();
 
-    if ((!_visible || !_controlsMounted) && mounted) {
-      setState(() {
-        _controlsMounted = true;
-        _visible = true;
-      });
+    if (!_visible && mounted) {
+      setState(() => _visible = true);
     }
 
     _scheduleAutoHide();
@@ -168,12 +153,11 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
       child: Stack(
         children: [
           Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
-          if (_shouldKeepControlsMounted)
-            _FadingWatchChrome(
-              visible: _visible,
-              fadeDuration: _fadeDuration,
-              child: _WatchChromeStack(widget: widget),
-            ),
+          _FadingWatchChrome(
+            visible: _visible,
+            fadeDuration: _fadeDuration,
+            child: _WatchChromeStack(widget: widget, hasError: _hasError),
+          ),
           _WatchErrorOverlay(
             error: widget.error,
             runtimeError: widget.runtimeError,
@@ -234,8 +218,9 @@ class _FadingWatchChrome extends StatelessWidget {
 
 class _WatchChromeStack extends StatelessWidget {
   final WatchControlsOverlay widget;
+  final bool hasError;
 
-  const _WatchChromeStack({required this.widget});
+  const _WatchChromeStack({required this.widget, required this.hasError});
 
   @override
   Widget build(BuildContext context) {
@@ -284,9 +269,11 @@ class _WatchChromeStack extends StatelessWidget {
               showLiveEdgeLabel: widget.showLiveEdgeLabel,
               liveDvrDuration: widget.liveDvrDuration,
               liveDvrStartedAt: widget.liveDvrStartedAt,
-              onOpenDvrReplayAt: widget.onOpenDvrReplayAt,
+              onOpenDvrReplayAtPosition: widget.onOpenDvrReplayAtPosition,
               onReturnToLive: widget.onReturnToLive,
               playbackKind: widget.playbackKind,
+              timelineEnabled: widget.timelineEnabled && !hasError,
+              playbackTimelineController: widget.playbackTimelineController,
             ),
           ),
         ),

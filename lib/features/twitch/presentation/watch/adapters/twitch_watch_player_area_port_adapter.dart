@@ -14,6 +14,7 @@ import '../../widgets/watch/twitch_watch_player_area.dart';
 import '../twitch_watch_feature_ports.dart';
 import '../twitch_watch_playback_kind.dart';
 import '../twitch_watch_port_scope.dart';
+import '../controllers/twitch_playback_timeline_controller.dart';
 
 class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
@@ -50,9 +51,10 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const TwitchWatchPlayerAreaPortAdapter({
     super.key,
@@ -90,9 +92,10 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
-    this.onOpenDvrReplayAt,
+    this.onOpenDvrReplayAtPosition,
     this.onReturnToLive,
     this.playbackKind = TwitchWatchPlaybackKind.live,
+    this.playbackTimelineController,
   });
 
   @override
@@ -138,9 +141,10 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       showLiveEdgeLabel: showLiveEdgeLabel,
       liveDvrDuration: liveDvrDuration,
       liveDvrStartedAt: liveDvrStartedAt,
-      onOpenDvrReplayAt: onOpenDvrReplayAt,
+      onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
       onReturnToLive: onReturnToLive,
       playbackKind: playbackKind,
+      playbackTimelineController: playbackTimelineController,
     );
   }
 

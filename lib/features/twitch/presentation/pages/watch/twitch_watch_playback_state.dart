@@ -12,56 +12,99 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     required TwitchWatchPlaybackKind kind,
     required String? mediaUri,
   }) {
-    final safeUri = mediaUri?.trim();
-    final title = currentClipQualityClip?.title.trim().isNotEmpty == true
+    final session = TwitchPlaybackSessionController.instance;
+    final existingOwned =
+        session.playableStateForRouteOwner(playbackRouteOwner) ??
+        ownedPlaybackForVisibleRoute;
+    final isTopOwner = session.isTopRouteOwner(playbackRouteOwner);
+    final safeUri = isTopOwner
+        ? mediaUri?.trim()
+        : existingOwned?.mediaUri.trim() ?? mediaUri?.trim();
+    final effectiveKind = isTopOwner ? kind : existingOwned?.kind ?? kind;
+    final isLive = effectiveKind == TwitchWatchPlaybackKind.live;
+    final replayTitle = currentClipQualityClip?.title.trim().isNotEmpty == true
         ? currentClipQualityClip!.title
         : (currentVodQualityVideo ??
                   activeGrowingVodVideo ??
                   offlineVodFallbackVideo)
               ?.title;
-    final resumeVodVideo = switch (kind) {
-      TwitchWatchPlaybackKind.liveDvr || TwitchWatchPlaybackKind.vod =>
-        currentVodQualityVideo ??
-            activeGrowingVodVideo ??
-            offlineVodFallbackVideo,
+    final streamTitle = isLive
+        ? widget.resolvedInitialMetadata.streamTitle
+        : replayTitle;
+    final resumeVodVideo = switch (effectiveKind) {
+      TwitchWatchPlaybackKind.liveDvr => activeGrowingVodVideo,
+      TwitchWatchPlaybackKind.vod =>
+        currentVodQualityVideo ?? offlineVodFallbackVideo,
       TwitchWatchPlaybackKind.live => activeGrowingVodVideo,
       _ => null,
     };
-    TwitchPlaybackSessionController.instance.setPlayback(
+    final effectivePreferVodReplayChat = switch (effectiveKind) {
+      TwitchWatchPlaybackKind.live => false,
+      TwitchWatchPlaybackKind.liveDvr =>
+        activeGrowingVodVideo != null && preferVodReplayChat,
+      TwitchWatchPlaybackKind.vod || TwitchWatchPlaybackKind.clip => true,
+      TwitchWatchPlaybackKind.none => false,
+    };
+    session.setRouteOwnedPlayback(
+      owner: playbackRouteOwner,
       kind: safeUri == null || safeUri.isEmpty
           ? TwitchWatchPlaybackKind.none
-          : kind,
+          : effectiveKind,
       mediaUri: safeUri,
       metadata: widget.resolvedInitialMetadata.copyWith(
         channelLogin: channelLogin,
-        streamTitle: title,
+        streamTitle: streamTitle,
       ),
       activeDvrVideo: activeGrowingVodVideo,
       vodVideo: resumeVodVideo,
-      clip: kind == TwitchWatchPlaybackKind.clip
+      clip: effectiveKind == TwitchWatchPlaybackKind.clip
           ? currentClipQualityClip
           : null,
-      vodRatio: kind == TwitchWatchPlaybackKind.liveDvr
-          ? watchPorts.player.runtime.liveDvrBridgeTimelineRatio
+      vodRatio: effectiveKind == TwitchWatchPlaybackKind.liveDvr
+          ? null
           : activeGrowingVodVideo != null
           ? 1.0
           : null,
-      preferVodReplayChat: preferVodReplayChat,
+      preferVodReplayChat: effectivePreferVodReplayChat,
     );
-    ownedPlaybackForVisibleRoute =
-        TwitchPlaybackSessionController.instance.playableState;
-    TwitchPlaybackSessionController.instance.setRoutePlayback(
+    ownedPlaybackForVisibleRoute = session.playableStateForRouteOwner(
       playbackRouteOwner,
-      ownedPlaybackForVisibleRoute,
     );
   }
 
+  void applyPlaybackSessionStateToPage(TwitchPlaybackSessionState state) {
+    activeGrowingVodVideo = state.activeDvrVideo;
+    currentClipQualityClip = state.kind == TwitchWatchPlaybackKind.clip
+        ? state.clip
+        : null;
+    currentVodQualityVideo = switch (state.kind) {
+      TwitchWatchPlaybackKind.live => null,
+      TwitchWatchPlaybackKind.clip => null,
+      TwitchWatchPlaybackKind.liveDvr => state.activeDvrVideo ?? state.vodVideo,
+      TwitchWatchPlaybackKind.vod => state.vodVideo,
+      TwitchWatchPlaybackKind.none => null,
+    };
+    offlineVodFallbackVideo = state.kind == TwitchWatchPlaybackKind.vod
+        ? state.vodVideo
+        : null;
+    preferVodReplayChat = switch (state.kind) {
+      TwitchWatchPlaybackKind.live => false,
+      TwitchWatchPlaybackKind.liveDvr => state.preferVodReplayChat,
+      TwitchWatchPlaybackKind.vod || TwitchWatchPlaybackKind.clip => true,
+      TwitchWatchPlaybackKind.none => false,
+    };
+  }
+
   void clearOwnedPlayback() {
-    TwitchPlaybackSessionController.instance.clear();
     ownedPlaybackForVisibleRoute = null;
     TwitchPlaybackSessionController.instance.clearRoutePlayback(
       playbackRouteOwner,
     );
+    if (TwitchPlaybackSessionController.instance.isTopRouteOwner(
+      playbackRouteOwner,
+    )) {
+      TwitchPlaybackSessionController.instance.clear();
+    }
   }
 
   TwitchPlaybackSessionState? buildPlaybackSnapshot() {
@@ -84,13 +127,20 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   }
 
   Future<void> reconcileVisibleRoutePlayback() async {
-    final owned = ownedPlaybackForVisibleRoute;
+    final session = TwitchPlaybackSessionController.instance;
+    if (!session.isTopRouteOwner(playbackRouteOwner)) return;
+
+    final owned =
+        session.playableStateForRouteOwner(playbackRouteOwner) ??
+        ownedPlaybackForVisibleRoute;
     if (owned == null || !owned.playable) return;
 
     var ownedUri = owned.mediaUri.trim();
     final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
 
-    TwitchPlaybackSessionController.instance.restorePlayback(owned);
+    ownedPlaybackForVisibleRoute = owned;
+    applyPlaybackSessionStateToPage(owned);
+    session.restorePlayback(owned);
 
     if (owned.kind == TwitchWatchPlaybackKind.live) {
       final preparedUri = await watchPorts.player.runtime
@@ -120,7 +170,7 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
 
   TwitchWatchPlaybackKind get currentPlaybackKind {
     if (currentClipQualityClip != null) return TwitchWatchPlaybackKind.clip;
-    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+    if (watchPorts.player.runtime.usingLiveTimelineReplay) {
       return TwitchWatchPlaybackKind.liveDvr;
     }
     if (watchPorts.player.runtime.usingExternalVodPlayback ||
@@ -141,13 +191,13 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   }
 
   bool get hasDvrReplayPlayback {
-    return watchPorts.player.runtime.usingLiveDvrBridge ||
+    return watchPorts.player.runtime.usingLiveTimelineReplay ||
         watchPorts.player.runtime.usingExternalVodPlayback ||
         activeGrowingVodVideo != null;
   }
 
   bool get showsLiveDvrEdgeLabel {
-    return watchPorts.player.runtime.usingLiveDvrBridge ||
+    return watchPorts.player.runtime.usingLiveTimelineReplay ||
         activeGrowingVodVideo != null;
   }
 }

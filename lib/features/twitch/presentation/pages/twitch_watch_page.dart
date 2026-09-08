@@ -35,6 +35,7 @@ import '../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../watch/adapters/twitch_watch_player_area_port_adapter.dart';
 import '../watch/controllers/twitch_watch_chat_controller.dart';
 import '../watch/controllers/twitch_watch_engagement_controller.dart';
+import '../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../watch/controllers/twitch_watch_playback_controller.dart';
 import '../watch/controllers/twitch_watch_preferences_controller.dart';
 import '../watch/controllers/twitch_watch_relationship_controller.dart';
@@ -206,6 +207,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   late final TwitchWatchEngagementController engagementController;
   late final TwitchWatchRelationshipController relationshipController;
   late final TwitchWatchPlaybackController playbackController;
+  late final TwitchPlaybackTimelineController playbackTimelineController;
   late final TwitchVodChatReplayRuntime vodReplayController;
   late final TwitchVodSnapshotPlaylistProxy vodSnapshotPlaylistProxy;
 
@@ -288,6 +290,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   String? warmedLiveDvrQualityKey;
   DateTime? warmedLiveDvrResolvedAt;
   bool preferVodReplayChat = false;
+  bool liveTimelineActionInFlight = false;
+  bool pendingLiveTimelineReturnToLive = false;
+  Duration? pendingLiveTimelineSeekTarget;
+  DateTime? liveTimelineStartedAt;
   List<TwitchChannelPanel> aboutPanels = const <TwitchChannelPanel>[];
   List<TwitchChannelSocialLink> aboutSocialLinks =
       const <TwitchChannelSocialLink>[];
@@ -470,6 +476,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     channelController = TextEditingController(
       text: widget.resolvedInitialMetadata.channelLogin,
     );
+    liveTimelineStartedAt = widget.resolvedInitialMetadata.startedAt;
     _initialKnownFollowStatus = widget.resolvedInitialFollowStatus;
     messageController = TextEditingController();
     session = TwitchWatchSessionHandles.create(
@@ -540,6 +547,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       applyPlayerVolume: applyPlayerVolume,
       waitForInitialPlaybackSettle: waitForInitialPlaybackSettle,
     )..addListener(notifyControllerChanged);
+    playbackTimelineController = TwitchPlaybackTimelineController()
+      ..addListener(notifyControllerChanged);
     vodReplayController = TwitchVodChatReplayRuntime(
       api: TwitchVodCommentsApiService(
         client: watchServices.apiClient,
@@ -579,24 +588,25 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     final channel = channelLogin;
 
     try {
-      final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
-      if (currentUri != null && currentUri.isNotEmpty) {
+      final isVisiblePlaybackRoute = TwitchPlaybackSessionController.instance
+          .isTopRouteOwner(playbackRouteOwner);
+      if (!isVisiblePlaybackRoute) {
+        debugPrint(
+          '[WatchPlaybackState] skip foreground playback recovery '
+          'because route is hidden channel=$channel',
+        );
+      } else if (ownedPlaybackForVisibleRoute?.playable == true) {
+        await reconcileVisibleRoutePlayback();
+      } else if (TwitchMediaKitPlayerHost.currentMediaUri?.trim().isNotEmpty ==
+          true) {
         await playerSession.ensureReady();
         if (!mounted) return;
         await preferencesController.applyPlayerVolume();
-        final isLiveDvrReplay =
-            currentPlaybackKind == TwitchWatchPlaybackKind.liveDvr;
-        if (isLiveDvrReplay) {
-          final recovered = await recoverLiveDvrPlaybackAfterForeground(
-            channel: channel,
-            generation: watchLoadGeneration,
-          );
-          if (recovered) return;
-        }
         final player = playerSession.playerOrNull;
         if (player != null && !player.state.playing) {
           await player.play();
         }
+        if (mounted) setState(() {});
       } else if (!loadingPlayer && !widget.initialVodPlaybackOnly) {
         await loadPlayer(channel, forceOpen: true);
       }
@@ -655,6 +665,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   @override
   void dispose() {
     watchLoadGeneration++;
+    final restoringPreviousRoutePlayback =
+        shouldRestorePreviousPlaybackOnPop &&
+        restorePlaybackOnDispose?.playable == true;
     unawaited(
       TwitchPlaybackSessionController.instance.restoreAfterUnregisterRouteOwner(
         playbackRouteOwner,
@@ -672,12 +685,14 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       unawaited(watchPorts.player.disposeRuntime());
     }
     playbackController.removeListener(notifyControllerChanged);
+    playbackTimelineController.removeListener(notifyControllerChanged);
     vodReplayController.removeListener(notifyControllerChanged);
     relationshipController.removeListener(notifyControllerChanged);
     engagementController.removeListener(notifyControllerChanged);
     chatController.removeListener(notifyControllerChanged);
     preferencesController.removeListener(notifyControllerChanged);
     playbackController.dispose();
+    playbackTimelineController.dispose();
     vodReplayController.dispose();
     if (!handedOffToMiniPlayer) {
       unawaited(vodSnapshotPlaylistProxy.dispose());
@@ -692,20 +707,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       unawaited(volumeSubscriptionCancel);
     }
 
-    final restorePlayback = restorePlaybackOnDispose;
     if (handedOffToMiniPlayer) {
       // The shared player is now owned by the in-app mini player.
-    } else if (!isPushedMediaPlayback &&
-        restorePlayback != null &&
-        restorePlayback.mediaUri.trim().isNotEmpty) {
-      TwitchPlaybackSessionController.instance.restorePlayback(restorePlayback);
-      unawaited(
-        TwitchMediaKitPlayerHost.restoreSharedMedia(
-          uri: restorePlayback.mediaUri,
-          play: true,
-          forceOpen: true,
-        ).catchError((_) {}),
-      );
+    } else if (restoringPreviousRoutePlayback) {
+      // The previous watch route will restore its own playback snapshot.
     } else {
       unawaited(playerSession.pauseCurrent().catchError((_) {}));
     }
@@ -862,17 +867,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       hasDvrReplay: hasDvrReplayPlayback,
       showLiveEdgeLabel: showsLiveDvrEdgeLabel,
       playbackKind: currentPlaybackKind,
-      liveDvrDuration:
-          watchPorts.player.runtime.liveDvrBridgeDuration ??
-          activeGrowingVodVideo?.parsedDuration,
-      liveDvrStartedAt:
-          activeGrowingVodVideo?.createdAt ??
-          activeGrowingVodVideo?.publishedAt,
-      onOpenDvrReplayAt: watchPorts.player.runtime.usingLiveDvrBridge
-          ? (ratio) => unawaited(seekLiveDvrBridgePlayback(ratio))
-          : activeGrowingVodVideo == null
-          ? null
-          : (ratio) => unawaited(openActiveDvrReplay(initialRatio: ratio)),
+      playbackTimelineController: playbackTimelineController,
+      liveDvrDuration: currentLiveTimelineDuration(),
+      liveDvrStartedAt: liveTimelineStartedAt,
+      onOpenDvrReplayAtPosition: (target) =>
+          unawaited(openActiveDvrReplayAt(target)),
       onReturnToLive: () {
         unawaited(returnToLivePlayback());
       },

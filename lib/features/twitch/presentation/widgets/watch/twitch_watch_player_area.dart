@@ -6,6 +6,7 @@ import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
+import '../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../localization/vioclass_localizations.dart';
 import 'player/twitch_media_kit_video_surface.dart';
@@ -79,9 +80,10 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const TwitchWatchPlayerArea({
     super.key,
@@ -123,9 +125,10 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
-    this.onOpenDvrReplayAt,
+    this.onOpenDvrReplayAtPosition,
     this.onReturnToLive,
     this.playbackKind = TwitchWatchPlaybackKind.live,
+    this.playbackTimelineController,
   });
 
   @override
@@ -207,9 +210,11 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     showLiveEdgeLabel: showLiveEdgeLabel,
                     liveDvrDuration: liveDvrDuration,
                     liveDvrStartedAt: liveDvrStartedAt,
-                    onOpenDvrReplayAt: onOpenDvrReplayAt,
+                    onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
                     onReturnToLive: onReturnToLive,
                     playbackKind: playbackKind,
+                    playbackTimelineController: playbackTimelineController,
+                    timelineEnabled: !state.hasError,
                   ),
                 )
               : null,
@@ -240,6 +245,7 @@ class _WatchPlayerAreaState {
   final bool effectiveChatVisible;
   final bool effectiveFollowBusy;
   final bool overlayLoading;
+  final bool hasError;
   final List<TwitchM3u8Variant> effectiveQualityVariants;
   final TwitchM3u8Variant? effectiveCurrentVariant;
   final ValueChanged<TwitchM3u8Variant>? effectiveOnQualityChanged;
@@ -253,6 +259,7 @@ class _WatchPlayerAreaState {
     required this.effectiveChatVisible,
     required this.effectiveFollowBusy,
     required this.overlayLoading,
+    required this.hasError,
     required this.effectiveQualityVariants,
     required this.effectiveCurrentVariant,
     required this.effectiveOnQualityChanged,
@@ -285,10 +292,14 @@ class _WatchPlayerAreaState {
           widget.currentVariant ?? widget.playerRuntime.currentVariant,
       effectiveOnQualityChanged:
           widget.onQualityChanged ?? widget.onQualitySelected,
+      hasError:
+          (widget.error != null && widget.error!.trim().isNotEmpty) ||
+          widget.playerRuntime.error != null,
     );
   }
 
-  bool get shouldShowControlsOverlay => playerReady && !inPipMode;
+  bool get shouldShowControlsOverlay =>
+      player != null && !inPipMode && (playerReady || hasError);
   bool get shouldShowWaitingOverlay => !playerReady && !inPipMode;
 }
 
@@ -357,7 +368,9 @@ class _WatchPlayerVideoStage extends StatelessWidget {
 
     final controller = this.controller;
     if (controller == null) return const TwitchMediaKitVideoWaitingSurface();
-    return TwitchMediaKitVideoSurface(controller: controller);
+    return TwitchMediaKitVideoSurface(
+      controller: controller,
+    );
   }
 }
 

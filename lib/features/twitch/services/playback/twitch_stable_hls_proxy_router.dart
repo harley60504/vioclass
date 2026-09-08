@@ -45,9 +45,11 @@ class TwitchStableHlsProxyRouter {
   HttpServer? _server;
   TwitchDartHlsLowLatencyProxy? _inner;
   String? _upstreamPlaylistUrl;
+  Uri? _directStreamUri;
   bool _starting = false;
   bool _switching = false;
   int _switchGeneration = 0;
+  int _directStreamGeneration = 0;
 
   int? get port => _server?.port;
 
@@ -73,6 +75,28 @@ class TwitchStableHlsProxyRouter {
     final p = port;
     if (p == null) throw StateError('Stable HLS proxy router has not started.');
     return 'http://127.0.0.1:$p/stream.ts';
+  }
+
+  String liveReplayUrl({required Duration fromLive}) {
+    final p = port;
+    if (p == null) throw StateError('Stable HLS proxy router has not started.');
+    final seconds = fromLive.inSeconds.clamp(1, 20).toInt();
+    return 'http://127.0.0.1:$p/live-replay.ts?seconds=$seconds';
+  }
+
+  Future<void> startDirectStream({required String streamUrl}) async {
+    if (_starting) return;
+    _starting = true;
+    try {
+      if (_server == null) {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        _server = server;
+        unawaited(_serve(server));
+      }
+      await switchDirectStream(streamUrl);
+    } finally {
+      _starting = false;
+    }
   }
 
   Future<void> start({required String upstreamPlaylistUrl}) async {
@@ -102,6 +126,7 @@ class TwitchStableHlsProxyRouter {
 
     if (_inner != null &&
         _inner!.isRunning &&
+        _directStreamUri == null &&
         _upstreamPlaylistUrl == safeUrl) {
       return;
     }
@@ -109,6 +134,7 @@ class TwitchStableHlsProxyRouter {
     _switching = true;
     final previous = _inner;
     _inner = null;
+    _directStreamUri = null;
     _switchGeneration++;
 
     try {
@@ -150,6 +176,47 @@ class TwitchStableHlsProxyRouter {
     }
   }
 
+  Future<void> switchDirectStream(String streamUrl) async {
+    final safeUrl = streamUrl.trim();
+    final directUri = Uri.tryParse(safeUrl);
+    if (directUri == null || safeUrl.isEmpty) {
+      throw ArgumentError.value(streamUrl, 'streamUrl', 'cannot be empty');
+    }
+
+    if (_directStreamUri == directUri && _server != null) {
+      return;
+    }
+
+    _switching = true;
+    final previous = _inner;
+    _inner = null;
+    _directStreamUri = directUri;
+    _upstreamPlaylistUrl = null;
+    _directStreamGeneration++;
+    _switchGeneration++;
+
+    try {
+      await previous?.close();
+    } finally {
+      _switching = false;
+      _switchGeneration++;
+    }
+  }
+
+  Future<void> switchLiveReplayStream({required Duration fromLive}) async {
+    final inner = _inner;
+    if (inner == null || !inner.isRunning) {
+      throw StateError('Inner proxy not ready');
+    }
+    final replayUri = Uri.parse(liveReplayUrl(fromLive: fromLive));
+    _switching = true;
+    _directStreamUri = replayUri;
+    _directStreamGeneration++;
+    _switchGeneration++;
+    _switching = false;
+    _switchGeneration++;
+  }
+
   Future<void> waitUntilPrewarmed({
     Duration timeout = const Duration(milliseconds: 700),
   }) async {
@@ -170,6 +237,8 @@ class TwitchStableHlsProxyRouter {
     final inner = _inner;
     _inner = null;
     _upstreamPlaylistUrl = null;
+    _directStreamUri = null;
+    _directStreamGeneration++;
 
     await inner?.close();
     await server?.close(force: true);
@@ -192,7 +261,7 @@ class TwitchStableHlsProxyRouter {
       }
 
       final inner = _inner;
-      if (inner == null || !inner.isRunning) {
+      if ((inner == null || !inner.isRunning) && _directStreamUri == null) {
         request.response.statusCode = _switching
             ? HttpStatus.serviceUnavailable
             : HttpStatus.badGateway;
@@ -209,7 +278,29 @@ class TwitchStableHlsProxyRouter {
         return;
       }
 
+      if (path == '/live-replay.ts') {
+        if (inner == null || !inner.isRunning) {
+          request.response.statusCode = HttpStatus.badGateway;
+          request.response.write('Inner proxy not ready');
+          await request.response.close();
+          return;
+        }
+        await _proxyToInner(
+          request,
+          Uri.parse(
+            inner.liveReplayUrl(fromLive: _readReplayDuration(request)),
+          ),
+        );
+        return;
+      }
+
       if (path == '/playlist.m3u8') {
+        if (inner == null || !inner.isRunning) {
+          request.response.statusCode = HttpStatus.badGateway;
+          request.response.write('Inner proxy not ready');
+          await request.response.close();
+          return;
+        }
         await _proxyToInner(request, Uri.parse(inner.playlistUrl));
         return;
       }
@@ -237,6 +328,7 @@ class TwitchStableHlsProxyRouter {
       'stream=$streamUrl\n'
       'stream_ts=$streamTsUrl\n'
       'upstream=$_upstreamPlaylistUrl\n'
+      'direct=$_directStreamUri\n'
       'inner_running=${_inner?.isRunning ?? false}\n'
       'inner_stream=${_inner?.streamTsUrl}\n'
       'switching=$_switching\n'
@@ -260,15 +352,19 @@ class TwitchStableHlsProxyRouter {
 
     var lastAttachedInnerStreamUrl = '';
     var lastGeneration = -1;
+    var lastDirectStreamGeneration = -1;
 
     try {
       while (_server != null) {
-        final inner = await _waitForReadyInner(lastGeneration: lastGeneration);
-        if (inner == null) break;
+        final target = await _waitForReadyStreamTarget(
+          lastGeneration: lastGeneration,
+        );
+        if (target == null) break;
 
-        final target = Uri.parse(inner.streamTsUrl);
+        final directMode = _directStreamUri != null;
         lastAttachedInnerStreamUrl = target.toString();
         lastGeneration = _switchGeneration;
+        lastDirectStreamGeneration = _directStreamGeneration;
 
         try {
           final upstreamRequest = await _client.openUrl('GET', target);
@@ -282,13 +378,21 @@ class TwitchStableHlsProxyRouter {
             await response.flush();
           }
         } catch (_) {
-          if (_server == null) break;
+          // media_kit closes the old HTTP response when the same stable URL is
+          // force-opened for a new seek. End this request instead of looping a
+          // dead response and piling up stale stream pumps.
+          break;
+        }
+
+        if (directMode &&
+            lastDirectStreamGeneration != _directStreamGeneration) {
+          break;
         }
 
         // If the same inner stream simply ended without a router switch, do not
         // spin aggressively. Give the inner proxy a moment to expose fresh data.
         if (lastGeneration == _switchGeneration &&
-            lastAttachedInnerStreamUrl == (_inner?.streamTsUrl ?? '')) {
+            lastAttachedInnerStreamUrl == _currentStreamTargetLabel()) {
           await Future<void>.delayed(const Duration(milliseconds: 80));
         }
       }
@@ -307,26 +411,48 @@ class TwitchStableHlsProxyRouter {
     response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
   }
 
-  Future<TwitchDartHlsLowLatencyProxy?> _waitForReadyInner({
+  Duration _readReplayDuration(HttpRequest request) {
+    final raw = int.tryParse(request.uri.queryParameters['seconds'] ?? '');
+    return Duration(seconds: (raw ?? 10).clamp(1, 20).toInt());
+  }
+
+  Future<Uri?> _waitForReadyStreamTarget({
     required int lastGeneration,
     Duration timeout = const Duration(seconds: 6),
   }) async {
     final deadline = DateTime.now().add(timeout);
 
     while (_server != null && DateTime.now().isBefore(deadline)) {
+      final directStreamUri = _directStreamUri;
+      if (directStreamUri != null && _switchGeneration != lastGeneration) {
+        return directStreamUri;
+      }
+      if (directStreamUri != null && !_switching) {
+        return directStreamUri;
+      }
       final inner = _inner;
       if (inner != null &&
           inner.isRunning &&
           _switchGeneration != lastGeneration) {
-        return inner;
+        return Uri.parse(inner.streamTsUrl);
       }
       if (inner != null && inner.isRunning && !_switching) {
-        return inner;
+        return Uri.parse(inner.streamTsUrl);
       }
       await Future<void>.delayed(const Duration(milliseconds: 35));
     }
 
-    return _inner != null && _inner!.isRunning ? _inner : null;
+    final directStreamUri = _directStreamUri;
+    if (directStreamUri != null) return directStreamUri;
+    return _inner != null && _inner!.isRunning
+        ? Uri.parse(_inner!.streamTsUrl)
+        : null;
+  }
+
+  String _currentStreamTargetLabel() {
+    final directStreamUri = _directStreamUri;
+    if (directStreamUri != null) return directStreamUri.toString();
+    return _inner?.streamTsUrl ?? '';
   }
 
   Future<void> _proxyToInner(HttpRequest request, Uri target) async {

@@ -9,6 +9,7 @@ class TwitchStreamHeaderMetadata {
   final bool isMature;
   final int? viewerCount;
   final String profileImageUrl;
+  final DateTime? startedAt;
 
   const TwitchStreamHeaderMetadata({
     required this.channelLogin,
@@ -19,6 +20,7 @@ class TwitchStreamHeaderMetadata {
     this.isMature = false,
     this.viewerCount,
     this.profileImageUrl = '',
+    this.startedAt,
   });
 
   const TwitchStreamHeaderMetadata.empty({
@@ -50,6 +52,7 @@ class TwitchStreamHeaderMetadata {
       isMature: stream.isMature,
       viewerCount: stream.viewerCount,
       profileImageUrl: stream.profileImageUrl,
+      startedAt: stream.startedAt,
     );
   }
 
@@ -63,6 +66,7 @@ class TwitchStreamHeaderMetadata {
     int? viewerCount,
     bool clearViewerCount = false,
     String? profileImageUrl,
+    DateTime? startedAt,
   }) {
     return TwitchStreamHeaderMetadata(
       channelLogin: channelLogin ?? this.channelLogin,
@@ -73,6 +77,7 @@ class TwitchStreamHeaderMetadata {
       isMature: isMature ?? this.isMature,
       viewerCount: clearViewerCount ? null : viewerCount ?? this.viewerCount,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      startedAt: startedAt ?? this.startedAt,
     );
   }
 }

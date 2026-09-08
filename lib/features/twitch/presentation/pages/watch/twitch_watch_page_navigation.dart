@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/playback/twitch_media_kit_player_host.dart';
 import '../../mini_player/twitch_mini_player_controller.dart';
 import '../../settings/twitch_player_settings_controller.dart';
-import '../../watch/twitch_playback_session_controller.dart';
 import '../twitch_watch_page.dart';
 import 'twitch_watch_playback_state.dart';
 import 'twitch_watch_page_startup.dart';
@@ -28,8 +27,6 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
     leavingToMiniPlayer = true;
 
     if (shouldRestorePreviousPlaybackOnPop) {
-      handedOffToMiniPlayer = false;
-      await restorePreviousPlaybackForRoutePop();
       if (mounted) Navigator.of(context).pop();
       return;
     }
@@ -100,21 +97,4 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
     }
   }
 
-  Future<void> restorePreviousPlaybackForRoutePop() async {
-    final restorePlayback = restorePlaybackOnDispose;
-    if (restorePlayback == null || !restorePlayback.playable) return;
-
-    final restoreUri = restorePlayback.mediaUri.trim();
-    TwitchPlaybackSessionController.instance.restorePlayback(restorePlayback);
-    debugPrint(
-      '[WatchPlaybackState] restore previous route before pop '
-      'kind=${restorePlayback.kind} uri=$restoreUri',
-    );
-    await TwitchMediaKitPlayerHost.restoreSharedMedia(
-      uri: restoreUri,
-      play: true,
-      forceOpen: true,
-    );
-    await preferencesController.applyPlayerVolume();
-  }
 }

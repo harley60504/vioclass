@@ -7,9 +7,9 @@ import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../../../watch/twitch_watch_playback_kind.dart';
 import '../../shared/twitch_glass.dart';
-import 'twitch_live_playback_strip.dart';
 import 'twitch_player_common_buttons.dart';
 import 'twitch_player_more_actions_button.dart';
 import 'twitch_player_pip_button.dart';
@@ -36,9 +36,11 @@ class WatchBottomControlBar extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const WatchBottomControlBar({
     super.key,
@@ -60,9 +62,11 @@ class WatchBottomControlBar extends StatelessWidget {
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
-    this.onOpenDvrReplayAt,
+    this.onOpenDvrReplayAtPosition,
     this.onReturnToLive,
     this.playbackKind = TwitchWatchPlaybackKind.live,
+    this.timelineEnabled = true,
+    this.playbackTimelineController,
   });
 
   @override
@@ -71,89 +75,169 @@ class WatchBottomControlBar extends StatelessWidget {
       stream: player.stream.playing,
       initialData: player.state.playing,
       builder: (context, playingSnapshot) {
-        final playing = playingSnapshot.data ?? false;
+        return StreamBuilder<Duration>(
+          stream: player.stream.position,
+          initialData: player.state.position,
+          builder: (context, positionSnapshot) {
+            return StreamBuilder<Duration>(
+              stream: player.stream.duration,
+              initialData: player.state.duration,
+              builder: (context, durationSnapshot) {
+                final playing = playingSnapshot.data ?? false;
+                _configureTimelineController(
+                  playing: playing,
+                  playerPosition: positionSnapshot.data ?? Duration.zero,
+                  playerDuration: durationSnapshot.data ?? Duration.zero,
+                );
 
-        return LayoutBuilder(
-          builder: (context, constraints) {
-            final layout = _WatchBottomControlBarLayout.fromWidth(
-              constraints.maxWidth,
-            );
+                return LayoutBuilder(
+                  builder: (context, constraints) {
+                    final layout = _WatchBottomControlBarLayout.fromWidth(
+                      constraints.maxWidth,
+                    );
 
-            final controlsContent = SizedBox(
-              width: layout.contentWidth,
-              height: layout.contentHeight,
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: layout.horizontalPadding,
-                ),
-                child: layout.useCompactLayout
-                    ? _CompactWatchBottomControls(
-                        player: player,
-                        playerRuntime: playerRuntime,
-                        playing: playing,
-                        muted: muted,
-                        volume: volume,
-                        fullscreen: fullscreen,
-                        chatVisible: chatVisible,
-                        showFullscreenButton: showFullscreenButton,
-                        onToggleMute: onToggleMute,
-                        onVolumeChanged: onVolumeChanged,
-                        qualityVariants: qualityVariants,
-                        currentVariant: currentVariant,
-                        onQualityChanged: onQualityChanged,
-                        onToggleChat: onToggleChat,
-                        onToggleFullscreen: onToggleFullscreen,
-                        hasDvrReplay: hasDvrReplay,
-                        showLiveEdgeLabel: showLiveEdgeLabel,
-                        liveDvrDuration: liveDvrDuration,
-                        liveDvrStartedAt: liveDvrStartedAt,
-                        onOpenDvrReplayAt: onOpenDvrReplayAt,
-                        onReturnToLive: onReturnToLive,
-                        playbackKind: playbackKind,
-                        veryNarrow: layout.veryNarrow,
-                      )
-                    : _WideWatchBottomControls(
-                        player: player,
-                        playerRuntime: playerRuntime,
-                        playing: playing,
-                        muted: muted,
-                        volume: volume,
-                        fullscreen: fullscreen,
-                        chatVisible: chatVisible,
-                        showFullscreenButton: showFullscreenButton,
-                        onToggleMute: onToggleMute,
-                        onVolumeChanged: onVolumeChanged,
-                        qualityVariants: qualityVariants,
-                        currentVariant: currentVariant,
-                        onQualityChanged: onQualityChanged,
-                        onToggleChat: onToggleChat,
-                        onToggleFullscreen: onToggleFullscreen,
-                        hasDvrReplay: hasDvrReplay,
-                        showLiveEdgeLabel: showLiveEdgeLabel,
-                        liveDvrDuration: liveDvrDuration,
-                        liveDvrStartedAt: liveDvrStartedAt,
-                        onOpenDvrReplayAt: onOpenDvrReplayAt,
-                        onReturnToLive: onReturnToLive,
-                        playbackKind: playbackKind,
+                    final controlsContent = SizedBox(
+                      width: layout.contentWidth,
+                      height: layout.contentHeight,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: layout.horizontalPadding,
+                        ),
+                        child: layout.useCompactLayout
+                            ? _CompactWatchBottomControls(
+                                player: player,
+                                playerRuntime: playerRuntime,
+                                playing: playing,
+                                muted: muted,
+                                volume: volume,
+                                fullscreen: fullscreen,
+                                chatVisible: chatVisible,
+                                showFullscreenButton: showFullscreenButton,
+                                onToggleMute: onToggleMute,
+                                onVolumeChanged: onVolumeChanged,
+                                qualityVariants: qualityVariants,
+                                currentVariant: currentVariant,
+                                onQualityChanged: onQualityChanged,
+                                onToggleChat: onToggleChat,
+                                onToggleFullscreen: onToggleFullscreen,
+                                hasDvrReplay: hasDvrReplay,
+                                showLiveEdgeLabel: showLiveEdgeLabel,
+                                liveDvrDuration: liveDvrDuration,
+                                liveDvrStartedAt: liveDvrStartedAt,
+                                onOpenDvrReplayAtPosition:
+                                    onOpenDvrReplayAtPosition,
+                                onReturnToLive: onReturnToLive,
+                                playbackKind: playbackKind,
+                                timelineEnabled: timelineEnabled,
+                                playbackTimelineController:
+                                    playbackTimelineController,
+                                veryNarrow: layout.veryNarrow,
+                              )
+                            : _WideWatchBottomControls(
+                                player: player,
+                                playerRuntime: playerRuntime,
+                                playing: playing,
+                                muted: muted,
+                                volume: volume,
+                                fullscreen: fullscreen,
+                                chatVisible: chatVisible,
+                                showFullscreenButton: showFullscreenButton,
+                                onToggleMute: onToggleMute,
+                                onVolumeChanged: onVolumeChanged,
+                                qualityVariants: qualityVariants,
+                                currentVariant: currentVariant,
+                                onQualityChanged: onQualityChanged,
+                                onToggleChat: onToggleChat,
+                                onToggleFullscreen: onToggleFullscreen,
+                                hasDvrReplay: hasDvrReplay,
+                                showLiveEdgeLabel: showLiveEdgeLabel,
+                                liveDvrDuration: liveDvrDuration,
+                                liveDvrStartedAt: liveDvrStartedAt,
+                                onOpenDvrReplayAtPosition:
+                                    onOpenDvrReplayAtPosition,
+                                onReturnToLive: onReturnToLive,
+                                playbackKind: playbackKind,
+                                timelineEnabled: timelineEnabled,
+                                playbackTimelineController:
+                                    playbackTimelineController,
+                              ),
                       ),
-              ),
-            );
+                    );
 
-            return _WatchBottomControlSurface(
-              height: layout.barHeight,
-              child: layout.useCompactLayout
-                  ? ClipRect(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.center,
-                        child: controlsContent,
-                      ),
-                    )
-                  : controlsContent,
+                    return _WatchBottomControlSurface(
+                      height: layout.barHeight,
+                      child: layout.useCompactLayout
+                          ? ClipRect(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.center,
+                                child: controlsContent,
+                              ),
+                            )
+                          : controlsContent,
+                    );
+                  },
+                );
+              },
             );
           },
         );
       },
+    );
+  }
+
+  void _configureTimelineController({
+    required bool playing,
+    required Duration playerPosition,
+    required Duration playerDuration,
+  }) {
+    final controller = playbackTimelineController;
+    if (controller == null) return;
+
+    final usingLiveTimelineReplay = playerRuntime.usingLiveTimelineReplay;
+    final isPlainLive =
+        playbackKind == TwitchWatchPlaybackKind.live &&
+        !usingLiveTimelineReplay;
+    final liveHasReplayStepControls =
+        isPlainLive &&
+        liveDvrDuration != null &&
+        liveDvrDuration! > Duration.zero &&
+        onOpenDvrReplayAtPosition != null;
+    final isLiveTimeline =
+        usingLiveTimelineReplay ||
+        liveHasReplayStepControls ||
+        showLiveEdgeLabel ||
+        playbackKind == TwitchWatchPlaybackKind.liveDvr;
+
+    final mode = isPlainLive && !liveHasReplayStepControls
+        ? TwitchPlaybackTimelineMode.live
+        : switch (playbackKind) {
+            TwitchWatchPlaybackKind.clip => TwitchPlaybackTimelineMode.clip,
+            TwitchWatchPlaybackKind.liveDvr =>
+              TwitchPlaybackTimelineMode.liveDvr,
+            TwitchWatchPlaybackKind.vod => TwitchPlaybackTimelineMode.vod,
+            TwitchWatchPlaybackKind.none => TwitchPlaybackTimelineMode.live,
+            TwitchWatchPlaybackKind.live =>
+              isLiveTimeline
+                  ? TwitchPlaybackTimelineMode.liveDvr
+                  : TwitchPlaybackTimelineMode.live,
+          };
+    final duration = isLiveTimeline ? liveDvrDuration : playerDuration;
+    final position = isLiveTimeline
+        ? usingLiveTimelineReplay
+              ? playerRuntime.liveDvrBridgeTimelinePosition
+              : duration
+        : playerPosition;
+
+    controller.configure(
+      mode: mode,
+      playing: playing,
+      advancesWithPlayback: usingLiveTimelineReplay,
+      timelineEnabled:
+          timelineEnabled && (!isPlainLive || liveHasReplayStepControls),
+      position: position,
+      duration: duration,
+      liveStartedAt: isLiveTimeline ? liveDvrStartedAt : null,
     );
   }
 }
@@ -234,10 +318,12 @@ class _CompactWatchBottomControls extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final bool veryNarrow;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const _CompactWatchBottomControls({
     required this.player,
@@ -259,10 +345,12 @@ class _CompactWatchBottomControls extends StatelessWidget {
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
-    required this.onOpenDvrReplayAt,
+    required this.onOpenDvrReplayAtPosition,
     required this.onReturnToLive,
     required this.veryNarrow,
     required this.playbackKind,
+    required this.timelineEnabled,
+    required this.playbackTimelineController,
   });
 
   @override
@@ -275,6 +363,15 @@ class _CompactWatchBottomControls extends StatelessWidget {
           size: veryNarrow ? 26 : 28,
           dense: true,
         ),
+        _TimelineStepButtons(
+          player: player,
+          timelineController: playbackTimelineController,
+          playbackKind: playbackKind,
+          onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
+          onReturnToLive: onReturnToLive,
+          iconSize: veryNarrow ? 18 : 20,
+          dense: true,
+        ),
         SizedBox(width: veryNarrow ? 2 : 6),
         if (veryNarrow) ...[
           _LivePlaybackSheetButton(
@@ -284,9 +381,11 @@ class _CompactWatchBottomControls extends StatelessWidget {
             showLiveEdgeLabel: showLiveEdgeLabel,
             liveDvrDuration: liveDvrDuration,
             liveDvrStartedAt: liveDvrStartedAt,
-            onOpenDvrReplayAt: onOpenDvrReplayAt,
+            onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
             onReturnToLive: onReturnToLive,
             playbackKind: playbackKind,
+            timelineEnabled: timelineEnabled,
+            playbackTimelineController: playbackTimelineController,
           ),
           const Spacer(),
         ] else ...[
@@ -299,9 +398,11 @@ class _CompactWatchBottomControls extends StatelessWidget {
               showLiveEdgeLabel: showLiveEdgeLabel,
               liveDvrDuration: liveDvrDuration,
               liveDvrStartedAt: liveDvrStartedAt,
-              onOpenDvrReplayAt: onOpenDvrReplayAt,
+              onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
               onReturnToLive: onReturnToLive,
               playbackKind: playbackKind,
+              timelineEnabled: timelineEnabled,
+              playbackTimelineController: playbackTimelineController,
             ),
           ),
         ],
@@ -359,9 +460,11 @@ class _WideWatchBottomControls extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const _WideWatchBottomControls({
     required this.player,
@@ -383,9 +486,11 @@ class _WideWatchBottomControls extends StatelessWidget {
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
-    required this.onOpenDvrReplayAt,
+    required this.onOpenDvrReplayAtPosition,
     required this.onReturnToLive,
     required this.playbackKind,
+    required this.timelineEnabled,
+    required this.playbackTimelineController,
   });
 
   @override
@@ -393,6 +498,14 @@ class _WideWatchBottomControls extends StatelessWidget {
     return Row(
       children: [
         _PlayPauseButton(player: player, playing: playing, size: 32),
+        _TimelineStepButtons(
+          player: player,
+          timelineController: playbackTimelineController,
+          playbackKind: playbackKind,
+          onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
+          onReturnToLive: onReturnToLive,
+          iconSize: 21,
+        ),
         const SizedBox(width: 16),
         Expanded(
           child: _WatchPlaybackStrip(
@@ -402,9 +515,11 @@ class _WideWatchBottomControls extends StatelessWidget {
             showLiveEdgeLabel: showLiveEdgeLabel,
             liveDvrDuration: liveDvrDuration,
             liveDvrStartedAt: liveDvrStartedAt,
-            onOpenDvrReplayAt: onOpenDvrReplayAt,
+            onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
             onReturnToLive: onReturnToLive,
             playbackKind: playbackKind,
+            timelineEnabled: timelineEnabled,
+            playbackTimelineController: playbackTimelineController,
           ),
         ),
         const SizedBox(width: 16),
@@ -445,9 +560,11 @@ class _WatchPlaybackStrip extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const _WatchPlaybackStrip({
     required this.player,
@@ -457,9 +574,11 @@ class _WatchPlaybackStrip extends StatelessWidget {
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
-    required this.onOpenDvrReplayAt,
+    required this.onOpenDvrReplayAtPosition,
     required this.onReturnToLive,
     required this.playbackKind,
+    required this.timelineEnabled,
+    required this.playbackTimelineController,
   });
 
   @override
@@ -468,35 +587,55 @@ class _WatchPlaybackStrip extends StatelessWidget {
       final useLiveTimeline = playbackKind == TwitchWatchPlaybackKind.liveDvr;
       return TwitchVodPlaybackStrip(
         player: player,
+        timelineController: playbackTimelineController,
         compact: compact,
         showLiveEdgeLabel: useLiveTimeline && showLiveEdgeLabel,
         liveTimelineDuration: useLiveTimeline ? liveDvrDuration : null,
         liveTimelineStartedAt: useLiveTimeline ? liveDvrStartedAt : null,
+        playbackKind: playbackKind,
+        onOpenDvrReplayAtPosition: useLiveTimeline
+            ? onOpenDvrReplayAtPosition
+            : null,
         onReturnToLive: useLiveTimeline ? onReturnToLive : null,
+        timelineEnabled: timelineEnabled,
       );
     }
 
     if (hasDvrReplay) {
+      final usingLiveTimelineReplay = playerRuntime.usingLiveTimelineReplay;
       return TwitchVodPlaybackStrip(
         player: player,
+        timelineController: playbackTimelineController,
         compact: compact,
         showLiveEdgeLabel: true,
-        forceLiveEdge: true,
+        forceLiveEdge: !usingLiveTimelineReplay,
         liveTimelineDuration: liveDvrDuration,
         liveTimelineStartedAt: liveDvrStartedAt,
-        timelineValue: playerRuntime.usingLiveDvrBridge
-            ? playerRuntime.liveDvrBridgeTimelineRatio
-            : 1.0,
-        timelineValueAdvancesWithPlayer: false,
-        onOpenDvrReplayAt: onOpenDvrReplayAt,
+        timelinePosition: usingLiveTimelineReplay
+            ? playerRuntime.liveDvrBridgeTimelinePosition
+            : liveDvrDuration,
+        timelinePositionAdvancesWithPlayer: usingLiveTimelineReplay,
+        playbackKind: playbackKind,
+        onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
         onReturnToLive: onReturnToLive,
+        timelineEnabled: timelineEnabled,
       );
     }
 
-    return TwitchLivePlaybackStrip(
+    return TwitchVodPlaybackStrip(
       player: player,
-      playerRuntime: playerRuntime,
+      timelineController: playbackTimelineController,
       compact: compact,
+      showLiveEdgeLabel: true,
+      forceLiveEdge: true,
+      liveTimelineDuration: liveDvrDuration,
+      liveTimelineStartedAt: liveDvrStartedAt,
+      timelinePosition: liveDvrDuration,
+      timelinePositionAdvancesWithPlayer: false,
+      playbackKind: TwitchWatchPlaybackKind.live,
+      onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
+      onReturnToLive: onReturnToLive,
+      timelineEnabled: false,
     );
   }
 }
@@ -523,6 +662,94 @@ class _PlayPauseButton extends StatelessWidget {
       dense: dense,
       onPressed: () {
         unawaited(playing ? player.pause() : player.play());
+      },
+    );
+  }
+}
+
+class _TimelineStepButtons extends StatelessWidget {
+  final Player player;
+  final TwitchPlaybackTimelineController? timelineController;
+  final TwitchWatchPlaybackKind playbackKind;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
+  final VoidCallback? onReturnToLive;
+  final double iconSize;
+  final bool dense;
+
+  const _TimelineStepButtons({
+    required this.player,
+    required this.timelineController,
+    required this.playbackKind,
+    required this.onOpenDvrReplayAtPosition,
+    required this.onReturnToLive,
+    required this.iconSize,
+    this.dense = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = timelineController;
+    if (controller == null) return const SizedBox.shrink();
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final snapshot = controller.snapshot;
+        final duration = snapshot.duration;
+        if (!snapshot.canSeek ||
+            duration == null ||
+            duration <= Duration.zero) {
+          return const SizedBox.shrink();
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PlainIconButton(
+              tooltip: context.vio.t('倒退 10 秒'),
+              icon: Icons.replay_10_rounded,
+              size: iconSize,
+              dense: dense,
+              onPressed: () => _jumpBy(controller, snapshot, duration, -10),
+            ),
+            PlainIconButton(
+              tooltip: context.vio.t('快轉 10 秒'),
+              icon: Icons.forward_10_rounded,
+              size: iconSize,
+              dense: dense,
+              onPressed: () => _jumpBy(controller, snapshot, duration, 10),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _jumpBy(
+    TwitchPlaybackTimelineController controller,
+    TwitchPlaybackTimelineSnapshot snapshot,
+    Duration duration,
+    int seconds,
+  ) {
+    controller.queueJumpBy(
+      delta: Duration(seconds: seconds),
+      current: snapshot.position,
+      duration: duration,
+      fromLiveEdge: snapshot.isAtLiveEdge,
+      onCommit: (target) {
+        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
+            target >= duration &&
+            onReturnToLive != null) {
+          controller.returnToLive();
+          onReturnToLive!();
+          return;
+        }
+        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
+            onOpenDvrReplayAtPosition != null) {
+          onOpenDvrReplayAtPosition!(target);
+          return;
+        }
+        unawaited(player.seek(target));
       },
     );
   }
@@ -626,9 +853,11 @@ class _LivePlaybackSheetButton extends StatelessWidget {
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
-  final ValueChanged<double>? onOpenDvrReplayAt;
+  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool timelineEnabled;
+  final TwitchPlaybackTimelineController? playbackTimelineController;
 
   const _LivePlaybackSheetButton({
     required this.player,
@@ -637,9 +866,11 @@ class _LivePlaybackSheetButton extends StatelessWidget {
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
-    required this.onOpenDvrReplayAt,
+    required this.onOpenDvrReplayAtPosition,
     required this.onReturnToLive,
     required this.playbackKind,
+    required this.timelineEnabled,
+    required this.playbackTimelineController,
   });
 
   void _showPlaybackSheet(BuildContext context) {
@@ -727,9 +958,11 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                         showLiveEdgeLabel: showLiveEdgeLabel,
                         liveDvrDuration: liveDvrDuration,
                         liveDvrStartedAt: liveDvrStartedAt,
-                        onOpenDvrReplayAt: onOpenDvrReplayAt,
+                        onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
                         onReturnToLive: onReturnToLive,
                         playbackKind: playbackKind,
+                        timelineEnabled: timelineEnabled,
+                        playbackTimelineController: playbackTimelineController,
                       ),
                     ],
                   ),
@@ -749,7 +982,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
       icon: Icons.timeline_rounded,
       size: 22,
       dense: true,
-      onPressed: () => _showPlaybackSheet(context),
+      onPressed: timelineEnabled ? () => _showPlaybackSheet(context) : null,
     );
   }
 }

@@ -11,9 +11,6 @@ import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
 class TwitchLiveDvrBridgeProxy {
-  static const double liveEdgeRatio = 0.995;
-  static const double maxReplayRatio = liveEdgeRatio - 0.01;
-
   final Dio _dio;
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 5)
@@ -23,7 +20,7 @@ class TwitchLiveDvrBridgeProxy {
   HttpServer? _server;
   Uri? _dvrPlaylistUri;
   Duration? _latestDuration;
-  double _seekRatio = 1.0;
+  Duration? _seekPosition;
   int _streamGeneration = 0;
   int? _dvrSeekStartIndex;
   DateTime _dvrSeekStartedAt = DateTime.now();
@@ -41,14 +38,15 @@ class TwitchLiveDvrBridgeProxy {
   Duration? get latestDuration => _latestDuration;
   bool get isRunning => _server != null;
   bool get isLiveMode => false;
-  double get timelineRatio {
+  Duration? get timelinePosition {
     final duration = _latestDuration;
-    if (duration == null || duration.inMilliseconds <= 0) return _seekRatio;
-    final elapsed = DateTime.now().difference(_dvrSeekStartedAt);
-    if (elapsed.isNegative) return _seekRatio;
-    return (_seekRatio + elapsed.inMilliseconds / duration.inMilliseconds)
-        .clamp(0.0, liveEdgeRatio)
-        .toDouble();
+    if (duration == null || duration.inMilliseconds <= 0) {
+      return _seekPosition;
+    }
+    final baseMs = _seekPosition?.inMilliseconds ?? 0;
+    return Duration(
+      milliseconds: baseMs.clamp(0, duration.inMilliseconds).toInt(),
+    );
   }
 
   String get playlistPlaybackUrl => '$playlistUrl?v=$_streamGeneration';
@@ -77,7 +75,7 @@ class TwitchLiveDvrBridgeProxy {
 
     await _validatePlaylist(dvrPlaylistUri);
     _dvrPlaylistUri = dvrPlaylistUri;
-    _seekRatio = 0.92;
+    _seekPosition = null;
     _dvrSeekStartIndex = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
@@ -85,21 +83,22 @@ class TwitchLiveDvrBridgeProxy {
     return Uri.parse('http://127.0.0.1:${server.port}/playlist.m3u8');
   }
 
-  String seekToRatio(double ratio) {
-    _seekRatio = ratio.clamp(0.0, maxReplayRatio).toDouble();
+  String seekToPosition(Duration position) {
+    final duration = _latestDuration;
+    final maxMs = math.max(
+      duration?.inMilliseconds ?? position.inMilliseconds,
+      1,
+    );
+    final positionMs = position.inMilliseconds.clamp(0, maxMs).toInt();
+    _seekPosition = Duration(milliseconds: positionMs);
     _dvrSeekStartIndex = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
     debugPrint(
-      '[LiveDvrBridge] seek ratio=${ratio.toStringAsFixed(3)} '
-      'stored=${_seekRatio.toStringAsFixed(3)} '
+      '[LiveDvrBridge] seek position=${_seekPosition!.inSeconds}s '
       'generation=$_streamGeneration',
     );
     return streamTsPlaybackUrl;
-  }
-
-  void updateTimelineRatio(double ratio) {
-    _seekRatio = ratio.clamp(0.0, maxReplayRatio).toDouble();
   }
 
   Future<void> close() async {
@@ -214,7 +213,10 @@ class TwitchLiveDvrBridgeProxy {
     _applyStreamHeaders(request.response);
     request.response.bufferOutput = false;
     try {
-      await _writeSegment(request.response, sourceUri, _streamGeneration);
+      final generation =
+          int.tryParse(request.uri.queryParameters['g'] ?? '') ??
+          _streamGeneration;
+      await _writeSegment(request.response, sourceUri, generation);
     } finally {
       try {
         await request.response.close();
@@ -235,16 +237,11 @@ class TwitchLiveDvrBridgeProxy {
     _applyStreamHeaders(response);
     response.bufferOutput = false;
 
-    var observedGeneration = _streamGeneration;
     try {
-      while (_server != null) {
-        final generation = _streamGeneration;
-        if (generation != observedGeneration) {
-          observedGeneration = generation;
-          debugPrint('[LiveDvrBridge] switch dvr generation=$generation');
-        }
-        await _streamDvrFromRatio(response, generation);
-      }
+      final generation =
+          int.tryParse(request.uri.queryParameters['v'] ?? '') ??
+          _streamGeneration;
+      await _streamDvrForRequest(response, generation);
     } finally {
       try {
         await response.close();
@@ -284,7 +281,7 @@ class TwitchLiveDvrBridgeProxy {
     );
     if (items.isEmpty) return _emptyPlaylist();
 
-    _dvrSeekStartIndex ??= _indexForRatio(items, _seekRatio);
+    _dvrSeekStartIndex ??= _indexForCurrentSeek(items);
     final averageMs = math.max(
       250,
       (_latestDuration!.inMilliseconds / items.length).round(),
@@ -300,7 +297,8 @@ class TwitchLiveDvrBridgeProxy {
     final window = items.sublist(windowStart, current + 1);
     debugPrint(
       '[LiveDvrBridge] playlist dvr items=${items.length} index=$current '
-      'ratio=${_seekRatio.toStringAsFixed(3)} generation=$_streamGeneration',
+      'position=${_seekPosition?.inSeconds ?? 0}s '
+      'generation=$_streamGeneration',
     );
     return _segmentPlaylist(
       items: window,
@@ -349,37 +347,51 @@ class TwitchLiveDvrBridgeProxy {
         '#EXT-X-MEDIA-SEQUENCE:0\n';
   }
 
-  Future<void> _streamDvrFromRatio(
+  Future<void> _streamDvrForRequest(
     HttpResponse response,
     int generation,
   ) async {
-    final dvrUri = _dvrPlaylistUri;
-    if (dvrUri == null) return;
+    int? nextSequence;
 
-    final text = await _fetchPlaylist(dvrUri);
-    final playlist = TwitchHlsPlaylistParser.parse(
-      text,
-      playlistUrl: dvrUri.toString(),
-    );
-    final items = playlist.items.where((item) => !item.isPrefetch).toList();
-    _latestDuration = items.fold<Duration>(
-      Duration.zero,
-      (total, item) => total + item.duration,
-    );
-    if (items.isEmpty) return;
+    while (_server != null && generation == _streamGeneration) {
+      final dvrUri = _dvrPlaylistUri;
+      if (dvrUri == null) return;
 
-    final start = _indexForRatio(items, _seekRatio);
-    debugPrint(
-      '[LiveDvrBridge] dvr items=${items.length} start=$start '
-      'ratio=${_seekRatio.toStringAsFixed(3)} generation=$generation',
-    );
-    for (var i = start; i < items.length; i++) {
-      if (generation != _streamGeneration) return;
-      final item = items[i];
-      if (i == start) {
-        debugPrint('[LiveDvrBridge] write dvr ${item.label}');
+      final text = await _fetchPlaylist(dvrUri);
+      final playlist = TwitchHlsPlaylistParser.parse(
+        text,
+        playlistUrl: dvrUri.toString(),
+      );
+      final items = playlist.items.where((item) => !item.isPrefetch).toList();
+      _latestDuration = items.fold<Duration>(
+        Duration.zero,
+        (total, item) => total + item.duration,
+      );
+      if (items.isEmpty) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+        continue;
       }
-      await _writeSegment(response, Uri.parse(item.url), generation);
+
+      final start = nextSequence == null
+          ? _indexForCurrentSeek(items)
+          : _indexForSequence(items, nextSequence);
+      debugPrint(
+        '[LiveDvrBridge] dvr items=${items.length} start=$start '
+        'position=${_seekPosition?.inSeconds ?? 0}s generation=$generation',
+      );
+
+      for (var i = start; i < items.length; i++) {
+        if (generation != _streamGeneration || _server == null) return;
+        final item = items[i];
+        if (i == start) {
+          debugPrint('[LiveDvrBridge] write dvr ${item.label}');
+        }
+        await _writeSegment(response, Uri.parse(item.url), generation);
+        nextSequence = item.sequence + 1;
+      }
+
+      final waitMs = playlist.targetDuration.inMilliseconds.clamp(350, 1800);
+      await Future<void>.delayed(Duration(milliseconds: waitMs.toInt()));
     }
   }
 
@@ -409,7 +421,12 @@ class TwitchLiveDvrBridgeProxy {
     response.headers.set(HttpHeaders.serverHeader, 'Streamlink');
     response.headers.contentType = ContentType('video', 'mp2t');
     response.headers.chunkedTransferEncoding = true;
-    response.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+    response.headers.set(
+      HttpHeaders.cacheControlHeader,
+      'no-store, no-cache, must-revalidate',
+    );
+    response.headers.set(HttpHeaders.pragmaHeader, 'no-cache');
+    response.headers.set(HttpHeaders.expiresHeader, '0');
     response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
   }
 
@@ -430,19 +447,34 @@ class TwitchLiveDvrBridgeProxy {
     return text;
   }
 
-  int _indexForRatio(List<TwitchHlsSegmentItem> items, double ratio) {
+  int _indexForCurrentSeek(List<TwitchHlsSegmentItem> items) {
+    final position = _seekPosition;
+    return _indexForPosition(items, position ?? Duration.zero);
+  }
+
+  int _indexForPosition(List<TwitchHlsSegmentItem> items, Duration position) {
+    if (items.isEmpty) return 0;
     final duration = items.fold<Duration>(
       Duration.zero,
       (total, item) => total + item.duration,
     );
     if (duration.inMilliseconds <= 0) return 0;
-    final targetMs = (duration.inMilliseconds * ratio.clamp(0.0, liveEdgeRatio))
-        .round();
+    final targetMs = position.inMilliseconds
+        .clamp(0, duration.inMilliseconds)
+        .toInt();
     var cursor = 0;
     for (var i = 0; i < items.length; i++) {
       cursor += items[i].duration.inMilliseconds;
       if (cursor >= targetMs) return i;
     }
     return math.max(0, items.length - 1);
+  }
+
+  int _indexForSequence(List<TwitchHlsSegmentItem> items, int sequence) {
+    if (items.isEmpty) return 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].sequence >= sequence) return i;
+    }
+    return items.length;
   }
 }

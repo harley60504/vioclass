@@ -32,13 +32,11 @@ class TwitchMiniPlayerOverlay extends StatefulWidget {
 
 class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
   Offset _offset = Offset.zero;
-  bool _expandingToWatchPage = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_handleControllerChanged);
-    _syncAutoPip();
   }
 
   @override
@@ -48,27 +46,16 @@ class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
       oldWidget.controller.removeListener(_handleControllerChanged);
       widget.controller.addListener(_handleControllerChanged);
     }
-    if (oldWidget.androidPipEnabled != widget.androidPipEnabled) {
-      _syncAutoPip();
-    }
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_handleControllerChanged);
-    unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
     super.dispose();
   }
 
   void _handleControllerChanged() {
-    _syncAutoPip();
     if (mounted) setState(() {});
-  }
-
-  void _syncAutoPip() {
-    if (_expandingToWatchPage) return;
-    final enabled = widget.controller.isActive && widget.androidPipEnabled;
-    unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(enabled));
   }
 
   @override
@@ -87,7 +74,6 @@ class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
           final initialVodVideo = entry.kind == TwitchWatchPlaybackKind.liveDvr
               ? entry.resumeVodVideo ?? entry.activeDvrVideo
               : entry.resumeVodVideo;
-          _expandingToWatchPage = true;
           final route = PageRouteBuilder<void>(
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
@@ -104,8 +90,6 @@ class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
             ),
           );
           await Navigator.of(context).push(route);
-          _expandingToWatchPage = false;
-          _syncAutoPip();
         },
         onPanUpdate: (details) {
           setState(() => _offset += details.delta);
@@ -142,7 +126,8 @@ class _MiniPlayerCard extends StatefulWidget {
   State<_MiniPlayerCard> createState() => _MiniPlayerCardState();
 }
 
-class _MiniPlayerCardState extends State<_MiniPlayerCard> {
+class _MiniPlayerCardState extends State<_MiniPlayerCard>
+    with WidgetsBindingObserver {
   late final TwitchMediaKitPlayerSession _session;
   bool _ready = false;
   bool _handingOffToWatchPage = false;
@@ -150,6 +135,7 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _session = TwitchMediaKitPlayerHost.acquire(title: 'VioClass Mini');
     TwitchMiniPlayerController.instance.attachSession(_session);
     TwitchMediaKitPlayerHost.keepPlayingWithoutSession(null);
@@ -167,12 +153,21 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (!_handingOffToWatchPage) {
       unawaited(_session.pauseCurrent().catchError((_) {}));
     }
     TwitchMiniPlayerController.instance.detachSession(_session);
     _session.release();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_restoreCurrentPlayback());
+    }
   }
 
   void _expandToWatchPage() {
@@ -189,6 +184,10 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard> {
   }
 
   Future<void> _open() async {
+    await _restoreCurrentPlayback();
+  }
+
+  Future<void> _restoreCurrentPlayback() async {
     try {
       await _session.openOrResume(uri: widget.entry.mediaUri, play: true);
       if (!mounted) return;

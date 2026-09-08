@@ -17,6 +17,7 @@ import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../navigation/twitch_route_observer.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
+import '../watch/twitch_playback_session_controller.dart';
 import 'twitch_watch_page.dart';
 import 'watch/twitch_watch_playback_state.dart';
 
@@ -105,6 +106,12 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
   @override
   void didPush() {
     _pauseIssuedForCurrentLeave = false;
+    final watchState = _watchKey.currentState;
+    if (watchState != null) {
+      TwitchPlaybackSessionController.instance.activateRouteOwner(
+        watchState.playbackRouteOwner,
+      );
+    }
   }
 
   @override
@@ -112,6 +119,9 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
     _pauseIssuedForCurrentLeave = false;
     final watchState = _watchKey.currentState;
     if (watchState != null) {
+      TwitchPlaybackSessionController.instance.activateRouteOwner(
+        watchState.playbackRouteOwner,
+      );
       unawaited(watchState.reconcileVisibleRoutePlayback());
     }
   }
@@ -131,6 +141,14 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
 
   void _pauseBecausePlayerRouteHidden() {
     if (_pauseIssuedForCurrentLeave) return;
+    final watchState = _watchKey.currentState;
+    final isPushedMediaPlayback =
+        widget.initialVodVideo != null || widget.initialClip != null;
+    final hasPreviousPlayback =
+        watchState?.restorePlaybackOnDispose?.playable == true;
+    if (isPushedMediaPlayback && hasPreviousPlayback) {
+      return;
+    }
     if (TwitchMiniPlayerController.instance.isActiveMediaUri(
       TwitchMediaKitPlayerHost.currentMediaUri,
     )) {

@@ -15,8 +15,11 @@ import 'twitch_watch_page_relationship.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
-const double _liveDvrLiveEdgeRatio = 0.995;
 const Duration _liveDvrWarmTtl = Duration(minutes: 8);
+const Duration _liveReplayBufferDuration = Duration(seconds: 20);
+const Duration _liveTimelineEdgeTolerance = Duration(milliseconds: 500);
+
+enum _LiveTimelineSeekRoute { liveEdge, liveBuffer, dvrArchive }
 
 extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   Future<void> loadAuth() async {
@@ -469,7 +472,12 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         activeGrowingVodVideo = video;
         await switchToLiveDvrReplay(
           video: video,
-          ratio: widget.initialVodReplayRatio ?? 0.92,
+          position:
+              positionForVodRatio(
+                widget.initialVodReplayRatio,
+                video.parsedDuration ?? currentLiveTimelineDuration(),
+              ) ??
+              defaultLiveDvrReplayPosition(),
         );
         if (mounted) setState(() {});
         return true;
@@ -558,7 +566,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
   void rememberMediaUriForRouteRestore() {
     if (restorePlaybackOnDispose != null) return;
-    final current = TwitchPlaybackSessionController.instance.playableState;
+    final session = TwitchPlaybackSessionController.instance;
+    final current =
+        session.playableStateBeforeRouteOwner(playbackRouteOwner) ??
+        session.playableState;
     if (current == null) return;
     restorePlaybackOnDispose = current;
   }
@@ -604,83 +615,6 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('prepare active growing VOD failed: $error');
       }
-    }
-  }
-
-  Future<bool> recoverLiveDvrPlaybackAfterForeground({
-    required String channel,
-    required int generation,
-  }) async {
-    final currentVideo = activeGrowingVodVideo;
-    if (currentVideo == null) return false;
-
-    if (watchPorts.player.runtime.usingLiveDvrBridge) {
-      final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
-      final runtimeUri = watchPorts.player.runtime.proxyMpvUrl?.trim();
-      if (currentUri != null &&
-          currentUri.isNotEmpty &&
-          runtimeUri != null &&
-          runtimeUri.isNotEmpty &&
-          currentUri == runtimeUri) {
-        debugPrint('[LiveDvrBridge] foreground keeps current dvr playback');
-        final player = playerSession.playerOrNull;
-        if (player != null && !player.state.playing) {
-          await player.play();
-        }
-        return true;
-      }
-    }
-
-    final ratio = watchPorts.player.runtime.liveDvrBridgeTimelineRatio ?? 0.92;
-    final freshVideo =
-        await _fetchCurrentDvrVideoSnapshot(
-          channel: channel,
-          generation: generation,
-          currentVideoId: currentVideo.id,
-        ) ??
-        currentVideo;
-    if (!isCurrentWatchTask(generation, channel)) return false;
-
-    if (freshVideo.isLikelyGrowingArchive) {
-      activeGrowingVodVideo = freshVideo;
-      final prepared = await prepareLiveDvrBridgeSource(freshVideo);
-      if (!prepared) return false;
-      await seekLiveDvrBridgePlayback(ratio);
-      return true;
-    }
-
-    return openVodPlayback(
-      channel: channel,
-      generation: generation,
-      video: freshVideo,
-      initialRatio: ratio,
-    );
-  }
-
-  Future<TwitchChannelVideo?> _fetchCurrentDvrVideoSnapshot({
-    required String channel,
-    required int generation,
-    required String currentVideoId,
-  }) async {
-    final fallbackChannel = widget.resolvedInitialOfflineChannel;
-    final discoveryService = widget.initialDiscoveryService;
-    if (fallbackChannel == null || discoveryService == null) return null;
-
-    try {
-      final page = await discoveryService.fetchChannelVideos(
-        userId: fallbackChannel.broadcasterId,
-        first: 5,
-      );
-      if (!isCurrentWatchTask(generation, channel)) return null;
-      for (final video in page.videos) {
-        if (video.id == currentVideoId) return video;
-      }
-      return page.videos.isEmpty ? null : page.videos.first;
-    } catch (error) {
-      if (isCurrentWatchTask(generation, channel)) {
-        debugPrint('refresh active DVR video failed: $error');
-      }
-      return null;
     }
   }
 
@@ -778,11 +712,19 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     }
   }
 
-  Future<void> openActiveDvrReplay({double initialRatio = 0.92}) async {
+  Future<void> openActiveDvrReplay({Duration? initialPosition}) async {
+    final duration = currentLiveTimelineDuration();
+    if (duration != null && duration.inMilliseconds > 0) {
+      await openActiveDvrReplayAt(
+        initialPosition ?? defaultLiveDvrReplayPosition(),
+      );
+      return;
+    }
+
     final generation = watchLoadGeneration;
     final channel = channelLogin;
-    if (watchPorts.player.runtime.usingLiveDvrBridge) {
-      await seekLiveDvrBridgePlayback(initialRatio);
+    final target = initialPosition ?? defaultLiveDvrReplayPosition();
+    if (await tryOpenLiveBufferReplayAt(target)) {
       return;
     }
 
@@ -798,7 +740,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     }
 
     if (video.isLikelyGrowingArchive) {
-      await switchToLiveDvrReplay(video: video, ratio: initialRatio);
+      await switchToLiveDvrReplay(video: video, position: target);
       return;
     }
 
@@ -806,13 +748,120 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       channel: channel,
       generation: generation,
       video: video,
-      initialRatio: initialRatio,
+      initialRatio: ratioForVodPosition(target, video.parsedDuration),
+    );
+    if (!loaded) showSnack('DVR 回放載入失敗。');
+  }
+
+  Future<void> openActiveDvrReplayAt(Duration target) async {
+    final duration = currentLiveTimelineDuration();
+    final targetMs = duration == null || duration.inMilliseconds <= 0
+        ? target.inMilliseconds
+        : target.inMilliseconds.clamp(0, duration.inMilliseconds).toInt();
+    pendingLiveTimelineSeekTarget = Duration(milliseconds: targetMs);
+    pendingLiveTimelineReturnToLive = false;
+    await drainLiveTimelineActions();
+  }
+
+  Future<void> openActiveDvrReplayAtOnce(Duration target) async {
+    final duration = currentLiveTimelineDuration();
+    if (duration == null || duration.inMilliseconds <= 0) {
+      await openActiveDvrReplay();
+      return;
+    }
+
+    final safeTarget = clampLiveTimelinePosition(target, duration);
+    final route = _liveTimelineSeekRoute(safeTarget, duration);
+
+    final generation = watchLoadGeneration;
+    final channel = channelLogin;
+    switch (route) {
+      case _LiveTimelineSeekRoute.liveEdge:
+        await returnToLivePlaybackOnce();
+        return;
+      case _LiveTimelineSeekRoute.liveBuffer:
+        if (await openLiveBufferReplayIfAvailable(safeTarget, duration)) {
+          return;
+        }
+        break;
+      case _LiveTimelineSeekRoute.dvrArchive:
+        break;
+    }
+
+    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+      await seekLiveDvrBridgePlaybackAt(safeTarget);
+      return;
+    }
+
+    var video = activeGrowingVodVideo;
+    if (video == null) {
+      await prepareActiveGrowingVod(channel: channel, generation: generation);
+      video = activeGrowingVodVideo;
+    }
+    if (video == null) {
+      showSnack('目前找不到可回看的直播 VOD。');
+      return;
+    }
+
+    if (video.isLikelyGrowingArchive) {
+      final prepared = await prepareLiveDvrBridgeSource(video);
+      if (!prepared) {
+        showSnack('目前找不到可用的 DVR 播放來源。');
+        return;
+      }
+      await seekLiveDvrBridgePlaybackAt(safeTarget);
+      return;
+    }
+
+    final loaded = await openVodPlayback(
+      channel: channel,
+      generation: generation,
+      video: video,
+      initialRatio: ratioForVodPosition(safeTarget, video.parsedDuration),
     );
     if (!loaded) showSnack('DVR 回放載入失敗。');
   }
 
   Future<void> returnToLivePlayback() async {
-    if (watchPorts.player.runtime.usingLiveDvrBridge) {
+    pendingLiveTimelineSeekTarget = null;
+    pendingLiveTimelineReturnToLive = true;
+    await drainLiveTimelineActions();
+  }
+
+  Future<void> drainLiveTimelineActions() async {
+    if (liveTimelineActionInFlight) return;
+
+    liveTimelineActionInFlight = true;
+    try {
+      while (mounted) {
+        final shouldReturnToLive = pendingLiveTimelineReturnToLive;
+        final nextTarget = pendingLiveTimelineSeekTarget;
+        if (!shouldReturnToLive && nextTarget == null) break;
+
+        pendingLiveTimelineReturnToLive = false;
+        pendingLiveTimelineSeekTarget = null;
+        final generation = watchLoadGeneration;
+        final channel = channelLogin;
+
+        if (shouldReturnToLive) {
+          await returnToLivePlaybackOnce();
+        } else if (nextTarget != null) {
+          await openActiveDvrReplayAtOnce(nextTarget);
+        }
+
+        if (!isCurrentWatchTask(generation, channel)) {
+          pendingLiveTimelineReturnToLive = false;
+          pendingLiveTimelineSeekTarget = null;
+          break;
+        }
+      }
+    } finally {
+      liveTimelineActionInFlight = false;
+    }
+  }
+
+  Future<void> returnToLivePlaybackOnce() async {
+    if (watchPorts.player.runtime.usingLiveTimelineReplay) {
       debugPrint('[LiveDvrBridge] return to low-latency live requested');
       await switchToLowLatencyLivePlayback();
       return;
@@ -829,41 +878,30 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
   Future<void> switchToLiveDvrReplay({
     required TwitchChannelVideo video,
-    required double ratio,
+    required Duration position,
   }) async {
     final prepared = await prepareLiveDvrBridgeSource(video);
     if (!prepared) {
       showSnack('目前找不到可用的 DVR 播放來源。');
       return;
     }
-    await seekLiveDvrBridgePlayback(ratio);
+    await seekLiveDvrBridgePlaybackAt(position);
   }
 
-  Future<void> seekLiveDvrBridgePlayback(double ratio) async {
-    final atLiveEdge = ratio >= _liveDvrLiveEdgeRatio;
-    if (atLiveEdge) {
-      await switchToLowLatencyLivePlayback();
-      return;
-    }
+  Future<void> seekLiveDvrBridgePlaybackAt(Duration target) async {
     final video = activeGrowingVodVideo;
-    final timelineDuration =
-        watchPorts.player.runtime.liveDvrBridgeDuration ??
-        video?.parsedDuration;
+    final timelineDuration = currentLiveTimelineDuration();
+    final safeTarget = timelineDuration == null
+        ? target
+        : clampLiveTimelinePosition(target, timelineDuration);
     final timelineOffsetSeconds =
         timelineDuration == null || timelineDuration.inMilliseconds <= 0
         ? null
-        : timelineDuration.inMilliseconds *
-              ratio.clamp(0.0, _liveDvrLiveEdgeRatio) /
-              1000;
-    final playbackUrl = await watchPorts.player.runtime.seekLiveDvrBridgeRatio(
-      ratio,
-    );
+        : safeTarget.inMilliseconds / 1000;
+    final playbackUrl = await watchPorts.player.runtime
+        .seekLiveDvrBridgePosition(safeTarget);
     if (playbackUrl == null) return;
-    await playbackController.openMedia(
-      uri: playbackUrl,
-      play: true,
-      forceOpen: true,
-    );
+    await openLiveDvrBridgeMedia(playbackUrl);
     if (video != null) {
       preferVodReplayChat = true;
       markOwnedPlayback(
@@ -883,6 +921,153 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       );
     }
     if (mounted) setState(() {});
+  }
+
+  Future<void> openLiveDvrBridgeMedia(String playbackUrl) async {
+    await playbackController.openMedia(
+      uri: playbackUrl,
+      play: true,
+      forceOpen: true,
+    );
+  }
+
+  Future<bool> tryOpenLiveBufferReplayAt(Duration target) async {
+    final timelineDuration = currentLiveTimelineDuration();
+    if (timelineDuration == null || timelineDuration.inMilliseconds <= 0) {
+      return false;
+    }
+
+    return openLiveBufferReplayIfAvailable(target, timelineDuration);
+  }
+
+  Future<bool> openLiveBufferReplayIfAvailable(
+    Duration target,
+    Duration timelineDuration,
+  ) async {
+    final safeTarget = clampLiveTimelinePosition(target, timelineDuration);
+    final fromLiveMs =
+        timelineDuration.inMilliseconds - safeTarget.inMilliseconds;
+    if (fromLiveMs <= 0 ||
+        fromLiveMs > _liveReplayBufferDuration.inMilliseconds) {
+      return false;
+    }
+
+    final playbackUrl = await watchPorts.player.runtime.seekLiveBufferReplay(
+      fromLive: Duration(milliseconds: fromLiveMs),
+      timelineDuration: timelineDuration,
+    );
+    if (playbackUrl == null) return false;
+
+    vodReplayController.stop();
+    preferVodReplayChat = false;
+    playbackController.setError(null);
+    await playbackController.openMedia(
+      uri: playbackUrl,
+      play: true,
+      forceOpen: true,
+    );
+    markOwnedPlayback(
+      kind: TwitchWatchPlaybackKind.liveDvr,
+      mediaUri: playbackUrl,
+    );
+    if (mounted) setState(() {});
+    return true;
+  }
+
+  _LiveTimelineSeekRoute _liveTimelineSeekRoute(
+    Duration target,
+    Duration timelineDuration,
+  ) {
+    final safeTarget = clampLiveTimelinePosition(target, timelineDuration);
+    final fromLiveMs =
+        timelineDuration.inMilliseconds - safeTarget.inMilliseconds;
+    if (fromLiveMs <= _liveTimelineEdgeTolerance.inMilliseconds) {
+      return _LiveTimelineSeekRoute.liveEdge;
+    }
+    if (fromLiveMs <= _liveReplayBufferDuration.inMilliseconds) {
+      return _LiveTimelineSeekRoute.liveBuffer;
+    }
+    return _LiveTimelineSeekRoute.dvrArchive;
+  }
+
+  Duration clampLiveTimelinePosition(
+    Duration target,
+    Duration timelineDuration,
+  ) {
+    if (timelineDuration.inMilliseconds <= 0) return Duration.zero;
+    return Duration(
+      milliseconds: target.inMilliseconds
+          .clamp(0, timelineDuration.inMilliseconds)
+          .toInt(),
+    );
+  }
+
+  Duration? currentLiveTimelineDuration() {
+    final bridgeDuration = watchPorts.player.runtime.liveDvrBridgeDuration;
+    final startedAt = liveTimelineStartedAt;
+    final elapsed = startedAt == null
+        ? null
+        : DateTime.now().toUtc().difference(startedAt.toUtc());
+    final positiveElapsed = elapsed == null || elapsed.isNegative
+        ? null
+        : elapsed;
+
+    if (bridgeDuration == null || bridgeDuration.inMilliseconds <= 0) {
+      return positiveElapsed;
+    }
+    if (positiveElapsed == null) return bridgeDuration;
+    return positiveElapsed.inMilliseconds > bridgeDuration.inMilliseconds
+        ? positiveElapsed
+        : bridgeDuration;
+  }
+
+  Duration? currentLiveTimelinePosition() {
+    final runtimePosition =
+        watchPorts.player.runtime.liveDvrBridgeTimelinePosition;
+    if (runtimePosition != null && runtimePosition >= Duration.zero) {
+      return runtimePosition;
+    }
+
+    final timelineDuration = currentLiveTimelineDuration();
+    final playerPosition = playerSession.playerOrNull?.state.position;
+    if (playerPosition != null && playerPosition >= Duration.zero) {
+      if (timelineDuration == null || timelineDuration.inMilliseconds <= 0) {
+        return playerPosition;
+      }
+      return Duration(
+        milliseconds: playerPosition.inMilliseconds
+            .clamp(0, timelineDuration.inMilliseconds)
+            .toInt(),
+      );
+    }
+
+    return null;
+  }
+
+  Duration defaultLiveDvrReplayPosition() {
+    final timelineDuration = currentLiveTimelineDuration();
+    if (timelineDuration == null || timelineDuration.inMilliseconds <= 0) {
+      return Duration.zero;
+    }
+    final backoff = _liveReplayBufferDuration ~/ 2;
+    if (timelineDuration <= backoff) return Duration.zero;
+    return timelineDuration - backoff;
+  }
+
+  double? ratioForVodPosition(Duration position, Duration? duration) {
+    if (duration == null || duration.inMilliseconds <= 0) return null;
+    return (position.inMilliseconds / duration.inMilliseconds)
+        .clamp(0.0, 1.0)
+        .toDouble();
+  }
+
+  Duration? positionForVodRatio(double? ratio, Duration? duration) {
+    if (ratio == null || duration == null || duration.inMilliseconds <= 0) {
+      return null;
+    }
+    return Duration(
+      milliseconds: (duration.inMilliseconds * ratio.clamp(0.0, 1.0)).round(),
+    );
   }
 
   Future<void> switchToLowLatencyLivePlayback() async {
@@ -932,7 +1117,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       debugPrint(
         '[WatchVodOnly] growing archive redirected to live DVR bridge',
       );
-      await switchToLiveDvrReplay(video: video, ratio: initialRatio ?? 0.92);
+      await switchToLiveDvrReplay(
+        video: video,
+        position:
+            positionForVodRatio(
+              initialRatio,
+              video.parsedDuration ?? currentLiveTimelineDuration(),
+            ) ??
+            defaultLiveDvrReplayPosition(),
+      );
       return true;
     }
 
@@ -1059,9 +1252,9 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         warmedLiveDvrVideoId = video.id;
         warmedLiveDvrQualityKey = variant.adAwareQualityKey;
         warmedLiveDvrResolvedAt = DateTime.now();
-        final ratio =
-            watchPorts.player.runtime.liveDvrBridgeTimelineRatio ?? 0.92;
-        await seekLiveDvrBridgePlayback(ratio);
+        await seekLiveDvrBridgePlaybackAt(
+          currentLiveTimelinePosition() ?? defaultLiveDvrReplayPosition(),
+        );
         return;
       }
 

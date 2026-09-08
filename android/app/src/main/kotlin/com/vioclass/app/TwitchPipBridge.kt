@@ -62,6 +62,20 @@ class TwitchPipBridge(
         )
     }
 
+    fun notifyActivityStarted() {
+        channel?.invokeMethod(
+            "onActivityStarted",
+            mapOf("isInPip" to isCurrentlyInPip()),
+        )
+    }
+
+    fun notifyActivityStopped() {
+        channel?.invokeMethod(
+            "onActivityStopped",
+            mapOf("isInPip" to isCurrentlyInPip()),
+        )
+    }
+
     private fun setSourceRectHint(left: Int, top: Int, right: Int, bottom: Int) {
         if (right <= left || bottom <= top) return
         sourceRectHint = Rect(left, top, right, bottom)
@@ -73,9 +87,13 @@ class TwitchPipBridge(
             activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
     }
 
+    private fun isCurrentlyInPip(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode
+    }
+
     private fun enterPip(width: Int, height: Int): Boolean {
         if (!isPipAvailable()) return false
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInPictureInPictureMode) {
+        if (isCurrentlyInPip()) {
             return true
         }
 
