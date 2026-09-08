@@ -19,6 +19,52 @@ class TwitchEmoteImageCacheManager {
     ),
   );
 
+  static final CacheManager animatedInstance = CacheManager(
+    Config(
+      'twitchAnimatedEmoteImageCache',
+      stalePeriod: const Duration(days: 7),
+      maxNrOfCacheObjects: 300,
+    ),
+  );
+
+  static final Map<String, Future<Uint8List>> _animatedLoads =
+      <String, Future<Uint8List>>{};
+
+  static Future<Uint8List> loadAnimatedBytes(String url) {
+    final sourceUrl = url.trim();
+    if (sourceUrl.isEmpty) {
+      return Future<Uint8List>.error(
+        ArgumentError.value(url, 'url', 'cannot be empty'),
+      );
+    }
+
+    final existing = _animatedLoads[sourceUrl];
+    if (existing != null) return existing;
+
+    late final Future<Uint8List> load;
+    load = _loadAnimatedBytes(sourceUrl).whenComplete(() {
+      if (identical(_animatedLoads[sourceUrl], load)) {
+        _animatedLoads.remove(sourceUrl);
+      }
+    });
+    _animatedLoads[sourceUrl] = load;
+    return load;
+  }
+
+  static Future<Uint8List> _loadAnimatedBytes(String url) async {
+    final cached = await animatedInstance.getFileFromCache(url);
+    if (cached != null && await cached.file.exists()) {
+      return cached.file.readAsBytes();
+    }
+
+    final downloaded = await animatedInstance.downloadFile(
+      url,
+      key: url,
+      force: false,
+    );
+    return downloaded.file.readAsBytes();
+  }
+
   static String buildCacheKey({
     required String providerLabel,
     required String id,

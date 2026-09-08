@@ -139,7 +139,7 @@ class TwitchPlayerRuntime extends ChangeNotifier {
         upstreamPlaylistUrl: variant.url,
         upstreamHeaders: defaultUpstreamHeaders,
         edgeSegmentCount: 1,
-        prefetchSegmentCount: 3,
+        prefetchSegmentCount: 1,
         outputFutureSegments: true,
         futureOutputSegmentCount: 1,
         dropBehindLiveEdge: true,

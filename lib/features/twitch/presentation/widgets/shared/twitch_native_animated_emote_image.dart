@@ -27,11 +27,7 @@ class TwitchNativeAnimatedEmoteImage extends StatelessWidget {
     return Image(
       image: NativeAnimatedImageProvider.fromBytesProvider(
         tag: sourceUrl,
-        loader: () async {
-          final file = await TwitchEmoteImageCacheManager.instance
-              .getSingleFile(sourceUrl);
-          return file.readAsBytes();
-        },
+        loader: () => TwitchEmoteImageCacheManager.loadAnimatedBytes(sourceUrl),
       ),
       width: width,
       height: height,

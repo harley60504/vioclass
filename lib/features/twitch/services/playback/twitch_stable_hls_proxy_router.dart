@@ -26,7 +26,7 @@ class TwitchStableHlsProxyRouter {
   TwitchStableHlsProxyRouter({
     required this.upstreamHeaders,
     this.edgeSegmentCount = 1,
-    this.prefetchSegmentCount = 3,
+    this.prefetchSegmentCount = 1,
     this.outputFutureSegments = true,
     this.futureOutputSegmentCount = 1,
     this.dropBehindLiveEdge = true,
@@ -50,6 +50,7 @@ class TwitchStableHlsProxyRouter {
   bool _switching = false;
   int _switchGeneration = 0;
   int _directStreamGeneration = 0;
+  int _streamClientGeneration = 0;
 
   int? get port => _server?.port;
 
@@ -345,6 +346,11 @@ class TwitchStableHlsProxyRouter {
       return;
     }
 
+    // media_kit may open the same stable stream URL again before Windows has
+    // reported the previous socket as closed. Keep only the newest stream pump
+    // so stale local clients cannot multiply loopback traffic indefinitely.
+    final streamClientGeneration = ++_streamClientGeneration;
+
     final response = request.response;
     response.statusCode = HttpStatus.ok;
     _applyStreamHeaders(response);
@@ -355,11 +361,15 @@ class TwitchStableHlsProxyRouter {
     var lastDirectStreamGeneration = -1;
 
     try {
-      while (_server != null) {
+      while (_server != null &&
+          streamClientGeneration == _streamClientGeneration) {
         final target = await _waitForReadyStreamTarget(
           lastGeneration: lastGeneration,
         );
-        if (target == null) break;
+        if (target == null ||
+            streamClientGeneration != _streamClientGeneration) {
+          break;
+        }
 
         final directMode = _directStreamUri != null;
         lastAttachedInnerStreamUrl = target.toString();
@@ -373,7 +383,10 @@ class TwitchStableHlsProxyRouter {
           final upstreamResponse = await upstreamRequest.close();
 
           await for (final chunk in upstreamResponse) {
-            if (_server == null) break;
+            if (_server == null ||
+                streamClientGeneration != _streamClientGeneration) {
+              break;
+            }
             response.add(chunk);
             await response.flush();
           }
