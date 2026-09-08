@@ -150,10 +150,10 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
                 onBack: () => setState(() => _detailReward = null),
                 onRedeem: () async {
                   final result = await _redeemReward(context, reward);
-                  if (!mounted) return;
+                  if (!mounted || result == null) return;
                   setState(() {
                     _detailReward = null;
-                    if (result != null) _redeemResult = result;
+                    _redeemResult = result;
                   });
                 },
               ),
@@ -232,11 +232,6 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
         return null;
       }
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.vio.t('目前無法兌換這個獎勵，請稍後再試。'))),
-        );
-      }
       return null;
     }
 
@@ -257,10 +252,6 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
   }) async {
     final loader = widget.onLoadChannelPointEmotes;
     if (loader == null) {
-      showChannelPointsSnack(
-        context,
-        context.vio.t('Channel Points emote menu 目前先暫時關閉。'),
-      );
       return null;
     }
 

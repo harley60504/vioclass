@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../../api/core/twitch_api_exception.dart';
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
@@ -74,7 +73,7 @@ class TwitchWatchSheetPortLauncher {
       context: context,
       snapshot: channelPointsSnapshot(),
       loading: loadingEngagement() || engagementBootstrapping(),
-      onRefresh: () => refreshEngagement(showSnackOnError: true),
+      onRefresh: () => refreshEngagement(showSnackOnError: false),
       onClaim: claimCommunityPoints,
       onPrepareTextReward: prepareChannelPointTextReward,
       onRedeemReward: redeemChannelPointReward,
@@ -86,25 +85,17 @@ class TwitchWatchSheetPortLauncher {
 
   Future<List<TwitchChannelPointEmoteOption>>
   loadChannelPointModifiableEmotes() async {
-    try {
-      return await engagement.loadChannelPointEmotes(
-        channelLogin: channelLogin(),
-        channelId: channelPointsSnapshot()?.channelId ?? channelId(),
-      );
-    } catch (error) {
-      showMessage('忠誠點數貼圖暫時載入失敗，稍後再試。');
-      return const <TwitchChannelPointEmoteOption>[];
-    }
+    return engagement.loadChannelPointEmotes(
+      channelLogin: channelLogin(),
+      channelId: channelPointsSnapshot()?.channelId ?? channelId(),
+    );
   }
 
   Future<void> prepareChannelPointTextReward(
     Map<String, dynamic> reward,
   ) async {
     final setPending = setPendingSpecialMessage;
-    if (setPending == null) {
-      showMessage('尚未接上聊天室輸入欄。');
-      return;
-    }
+    if (setPending == null) return;
 
     final cost = readChannelPointInt(reward['cost']);
     final title = channelPointRewardTitle(reward);
@@ -123,26 +114,20 @@ class TwitchWatchSheetPortLauncher {
         payload: <String, dynamic>{'reward': reward},
       ),
     );
-
-    showMessage('已準備：$title');
   }
 
   Future<void> claimCommunityPoints(String claimId) async {
     final resolvedChannelId = channelPointsSnapshot()?.channelId ?? channelId();
-    if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
-      showMessage('找不到頻道資訊，暫時不能領取忠誠點數。');
-      return;
-    }
+    if (resolvedChannelId == null || resolvedChannelId.isEmpty) return;
 
     try {
-      final result = await engagement.claimCommunityPoints(
+      await engagement.claimCommunityPoints(
         channelId: resolvedChannelId,
         claimId: claimId,
       );
-      showMessage('已送出領取忠誠點數：+${result.pointsEarned}');
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
-      showMessage('忠誠點數領取失敗，稍後再試。');
+      debugPrint('[ChannelPointsClaim] failed: $error');
     }
   }
 
@@ -151,10 +136,7 @@ class TwitchWatchSheetPortLauncher {
     String textInput,
   ) async {
     final resolvedChannelId = channelPointsSnapshot()?.channelId ?? channelId();
-    if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
-      showMessage('找不到頻道資訊，暫時不能兌換忠誠點數獎勵。');
-      return null;
-    }
+    if (resolvedChannelId == null || resolvedChannelId.isEmpty) return null;
 
     try {
       final result = _isRandomEmoteUnlockReward(reward)
@@ -171,8 +153,6 @@ class TwitchWatchSheetPortLauncher {
       return result.displayResult;
     } catch (error) {
       debugPrint('[ChannelPointsRedeem] failed: $error');
-      final reason = _channelPointRedeemFailureReason(error);
-      showMessage(reason == null ? '忠誠點數兌換失敗，稍後再試。' : '忠誠點數兌換失敗：$reason');
       return null;
     }
   }
@@ -182,21 +162,6 @@ class TwitchWatchSheetPortLauncher {
     if (type == 'RANDOM_SUB_EMOTE_UNLOCK') return true;
     return channelPointRewardTitle(reward).trim().toLowerCase() ==
         'unlock a random sub emote';
-  }
-
-  String? _channelPointRedeemFailureReason(Object error) {
-    if (error is TwitchApiException) {
-      final message = error.message.trim();
-      if (message.isEmpty) return null;
-      return message
-          .replaceFirst('UnlockRandomSubscriberEmote failed: ', '')
-          .replaceFirst('RedeemCommunityPointsCustomReward failed: ', '');
-    }
-
-    final text = error.toString().trim();
-    if (text.isEmpty) return null;
-    if (text.length > 80) return '${text.substring(0, 80)}...';
-    return text;
   }
 
   Future<void> openPredictionBetSheet(BuildContext context) async {

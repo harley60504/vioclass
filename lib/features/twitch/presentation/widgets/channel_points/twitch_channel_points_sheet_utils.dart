@@ -314,7 +314,3 @@ String formatChannelPointCompactNumber(int value) {
 
   return value.toString();
 }
-
-void showChannelPointsSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-}
