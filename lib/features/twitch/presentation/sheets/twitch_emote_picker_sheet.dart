@@ -613,8 +613,10 @@ class _EmoteTile extends StatelessWidget {
                                 id: entry.id,
                                 name: entry.name,
                                 imageUrl: entry.imageUrl,
+                                staticImageUrl: entry.staticImageUrl,
                                 providerLabel: entry.providerLabel,
                                 isOfficial: entry.isOfficial,
+                                isAnimated: entry.isAnimated,
                                 locked: locked,
                                 fit: BoxFit.contain,
                                 memCacheWidth: 144,
@@ -762,6 +764,14 @@ class _EmoteEntry {
   }
 
   bool get isOfficial => official != null;
+
+  bool get isAnimated => official != null || (thirdParty?.isAnimated ?? false);
+
+  String get staticImageUrl =>
+      thirdParty?.effectiveStaticImageUrl ??
+      (official == null
+          ? ''
+          : TwitchEmoteImage.officialStaticEmoteUrl(official!.id));
 
   String get stableKey {
     final cleanId = id.trim();

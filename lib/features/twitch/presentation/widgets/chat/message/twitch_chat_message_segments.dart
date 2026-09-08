@@ -442,6 +442,7 @@ void _appendOfficialEmoteSpan({
           staticImageUrl: TwitchEmoteImage.officialStaticEmoteUrl(emote.id),
           providerLabel: emote.sourceLabel,
           isOfficial: true,
+          isAnimated: true,
           animate: animateEmotes,
           width: size,
           height: size,
@@ -528,6 +529,7 @@ WidgetSpan _twitchEmoteSpan({
         ),
         providerLabel: 'Twitch',
         isOfficial: true,
+        isAnimated: true,
         animate: animateEmotes,
         width: size,
         height: size,
@@ -568,6 +570,7 @@ class _ThirdPartyInlineEmoteImage extends StatelessWidget {
       staticImageUrl: emote.effectiveStaticImageUrl,
       providerLabel: emote.providerLabel,
       isOfficial: false,
+      isAnimated: emote.isAnimated,
       animate: shouldAnimate,
       width: width,
       height: height,
@@ -584,6 +587,7 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
   final String staticImageUrl;
   final String providerLabel;
   final bool isOfficial;
+  final bool isAnimated;
   final bool animate;
   final double width;
   final double height;
@@ -597,6 +601,7 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
     required this.staticImageUrl,
     required this.providerLabel,
     required this.isOfficial,
+    required this.isAnimated,
     required this.animate,
     required this.width,
     required this.height,
@@ -623,6 +628,7 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
         staticImageUrl: staticImageUrl,
         providerLabel: providerLabel,
         isOfficial: isOfficial,
+        isAnimated: isAnimated,
         preferStaticOfficial: !animate,
         forceStatic: !animate,
         width: width,

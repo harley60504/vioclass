@@ -2,7 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/chat/twitch_emote_image_cache_manager.dart';
-import 'twitch_animated_gif_emote_image.dart';
+import 'twitch_native_animated_emote_image.dart';
 
 /// Shared Twitch / third-party emote image renderer.
 ///
@@ -18,6 +18,7 @@ class TwitchEmoteImage extends StatefulWidget {
   final String staticImageUrl;
   final String providerLabel;
   final bool isOfficial;
+  final bool isAnimated;
   final bool locked;
   final bool preferStaticOfficial;
   final bool forceStatic;
@@ -45,6 +46,7 @@ class TwitchEmoteImage extends StatefulWidget {
     this.staticImageUrl = '',
     this.providerLabel = '',
     this.isOfficial = false,
+    this.isAnimated = false,
     this.locked = false,
     this.preferStaticOfficial = false,
     this.forceStatic = false,
@@ -98,6 +100,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         oldWidget.staticImageUrl != widget.staticImageUrl ||
         oldWidget.providerLabel != widget.providerLabel ||
         oldWidget.isOfficial != widget.isOfficial ||
+        oldWidget.isAnimated != widget.isAnimated ||
         oldWidget.preferStaticOfficial != widget.preferStaticOfficial ||
         oldWidget.forceStatic != widget.forceStatic) {
       imageIndex = 0;
@@ -142,7 +145,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
       url: currentUrl,
     );
 
-    if (shouldUseCustomAnimatedGifForUrl(currentUrl)) {
+    if (shouldUseAnimatedPipeline(currentUrl)) {
       final staticFallbackUrl = uniqueUrls(<String>[
         widget.staticImageUrl,
         TwitchEmoteImage.officialStaticEmoteUrl(widget.id),
@@ -151,7 +154,7 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
 
       return Opacity(
         opacity: widget.locked ? 0.62 : 1.0,
-        child: TwitchAnimatedGifEmoteImage(
+        child: TwitchNativeAnimatedEmoteImage(
           key: ValueKey<String>('direct:$cacheKey'),
           url: currentUrl,
           width: widget.width,
@@ -209,13 +212,14 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     );
   }
 
-  bool shouldUseCustomAnimatedGifForUrl(String url) {
-    if (!widget.isOfficial ||
-        widget.forceStatic ||
-        widget.preferStaticOfficial) {
+  bool shouldUseAnimatedPipeline(String url) {
+    if (widget.forceStatic || widget.preferStaticOfficial) {
       return false;
     }
-    return url.contains('/emoticons/v2/') && url.contains('/animated/');
+    if (widget.isOfficial) {
+      return url.contains('/emoticons/v2/') && url.contains('/animated/');
+    }
+    return widget.isAnimated;
   }
 
   void handleImageError({
