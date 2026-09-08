@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../services/chat/twitch_emote_image_cache_manager.dart';
+import 'twitch_animated_gif_emote_image.dart';
 
 /// Shared Twitch / third-party emote image renderer.
 ///
@@ -141,6 +142,44 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
       url: currentUrl,
     );
 
+    if (shouldUseCustomAnimatedGifForUrl(currentUrl)) {
+      final staticFallbackUrl = uniqueUrls(<String>[
+        widget.staticImageUrl,
+        TwitchEmoteImage.officialStaticEmoteUrl(widget.id),
+        TwitchEmoteImage.officialDefaultEmoteUrl(widget.id),
+      ]).firstOrNull;
+
+      return Opacity(
+        opacity: widget.locked ? 0.62 : 1.0,
+        child: TwitchAnimatedGifEmoteImage(
+          key: ValueKey<String>('direct:$cacheKey'),
+          url: currentUrl,
+          width: widget.width,
+          height: widget.height,
+          fit: widget.fit,
+          filterQuality: widget.filterQuality,
+          fallback: staticFallbackUrl == null
+              ? fallback
+              : TwitchEmoteImage(
+                  id: widget.id,
+                  name: widget.name,
+                  imageUrl: staticFallbackUrl,
+                  staticImageUrl: widget.staticImageUrl,
+                  providerLabel: widget.providerLabel,
+                  isOfficial: widget.isOfficial,
+                  locked: widget.locked,
+                  forceStatic: true,
+                  width: widget.width,
+                  height: widget.height,
+                  fit: widget.fit,
+                  filterQuality: widget.filterQuality,
+                  placeholder: widget.placeholder,
+                  errorPlaceholder: widget.errorPlaceholder,
+                ),
+        ),
+      );
+    }
+
     return Opacity(
       opacity: widget.locked ? 0.62 : 1.0,
       child: CachedNetworkImage(
@@ -168,6 +207,15 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
         },
       ),
     );
+  }
+
+  bool shouldUseCustomAnimatedGifForUrl(String url) {
+    if (!widget.isOfficial ||
+        widget.forceStatic ||
+        widget.preferStaticOfficial) {
+      return false;
+    }
+    return url.contains('/emoticons/v2/') && url.contains('/animated/');
   }
 
   void handleImageError({
@@ -231,8 +279,8 @@ class _TwitchEmoteImageState extends State<TwitchEmoteImage> {
     }
 
     return uniqueUrls(<String>[
-      widget.imageUrl,
       TwitchEmoteImage.officialAnimatedEmoteUrl(widget.id),
+      widget.imageUrl,
       TwitchEmoteImage.officialDefaultEmoteUrl(widget.id),
       staticUrl,
       TwitchEmoteImage.officialStaticEmoteUrl(widget.id),

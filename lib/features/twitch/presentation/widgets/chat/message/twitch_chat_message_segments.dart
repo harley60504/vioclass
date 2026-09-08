@@ -611,6 +611,8 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
       return Text(fallbackText, style: _normalTextStyle(metrics));
     }
 
+    final resizeInMemoryCache = !animate;
+
     return SizedBox(
       width: width,
       height: height,
@@ -625,8 +627,8 @@ class _ChatMenuStyleEmoteImage extends StatelessWidget {
         forceStatic: !animate,
         width: width,
         height: height,
-        memCacheWidth: 96,
-        memCacheHeight: 96,
+        memCacheWidth: resizeInMemoryCache ? 96 : null,
+        memCacheHeight: resizeInMemoryCache ? 96 : null,
         placeholder: const SizedBox.shrink(),
         errorPlaceholder: Text(fallbackText, style: _normalTextStyle(metrics)),
       ),
