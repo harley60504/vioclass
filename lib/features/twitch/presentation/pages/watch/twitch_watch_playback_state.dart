@@ -22,6 +22,8 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
         : existingOwned?.mediaUri.trim() ?? mediaUri?.trim();
     final effectiveKind = isTopOwner ? kind : existingOwned?.kind ?? kind;
     final isLive = effectiveKind == TwitchWatchPlaybackKind.live;
+    final usesLiveTimeline =
+        isLive || effectiveKind == TwitchWatchPlaybackKind.liveDvr;
     final replayTitle = currentClipQualityClip?.title.trim().isNotEmpty == true
         ? currentClipQualityClip!.title
         : (currentVodQualityVideo ??
@@ -52,8 +54,11 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
           : effectiveKind,
       mediaUri: safeUri,
       metadata: widget.resolvedInitialMetadata.copyWith(
+        streamId: usesLiveTimeline ? liveTimelineStreamId ?? '' : null,
         channelLogin: channelLogin,
         streamTitle: streamTitle,
+        startedAt: usesLiveTimeline ? liveTimelineStartedAt : null,
+        clearStartedAt: usesLiveTimeline && liveTimelineStartedAt == null,
       ),
       activeDvrVideo: activeGrowingVodVideo,
       vodVideo: resumeVodVideo,
@@ -73,6 +78,12 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   }
 
   void applyPlaybackSessionStateToPage(TwitchPlaybackSessionState state) {
+    if (state.kind == TwitchWatchPlaybackKind.live ||
+        state.kind == TwitchWatchPlaybackKind.liveDvr) {
+      final streamId = state.metadata.streamId.trim();
+      liveTimelineStreamId = streamId.isEmpty ? null : streamId;
+      liveTimelineStartedAt = state.metadata.startedAt;
+    }
     activeGrowingVodVideo = state.activeDvrVideo;
     currentClipQualityClip = state.kind == TwitchWatchPlaybackKind.clip
         ? state.clip

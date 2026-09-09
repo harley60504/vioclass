@@ -54,6 +54,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
 
   Duration? _effectiveLiveTimelineDuration() {
     final base = widget.liveTimelineDuration;
+    if (base != null && !base.isNegative) return base;
     final startedAt = widget.liveTimelineStartedAt;
     final elapsed = startedAt == null
         ? null
@@ -62,7 +63,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
         ? null
         : elapsed;
 
-    return positiveElapsed ?? base;
+    return positiveElapsed;
   }
 
   @override

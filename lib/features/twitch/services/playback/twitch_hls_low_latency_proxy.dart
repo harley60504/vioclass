@@ -640,6 +640,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
     server = null;
     port = null;
 
+    await currentEngine?.disconnectClients();
     currentEngine?.stop();
     httpClient.close(force: true);
     await currentServer?.close(force: true);
@@ -830,13 +831,14 @@ class _TwitchDartHlsLowLatencyProxyCore {
 
   Future<void> _pipeEngineOutputToResponse({
     required HttpResponse response,
-    required Stream<List<int>> stream,
+    required StreamIterator<List<int>> iterator,
   }) async {
     var flushedFirstChunk = false;
     var bytesSinceFlush = 0;
     var lastFlushAt = DateTime.now();
 
-    await for (final chunk in stream) {
+    while (await iterator.moveNext()) {
+      final chunk = iterator.current;
       response.add(chunk);
       bytesSinceFlush += chunk.length;
 
@@ -847,7 +849,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
           now.difference(lastFlushAt) >= const Duration(milliseconds: 15);
 
       if (shouldFlush) {
-        await response.flush();
+        await response.flush().timeout(const Duration(seconds: 1));
         flushedFirstChunk = true;
         bytesSinceFlush = 0;
         lastFlushAt = now;
@@ -855,7 +857,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
     }
 
     if (bytesSinceFlush > 0) {
-      await response.flush();
+      await response.flush().timeout(const Duration(seconds: 1));
     }
   }
 
@@ -1483,6 +1485,8 @@ class _TwitchHlsLowLatencyEngine {
   bool _stopped = false;
   bool _pollerStarted = false;
   int _activeClientCount = 0;
+  final Set<StreamIterator<List<int>>> _clientIterators =
+      <StreamIterator<List<int>>>{};
 
   final Completer<void> _firstSnapshotReady = Completer<void>();
 
@@ -1606,21 +1610,40 @@ class _TwitchHlsLowLatencyEngine {
   List<TwitchHlsSegmentItem> snapshotRecentReplayItems() =>
       List<TwitchHlsSegmentItem>.of(_recentWrittenItemHistory.values);
 
+  Future<void> disconnectClients() async {
+    final iterators = List<StreamIterator<List<int>>>.of(_clientIterators);
+    _clientIterators.clear();
+
+    for (final iterator in iterators) {
+      try {
+        await iterator.cancel();
+      } catch (_) {}
+    }
+  }
+
   Future<void> pipeClientToResponse(HttpResponse response) async {
     cancelIdleStop();
     startPrewarm();
     _ensurePersistentWriterStarted();
 
+    final iterator = StreamIterator<List<int>>(
+      _liveBus.createClientStream(includeReplay: true),
+    );
+    _clientIterators.add(iterator);
     _activeClientCount++;
 
     try {
       await owner._pipeEngineOutputToResponse(
         response: response,
-        stream: _liveBus.createClientStream(includeReplay: true),
+        iterator: iterator,
       );
     } catch (_) {
       // Silent by design.
     } finally {
+      _clientIterators.remove(iterator);
+      try {
+        await iterator.cancel();
+      } catch (_) {}
       _activeClientCount = math.max(0, _activeClientCount - 1);
 
       try {
@@ -1641,6 +1664,10 @@ class _TwitchHlsLowLatencyEngine {
     startPrewarm();
     _ensurePersistentWriterStarted();
 
+    final iterator = StreamIterator<List<int>>(
+      _liveBus.createClientStream(includeReplay: false),
+    );
+    _clientIterators.add(iterator);
     _activeClientCount++;
 
     try {
@@ -1655,11 +1682,15 @@ class _TwitchHlsLowLatencyEngine {
 
       await owner._pipeEngineOutputToResponse(
         response: response,
-        stream: _liveBus.createClientStream(includeReplay: false),
+        iterator: iterator,
       );
     } catch (_) {
       // Silent by design.
     } finally {
+      _clientIterators.remove(iterator);
+      try {
+        await iterator.cancel();
+      } catch (_) {}
       _activeClientCount = math.max(0, _activeClientCount - 1);
 
       try {
@@ -1938,6 +1969,10 @@ class _TwitchHlsLowLatencyEngine {
     _writtenUrls.add(item.url);
     _writtenSequences.add(item.sequence);
 
+    _pruneWrittenHistory(item);
+  }
+
+  void _pruneWrittenHistory(TwitchHlsSegmentItem item) {
     if (_writtenSequences.length > 320) {
       final minKeep = item.sequence - 180;
       _writtenSequences.removeWhere((value) => value < minKeep);
@@ -1947,11 +1982,16 @@ class _TwitchHlsLowLatencyEngine {
       final recentUrls = _lastNormalItems.map((item) => item.url).toSet();
       _writtenUrls.removeWhere((value) => !recentUrls.contains(value));
     }
+
+    while (_writtenUrls.length > 320) {
+      _writtenUrls.remove(_writtenUrls.first);
+    }
   }
 
   void markSkipped(TwitchHlsSegmentItem item) {
     _writtenUrls.add(item.url);
     _writtenSequences.add(item.sequence);
+    _pruneWrittenHistory(item);
 
     final removed = _prefetches.remove(item.url);
     removed?.cancel();
@@ -2636,6 +2676,14 @@ class _TwitchHlsPersistentWriter {
     _sessionWrittenUrls.add(item.url);
     _sessionWrittenSequences.add(item.sequence);
 
+    if (_sessionWrittenSequences.length > 320) {
+      final minKeep = item.sequence - 180;
+      _sessionWrittenSequences.removeWhere((value) => value < minKeep);
+    }
+    while (_sessionWrittenUrls.length > 320) {
+      _sessionWrittenUrls.remove(_sessionWrittenUrls.first);
+    }
+
     if (item.sequence > _lastWrittenSequence) {
       _lastWrittenSequence = item.sequence;
     }
@@ -2670,7 +2718,7 @@ class _TwitchHlsResponseByteSink implements TwitchHlsByteSink {
   Future<void> addStream(Stream<List<int>> stream) async {
     await for (final chunk in stream) {
       response.add(chunk);
-      await response.flush();
+      await response.flush().timeout(const Duration(seconds: 1));
     }
   }
 
@@ -2738,7 +2786,10 @@ class TwitchHlsLiveByteBus implements TwitchHlsByteSink {
   void _add(List<int> chunk) {
     if (_closed || chunk.isEmpty) return;
 
-    final safeChunk = List<int>.of(chunk, growable: false);
+    // Keep replay and any briefly queued client data byte-packed. A normal
+    // fixed-length List<int> stores references and can use many times the
+    // segment size while a disconnected loopback client is being cancelled.
+    final safeChunk = Uint8List.fromList(chunk);
     _replayChunks.addLast(safeChunk);
     _bufferedBytes += safeChunk.length;
 

@@ -178,7 +178,12 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
   void primeInitialActiveDvrAvailability(String channel, int generation) {
     final video = widget.initialActiveDvrVideo;
-    if (video == null || !video.isLikelyGrowingArchive) return;
+    if (video == null) return;
+    final reusingBoundLiveDvr =
+        widget.initialReuseCurrentPlayback &&
+        liveTimelineStreamId?.trim().isNotEmpty == true &&
+        liveTimelineStartedAt != null;
+    if (!video.isLikelyGrowingArchive && !reusingBoundLiveDvr) return;
 
     activeGrowingVodVideo = video;
     currentVodQualityVideo ??= video;
@@ -228,6 +233,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }) async {
     await yieldToUi();
     if (!isCurrentWatchTask(generation, channel)) return;
+
+    final shouldRefreshLiveIdentity =
+        widget.initialClip == null &&
+        widget.initialVodVideo == null &&
+        !widget.initialVodPlaybackOnly;
+    if (shouldRefreshLiveIdentity) {
+      await refreshLiveTimelineStartedAt(allowWithoutLivePlayback: true);
+      if (!isCurrentWatchTask(generation, channel)) return;
+    }
 
     var chatStartedEarly = false;
     if (reuseCurrentLivePlayback) {
@@ -469,7 +483,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
     try {
       rememberMediaUriForRouteRestore();
-      if (video.isLikelyGrowingArchive) {
+      if (_usesLiveDvrArchive(video)) {
         activeGrowingVodVideo = video;
         await switchToLiveDvrReplay(
           video: video,
@@ -575,6 +589,17 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     restorePlaybackOnDispose = current;
   }
 
+  bool _usesLiveDvrArchive(TwitchChannelVideo video) {
+    final activeVideoId = activeGrowingVodVideo?.id.trim() ?? '';
+    final videoId = video.id.trim();
+    final isBoundToCurrentLive =
+        videoId.isNotEmpty &&
+        activeVideoId == videoId &&
+        liveTimelineStreamId?.trim().isNotEmpty == true &&
+        liveTimelineStartedAt != null;
+    return isBoundToCurrentLive || video.isLikelyGrowingArchive;
+  }
+
   Future<void> prepareActiveGrowingVod({
     required String channel,
     required int generation,
@@ -624,7 +649,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required String channel,
     required int generation,
   }) async {
-    if (!video.isLikelyGrowingArchive) return;
+    if (!_usesLiveDvrArchive(video)) return;
     final wasUsable = hasUsableLiveDvrArchive;
 
     try {
@@ -668,7 +693,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }
 
   Future<bool> prepareLiveDvrBridgeSource(TwitchChannelVideo? video) async {
-    if (video == null || !video.isLikelyGrowingArchive) {
+    if (video == null || !_usesLiveDvrArchive(video)) {
       watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
       return false;
     }
@@ -750,7 +775,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       return;
     }
 
-    if (video.isLikelyGrowingArchive) {
+    if (_usesLiveDvrArchive(video)) {
       await switchToLiveDvrReplay(video: video, position: target);
       return;
     }
@@ -822,7 +847,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       return;
     }
 
-    if (video.isLikelyGrowingArchive) {
+    if (_usesLiveDvrArchive(video)) {
       final prepared = await prepareLiveDvrBridgeSource(video);
       if (!prepared) {
         showSnack('目前找不到可用的 DVR 播放來源。');
@@ -1119,7 +1144,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     Duration? initialLiveBackoff,
     bool reuseCurrentPlayback = false,
   }) async {
-    if (video.isLikelyGrowingArchive) {
+    if (_usesLiveDvrArchive(video)) {
       activeGrowingVodVideo = video;
       debugPrint(
         '[WatchVodOnly] growing archive redirected to live DVR bridge',
@@ -1150,7 +1175,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     currentClipQualityClip = null;
     debugPrint(
       '[WatchVodOnly] video=${video.id} '
-      'growing=${video.isLikelyGrowingArchive} '
+      'growing=${_usesLiveDvrArchive(video)} '
       'duration=${video.duration} playlist=${playlist.playlistUri} '
       'variant=${playlist.selectedVariant?.name} '
       'variants=${playlist.variants.length}',
@@ -1160,7 +1185,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final playbackUri = playlist.playlistUri;
     debugPrint(
       '[WatchVodOnly] playbackUri=$playbackUri '
-      'viaGrowingDvrProxy=${video.isLikelyGrowingArchive}',
+      'viaGrowingDvrProxy=${_usesLiveDvrArchive(video)}',
     );
     if (!isCurrentWatchTask(generation, channel)) return false;
     final expectedDuration = video.parsedDuration;
@@ -1245,7 +1270,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       }
 
       if (video == null) return;
-      if (video.isLikelyGrowingArchive) {
+      if (_usesLiveDvrArchive(video)) {
         final selectedUri = Uri.tryParse(variant.url);
         if (selectedUri == null) {
           throw StateError('VOD 畫質 URL 無效。');

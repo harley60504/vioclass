@@ -198,6 +198,19 @@ class TwitchWatchPage extends StatefulWidget {
 
 class TwitchWatchPageState extends State<TwitchWatchPage>
     with WidgetsBindingObserver {
+  static const Duration _foregroundRecoveryMinimumBackground = Duration(
+    seconds: 2,
+  );
+  static const Duration _foregroundInitialProbeDuration = Duration(
+    milliseconds: 1800,
+  );
+  static const Duration _foregroundReconnectProbeDuration = Duration(
+    milliseconds: 2600,
+  );
+  static const Duration _foregroundProxyOnlyGraceDuration = Duration(
+    milliseconds: 1400,
+  );
+
   final Object playbackRouteOwner = Object();
 
   late final TextEditingController channelController;
@@ -298,6 +311,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   bool liveTimelineActionInFlight = false;
   bool pendingLiveTimelineReturnToLive = false;
   Duration? pendingLiveTimelineSeekTarget;
+  String? liveTimelineStreamId;
   DateTime? liveTimelineStartedAt;
   List<TwitchChannelPanel> aboutPanels = const <TwitchChannelPanel>[];
   List<TwitchChannelSocialLink> aboutSocialLinks =
@@ -481,7 +495,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     channelController = TextEditingController(
       text: widget.resolvedInitialMetadata.channelLogin,
     );
-    liveTimelineStartedAt = widget.resolvedInitialMetadata.startedAt;
+    final initialMetadata = widget.resolvedInitialMetadata;
+    final initialStreamId = initialMetadata.streamId.trim();
+    liveTimelineStreamId = initialStreamId.isEmpty ? null : initialStreamId;
+    liveTimelineStartedAt = initialMetadata.startedAt;
     _initialKnownFollowStatus = widget.resolvedInitialFollowStatus;
     messageController = TextEditingController();
     session = TwitchWatchSessionHandles.create(
@@ -595,21 +612,36 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed) {
-      final shouldReconnectLive = livePlaybackBackgroundedAt != null;
-      livePlaybackBackgroundedAt = null;
-      playbackTimelineController.resumeClock();
-      unawaited(
-        recoverWatchAfterForeground(shouldReconnectLive: shouldReconnectLive),
-      );
-    } else {
-      livePlaybackBackgroundedAt ??= DateTime.now();
-      playbackTimelineController.suspendClock();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        final backgroundedAt = livePlaybackBackgroundedAt;
+        livePlaybackBackgroundedAt = null;
+        final backgroundDuration = backgroundedAt == null
+            ? Duration.zero
+            : DateTime.now().difference(backgroundedAt);
+        playbackTimelineController.resumeClock();
+        unawaited(
+          recoverWatchAfterForeground(
+            shouldProbeLiveRecovery:
+                backgroundDuration >= _foregroundRecoveryMinimumBackground,
+          ),
+        );
+        break;
+      case AppLifecycleState.inactive:
+        // Desktop focus changes and short system interruptions are not a real
+        // background transition. Keep the live pump and playback clock intact.
+        break;
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        livePlaybackBackgroundedAt ??= DateTime.now();
+        playbackTimelineController.suspendClock();
+        break;
     }
   }
 
   Future<void> recoverWatchAfterForeground({
-    bool shouldReconnectLive = false,
+    bool shouldProbeLiveRecovery = false,
   }) async {
     if (!mounted) return;
     final channel = channelLogin;
@@ -630,35 +662,28 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
           return;
         }
         if (ownedPlaybackForVisibleRoute?.playable == true) {
-          final shouldProbeLiveRecovery =
-              shouldReconnectLive &&
+          final shouldProbeCurrentLive =
+              shouldProbeLiveRecovery &&
               ownedPlaybackForVisibleRoute?.kind ==
                   TwitchWatchPlaybackKind.live;
-          final playerBeforeRecovery = playerSession.playerOrNull;
-          final positionBeforeRecovery = playerBeforeRecovery?.state.position;
-          await reconcileVisibleRoutePlayback(
-            forceProxyReconnect: shouldProbeLiveRecovery,
-          );
-          if (shouldProbeLiveRecovery && positionBeforeRecovery != null) {
-            final player = playerSession.playerOrNull;
-            if (player != null && !player.state.playing) {
-              await player.play();
+          final player = playerSession.playerOrNull;
+          final ownedUri = ownedPlaybackForVisibleRoute?.mediaUri.trim();
+          final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
+          if (!shouldProbeCurrentLive) {
+            if (player == null ||
+                ownedUri == null ||
+                ownedUri.isEmpty ||
+                currentUri != ownedUri) {
+              await reconcileVisibleRoutePlayback();
+            } else {
+              if (!player.state.playing) await player.play();
+              await preferencesController.applyPlayerVolume();
+              if (mounted) setState(() {});
             }
-            await Future<void>.delayed(const Duration(milliseconds: 1200));
-            if (!mounted ||
-                !TwitchPlaybackSessionController.instance.isTopRouteOwner(
-                  playbackRouteOwner,
-                )) {
-              return;
-            }
-            final playbackAdvanced =
-                player != null &&
-                identical(player, playerSession.playerOrNull) &&
-                player.state.position - positionBeforeRecovery >=
-                    const Duration(milliseconds: 500);
-            if (!playbackAdvanced) {
-              await reconcileVisibleRoutePlayback(forceOpen: true);
-            }
+          } else if (player != null) {
+            await _recoverLivePlaybackAfterForeground();
+          } else {
+            await reconcileVisibleRoutePlayback(forceOpen: true);
           }
         } else if (TwitchMediaKitPlayerHost.currentMediaUri
                 ?.trim()
@@ -706,6 +731,116 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     }
   }
 
+  Future<void> _recoverLivePlaybackAfterForeground() async {
+    var player = playerSession.playerOrNull;
+    if (player == null) {
+      await reconcileVisibleRoutePlayback(forceOpen: true);
+      return;
+    }
+
+    bool routeIsStillVisible() {
+      return mounted &&
+          TwitchPlaybackSessionController.instance.isTopRouteOwner(
+            playbackRouteOwner,
+          );
+    }
+
+    final runtime = watchPorts.player.runtime;
+    final positionBefore = player.state.position;
+    final proxyBefore = await runtime.refreshProxyLiveStatus(notify: false);
+    if (!player.state.playing) await player.play();
+    await Future<void>.delayed(_foregroundInitialProbeDuration);
+    if (!routeIsStillVisible()) return;
+
+    final proxyAfter = await runtime.refreshProxyLiveStatus(notify: false);
+    var playerAdvanced =
+        identical(player, playerSession.playerOrNull) &&
+        player.state.position - positionBefore >=
+            const Duration(milliseconds: 500);
+    final proxyAdvanced =
+        proxyBefore != null &&
+        proxyAfter != null &&
+        (proxyAfter.lastWrittenSequence > proxyBefore.lastWrittenSequence ||
+            proxyAfter.outputDuration > proxyBefore.outputDuration);
+    debugPrint(
+      '[WatchForeground] initial probe player=$playerAdvanced '
+      'proxy=$proxyAdvanced '
+      'position=${positionBefore.inMilliseconds}->'
+      '${player.state.position.inMilliseconds} '
+      'sequence=${proxyBefore?.lastWrittenSequence}->'
+      '${proxyAfter?.lastWrittenSequence}',
+    );
+    if (!playerAdvanced && proxyAdvanced) {
+      await Future<void>.delayed(_foregroundProxyOnlyGraceDuration);
+      if (!routeIsStillVisible()) return;
+      playerAdvanced =
+          identical(player, playerSession.playerOrNull) &&
+          player.state.position - positionBefore >=
+              const Duration(milliseconds: 500);
+    }
+    if (playerAdvanced) {
+      await preferencesController.applyPlayerVolume();
+      if (mounted) setState(() {});
+      return;
+    }
+    if (proxyAdvanced) {
+      await reconcileVisibleRoutePlayback(forceOpen: true);
+      return;
+    }
+
+    await reconcileVisibleRoutePlayback(forceProxyReconnect: true);
+    if (!routeIsStillVisible()) return;
+    player = playerSession.playerOrNull;
+    if (player == null) {
+      await reconcileVisibleRoutePlayback(forceOpen: true);
+      return;
+    }
+
+    final positionAfterReconnect = player.state.position;
+    final proxyAfterReconnect = await runtime.refreshProxyLiveStatus(
+      notify: false,
+    );
+    if (!player.state.playing) await player.play();
+    await Future<void>.delayed(_foregroundReconnectProbeDuration);
+    if (!routeIsStillVisible()) return;
+
+    var recoveredPlayer =
+        identical(player, playerSession.playerOrNull) &&
+        player.state.position - positionAfterReconnect >=
+            const Duration(milliseconds: 500);
+    final proxyAfterReconnectProbe = await runtime.refreshProxyLiveStatus(
+      notify: false,
+    );
+    final recoveredProxy =
+        proxyAfterReconnect != null &&
+        proxyAfterReconnectProbe != null &&
+        (proxyAfterReconnectProbe.lastWrittenSequence >
+                proxyAfterReconnect.lastWrittenSequence ||
+            proxyAfterReconnectProbe.outputDuration >
+                proxyAfterReconnect.outputDuration);
+
+    if (!recoveredPlayer && recoveredProxy) {
+      await Future<void>.delayed(_foregroundProxyOnlyGraceDuration);
+      if (!routeIsStillVisible()) return;
+      recoveredPlayer =
+          identical(player, playerSession.playerOrNull) &&
+          player.state.position - positionAfterReconnect >=
+              const Duration(milliseconds: 500);
+    }
+
+    debugPrint(
+      '[WatchForeground] reconnect probe player=$recoveredPlayer '
+      'proxy=$recoveredProxy '
+      'position=${positionAfterReconnect.inMilliseconds}->'
+      '${player.state.position.inMilliseconds} '
+      'sequence=${proxyAfterReconnect?.lastWrittenSequence}->'
+      '${proxyAfterReconnectProbe?.lastWrittenSequence}',
+    );
+    if (!recoveredPlayer) {
+      await reconcileVisibleRoutePlayback(forceOpen: true);
+    }
+  }
+
   Future<void> recoverWatchAfterNetworkRestored() async {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted || !VioClassConnectivityService.instance.hasInternetAccess) {
@@ -749,8 +884,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     }
   }
 
-  Future<bool?> refreshLiveTimelineStartedAt() async {
-    if (currentPlaybackKind != TwitchWatchPlaybackKind.live &&
+  Future<bool?> refreshLiveTimelineStartedAt({
+    bool allowWithoutLivePlayback = false,
+  }) async {
+    if (!allowWithoutLivePlayback &&
+        currentPlaybackKind != TwitchWatchPlaybackKind.live &&
         currentPlaybackKind != TwitchWatchPlaybackKind.liveDvr) {
       return null;
     }
@@ -766,24 +904,31 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
           );
       final stream = await discoveryService.fetchLiveStream(login: login);
       final startedAt = stream?.startedAt;
+      final rawStreamId = stream?.id.trim() ?? '';
+      final streamId = rawStreamId.isEmpty ? null : rawStreamId;
       if (!mounted || channelLogin != login) return null;
       if (startedAt == null) {
+        liveTimelineStreamId = null;
         liveTimelineStartedAt = null;
         activeGrowingVodVideo = null;
         warmedLiveDvrVideoId = null;
         warmedLiveDvrQualityKey = null;
         warmedLiveDvrResolvedAt = null;
         playbackTimelineController.reset();
+        syncOwnedPlaybackLiveIdentity();
         setState(() {});
         return false;
       }
-      if (liveTimelineStartedAt != startedAt) {
+      if (liveTimelineStreamId != streamId ||
+          liveTimelineStartedAt != startedAt) {
+        liveTimelineStreamId = streamId;
         liveTimelineStartedAt = startedAt;
         activeGrowingVodVideo = null;
         warmedLiveDvrVideoId = null;
         warmedLiveDvrQualityKey = null;
         warmedLiveDvrResolvedAt = null;
         playbackTimelineController.reset();
+        syncOwnedPlaybackLiveIdentity();
         unawaited(
           prepareActiveGrowingVod(
             channel: login,
@@ -797,6 +942,20 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       debugPrint('[WatchTimeline] refresh started_at failed: $error');
       return null;
     }
+  }
+
+  void syncOwnedPlaybackLiveIdentity() {
+    final playback =
+        TwitchPlaybackSessionController.instance.playableStateForRouteOwner(
+          playbackRouteOwner,
+        ) ??
+        ownedPlaybackForVisibleRoute;
+    if (playback == null ||
+        (playback.kind != TwitchWatchPlaybackKind.live &&
+            playback.kind != TwitchWatchPlaybackKind.liveDvr)) {
+      return;
+    }
+    markOwnedPlayback(kind: playback.kind, mediaUri: playback.mediaUri);
   }
 
   Future<void> primeReusedPlaybackSurface() async {
@@ -989,13 +1148,19 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   Widget build(BuildContext context) {
     final runtime = chatRuntime;
     final fallbackVideo = offlineVodFallbackVideo;
+    final usesLiveTimeline =
+        currentPlaybackKind == TwitchWatchPlaybackKind.live ||
+        currentPlaybackKind == TwitchWatchPlaybackKind.liveDvr;
     final metadata = widget.resolvedInitialMetadata.copyWith(
+      streamId: usesLiveTimeline ? liveTimelineStreamId ?? '' : null,
       channelLogin: channelLogin,
       streamTitle: fallbackVideo == null
           ? widget.resolvedInitialMetadata.streamTitle
           : fallbackVideo.title,
       gameName: widget.resolvedInitialMetadata.gameName,
       clearViewerCount: fallbackVideo != null,
+      startedAt: usesLiveTimeline ? liveTimelineStartedAt : null,
+      clearStartedAt: usesLiveTimeline && liveTimelineStartedAt == null,
     );
 
     final playerArea = TwitchWatchPlayerAreaPortAdapter(

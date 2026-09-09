@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,10 +39,33 @@ final Dio _linkPreviewDio = Dio(
     },
   ),
 );
-final Map<String, TwitchChatLinkPreviewData?> _linkPreviewCache =
-    <String, TwitchChatLinkPreviewData?>{};
+const int _linkPreviewCacheLimit = 128;
+const Duration _linkPreviewCacheTtl = Duration(minutes: 20);
+final LinkedHashMap<String, _CachedLinkPreview> _linkPreviewCache =
+    LinkedHashMap<String, _CachedLinkPreview>();
 final Map<String, Future<TwitchChatLinkPreviewData?>> _linkPreviewInflight =
     <String, Future<TwitchChatLinkPreviewData?>>{};
+
+class _CachedLinkPreview {
+  final TwitchChatLinkPreviewData? preview;
+  final DateTime storedAt;
+
+  const _CachedLinkPreview({required this.preview, required this.storedAt});
+
+  bool get expired =>
+      DateTime.now().difference(storedAt) >= _linkPreviewCacheTtl;
+}
+
+void _rememberLinkPreview(String url, TwitchChatLinkPreviewData? preview) {
+  _linkPreviewCache.remove(url);
+  _linkPreviewCache[url] = _CachedLinkPreview(
+    preview: preview,
+    storedAt: DateTime.now(),
+  );
+  while (_linkPreviewCache.length > _linkPreviewCacheLimit) {
+    _linkPreviewCache.remove(_linkPreviewCache.keys.first);
+  }
+}
 
 const String _clipPreviewQuery = r'''
   query ChatLinkPreviewClip($slug: ID!) {
@@ -533,8 +558,10 @@ Future<TwitchChatLinkPreviewData?> fetchTwitchChatLinkPreview(String rawUrl) {
   }
 
   final url = uri.toString();
-  if (_linkPreviewCache.containsKey(url)) {
-    return Future<TwitchChatLinkPreviewData?>.value(_linkPreviewCache[url]);
+  final cached = _linkPreviewCache.remove(url);
+  if (cached != null && !cached.expired) {
+    _linkPreviewCache[url] = cached;
+    return Future<TwitchChatLinkPreviewData?>.value(cached.preview);
   }
 
   final existing = _linkPreviewInflight[url];
@@ -542,12 +569,12 @@ Future<TwitchChatLinkPreviewData?> fetchTwitchChatLinkPreview(String rawUrl) {
 
   final future = _fetchTwitchChatLinkPreview(uri)
       .then((preview) {
-        _linkPreviewCache[url] = preview;
+        _rememberLinkPreview(url, preview);
         _linkPreviewInflight.remove(url);
         return preview;
       })
       .catchError((Object _) {
-        _linkPreviewCache[url] = null;
+        _rememberLinkPreview(url, null);
         _linkPreviewInflight.remove(url);
         return null;
       });
@@ -937,7 +964,9 @@ Future<void> showTwitchChatLinkPreviewSheet(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          uri.host.isEmpty ? sheetContext.vio.t('連結預覽') : uri.host,
+                          uri.host.isEmpty
+                              ? sheetContext.vio.t('連結預覽')
+                              : uri.host,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: twitchChatTextStyle(

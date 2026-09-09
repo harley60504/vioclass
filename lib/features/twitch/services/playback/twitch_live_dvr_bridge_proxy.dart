@@ -427,7 +427,7 @@ class TwitchLiveDvrBridgeProxy {
     await for (final chunk in upstream) {
       if (generation != _streamGeneration || _server == null) return;
       response.add(chunk);
-      await response.flush();
+      await response.flush().timeout(const Duration(seconds: 1));
     }
   }
 

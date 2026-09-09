@@ -9,23 +9,25 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
   defaultValue: true,
 );
 
-/// Keep the native media_kit [Player] warm for fast re-entry, but do not keep
-/// the Flutter [VideoController] / texture surface as a process-wide singleton.
+/// Keep the native media_kit [Player] and its [VideoController] warm for fast
+/// re-entry.
 ///
 /// - CPU profiles showed proxy/player were not the heavy path.
 /// - Replacing only the Video widget with a placeholder restored stable 90 FPS.
 /// - Therefore the expensive / sticky part is the Flutter video surface.
 ///
-/// This host persists the native Player and currently opened media URI.
-/// Each visible owner gets its own VideoController / texture surface so DVR,
-/// VOD, clip, and live proxy reopens do not fight over a stale surface.
+/// The controller is created once for each native Player. Visible sessions only
+/// transfer the reference to that controller, preventing route, mini-player,
+/// DVR, and live transitions from repeatedly allocating native video textures.
 class TwitchMediaKitPlayerHost {
   static Player? _player;
+  static VideoController? _videoController;
   static int _refCount = 0;
   static int _generation = 0;
   static String? _currentMediaUri;
   static String? _keepPlayingWithoutSessionUri;
   static Future<void>? _creatingPlayer;
+  static Future<void>? _creatingVideoController;
 
   TwitchMediaKitPlayerHost._();
 
@@ -120,15 +122,45 @@ class TwitchMediaKitPlayerHost {
     return created;
   }
 
-  static Future<VideoController> _createVideoController(Player player) {
-    return VideoController.create(
-      player,
-      configuration: const VideoControllerConfiguration(
-        enableHardwareAcceleration: true,
-        androidAttachSurfaceAfterVideoParameters: false,
-        hwdec: 'auto-safe',
-      ),
-    );
+  static Future<VideoController> _ensureVideoController(Player player) async {
+    final existing = _videoController;
+    if (existing != null) return existing;
+
+    final creating = _creatingVideoController;
+    if (creating != null) {
+      await creating;
+      final created = _videoController;
+      if (created == null) {
+        throw StateError(
+          'VideoController creation completed without a controller.',
+        );
+      }
+      return created;
+    }
+
+    _creatingVideoController = () async {
+      final controller = await VideoController.create(
+        player,
+        configuration: const VideoControllerConfiguration(
+          enableHardwareAcceleration: true,
+          androidAttachSurfaceAfterVideoParameters: false,
+          hwdec: 'auto-safe',
+        ),
+      );
+      _videoController = controller;
+    }();
+
+    try {
+      await _creatingVideoController;
+    } finally {
+      _creatingVideoController = null;
+    }
+
+    final created = _videoController;
+    if (created == null) {
+      throw StateError('VideoController creation failed.');
+    }
+    return created;
   }
 
   static Future<void> openOrResume(
@@ -244,6 +276,8 @@ class TwitchMediaKitPlayerHost {
   static Future<void> _disposeCurrent() async {
     final player = _player;
     _player = null;
+    _videoController = null;
+    _creatingVideoController = null;
     _currentMediaUri = null;
     _keepPlayingWithoutSessionUri = null;
     _generation++;
@@ -344,7 +378,7 @@ class TwitchMediaKitPlayerSession {
     }
 
     _creatingVideoController = () async {
-      final controller = await TwitchMediaKitPlayerHost._createVideoController(
+      final controller = await TwitchMediaKitPlayerHost._ensureVideoController(
         hostPlayer,
       );
       if (_released) return;
@@ -384,10 +418,8 @@ class TwitchMediaKitPlayerSession {
   }
 
   void _detachVideoSurface() {
-    // media_kit_video's VideoController does not expose a stable public dispose
-    // API across the package versions tested in this project. Dropping this
-    // session-owned reference lets the WatchPage remove the Video widget and its
-    // texture surface from the Flutter tree while the shared Player remains warm.
+    // The session releases ownership of the shared surface. The host keeps the
+    // controller alive so the next visible owner reuses the same native texture.
     _videoController = null;
     _creatingVideoController = null;
   }

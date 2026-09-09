@@ -95,6 +95,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    final imageCache = PaintingBinding.instance.imageCache;
+    imageCache.maximumSize = 300;
+    imageCache.maximumSizeBytes = 64 * 1024 * 1024;
+
     apiClient = TwitchApiClient();
     authService = TwitchAuthService(apiClient: apiClient);
     dropsAuthService = TwitchDropsAuthService(apiClient: apiClient);

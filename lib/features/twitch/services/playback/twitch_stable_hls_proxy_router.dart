@@ -406,7 +406,7 @@ class TwitchStableHlsProxyRouter {
                 break;
               }
               response.add(chunk);
-              await response.flush();
+              await response.flush().timeout(const Duration(seconds: 1));
             }
           } finally {
             if (identical(_activeUpstreamIterator, iterator)) {

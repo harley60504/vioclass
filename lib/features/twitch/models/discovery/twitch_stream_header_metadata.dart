@@ -1,6 +1,7 @@
 import 'twitch_live_stream.dart';
 
 class TwitchStreamHeaderMetadata {
+  final String streamId;
   final String channelLogin;
   final String streamTitle;
   final String gameName;
@@ -12,6 +13,7 @@ class TwitchStreamHeaderMetadata {
   final DateTime? startedAt;
 
   const TwitchStreamHeaderMetadata({
+    this.streamId = '',
     required this.channelLogin,
     this.streamTitle = '',
     this.gameName = '',
@@ -44,6 +46,7 @@ class TwitchStreamHeaderMetadata {
 
   factory TwitchStreamHeaderMetadata.fromLiveStream(TwitchLiveStream stream) {
     return TwitchStreamHeaderMetadata(
+      streamId: stream.id,
       channelLogin: stream.channelLogin,
       streamTitle: stream.title,
       gameName: stream.gameName,
@@ -57,6 +60,7 @@ class TwitchStreamHeaderMetadata {
   }
 
   TwitchStreamHeaderMetadata copyWith({
+    String? streamId,
     String? channelLogin,
     String? streamTitle,
     String? gameName,
@@ -67,8 +71,10 @@ class TwitchStreamHeaderMetadata {
     bool clearViewerCount = false,
     String? profileImageUrl,
     DateTime? startedAt,
+    bool clearStartedAt = false,
   }) {
     return TwitchStreamHeaderMetadata(
+      streamId: streamId ?? this.streamId,
       channelLogin: channelLogin ?? this.channelLogin,
       streamTitle: streamTitle ?? this.streamTitle,
       gameName: gameName ?? this.gameName,
@@ -77,7 +83,7 @@ class TwitchStreamHeaderMetadata {
       isMature: isMature ?? this.isMature,
       viewerCount: clearViewerCount ? null : viewerCount ?? this.viewerCount,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
-      startedAt: startedAt ?? this.startedAt,
+      startedAt: clearStartedAt ? null : startedAt ?? this.startedAt,
     );
   }
 }

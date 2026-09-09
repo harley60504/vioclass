@@ -467,6 +467,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     if (targetId == null || targetId.isEmpty) return;
 
     _deletedMessageIds.add(targetId);
+    _trimHistory(_deletedMessageIds);
     _messages.removeWhere((item) => item.id == targetId);
     notifyListeners();
   }
@@ -652,10 +653,19 @@ class TwitchChatRuntime extends ChangeNotifier {
     final id = message.id;
     if (id.isNotEmpty) {
       _seenMessageIds.add(id);
+      _trimHistory(_seenMessageIds);
     }
     final fingerprint = _messageFingerprint(message);
     if (fingerprint.isNotEmpty) {
       _seenMessageFingerprints.add(fingerprint);
+      _trimHistory(_seenMessageFingerprints);
+    }
+  }
+
+  void _trimHistory(Set<String> history) {
+    final limit = maxMessages > 0 ? maxMessages * 2 : 1;
+    while (history.length > limit) {
+      history.remove(history.first);
     }
   }
 

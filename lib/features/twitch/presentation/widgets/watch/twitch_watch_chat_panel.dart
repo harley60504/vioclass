@@ -100,6 +100,25 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   static final Map<String, bool> _showPredictionByChannel = <String, bool>{};
   static final Map<String, String> _lastPredictionIdByChannel =
       <String, String>{};
+  static const int _channelStateLimit = 200;
+
+  static void _rememberChannelState<T>(
+    Map<String, T> cache,
+    String key,
+    T value,
+  ) {
+    cache.remove(key);
+    cache[key] = value;
+    while (cache.length > _channelStateLimit) {
+      cache.remove(cache.keys.first);
+    }
+  }
+
+  static T? _readChannelState<T>(Map<String, T> cache, String key) {
+    final value = cache.remove(key);
+    if (value != null) cache[key] = value;
+    return value;
+  }
 
   final TwitchChatAppearanceController _appearanceController =
       twitchChatAppearanceController;
@@ -247,7 +266,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     if (id.isNotEmpty && id != previousId) {
       lastPredictionId = id;
-      _lastPredictionIdByChannel[_visibilityKey] = id;
+      _rememberChannelState(_lastPredictionIdByChannel, _visibilityKey, id);
 
       if (!_hasObservedPredictionThisSession) {
         _hasObservedPredictionThisSession = true;
@@ -305,11 +324,11 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     final prediction = _visiblePrediction;
     final predictionId = prediction?.id.trim() ?? '';
 
-    showPinned = _showPinnedByChannel[key] ?? true;
+    showPinned = _readChannelState(_showPinnedByChannel, key) ?? true;
 
     if (predictionId.isNotEmpty) {
       lastPredictionId = predictionId;
-      _lastPredictionIdByChannel[key] = predictionId;
+      _rememberChannelState(_lastPredictionIdByChannel, key, predictionId);
       _hasObservedPredictionThisSession = true;
     } else {
       lastPredictionId = null;
@@ -318,7 +337,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     showPrediction =
         prediction != null && !_shouldAutoHidePredictionBanner(prediction);
-    _showPredictionByChannel[key] = showPrediction;
+    _rememberChannelState(_showPredictionByChannel, key, showPrediction);
   }
 
   String _keyForWidget(TwitchWatchChatPanel widget) {
@@ -330,7 +349,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
   }
 
   void _setShowPinned(bool value) {
-    _showPinnedByChannel[_visibilityKey] = value;
+    _rememberChannelState(_showPinnedByChannel, _visibilityKey, value);
     setState(() => showPinned = value);
   }
 
@@ -356,7 +375,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     bool rebuild = true,
   }) {
     if (persist) {
-      _showPredictionByChannel[_visibilityKey] = value;
+      _rememberChannelState(_showPredictionByChannel, _visibilityKey, value);
     }
     if (!value) {
       _cancelPredictionAutoHide();

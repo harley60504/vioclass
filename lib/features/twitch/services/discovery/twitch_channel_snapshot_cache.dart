@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../models/discovery/twitch_stream_header_metadata.dart';
 
@@ -185,13 +187,15 @@ class TwitchChannelSnapshot {
 class TwitchChannelSnapshotCache {
   TwitchChannelSnapshotCache._();
 
+  static const int _maxIndexEntries = 500;
+
   static final TwitchChannelSnapshotCache instance =
       TwitchChannelSnapshotCache._();
 
-  final Map<String, TwitchChannelSnapshot> _byId =
-      <String, TwitchChannelSnapshot>{};
-  final Map<String, TwitchChannelSnapshot> _byLogin =
-      <String, TwitchChannelSnapshot>{};
+  final LinkedHashMap<String, TwitchChannelSnapshot> _byId =
+      LinkedHashMap<String, TwitchChannelSnapshot>();
+  final LinkedHashMap<String, TwitchChannelSnapshot> _byLogin =
+      LinkedHashMap<String, TwitchChannelSnapshot>();
 
   void rememberLiveStream(TwitchLiveStream stream, {bool? isFollowed}) {
     remember(
@@ -257,8 +261,10 @@ class TwitchChannelSnapshotCache {
 
     final mergedId = merged.broadcasterId.trim();
     final mergedLogin = merged.broadcasterLogin.trim().toLowerCase();
-    if (mergedId.isNotEmpty) _byId[mergedId] = merged;
-    if (mergedLogin.isNotEmpty) _byLogin[mergedLogin] = merged;
+    if (mergedId.isNotEmpty) _rememberIndexed(_byId, mergedId, merged);
+    if (mergedLogin.isNotEmpty) {
+      _rememberIndexed(_byLogin, mergedLogin, merged);
+    }
   }
 
   TwitchChannelSnapshot? find({String? id, String? login}) {
@@ -290,7 +296,9 @@ class TwitchChannelSnapshotCache {
     );
 
     if (channel != null) {
-      return snapshot == null ? channel : snapshot.mergeFollowedChannel(channel);
+      return snapshot == null
+          ? channel
+          : snapshot.mergeFollowedChannel(channel);
     }
 
     if (snapshot != null &&
@@ -313,15 +321,36 @@ class TwitchChannelSnapshotCache {
   TwitchChannelSnapshot? _findRaw({required String id, required String login}) {
     final cleanId = id.trim();
     if (cleanId.isNotEmpty) {
-      final byId = _byId[cleanId];
+      final byId = _takeRecent(_byId, cleanId);
       if (byId != null) return byId;
     }
 
     final cleanLogin = login.trim().toLowerCase();
     if (cleanLogin.isNotEmpty) {
-      return _byLogin[cleanLogin];
+      return _takeRecent(_byLogin, cleanLogin);
     }
 
     return null;
+  }
+
+  void _rememberIndexed(
+    LinkedHashMap<String, TwitchChannelSnapshot> index,
+    String key,
+    TwitchChannelSnapshot snapshot,
+  ) {
+    index.remove(key);
+    index[key] = snapshot;
+    while (index.length > _maxIndexEntries) {
+      index.remove(index.keys.first);
+    }
+  }
+
+  TwitchChannelSnapshot? _takeRecent(
+    LinkedHashMap<String, TwitchChannelSnapshot> index,
+    String key,
+  ) {
+    final snapshot = index.remove(key);
+    if (snapshot != null) index[key] = snapshot;
+    return snapshot;
   }
 }

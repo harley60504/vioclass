@@ -20,6 +20,18 @@ class _CachedRelationshipStatus {
 class TwitchWatchRelationshipController extends ChangeNotifier {
   static final Map<String, _CachedRelationshipStatus> _relationshipCache =
       <String, _CachedRelationshipStatus>{};
+  static const int _relationshipCacheLimit = 200;
+
+  static void _rememberRelationship(
+    String key,
+    _CachedRelationshipStatus status,
+  ) {
+    _relationshipCache.remove(key);
+    _relationshipCache[key] = status;
+    while (_relationshipCache.length > _relationshipCacheLimit) {
+      _relationshipCache.remove(_relationshipCache.keys.first);
+    }
+  }
 
   final dynamic relationshipPort;
   final String Function() channelLogin;
@@ -58,7 +70,8 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
     final login = (targetChannelLogin ?? channelLogin()).trim().toLowerCase();
     if (login.isEmpty || checkingRelationship) return;
     final cacheKey = _cacheKey(login);
-    final cached = _relationshipCache[cacheKey];
+    final cached = _relationshipCache.remove(cacheKey);
+    if (cached != null) _relationshipCache[cacheKey] = cached;
     if (cached != null && cached.fresh) {
       _applySnapshot(
         following: cached.isFollowing,
@@ -84,10 +97,13 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
       _applySnapshot(following: following, resolvedUserId: resolvedUserId);
       hasResolvedRelationshipStatus = true;
-      _relationshipCache[cacheKey] = _CachedRelationshipStatus(
-        isFollowing: following,
-        userId: resolvedUserId.isEmpty ? null : resolvedUserId,
-        storedAt: DateTime.now(),
+      _rememberRelationship(
+        cacheKey,
+        _CachedRelationshipStatus(
+          isFollowing: following,
+          userId: resolvedUserId.isEmpty ? null : resolvedUserId,
+          storedAt: DateTime.now(),
+        ),
       );
       TwitchChannelSnapshotCache.instance.remember(
         TwitchChannelSnapshot(
@@ -130,10 +146,13 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
       _applySnapshot(following: following, resolvedUserId: resolvedUserId);
       hasResolvedRelationshipStatus = true;
-      _relationshipCache[_cacheKey(login)] = _CachedRelationshipStatus(
-        isFollowing: following,
-        userId: resolvedUserId.isEmpty ? null : resolvedUserId,
-        storedAt: DateTime.now(),
+      _rememberRelationship(
+        _cacheKey(login),
+        _CachedRelationshipStatus(
+          isFollowing: following,
+          userId: resolvedUserId.isEmpty ? null : resolvedUserId,
+          storedAt: DateTime.now(),
+        ),
       );
       TwitchChannelSnapshotCache.instance.remember(
         TwitchChannelSnapshot(
