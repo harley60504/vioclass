@@ -17,6 +17,8 @@ import 'twitch_player_quality_button.dart';
 import 'twitch_player_volume_control.dart';
 import 'twitch_vod_playback_strip.dart';
 
+const Duration _liveSeekWindowDuration = Duration(seconds: 20);
+
 class WatchBottomControlBar extends StatelessWidget {
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
@@ -33,6 +35,7 @@ class WatchBottomControlBar extends StatelessWidget {
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -59,6 +62,7 @@ class WatchBottomControlBar extends StatelessWidget {
     required this.onToggleChat,
     required this.onToggleFullscreen,
     this.hasDvrReplay = false,
+    this.hasFullLiveDvr = false,
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
@@ -126,6 +130,7 @@ class WatchBottomControlBar extends StatelessWidget {
                                     onToggleChat: onToggleChat,
                                     onToggleFullscreen: onToggleFullscreen,
                                     hasDvrReplay: hasDvrReplay,
+                                    hasFullLiveDvr: hasFullLiveDvr,
                                     showLiveEdgeLabel: showLiveEdgeLabel,
                                     liveDvrDuration: liveDvrDuration,
                                     liveDvrStartedAt: liveDvrStartedAt,
@@ -155,6 +160,7 @@ class WatchBottomControlBar extends StatelessWidget {
                                     onToggleChat: onToggleChat,
                                     onToggleFullscreen: onToggleFullscreen,
                                     hasDvrReplay: hasDvrReplay,
+                                    hasFullLiveDvr: hasFullLiveDvr,
                                     showLiveEdgeLabel: showLiveEdgeLabel,
                                     liveDvrDuration: liveDvrDuration,
                                     liveDvrStartedAt: liveDvrStartedAt,
@@ -320,6 +326,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -347,6 +354,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
     required this.onToggleChat,
     required this.onToggleFullscreen,
     required this.hasDvrReplay,
+    required this.hasFullLiveDvr,
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
@@ -372,6 +380,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
           player: player,
           timelineController: playbackTimelineController,
           playbackKind: playbackKind,
+          limitToLiveBuffer: !hasFullLiveDvr,
           onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
           onReturnToLive: onReturnToLive,
           iconSize: veryNarrow ? 18 : 20,
@@ -383,6 +392,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
             player: player,
             playerRuntime: playerRuntime,
             hasDvrReplay: hasDvrReplay,
+            hasFullLiveDvr: hasFullLiveDvr,
             showLiveEdgeLabel: showLiveEdgeLabel,
             liveDvrDuration: liveDvrDuration,
             liveDvrStartedAt: liveDvrStartedAt,
@@ -400,6 +410,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
               playerRuntime: playerRuntime,
               compact: true,
               hasDvrReplay: hasDvrReplay,
+              hasFullLiveDvr: hasFullLiveDvr,
               showLiveEdgeLabel: showLiveEdgeLabel,
               liveDvrDuration: liveDvrDuration,
               liveDvrStartedAt: liveDvrStartedAt,
@@ -462,6 +473,7 @@ class _WideWatchBottomControls extends StatelessWidget {
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -488,6 +500,7 @@ class _WideWatchBottomControls extends StatelessWidget {
     required this.onToggleChat,
     required this.onToggleFullscreen,
     required this.hasDvrReplay,
+    required this.hasFullLiveDvr,
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
@@ -507,6 +520,7 @@ class _WideWatchBottomControls extends StatelessWidget {
           player: player,
           timelineController: playbackTimelineController,
           playbackKind: playbackKind,
+          limitToLiveBuffer: !hasFullLiveDvr,
           onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
           onReturnToLive: onReturnToLive,
           iconSize: 21,
@@ -517,6 +531,7 @@ class _WideWatchBottomControls extends StatelessWidget {
             player: player,
             playerRuntime: playerRuntime,
             hasDvrReplay: hasDvrReplay,
+            hasFullLiveDvr: hasFullLiveDvr,
             showLiveEdgeLabel: showLiveEdgeLabel,
             liveDvrDuration: liveDvrDuration,
             liveDvrStartedAt: liveDvrStartedAt,
@@ -562,6 +577,7 @@ class _WatchPlaybackStrip extends StatelessWidget {
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final bool compact;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -576,6 +592,7 @@ class _WatchPlaybackStrip extends StatelessWidget {
     required this.playerRuntime,
     this.compact = false,
     required this.hasDvrReplay,
+    required this.hasFullLiveDvr,
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
@@ -597,6 +614,9 @@ class _WatchPlaybackStrip extends StatelessWidget {
         showLiveEdgeLabel: useLiveTimeline && showLiveEdgeLabel,
         liveTimelineDuration: useLiveTimeline ? liveDvrDuration : null,
         liveTimelineStartedAt: useLiveTimeline ? liveDvrStartedAt : null,
+        liveSeekWindowDuration: useLiveTimeline && !hasFullLiveDvr
+            ? _liveSeekWindowDuration
+            : null,
         playbackKind: playbackKind,
         onOpenDvrReplayAtPosition: useLiveTimeline
             ? onOpenDvrReplayAtPosition
@@ -616,6 +636,9 @@ class _WatchPlaybackStrip extends StatelessWidget {
         forceLiveEdge: !usingLiveTimelineReplay,
         liveTimelineDuration: liveDvrDuration,
         liveTimelineStartedAt: liveDvrStartedAt,
+        liveSeekWindowDuration: !hasFullLiveDvr
+            ? _liveSeekWindowDuration
+            : null,
         timelinePosition: usingLiveTimelineReplay
             ? playerRuntime.liveDvrBridgeTimelinePosition
             : liveDvrDuration,
@@ -674,6 +697,7 @@ class _TimelineStepButtons extends StatelessWidget {
   final Player player;
   final TwitchPlaybackTimelineController? timelineController;
   final TwitchWatchPlaybackKind playbackKind;
+  final bool limitToLiveBuffer;
   final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
   final VoidCallback? onReturnToLive;
   final double iconSize;
@@ -683,6 +707,7 @@ class _TimelineStepButtons extends StatelessWidget {
     required this.player,
     required this.timelineController,
     required this.playbackKind,
+    required this.limitToLiveBuffer,
     required this.onOpenDvrReplayAtPosition,
     required this.onReturnToLive,
     required this.iconSize,
@@ -739,6 +764,11 @@ class _TimelineStepButtons extends StatelessWidget {
       current: snapshot.position,
       duration: duration,
       fromLiveEdge: snapshot.isAtLiveEdge,
+      minimum:
+          limitToLiveBuffer &&
+              snapshot.mode == TwitchPlaybackTimelineMode.liveDvr
+          ? duration - _liveSeekWindowDuration
+          : Duration.zero,
       onCommit: (target) {
         if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
             target >= duration &&
@@ -853,6 +883,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
   final Player player;
   final TwitchPlaylistPlayerRuntime playerRuntime;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -866,6 +897,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
     required this.player,
     required this.playerRuntime,
     required this.hasDvrReplay,
+    required this.hasFullLiveDvr,
     required this.showLiveEdgeLabel,
     required this.liveDvrDuration,
     required this.liveDvrStartedAt,
@@ -958,6 +990,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
                         player: player,
                         playerRuntime: playerRuntime,
                         hasDvrReplay: hasDvrReplay,
+                        hasFullLiveDvr: hasFullLiveDvr,
                         showLiveEdgeLabel: showLiveEdgeLabel,
                         liveDvrDuration: liveDvrDuration,
                         liveDvrStartedAt: liveDvrStartedAt,

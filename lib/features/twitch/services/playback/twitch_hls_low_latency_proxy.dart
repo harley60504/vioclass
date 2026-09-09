@@ -27,6 +27,8 @@ enum TwitchHlsStartupMode {
   streamlinkLiveEdge,
 }
 
+const Duration _liveReplayCacheDuration = Duration(seconds: 22);
+
 class _TwitchHlsPrefetchRuntimeState {
   DateTime? requestStartedAt;
   DateTime? responseOpenedAt;
@@ -299,6 +301,25 @@ class TwitchDartHlsLowLatencyProxy {
     return _liveStatus;
   }
 
+  Future<void> reconnectAtSegmentBoundary({
+    Duration timeout = const Duration(seconds: 3),
+  }) async {
+    final control = _controlPort;
+    if (!_running || control == null) return;
+
+    final reply = ReceivePort();
+    try {
+      control.send(<String, Object?>{
+        'type': 'reconnectAtSegmentBoundary',
+        'timeoutMs': timeout.inMilliseconds,
+        'replyPort': reply.sendPort,
+      });
+      await reply.first.timeout(timeout + const Duration(milliseconds: 120));
+    } finally {
+      reply.close();
+    }
+  }
+
   Future<void> close() async {
     _starting = false;
 
@@ -445,6 +466,16 @@ Future<void> _twitchHlsProxyIsolateEntry(Map<String, Object?> args) async {
           'status': proxy.liveStatus().toJson(),
         });
       }
+
+      if (type == 'reconnectAtSegmentBoundary') {
+        final timeoutMs = raw['timeoutMs'] as int? ?? 3000;
+        await proxy.reconnectAtSegmentBoundary(
+          timeout: Duration(milliseconds: timeoutMs),
+        );
+        commandReply?.send(<String, Object?>{
+          'type': 'reconnectAtSegmentBoundary.done',
+        });
+      }
     }
 
     controlPort.close();
@@ -565,6 +596,32 @@ class _TwitchDartHlsLowLatencyProxyCore {
     final engine = _prewarmEngine;
     if (engine == null || engine.isStopped) return;
     await engine.waitUntilReady(timeout: timeout);
+  }
+
+  Future<void> reconnectAtSegmentBoundary({required Duration timeout}) async {
+    final previous = _prewarmEngine;
+    if (previous == null || previous.isStopped) return;
+
+    final deadline = DateTime.now().add(timeout);
+    final lastWrittenSequence = await previous.stopWriterAtSegmentBoundary(
+      timeout: timeout,
+    );
+    final replayItems = previous.snapshotRecentReplayItems();
+    previous.stop();
+
+    if (server == null) return;
+    final next = _TwitchHlsLowLatencyEngine(
+      owner: this,
+      playlistUrl: upstreamPlaylistUrl,
+      startupAfterSequence: lastWrittenSequence,
+    );
+    next.rememberAvailableReplayItems(replayItems);
+    _prewarmEngine = next;
+    next.startPrewarm();
+    final remaining = deadline.difference(DateTime.now());
+    await next.waitUntilReady(
+      timeout: remaining > Duration.zero ? remaining : Duration.zero,
+    );
   }
 
   TwitchHlsLiveStatus liveStatus() {
@@ -1400,8 +1457,13 @@ class _TwitchDartHlsLowLatencyProxyCore {
 class _TwitchHlsLowLatencyEngine {
   final _TwitchDartHlsLowLatencyProxyCore owner;
   final String playlistUrl;
+  final int startupAfterSequence;
 
-  _TwitchHlsLowLatencyEngine({required this.owner, required this.playlistUrl});
+  _TwitchHlsLowLatencyEngine({
+    required this.owner,
+    required this.playlistUrl,
+    this.startupAfterSequence = -1,
+  });
 
   final Set<int> _writtenSequences = <int>{};
   final Set<String> _writtenUrls = <String>{};
@@ -1466,7 +1528,11 @@ class _TwitchHlsLowLatencyEngine {
     final existing = _writer;
     if (existing != null && !existing.isStopped) return;
 
-    final writer = _TwitchHlsPersistentWriter(engine: this, output: _liveBus);
+    final writer = _TwitchHlsPersistentWriter(
+      engine: this,
+      output: _liveBus,
+      startupAfterSequence: startupAfterSequence,
+    );
 
     _writer = writer;
     unawaited(writer.start());
@@ -1525,6 +1591,20 @@ class _TwitchHlsLowLatencyEngine {
       waiter.complete();
     }
   }
+
+  Future<int> stopWriterAtSegmentBoundary({required Duration timeout}) async {
+    final writer = _writer;
+    if (writer == null) return startupAfterSequence;
+    try {
+      return await writer.stopAtSegmentBoundary().timeout(timeout);
+    } catch (_) {
+      writer.stop();
+      return writer.lastWrittenSequence;
+    }
+  }
+
+  List<TwitchHlsSegmentItem> snapshotRecentReplayItems() =>
+      List<TwitchHlsSegmentItem>.of(_recentWrittenItemHistory.values);
 
   Future<void> pipeClientToResponse(HttpResponse response) async {
     cancelIdleStop();
@@ -1617,7 +1697,15 @@ class _TwitchHlsLowLatencyEngine {
 
   void rememberWrittenItem(TwitchHlsSegmentItem item) {
     if (item.duration.inMilliseconds <= 0) return;
-    _recentWrittenItemHistory['${item.sequence}:${item.url}'] = item;
+    _recentWrittenItemHistory['${item.sequence}'] = item;
+    _trimRecentWrittenItemHistory();
+  }
+
+  void rememberAvailableReplayItems(Iterable<TwitchHlsSegmentItem> items) {
+    for (final item in items) {
+      if (item.isPrefetch || item.duration.inMilliseconds <= 0) continue;
+      _recentWrittenItemHistory['${item.sequence}'] = item;
+    }
     _trimRecentWrittenItemHistory();
   }
 
@@ -1627,9 +1715,12 @@ class _TwitchHlsLowLatencyEngine {
       total += item.duration;
     }
 
-    while (_recentWrittenItemHistory.length > 1 &&
-        total > const Duration(seconds: 20)) {
+    while (_recentWrittenItemHistory.length > 1) {
       final firstKey = _recentWrittenItemHistory.keys.first;
+      final first = _recentWrittenItemHistory[firstKey];
+      if (first == null || total - first.duration < _liveReplayCacheDuration) {
+        break;
+      }
       final removed = _recentWrittenItemHistory.remove(firstKey);
       if (removed == null) break;
       total -= removed.duration;
@@ -1664,6 +1755,12 @@ class _TwitchHlsLowLatencyEngine {
           );
           continue;
         }
+
+        // Seed the replay ring from the normal segments already present when
+        // the channel is opened. Later playlist polls replace matching
+        // sequences and append new live segments without recording replay
+        // output back into the ring.
+        rememberAvailableReplayItems(normalItems);
 
         final outputFutureItems = owner.outputFutureSegments
             ? futureItems
@@ -1938,7 +2035,7 @@ class _TwitchHlsPersistentWriter {
   bool _stopped = false;
   bool _started = false;
 
-  int _lastWrittenSequence = -1;
+  int _lastWrittenSequence;
   int? _startupInitialLatestSequence;
   String? _lastMapUrl;
   Duration _writtenOutputDuration = Duration.zero;
@@ -1949,9 +2046,17 @@ class _TwitchHlsPersistentWriter {
   final Set<int> _sessionWrittenSequences = <int>{};
   final Set<String> _sessionWrittenUrls = <String>{};
 
-  _TwitchHlsPersistentWriter({required this.engine, required this.output});
+  bool _writingItem = false;
+  Completer<int>? _stopAtBoundaryCompleter;
+
+  _TwitchHlsPersistentWriter({
+    required this.engine,
+    required this.output,
+    int startupAfterSequence = -1,
+  }) : _lastWrittenSequence = startupAfterSequence;
 
   bool get isStopped => _stopped;
+  int get lastWrittenSequence => _lastWrittenSequence;
 
   Future<void> start() async {
     if (_started || _stopped) return;
@@ -1963,7 +2068,7 @@ class _TwitchHlsPersistentWriter {
       final startup = await _selectStartupItem();
       if (startup == null) return;
 
-      await _writeItem(startup);
+      await _writeItemAtBoundary(startup);
 
       while (!_stopped && !engine.isStopped && engine.owner.server != null) {
         final next = _selectNextItem();
@@ -1973,7 +2078,7 @@ class _TwitchHlsPersistentWriter {
           continue;
         }
 
-        await _writeItem(next);
+        await _writeItemAtBoundary(next);
       }
     } catch (_) {
       // Silent by design.
@@ -1985,6 +2090,31 @@ class _TwitchHlsPersistentWriter {
   void stop() {
     if (_stopped) return;
     _stopped = true;
+    final completer = _stopAtBoundaryCompleter;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete(_lastWrittenSequence);
+    }
+  }
+
+  Future<int> stopAtSegmentBoundary() {
+    if (_stopped) return Future<int>.value(_lastWrittenSequence);
+    final existing = _stopAtBoundaryCompleter;
+    if (existing != null) return existing.future;
+
+    final completer = Completer<int>();
+    _stopAtBoundaryCompleter = completer;
+    if (!_writingItem) stop();
+    return completer.future;
+  }
+
+  Future<void> _writeItemAtBoundary(TwitchHlsSegmentItem item) async {
+    _writingItem = true;
+    try {
+      await _writeItem(item);
+    } finally {
+      _writingItem = false;
+    }
+    if (_stopAtBoundaryCompleter != null) stop();
   }
 
   TwitchHlsLiveStatus liveStatus() {

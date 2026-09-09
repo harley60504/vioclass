@@ -116,7 +116,10 @@ class TwitchStableHlsProxyRouter {
     }
   }
 
-  Future<void> switchUpstream(String upstreamPlaylistUrl) async {
+  Future<void> switchUpstream(
+    String upstreamPlaylistUrl, {
+    bool forceReconnect = false,
+  }) async {
     final safeUrl = upstreamPlaylistUrl.trim();
     if (safeUrl.isEmpty) {
       throw ArgumentError.value(
@@ -130,6 +133,16 @@ class TwitchStableHlsProxyRouter {
         _inner!.isRunning &&
         _directStreamUri == null &&
         _upstreamPlaylistUrl == safeUrl) {
+      if (forceReconnect) {
+        _switching = true;
+        try {
+          await _inner!.reconnectAtSegmentBoundary();
+          _switchGeneration++;
+        } finally {
+          _switching = false;
+          _switchGeneration++;
+        }
+      }
       return;
     }
 

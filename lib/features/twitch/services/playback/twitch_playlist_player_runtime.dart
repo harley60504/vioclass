@@ -107,6 +107,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   bool get usingLiveDvrBridge =>
       _usingLiveDvrReplay && (_bridgeProxy?.isRunning ?? false);
   bool get usingLiveBufferReplay => _usingLiveBufferReplay;
+  bool get hasLiveReplayBuffer {
+    final router = _proxy ?? _sharedProxy;
+    return !_usingExternalVodPlayback &&
+        router != null &&
+        router.isRunning &&
+        router.hasInnerProxy;
+  }
+
   bool get usingLiveTimelineReplay =>
       usingLiveDvrBridge || _usingLiveBufferReplay;
   bool get liveDvrBridgeAtLiveEdge =>
@@ -158,7 +166,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
   }
 
-  Future<Uri?> prepareLowLatencyLiveFromWarmUpstream() async {
+  Future<Uri?> prepareLowLatencyLiveFromWarmUpstream({
+    bool forceProxyReconnect = false,
+  }) async {
     (_bridgeProxy ?? _sharedBridgeProxy)?.stopStreaming();
     _liveDvrPlaylistOverride = null;
     _usingDvrPlaylist = false;
@@ -177,7 +187,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
 
     debugPrint('[LiveDvrBridge] prewarm low-latency live upstream=$upstream');
-    await router.switchUpstream(upstream);
+    await router.switchUpstream(upstream, forceReconnect: forceProxyReconnect);
     await router.waitUntilPrewarmed();
 
     _proxy = router;
@@ -480,7 +490,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return TwitchStableHlsProxyRouter(
       upstreamHeaders: defaultUpstreamHeaders,
       edgeSegmentCount: 1,
-      prefetchSegmentCount: 1,
+      prefetchSegmentCount: 3,
       outputFutureSegments: true,
       futureOutputSegmentCount: 1,
       dropBehindLiveEdge: true,

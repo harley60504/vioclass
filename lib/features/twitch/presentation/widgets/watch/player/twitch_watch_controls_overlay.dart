@@ -42,6 +42,7 @@ class WatchControlsOverlay extends StatefulWidget {
   final VoidCallback? onToggleChat;
   final VoidCallback? onToggleFullscreen;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -81,6 +82,7 @@ class WatchControlsOverlay extends StatefulWidget {
     required this.onToggleChat,
     required this.onToggleFullscreen,
     this.hasDvrReplay = false,
+    this.hasFullLiveDvr = false,
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
@@ -266,6 +268,7 @@ class _WatchChromeStack extends StatelessWidget {
               onToggleChat: widget.onToggleChat,
               onToggleFullscreen: widget.onToggleFullscreen,
               hasDvrReplay: widget.hasDvrReplay,
+              hasFullLiveDvr: widget.hasFullLiveDvr,
               showLiveEdgeLabel: widget.showLiveEdgeLabel,
               liveDvrDuration: widget.liveDvrDuration,
               liveDvrStartedAt: widget.liveDvrStartedAt,

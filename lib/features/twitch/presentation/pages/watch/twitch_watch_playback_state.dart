@@ -126,7 +126,10 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     return state;
   }
 
-  Future<void> reconcileVisibleRoutePlayback({bool forceOpen = false}) async {
+  Future<void> reconcileVisibleRoutePlayback({
+    bool forceOpen = false,
+    bool forceProxyReconnect = false,
+  }) async {
     final session = TwitchPlaybackSessionController.instance;
     if (!session.isTopRouteOwner(playbackRouteOwner)) return;
 
@@ -145,7 +148,9 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
 
     if (owned.kind == TwitchWatchPlaybackKind.live) {
       final preparedUri = await watchPorts.player.runtime
-          .prepareLowLatencyLiveFromWarmUpstream();
+          .prepareLowLatencyLiveFromWarmUpstream(
+            forceProxyReconnect: forceProxyReconnect,
+          );
       if (preparedUri != null) {
         ownedUri = preparedUri.toString();
         markOwnedPlayback(
@@ -193,6 +198,13 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
         watchPorts.player.runtime.usingExternalVodPlayback;
   }
 
+  bool get hasUsableLiveDvrArchive {
+    final video = activeGrowingVodVideo;
+    return video != null &&
+        warmedLiveDvrVideoId == video.id &&
+        watchPorts.player.runtime.hasWarmLiveDvrBridge;
+  }
+
   bool get shouldShowVodReplayChat {
     return offlineVodFallbackVideo != null || vodReplayController.active;
   }
@@ -200,7 +212,8 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   bool get hasDvrReplayPlayback {
     return watchPorts.player.runtime.usingLiveTimelineReplay ||
         watchPorts.player.runtime.usingExternalVodPlayback ||
-        activeGrowingVodVideo != null;
+        hasUsableLiveDvrArchive ||
+        watchPorts.player.runtime.hasLiveReplayBuffer;
   }
 
   bool get showsLiveDvrEdgeLabel {

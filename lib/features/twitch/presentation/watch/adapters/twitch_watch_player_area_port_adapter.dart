@@ -48,6 +48,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final ValueChanged<TwitchM3u8Variant>? onQualitySelected;
   final ValueChanged<String>? onError;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -89,6 +90,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
     this.onQualitySelected,
     this.onError,
     this.hasDvrReplay = false,
+    this.hasFullLiveDvr = false,
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
@@ -138,6 +140,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       onCreateClip: onCreateClip,
       creatingClip: creatingClip,
       hasDvrReplay: hasDvrReplay,
+      hasFullLiveDvr: hasFullLiveDvr,
       showLiveEdgeLabel: showLiveEdgeLabel,
       liveDvrDuration: liveDvrDuration,
       liveDvrStartedAt: liveDvrStartedAt,

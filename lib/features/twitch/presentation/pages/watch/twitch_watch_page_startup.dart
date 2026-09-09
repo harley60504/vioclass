@@ -16,7 +16,8 @@ import 'twitch_watch_page_relationship.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 const Duration _liveDvrWarmTtl = Duration(minutes: 8);
-const Duration _liveReplayBufferDuration = Duration(seconds: 20);
+const Duration _liveReplaySeekWindowDuration = Duration(seconds: 20);
+const Duration _liveReplayCacheDuration = Duration(seconds: 22);
 const Duration _liveTimelineEdgeTolerance = Duration(milliseconds: 500);
 
 enum _LiveTimelineSeekRoute { liveEdge, liveBuffer, dvrArchive }
@@ -624,6 +625,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required int generation,
   }) async {
     if (!video.isLikelyGrowingArchive) return;
+    final wasUsable = hasUsableLiveDvrArchive;
 
     try {
       final playlist = await watchServices.playbackApi.resolveVodPlaylist(
@@ -647,11 +649,20 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           mediaUri: TwitchMediaKitPlayerHost.currentMediaUri,
         );
       }
+      if (wasUsable != hasUsableLiveDvrArchive) {
+        playbackTimelineController.reset();
+      }
+      if (mounted) setState(() {});
     } catch (error) {
       warmedLiveDvrVideoId = null;
+      warmedLiveDvrQualityKey = null;
       warmedLiveDvrResolvedAt = null;
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('warm live DVR bridge failed: $error');
+        if (wasUsable != hasUsableLiveDvrArchive) {
+          playbackTimelineController.reset();
+        }
+        if (mounted) setState(() {});
       }
     }
   }
@@ -783,8 +794,16 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         if (await openLiveBufferReplayIfAvailable(safeTarget, duration)) {
           return;
         }
+        if (!hasUsableLiveDvrArchive) return;
         break;
       case _LiveTimelineSeekRoute.dvrArchive:
+        if (!hasUsableLiveDvrArchive) {
+          final bufferStart = duration > _liveReplaySeekWindowDuration
+              ? duration - _liveReplaySeekWindowDuration
+              : Duration.zero;
+          await openLiveBufferReplayIfAvailable(bufferStart, duration);
+          return;
+        }
         break;
     }
 
@@ -948,7 +967,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final fromLiveMs =
         timelineDuration.inMilliseconds - safeTarget.inMilliseconds;
     if (fromLiveMs <= 0 ||
-        fromLiveMs > _liveReplayBufferDuration.inMilliseconds) {
+        fromLiveMs > _liveReplayCacheDuration.inMilliseconds) {
       return false;
     }
 
@@ -984,7 +1003,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     if (fromLiveMs <= _liveTimelineEdgeTolerance.inMilliseconds) {
       return _LiveTimelineSeekRoute.liveEdge;
     }
-    if (fromLiveMs <= _liveReplayBufferDuration.inMilliseconds) {
+    if (fromLiveMs <= _liveReplaySeekWindowDuration.inMilliseconds) {
       return _LiveTimelineSeekRoute.liveBuffer;
     }
     return _LiveTimelineSeekRoute.dvrArchive;
@@ -1003,22 +1022,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }
 
   Duration? currentLiveTimelineDuration() {
-    final bridgeDuration = watchPorts.player.runtime.liveDvrBridgeDuration;
     final startedAt = liveTimelineStartedAt;
-    final elapsed = startedAt == null
-        ? null
-        : DateTime.now().toUtc().difference(startedAt.toUtc());
-    final positiveElapsed = elapsed == null || elapsed.isNegative
-        ? null
-        : elapsed;
-
-    if (bridgeDuration == null || bridgeDuration.inMilliseconds <= 0) {
-      return positiveElapsed;
-    }
-    if (positiveElapsed == null) return bridgeDuration;
-    return positiveElapsed.inMilliseconds > bridgeDuration.inMilliseconds
-        ? positiveElapsed
-        : bridgeDuration;
+    if (startedAt == null) return null;
+    final elapsed = DateTime.now().toUtc().difference(startedAt.toUtc());
+    return elapsed.isNegative ? null : elapsed;
   }
 
   Duration? currentLiveTimelinePosition() {
@@ -1049,7 +1056,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     if (timelineDuration == null || timelineDuration.inMilliseconds <= 0) {
       return Duration.zero;
     }
-    final backoff = _liveReplayBufferDuration ~/ 2;
+    final backoff = _liveReplaySeekWindowDuration ~/ 2;
     if (timelineDuration <= backoff) return Duration.zero;
     return timelineDuration - backoff;
   }

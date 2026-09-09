@@ -15,6 +15,7 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
   final bool forceLiveEdge;
   final Duration? liveTimelineDuration;
   final DateTime? liveTimelineStartedAt;
+  final Duration? liveSeekWindowDuration;
   final Duration? timelinePosition;
   final bool timelineEnabled;
   final TwitchPlaybackTimelineController? timelineController;
@@ -30,6 +31,7 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
     this.forceLiveEdge = false,
     this.liveTimelineDuration,
     this.liveTimelineStartedAt,
+    this.liveSeekWindowDuration,
     this.timelinePosition,
     this.timelineEnabled = true,
     this.timelineController,
@@ -60,9 +62,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
         ? null
         : elapsed;
 
-    if (base == null) return positiveElapsed;
-    if (positiveElapsed == null) return base;
-    return positiveElapsed > base ? positiveElapsed : base;
+    return positiveElapsed ?? base;
   }
 
   @override
@@ -92,6 +92,32 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     : duration;
                 final hasDuration = displayDuration.inMilliseconds > 500;
                 final canScrubTimeline = widget.timelineEnabled && hasDuration;
+                final requestedSeekWindow = widget.liveSeekWindowDuration;
+                final seekWindowMs = !hasDuration
+                    ? displayDuration.inMilliseconds
+                    : requestedSeekWindow == null
+                    ? displayDuration.inMilliseconds
+                    : requestedSeekWindow.inMilliseconds
+                          .clamp(1, displayDuration.inMilliseconds)
+                          .toInt();
+                final seekWindowStartMs =
+                    displayDuration.inMilliseconds - seekWindowMs;
+
+                Duration positionForSliderValue(double value) {
+                  return Duration(
+                    milliseconds:
+                        seekWindowStartMs + (seekWindowMs * value).round(),
+                  );
+                }
+
+                double sliderValueForPosition(Duration target) {
+                  if (seekWindowMs <= 0) return 0;
+                  return ((target.inMilliseconds - seekWindowStartMs) /
+                          seekWindowMs)
+                      .clamp(0.0, 1.0)
+                      .toDouble();
+                }
+
                 final hasPlayerDuration = duration.inMilliseconds > 500;
                 final rawValue = hasPlayerDuration
                     ? position.inMilliseconds / duration.inMilliseconds
@@ -108,10 +134,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                 final externalValue =
                     advancedExternalPosition != null &&
                         displayDuration.inMilliseconds > 0
-                    ? (advancedExternalPosition.inMilliseconds /
-                              displayDuration.inMilliseconds)
-                          .clamp(0.0, 1.0)
-                          .toDouble()
+                    ? sliderValueForPosition(advancedExternalPosition)
                     : null;
                 final baseValue = _dragging
                     ? (_dragValue ?? streamValue).clamp(0.0, 1.0).toDouble()
@@ -126,10 +149,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     : streamValue;
                 final value = baseValue;
                 final previewPosition = hasDuration
-                    ? Duration(
-                        milliseconds: (displayDuration.inMilliseconds * value)
-                            .round(),
-                      )
+                    ? positionForSliderValue(value)
                     : position;
                 final liveTailActive =
                     widget.showLiveEdgeLabel &&
@@ -155,14 +175,12 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     !compact &&
                     (media.size.width >= 760 || physicalShortestSide >= 1400);
                 void jumpToTarget(Duration target) {
-                  final next = displayDuration.inMilliseconds <= 0
-                      ? 0.0
-                      : target.inMilliseconds / displayDuration.inMilliseconds;
-                  final ratio = next.clamp(0.0, 1.0).toDouble();
+                  final ratio = sliderValueForPosition(target);
+                  final safeTarget = positionForSliderValue(ratio);
                   final exactLiveEdge =
                       isLiveTimeline &&
                       widget.onReturnToLive != null &&
-                      target >= displayDuration;
+                      safeTarget >= displayDuration;
 
                   if (exactLiveEdge) {
                     setState(() {
@@ -180,15 +198,15 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     _dragValue = null;
                     _scrubbedTimelineValue = ratio;
                   });
-                  widget.timelineController?.commitPosition(target);
+                  widget.timelineController?.commitPosition(safeTarget);
 
                   if (isLiveTimeline &&
                       widget.onOpenDvrReplayAtPosition != null) {
-                    widget.onOpenDvrReplayAtPosition!(target);
+                    widget.onOpenDvrReplayAtPosition!(safeTarget);
                     return;
                   }
 
-                  unawaited(player.seek(target));
+                  unawaited(player.seek(safeTarget));
                 }
 
                 Future<void> openTimeJumpSheet() async {
@@ -223,12 +241,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                                     _dragValue = next;
                                   });
                                   widget.timelineController?.beginDrag(
-                                    Duration(
-                                      milliseconds:
-                                          (displayDuration.inMilliseconds *
-                                                  next)
-                                              .round(),
-                                    ),
+                                    positionForSliderValue(next),
                                   );
                                 }
                               : null,
@@ -236,12 +249,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                               ? (next) {
                                   setState(() => _dragValue = next);
                                   widget.timelineController?.updateDrag(
-                                    Duration(
-                                      milliseconds:
-                                          (displayDuration.inMilliseconds *
-                                                  next)
-                                              .round(),
-                                    ),
+                                    positionForSliderValue(next),
                                   );
                                 }
                               : null,
@@ -267,16 +275,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                                     _dragValue = null;
                                     _scrubbedTimelineValue = next;
                                   });
-                                  final target = Duration(
-                                    milliseconds:
-                                        (displayDuration.inMilliseconds * next)
-                                            .round()
-                                            .clamp(
-                                              0,
-                                              displayDuration.inMilliseconds,
-                                            )
-                                            .toInt(),
-                                  );
+                                  final target = positionForSliderValue(next);
                                   widget.timelineController?.commitPosition(
                                     target,
                                   );

@@ -77,6 +77,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
   final ValueChanged<double>? onVolumeChanged;
   final ValueChanged<TwitchM3u8Variant>? onQualityChanged;
   final bool hasDvrReplay;
+  final bool hasFullLiveDvr;
   final bool showLiveEdgeLabel;
   final Duration? liveDvrDuration;
   final DateTime? liveDvrStartedAt;
@@ -122,6 +123,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     this.onVolumeChanged,
     this.onQualityChanged,
     this.hasDvrReplay = false,
+    this.hasFullLiveDvr = false,
     this.showLiveEdgeLabel = false,
     this.liveDvrDuration,
     this.liveDvrStartedAt,
@@ -209,6 +211,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     onToggleChat: onToggleChat,
                     onToggleFullscreen: onToggleFullscreen,
                     hasDvrReplay: hasDvrReplay,
+                    hasFullLiveDvr: hasFullLiveDvr,
                     showLiveEdgeLabel: showLiveEdgeLabel,
                     liveDvrDuration: liveDvrDuration,
                     liveDvrStartedAt: liveDvrStartedAt,

@@ -77,9 +77,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
           position ?? _fallbackPosition(mode),
           _duration,
         );
-      } else if (duration != null &&
-          (_duration == null || duration > _duration!)) {
+      } else if (duration != null && duration != _duration) {
         _duration = duration;
+        _position = _clampPosition(_position ?? Duration.zero, _duration);
       }
     } else {
       _duration = duration;
@@ -125,12 +125,19 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     required Duration duration,
     required bool fromLiveEdge,
     required ValueChanged<Duration> onCommit,
+    Duration minimum = Duration.zero,
   }) {
     final base =
         _pendingSeekTarget ??
         _position ??
         (fromLiveEdge && delta.isNegative ? duration : current);
-    final target = _clampPosition(base + delta, duration);
+    final minimumMs = minimum.inMilliseconds
+        .clamp(0, duration.inMilliseconds)
+        .toInt();
+    final targetMs = (base + delta).inMilliseconds
+        .clamp(minimumMs, duration.inMilliseconds)
+        .toInt();
+    final target = Duration(milliseconds: targetMs);
     _pendingSeekTarget = target;
     _position = target;
     _syncPlaybackTimer();
@@ -160,6 +167,31 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _dragging = false;
     _position = _duration;
     _syncPlaybackTimer();
+    notifyListeners();
+  }
+
+  void suspendClock() {
+    _lastPlaybackTickAt = null;
+  }
+
+  void resumeClock() {
+    if (_playbackTimer != null) {
+      _lastPlaybackTickAt = DateTime.now();
+    }
+  }
+
+  void reset() {
+    _pendingSeekTimer?.cancel();
+    _pendingSeekTimer = null;
+    _playbackTimer?.cancel();
+    _playbackTimer = null;
+    _mode = null;
+    _position = null;
+    _duration = null;
+    _pendingSeekTarget = null;
+    _lastPlaybackTickAt = null;
+    _dragging = false;
+    _advancing = false;
     notifyListeners();
   }
 
