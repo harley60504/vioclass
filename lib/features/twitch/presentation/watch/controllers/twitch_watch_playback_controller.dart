@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../../../services/playback/twitch_local_dvr_media_timing_probe.dart';
 import '../twitch_watch_feature_ports.dart';
 
 class TwitchWatchPlaybackController extends ChangeNotifier {
@@ -70,31 +71,64 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     try {
       final nextUri = uri.trim();
       final session = playerPort.services.playerSession;
-      if (startPosition != null) {
-        // DVR snapshots include preroll segments. High-resolution seek lets mpv
-        // begin from an earlier keyframe and decode forward to the requested
-        // sub-segment offset.
-        await session.ensureReady();
-        session.player.setProperty('hr-seek', 'yes');
-        session.player.setProperty('hr-seek-demuxer-offset', '2.0');
-      }
-
       final isLocalDvrSnapshot =
           startPosition != null &&
           nextUri.startsWith('http://127.0.0.1:') &&
           nextUri.contains('/playlist.m3u8?v=');
 
+      var hrSeekDemuxerOffset = const Duration(seconds: 2);
+      if (isLocalDvrSnapshot) {
+        final probe = await TwitchLocalDvrMediaTimingProbe.probe(
+          playlistUrl: nextUri,
+          startPosition: startPosition,
+        );
+        if (probe != null) {
+          hrSeekDemuxerOffset = probe.suggestedDemuxerOffset;
+          final timing = probe.timing;
+          debugPrint(
+            '[TsSeekIndex] segment=${probe.segmentIndex} '
+            'targetOffset=${_seconds(probe.targetOffset)}s '
+            'firstPts=${timing.firstPts90k ?? -1} '
+            'lastPts=${timing.lastPts90k ?? -1} '
+            'firstPcr=${timing.firstPcr27m ?? -1} '
+            'lastPcr=${timing.lastPcr27m ?? -1} '
+            'keyframes=${timing.keyframePts90k.length} '
+            'keyframeOffset=${probe.keyframeOffset == null ? '-' : '${_seconds(probe.keyframeOffset!)}s'} '
+            'decodeLead=${probe.decodeLead == null ? '-' : '${_seconds(probe.decodeLead!)}s'} '
+            'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
+          );
+        } else {
+          debugPrint(
+            '[TsSeekIndex] unavailable; hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
+          );
+        }
+      }
+
+      if (startPosition != null) {
+        // Frozen DVR snapshots are finite HLS. High-resolution seek can decode
+        // forward from the nearest random-access point; the TS timing probe
+        // expands the demuxer backoff when the actual GOP requires more than
+        // the conservative 2-second fallback.
+        await session.ensureReady();
+        session.player.setProperty('hr-seek', 'yes');
+        session.player.setProperty(
+          'hr-seek-demuxer-offset',
+          _seconds(hrSeekDemuxerOffset),
+        );
+      }
+
       if (isLocalDvrSnapshot) {
         debugPrint(
           '[TwitchPlayer] VOD snapshot precise start '
-          'target=${(startPosition.inMilliseconds / 1000).toStringAsFixed(3)}s',
+          'target=${_seconds(startPosition)}s '
+          'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
         );
       }
 
       if (startPosition != null && deferInitialSeek) {
         // Retained for callers that explicitly need a post-open seek. Frozen
-        // DVR snapshots do not use this path: they are finite VOD-style HLS and
-        // can safely use Media(start:).
+        // DVR snapshots normally use Media(start:) because they are finite and
+        // immutable for the seek generation.
         await session.openOrResume(
           uri: nextUri,
           play: false,
@@ -103,8 +137,8 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         await _waitForSeekableMedia(session.player, startPosition);
         debugPrint(
           '[TwitchPlayer] deferred precise seek '
-          'target=${(startPosition.inMilliseconds / 1000).toStringAsFixed(3)}s '
-          'duration=${(session.player.state.duration.inMilliseconds / 1000).toStringAsFixed(3)}s',
+          'target=${_seconds(startPosition)}s '
+          'duration=${_seconds(session.player.state.duration)}s',
         );
         await session.player.seek(startPosition);
         if (play) {
@@ -163,4 +197,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     playerError = null;
     notifyListeners();
   }
+
+  String _seconds(Duration value) =>
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
 }
