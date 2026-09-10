@@ -49,7 +49,7 @@ class TwitchParsedMediaPlaylist {
   final Duration? twitchElapsed;
   final Duration? twitchTotal;
   final DateTime? timelineOrigin;
-  final DateTime timingObservedAt;
+  final DateTime? timingObservedAt;
 
   const TwitchParsedMediaPlaylist({
     required this.items,
@@ -57,12 +57,12 @@ class TwitchParsedMediaPlaylist {
     required this.normalCount,
     required this.futureCount,
     required this.mediaSequence,
-    required this.timingObservedAt,
     this.targetDuration = const Duration(seconds: 2),
     this.hasEndList = false,
     this.twitchElapsed,
     this.twitchTotal,
     this.timelineOrigin,
+    this.timingObservedAt,
   });
 }
 
