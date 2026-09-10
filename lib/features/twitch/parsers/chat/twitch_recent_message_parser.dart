@@ -61,6 +61,10 @@ class TwitchRecentMessageParseIssue {
 ///
 /// 第二種不是標準 IRC trailing，但 recent-messages 會出現，所以只在 recent parser
 /// 補 fallback，不改 live IRC parser。
+///
+/// 官方 MessageBuffer 與第三方 recent-messages 都屬於「歷史訊息」。這裡統一標成
+/// recentObject，讓 runtime 的既有 fingerprint 可以跨來源去重；controller 會先加入
+/// 官方歷史，因此相同訊息同時存在官方與第三方時，官方版本會保留下來。
 class TwitchRecentMessageParser {
   final TwitchIrcMessageParser ircParser;
 
@@ -136,7 +140,7 @@ class TwitchRecentMessageParser {
       final parsed = parseRecentRawLine(raw);
 
       return _RecentSingleParseResult(
-        message: parsed.copyWith(source: TwitchChatMessageSource.recentRawIrc),
+        message: parsed,
         rawLine: raw,
         issue: parsed.message.trim().isEmpty
             ? TwitchRecentMessageParseIssue(
@@ -156,9 +160,7 @@ class TwitchRecentMessageParser {
 
         if (parsed.message.trim().isNotEmpty) {
           return _RecentSingleParseResult(
-            message: parsed.copyWith(
-              source: TwitchChatMessageSource.recentRawIrc,
-            ),
+            message: parsed,
             rawLine: rawLine,
             rawObject: rawObject,
           );
@@ -216,17 +218,17 @@ class TwitchRecentMessageParser {
     final parsed = ircParser.parseLine(raw);
 
     if (parsed.message.trim().isNotEmpty) {
-      return parsed.copyWith(source: TwitchChatMessageSource.recentRawIrc);
+      return parsed.copyWith(source: TwitchChatMessageSource.recentObject);
     }
 
     final relaxedMessage = extractRelaxedPrivmsgTrailing(raw);
     if (relaxedMessage == null || relaxedMessage.trim().isEmpty) {
-      return parsed.copyWith(source: TwitchChatMessageSource.recentRawIrc);
+      return parsed.copyWith(source: TwitchChatMessageSource.recentObject);
     }
 
     return parsed.copyWith(
       message: relaxedMessage,
-      source: TwitchChatMessageSource.recentRawIrc,
+      source: TwitchChatMessageSource.recentObject,
     );
   }
 
@@ -286,6 +288,7 @@ class TwitchRecentMessageParser {
     final tags = <String, String>{
       if (parsed != null) ...parsed.tags,
       ...readStringMap(item['tags']),
+      ...readStringMap(readNestedValue(item, const <String>['message', 'tags'])),
     };
 
     final nestedMessage = item['message'];
@@ -294,6 +297,7 @@ class TwitchRecentMessageParser {
         readTextValue(item['body']) ??
         readTextValue(item['content']) ??
         readTextValue(item['messageText']) ??
+        readTextValue(readNestedValue(item, const <String>['fragments'])) ??
         readTextValue(nestedMessage) ??
         readTextValue(
           readNestedValue(item, const <String>['message', 'text']),
@@ -301,53 +305,149 @@ class TwitchRecentMessageParser {
         readTextValue(
           readNestedValue(item, const <String>['message', 'body']),
         ) ??
+        readTextValue(
+          readNestedValue(item, const <String>['message', 'content']),
+        ) ??
+        readTextValue(
+          readNestedValue(
+            item,
+            const <String>['message', 'content', 'fragments'],
+          ),
+        ) ??
         parsed?.message ??
         '';
 
+    final extractedDisplayName = _readFirstPathText(
+      item,
+      const <List<String>>[
+        <String>['displayName'],
+        <String>['display_name'],
+        <String>['display-name'],
+        <String>['sender', 'displayName'],
+        <String>['sender', 'display_name'],
+        <String>['sender', 'name'],
+        <String>['user', 'displayName'],
+        <String>['user', 'display_name'],
+        <String>['user', 'name'],
+        <String>['author', 'displayName'],
+        <String>['author', 'name'],
+        <String>['chatter', 'displayName'],
+        <String>['chatter', 'name'],
+        <String>['message', 'sender', 'displayName'],
+        <String>['message', 'sender', 'display_name'],
+        <String>['message', 'sender', 'name'],
+        <String>['message', 'user', 'displayName'],
+        <String>['message', 'user', 'name'],
+        <String>['message', 'author', 'displayName'],
+        <String>['message', 'chatter', 'displayName'],
+      ],
+    );
+
     final userLogin =
-        readTextValue(item['userLogin']) ??
-        readTextValue(item['login']) ??
-        readTextValue(item['username']) ??
-        readTextValue(item['user']) ??
-        readTextValue(readNestedValue(item, const <String>['user', 'login'])) ??
-        readTextValue(
-          readNestedValue(item, const <String>['sender', 'login']),
+        _readFirstPathText(
+          item,
+          const <List<String>>[
+            <String>['userLogin'],
+            <String>['login'],
+            <String>['username'],
+            <String>['sender', 'login'],
+            <String>['sender', 'username'],
+            <String>['user', 'login'],
+            <String>['user', 'username'],
+            <String>['author', 'login'],
+            <String>['author', 'username'],
+            <String>['chatter', 'login'],
+            <String>['chatter', 'username'],
+            <String>['message', 'sender', 'login'],
+            <String>['message', 'sender', 'username'],
+            <String>['message', 'user', 'login'],
+            <String>['message', 'author', 'login'],
+            <String>['message', 'chatter', 'login'],
+          ],
         ) ??
         parsed?.userLogin ??
+        extractedDisplayName?.trim().toLowerCase() ??
         '';
 
     final displayName =
-        readTextValue(item['displayName']) ??
-        readTextValue(item['display-name']) ??
-        readTextValue(
-          readNestedValue(item, const <String>['user', 'displayName']),
-        ) ??
-        readTextValue(
-          readNestedValue(item, const <String>['sender', 'displayName']),
-        ) ??
-        parsed?.displayName ??
-        userLogin;
+        extractedDisplayName ?? parsed?.displayName ?? userLogin;
+
+    final badgesTag = _readBadgesTag(item);
+    final emotesTag = _buildEmotesTagFromObject(item);
 
     final mergedTags = <String, String>{
       ...tags,
       if (!tags.containsKey('display-name') && displayName.trim().isNotEmpty)
         'display-name': displayName.trim(),
+      if (!tags.containsKey('login') && userLogin.trim().isNotEmpty)
+        'login': userLogin.trim(),
       if (!tags.containsKey('id'))
-        'id': readTextValue(item['id']) ?? parsed?.tags['id'] ?? '',
+        'id':
+            _readFirstPathText(
+              item,
+              const <List<String>>[
+                <String>['id'],
+                <String>['message', 'id'],
+                <String>['content', 'id'],
+              ],
+            ) ??
+            parsed?.tags['id'] ??
+            '',
+      if (!tags.containsKey('user-id'))
+        'user-id':
+            _readFirstPathText(
+              item,
+              const <List<String>>[
+                <String>['userId'],
+                <String>['userID'],
+                <String>['sender', 'id'],
+                <String>['user', 'id'],
+                <String>['author', 'id'],
+                <String>['chatter', 'id'],
+                <String>['message', 'sender', 'id'],
+                <String>['message', 'user', 'id'],
+                <String>['message', 'author', 'id'],
+                <String>['message', 'chatter', 'id'],
+              ],
+            ) ??
+            parsed?.tags['user-id'] ??
+            '',
       if (!tags.containsKey('color'))
         'color':
-            readTextValue(item['color']) ??
-            readTextValue(item['userColor']) ??
-            readTextValue(
-              readNestedValue(item, const <String>['sender', 'color']),
+            _readFirstPathText(
+              item,
+              const <List<String>>[
+                <String>['color'],
+                <String>['userColor'],
+                <String>['chatColor'],
+                <String>['sender', 'color'],
+                <String>['sender', 'chatColor'],
+                <String>['user', 'color'],
+                <String>['message', 'sender', 'color'],
+                <String>['message', 'sender', 'chatColor'],
+              ],
             ) ??
             parsed?.tags['color'] ??
             '',
+      if (!tags.containsKey('badges') && badgesTag != null)
+        'badges': badgesTag,
+      if (!tags.containsKey('emotes') && emotesTag != null)
+        'emotes': emotesTag,
       if (!tags.containsKey('tmi-sent-ts'))
         'tmi-sent-ts':
-            readTimestampMillis(item['timestamp']) ??
-            readTimestampMillis(item['sentAt']) ??
-            readTimestampMillis(item['createdAt']) ??
+            _readFirstTimestampMillis(
+              item,
+              const <List<String>>[
+                <String>['timestamp'],
+                <String>['sentAt'],
+                <String>['createdAt'],
+                <String>['message', 'timestamp'],
+                <String>['message', 'sentAt'],
+                <String>['message', 'createdAt'],
+                <String>['content', 'timestamp'],
+                <String>['content', 'sentAt'],
+              ],
+            ) ??
             parsed?.tags['tmi-sent-ts'] ??
             '',
     }..removeWhere((key, value) => value.trim().isEmpty);
@@ -374,6 +474,173 @@ class TwitchRecentMessageParser {
     }
 
     return current;
+  }
+
+  String? _readFirstPathText(
+    Map<String, dynamic> item,
+    List<List<String>> paths,
+  ) {
+    for (final path in paths) {
+      final value = readNestedValue(item, path);
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+      if (value is num) {
+        return value.toString();
+      }
+    }
+    return null;
+  }
+
+  String? _readFirstTimestampMillis(
+    Map<String, dynamic> item,
+    List<List<String>> paths,
+  ) {
+    for (final path in paths) {
+      final timestamp = readTimestampMillis(readNestedValue(item, path));
+      if (timestamp != null && timestamp.isNotEmpty) return timestamp;
+    }
+    return null;
+  }
+
+  String? _readBadgesTag(Map<String, dynamic> item) {
+    for (final path in const <List<String>>[
+      <String>['badges'],
+      <String>['sender', 'badges'],
+      <String>['user', 'badges'],
+      <String>['author', 'badges'],
+      <String>['chatter', 'badges'],
+      <String>['message', 'badges'],
+      <String>['message', 'sender', 'badges'],
+      <String>['message', 'user', 'badges'],
+    ]) {
+      final tag = _badgeTagFromUnknown(readNestedValue(item, path));
+      if (tag != null && tag.isNotEmpty) return tag;
+    }
+    return null;
+  }
+
+  String? _badgeTagFromUnknown(Object? value) {
+    if (value == null) return null;
+
+    if (value is String) {
+      final clean = value.trim();
+      return clean.isEmpty ? null : clean;
+    }
+
+    if (value is List) {
+      final tokens = value
+          .map(_badgeTokenFromUnknown)
+          .whereType<String>()
+          .where((token) => token.isNotEmpty)
+          .toList(growable: false);
+      return tokens.isEmpty ? null : tokens.join(',');
+    }
+
+    if (value is Map) {
+      final direct = _badgeTokenFromUnknown(value);
+      if (direct != null && direct.isNotEmpty) return direct;
+
+      final tokens = <String>[];
+      for (final entry in value.entries) {
+        final version = entry.value?.toString().trim() ?? '';
+        final setId = entry.key.toString().trim();
+        if (setId.isNotEmpty && version.isNotEmpty && version != 'null') {
+          tokens.add('$setId/$version');
+        }
+      }
+      return tokens.isEmpty ? null : tokens.join(',');
+    }
+
+    return null;
+  }
+
+  String? _badgeTokenFromUnknown(Object? value) {
+    if (value is String) {
+      final clean = value.trim();
+      return clean.contains('/') ? clean : null;
+    }
+    if (value is! Map) return null;
+
+    String? firstNonEmpty(Iterable<Object?> values) {
+      for (final candidate in values) {
+        final text = candidate?.toString().trim() ?? '';
+        if (text.isNotEmpty && text != 'null') return text;
+      }
+      return null;
+    }
+
+    final setId = firstNonEmpty(<Object?>[
+      value['setID'],
+      value['setId'],
+      value['set_id'],
+      value['set-id'],
+      value['set'],
+      value['name'],
+    ]);
+    final version = firstNonEmpty(<Object?>[
+      value['version'],
+      value['versionID'],
+      value['versionId'],
+      value['version_id'],
+      value['value'],
+    ]);
+
+    if (setId == null || version == null) return null;
+    return '$setId/$version';
+  }
+
+  String? _buildEmotesTagFromObject(Map<String, dynamic> item) {
+    List<dynamic>? fragments;
+    for (final path in const <List<String>>[
+      <String>['fragments'],
+      <String>['content', 'fragments'],
+      <String>['message', 'fragments'],
+      <String>['message', 'content', 'fragments'],
+    ]) {
+      final value = readNestedValue(item, path);
+      if (value is List && value.isNotEmpty) {
+        fragments = value;
+        break;
+      }
+    }
+    if (fragments == null) return null;
+
+    final rangesById = <String, List<String>>{};
+    var cursor = 0;
+
+    for (final fragment in fragments) {
+      if (fragment is! Map) continue;
+      final text =
+          readTextValue(fragment['text']) ??
+          readTextValue(fragment['content']) ??
+          '';
+      if (text.isEmpty) continue;
+
+      final emote = fragment['emote'];
+      String? emoteId;
+      if (emote is Map) {
+        emoteId =
+            emote['id']?.toString().trim() ??
+            emote['emoteID']?.toString().trim() ??
+            emote['emoteId']?.toString().trim();
+      }
+      emoteId ??=
+          fragment['emoteID']?.toString().trim() ??
+          fragment['emoteId']?.toString().trim();
+
+      final start = cursor;
+      final end = cursor + text.length - 1;
+      if (emoteId != null && emoteId.isNotEmpty) {
+        rangesById.putIfAbsent(emoteId, () => <String>[]).add('$start-$end');
+      }
+      cursor = end + 1;
+    }
+
+    if (rangesById.isEmpty) return null;
+    return rangesById.entries
+        .map((entry) => '${entry.key}:${entry.value.join(',')}')
+        .join('/');
   }
 
   String? readTextValue(Object? value) {
@@ -413,11 +680,24 @@ class TwitchRecentMessageParser {
   }
 
   String? readTimestampMillis(Object? value) {
+    if (value is num) {
+      final numeric = value.toDouble();
+      if (!numeric.isFinite) return null;
+      final millis = numeric.abs() < 100000000000
+          ? (numeric * 1000).round()
+          : numeric.round();
+      return millis.toString();
+    }
+
     final text = readTextValue(value);
     if (text == null || text.trim().isEmpty) return null;
 
     final integer = int.tryParse(text.trim());
-    if (integer != null) return integer.toString();
+    if (integer != null) {
+      return integer.abs() < 100000000000
+          ? (integer * 1000).toString()
+          : integer.toString();
+    }
 
     final parsed = DateTime.tryParse(text.trim());
     if (parsed == null) return null;
