@@ -237,6 +237,25 @@ class TwitchHlsPlaylistParser {
         : hasFutureSegment
         ? const Duration(milliseconds: 160)
         : _halfDuration(targetDuration);
+    final normalItems = items
+        .where((item) => !item.isPrefetch)
+        .toList(growable: false);
+    final twitchElapsed = _parseTwitchDuration(
+      lines,
+      '#EXT-X-TWITCH-ELAPSED-SECS:',
+    );
+    final twitchTotal = _parseTwitchDuration(
+      lines,
+      '#EXT-X-TWITCH-TOTAL-SECS:',
+    );
+    final firstProgramDateTime = normalItems
+        .map((item) => item.programDateTime)
+        .whereType<DateTime>()
+        .firstOrNull;
+    final timelineOrigin = firstProgramDateTime != null && twitchElapsed != null
+        ? firstProgramDateTime.subtract(twitchElapsed)
+        : null;
+    final timingObservedAt = DateTime.now().toUtc();
 
     _debugTimingMetadata(
       lines: lines,
@@ -254,6 +273,10 @@ class TwitchHlsPlaylistParser {
       mediaSequence: mediaSequence,
       targetDuration: targetDuration,
       hasEndList: hasEndList,
+      twitchElapsed: twitchElapsed,
+      twitchTotal: twitchTotal,
+      timelineOrigin: timelineOrigin,
+      timingObservedAt: timingObservedAt,
     );
   }
 
@@ -335,6 +358,13 @@ class TwitchHlsPlaylistParser {
       'parts=$partCount preload=$preloadCount twitchPrefetch=$twitchPrefetchCount '
       'url=${_shortPlaylistUrl(playlistUrl)}',
     );
+  }
+
+  static Duration? _parseTwitchDuration(List<String> lines, String prefix) {
+    final raw = _firstTagValue(lines, prefix);
+    final seconds = double.tryParse(raw ?? '');
+    if (seconds == null || seconds < 0 || !seconds.isFinite) return null;
+    return Duration(microseconds: (seconds * Duration.microsecondsPerSecond).round());
   }
 
   static String? _firstTagValue(List<String> lines, String prefix) {
