@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
@@ -7,13 +8,13 @@ import 'package:flutter/foundation.dart';
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 
-/// A small TS replay source used only for the near-live window.
+/// Near-live TS replay source.
 ///
-/// It resolves a canonical Twitch stream position against
-/// EXT-X-TWITCH-ELAPSED-SECS + EXTINF and then emits media segments strictly in
-/// sequence order. Unlike the low-latency live byte bus, a replay request never
-/// jumps from cached segment N to arbitrary live bytes: it follows N, N+1, ...
-/// until the client closes or the router switches away.
+/// The caller supplies an exact behind-live duration. Each request fetches the
+/// current Twitch media playlist, converts that delay to a canonical stream
+/// position using EXT-X-TWITCH-TOTAL-SECS, resolves the matching segment using
+/// EXT-X-TWITCH-ELAPSED-SECS + EXTINF, then emits sequence N, N+1, N+2...
+/// without jumping into an unrelated live byte stream.
 class TwitchSequentialLiveReplayProxy {
   final String upstreamPlaylistUrl;
   final Map<String, String> upstreamHeaders;
@@ -35,13 +36,16 @@ class TwitchSequentialLiveReplayProxy {
 
   bool get isRunning => _server != null;
 
-  String streamUrl({required Duration targetPosition}) {
+  String streamUrl({required Duration fromLive}) {
     final server = _server;
     if (server == null) {
       throw StateError('Sequential live replay proxy has not started.');
     }
-    final targetUs = math.max(0, targetPosition.inMicroseconds);
-    return 'http://127.0.0.1:${server.port}/stream.ts?targetUs=$targetUs';
+    final fromLiveUs = fromLive.inMicroseconds.clamp(
+      1,
+      const Duration(seconds: 20).inMicroseconds,
+    );
+    return 'http://127.0.0.1:${server.port}/stream.ts?fromLiveUs=$fromLiveUs';
   }
 
   Future<void> start() async {
@@ -79,16 +83,22 @@ class TwitchSequentialLiveReplayProxy {
         return;
       }
 
-      final targetUs = int.tryParse(request.uri.queryParameters['targetUs'] ?? '');
-      final target = Duration(microseconds: math.max(0, targetUs ?? 0));
+      final rawUs = int.tryParse(
+        request.uri.queryParameters['fromLiveUs'] ?? '',
+      );
+      final fromLive = Duration(
+        microseconds: (rawUs ?? const Duration(seconds: 10).inMicroseconds)
+            .clamp(1, const Duration(seconds: 20).inMicroseconds)
+            .toInt(),
+      );
       request.response.statusCode = HttpStatus.ok;
       request.response.bufferOutput = false;
-      await _streamSequentialReplay(request.response, target);
+      await _streamSequentialReplay(request.response, fromLive);
     } catch (error) {
       try {
-        if (!request.response.headersSent) {
-          request.response.statusCode = HttpStatus.internalServerError;
-        }
+        request.response.statusCode = HttpStatus.internalServerError;
+      } catch (_) {}
+      try {
         await request.response.close();
       } catch (_) {}
       _log('stream error: $error');
@@ -97,31 +107,38 @@ class TwitchSequentialLiveReplayProxy {
 
   Future<void> _streamSequentialReplay(
     HttpResponse response,
-    Duration targetPosition,
+    Duration fromLive,
   ) async {
     var playlist = await _loadPlaylist();
-    var normalItems = _normalItems(playlist);
-    if (normalItems.isEmpty) return;
+    var items = _orderedItems(playlist);
+    if (items.isEmpty) return;
 
+    final total = _canonicalTotal(playlist, items);
+    final targetUs = math.max(
+      0,
+      total.inMicroseconds - fromLive.inMicroseconds,
+    );
+    final target = Duration(microseconds: targetUs);
     final resolved = _resolveTarget(
       playlist: playlist,
-      normalItems: normalItems,
-      targetPosition: targetPosition,
+      items: items,
+      targetPosition: target,
     );
     var nextSequence = resolved.item.sequence;
     String? lastMapUrl;
 
     _log(
-      'target=${_seconds(targetPosition)}s '
-      'segment=$nextSequence segmentStart=${_seconds(resolved.segmentStart)}s '
+      'seek fromLive=${_seconds(fromLive)}s '
+      'target=${_seconds(target)}s segment=$nextSequence '
+      'segmentStart=${_seconds(resolved.segmentStart)}s '
       'intra=${resolved.intraSegment.inMilliseconds}ms '
-      'clock=${resolved.usedTwitchElapsed ? 'twitch-elapsed' : 'tail-fallback'}',
+      'clock=${resolved.usedTwitchElapsed ? 'twitch-total/elapsed' : 'tail-fallback'}',
     );
 
     while (_server != null) {
-      normalItems = _normalItems(playlist);
+      items = _orderedItems(playlist);
       TwitchHlsSegmentItem? item;
-      for (final candidate in normalItems) {
+      for (final candidate in items) {
         if (candidate.sequence == nextSequence) {
           item = candidate;
           break;
@@ -129,52 +146,71 @@ class TwitchSequentialLiveReplayProxy {
       }
 
       if (item == null) {
-        if (normalItems.isNotEmpty && nextSequence < normalItems.first.sequence) {
+        if (items.isNotEmpty && nextSequence < items.first.sequence) {
           final previous = nextSequence;
-          nextSequence = normalItems.first.sequence;
+          nextSequence = items.first.sequence;
           _log(
-            'sequence gap expected=$previous recovered=$nextSequence '
+            'sequence discontinuity expected=$previous recovered=$nextSequence '
             'mediaSeq=${playlist.mediaSequence}',
           );
           continue;
         }
 
-        await Future<void>.delayed(const Duration(milliseconds: 120));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
         playlist = await _loadPlaylistBestEffort(playlist);
         continue;
       }
 
       final mapUrl = item.mapUrl;
       if (mapUrl != null && mapUrl != lastMapUrl) {
-        await _pipeUrl(response, mapUrl);
+        await _pipeUrlWithRetry(response, mapUrl, futureLike: false);
         lastMapUrl = mapUrl;
       }
 
-      await _pipeUrl(response, item.url);
+      await _pipeUrlWithRetry(
+        response,
+        item.url,
+        futureLike: item.isPrefetch,
+      );
       nextSequence = item.sequence + 1;
 
-      final hasNextInSnapshot = normalItems.any(
+      final hasNextInSnapshot = items.any(
         (candidate) => candidate.sequence == nextSequence,
       );
       if (!hasNextInSnapshot) {
-        await Future<void>.delayed(const Duration(milliseconds: 80));
+        await Future<void>.delayed(const Duration(milliseconds: 70));
         playlist = await _loadPlaylistBestEffort(playlist);
       }
     }
   }
 
+  Duration _canonicalTotal(
+    TwitchParsedMediaPlaylist playlist,
+    List<TwitchHlsSegmentItem> items,
+  ) {
+    final twitchTotal = playlist.twitchTotal;
+    if (twitchTotal != null) return twitchTotal;
+
+    final elapsed = playlist.twitchElapsed ?? Duration.zero;
+    var window = Duration.zero;
+    for (final item in items) {
+      window += item.duration;
+    }
+    return elapsed + window;
+  }
+
   _ReplayTarget _resolveTarget({
     required TwitchParsedMediaPlaylist playlist,
-    required List<TwitchHlsSegmentItem> normalItems,
+    required List<TwitchHlsSegmentItem> items,
     required Duration targetPosition,
   }) {
     final elapsed = playlist.twitchElapsed;
     if (elapsed != null) {
       var start = elapsed;
-      for (var index = 0; index < normalItems.length; index++) {
-        final item = normalItems[index];
+      for (var index = 0; index < items.length; index++) {
+        final item = items[index];
         final end = start + item.duration;
-        final isLast = index == normalItems.length - 1;
+        final isLast = index == items.length - 1;
         if (targetPosition < end || isLast) {
           final intraUs = targetPosition.inMicroseconds - start.inMicroseconds;
           final maxUs = math.max(item.duration.inMicroseconds - 1, 0);
@@ -191,33 +227,31 @@ class TwitchSequentialLiveReplayProxy {
       }
     }
 
-    final total = playlist.twitchTotal;
-    if (total != null) {
-      final fromLiveUs = math.max(
-        0,
-        total.inMicroseconds - targetPosition.inMicroseconds,
-      );
-      var behindUs = 0;
-      for (var index = normalItems.length - 1; index >= 0; index--) {
-        behindUs += normalItems[index].duration.inMicroseconds;
-        if (behindUs >= fromLiveUs || index == 0) {
-          final item = normalItems[index];
-          final start = total - Duration(microseconds: behindUs);
-          final intraUs = targetPosition.inMicroseconds - start.inMicroseconds;
-          final maxUs = math.max(item.duration.inMicroseconds - 1, 0);
-          return _ReplayTarget(
-            item: item,
-            segmentStart: start,
-            intraSegment: Duration(
-              microseconds: intraUs.clamp(0, maxUs).toInt(),
-            ),
-            usedTwitchElapsed: false,
-          );
-        }
+    final total = _canonicalTotal(playlist, items);
+    final fromTailUs = math.max(
+      0,
+      total.inMicroseconds - targetPosition.inMicroseconds,
+    );
+    var behindUs = 0;
+    for (var index = items.length - 1; index >= 0; index--) {
+      behindUs += items[index].duration.inMicroseconds;
+      if (behindUs >= fromTailUs || index == 0) {
+        final item = items[index];
+        final start = total - Duration(microseconds: behindUs);
+        final intraUs = targetPosition.inMicroseconds - start.inMicroseconds;
+        final maxUs = math.max(item.duration.inMicroseconds - 1, 0);
+        return _ReplayTarget(
+          item: item,
+          segmentStart: start,
+          intraSegment: Duration(
+            microseconds: intraUs.clamp(0, maxUs).toInt(),
+          ),
+          usedTwitchElapsed: false,
+        );
       }
     }
 
-    final fallback = normalItems.first;
+    final fallback = items.first;
     return _ReplayTarget(
       item: fallback,
       segmentStart: Duration.zero,
@@ -226,8 +260,12 @@ class TwitchSequentialLiveReplayProxy {
     );
   }
 
-  List<TwitchHlsSegmentItem> _normalItems(TwitchParsedMediaPlaylist playlist) {
-    final items = playlist.items.where((item) => !item.isPrefetch).toList();
+  List<TwitchHlsSegmentItem> _orderedItems(TwitchParsedMediaPlaylist playlist) {
+    final bySequence = <int, TwitchHlsSegmentItem>{};
+    for (final item in playlist.items) {
+      bySequence[item.sequence] = item;
+    }
+    final items = bySequence.values.toList();
     items.sort((a, b) => a.sequence.compareTo(b.sequence));
     return items;
   }
@@ -262,11 +300,33 @@ class TwitchSequentialLiveReplayProxy {
       await response.drain<void>();
       throw HttpException('HLS playlist HTTP ${response.statusCode}');
     }
-    final text = await response.transform(const SystemEncoding().decoder).join();
+    final text = await response.transform(utf8.decoder).join();
     return TwitchHlsPlaylistParser.parse(
       text,
       playlistUrl: upstreamPlaylistUrl,
     );
+  }
+
+  Future<void> _pipeUrlWithRetry(
+    HttpResponse output,
+    String value, {
+    required bool futureLike,
+  }) async {
+    final attempts = futureLike ? 16 : 4;
+    Object? lastError;
+    for (var attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        await _pipeUrl(output, value);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt >= attempts || _server == null) rethrow;
+        await Future<void>.delayed(
+          Duration(milliseconds: math.min(40 + attempt * 20, 240)),
+        );
+      }
+    }
+    throw lastError ?? StateError('segment retry failed');
   }
 
   Future<void> _pipeUrl(HttpResponse output, String value) async {
