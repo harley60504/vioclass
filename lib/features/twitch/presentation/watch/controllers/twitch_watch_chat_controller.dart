@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../api/auth/twitch_auth_api_service.dart';
 import '../../../api/chat/twitch_irc_api_service.dart';
 import '../../../api/chat/twitch_recent_messages_api_service.dart';
+import '../../../models/chat/twitch_chat_message.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../../parsers/chat/twitch_recent_message_parser.dart';
