@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:media_kit/media_kit.dart';
 
 import '../twitch_watch_feature_ports.dart';
 
@@ -78,7 +79,15 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         session.player.setProperty('hr-seek-demuxer-offset', '2.0');
       }
 
-      if (startPosition != null && deferInitialSeek) {
+      final isLocalGrowingDvrPlaylist =
+          startPosition != null &&
+          nextUri.startsWith('http://127.0.0.1:') &&
+          nextUri.contains('/playlist.m3u8?v=');
+      final shouldDeferInitialSeek =
+          startPosition != null &&
+          (deferInitialSeek || isLocalGrowingDvrPlaylist);
+
+      if (shouldDeferInitialSeek) {
         // Do not use Media(start:) for the growing local DVR HLS playlist.
         // mpv/FFmpeg can receive the initial seek before the HLS demuxer has
         // built its segment map; larger preroll-relative starts (20-30 s) can
@@ -89,10 +98,11 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           play: false,
           forceOpen: forceOpen,
         );
-        await _waitForSeekableMedia(session, startPosition);
+        await _waitForSeekableMedia(session.player, startPosition);
         debugPrint(
           '[TwitchPlayer] deferred precise seek '
-          'target=${(startPosition.inMilliseconds / 1000).toStringAsFixed(3)}s',
+          'target=${(startPosition.inMilliseconds / 1000).toStringAsFixed(3)}s '
+          'duration=${(session.player.state.duration.inMilliseconds / 1000).toStringAsFixed(3)}s',
         );
         await session.player.seek(startPosition);
         if (play) {
@@ -123,17 +133,14 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     }
   }
 
-  Future<void> _waitForSeekableMedia(
-    dynamic session,
-    Duration target,
-  ) async {
+  Future<void> _waitForSeekableMedia(Player player, Duration target) async {
     // Player.open() only guarantees that the open command was accepted. For a
     // local HLS playlist the duration/segment map normally appears shortly
     // afterwards. Keep this bounded so a stream with unknown duration still
     // proceeds to seek instead of hanging the UI action.
     final deadline = DateTime.now().add(const Duration(milliseconds: 900));
     while (DateTime.now().isBefore(deadline)) {
-      final duration = session.player.state.duration as Duration;
+      final duration = player.state.duration;
       if (duration > Duration.zero &&
           (duration >= target || duration.inMilliseconds > 1000)) {
         return;
