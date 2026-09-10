@@ -7,6 +7,7 @@ class TwitchHlsSegmentItem {
   final int sequence;
   final bool isPrefetch;
   final Duration duration;
+  final DateTime? programDateTime;
 
   const TwitchHlsSegmentItem({
     required this.url,
@@ -15,6 +16,7 @@ class TwitchHlsSegmentItem {
     required this.sequence,
     this.isPrefetch = false,
     this.duration = const Duration(seconds: 2),
+    this.programDateTime,
   });
 }
 

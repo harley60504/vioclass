@@ -360,8 +360,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _switchingQuality = false;
     _error = null;
     _masterPlaylistUri = null;
-    _playlistUri = null;
     _upstreamPlaylistUri = null;
+    _playlistUri = null;
     _masterPlaylistText = '';
     _variants = const <TwitchM3u8Variant>[];
     _currentVariant = null;
@@ -715,15 +715,24 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<({String playbackUrl, Duration startPosition})?>
-  seekLiveDvrBridgePosition(Duration position) async {
+  seekLiveDvrBridgePosition(
+    Duration position, {
+    DateTime? targetProgramDateTime,
+  }) async {
     final requestId = ++_sharedBridgeSeekRequestId;
     final bridge = _bridgeProxy ?? _sharedBridgeProxy;
     if (bridge == null || !bridge.isRunning) {
       debugPrint('[LiveDvrBridge] seek ignored: bridge not running');
       return null;
     }
-    debugPrint('[LiveDvrBridge] runtime seek position=${position.inSeconds}s');
-    final startPosition = bridge.seekToPosition(position);
+    debugPrint(
+      '[LiveDvrBridge] runtime seek position=${position.inSeconds}s '
+      'programTime=${targetProgramDateTime?.toUtc().toIso8601String() ?? '-'}',
+    );
+    final startPosition = await bridge.seekToPosition(
+      position,
+      targetProgramDateTime: targetProgramDateTime,
+    );
 
     if (requestId != _sharedBridgeSeekRequestId) {
       debugPrint('[LiveDvrBridge] stale seek ignored request=$requestId');

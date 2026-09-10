@@ -13,6 +13,7 @@ class TwitchHlsPlaylistParser {
 
     String? currentMapUrl;
     String? pendingLabel;
+    DateTime? nextProgramDateTime;
     var pendingDuration = const Duration(seconds: 2);
     var lastSegmentDuration = const Duration(seconds: 2);
     var targetDuration = const Duration(seconds: 2);
@@ -68,6 +69,15 @@ class TwitchHlsPlaylistParser {
 
       if (line == '#EXT-X-ENDLIST') {
         hasEndList = true;
+        continue;
+      }
+
+      if (line.startsWith('#EXT-X-PROGRAM-DATE-TIME:')) {
+        final raw = line.substring('#EXT-X-PROGRAM-DATE-TIME:'.length).trim();
+        final parsed = DateTime.tryParse(raw);
+        if (parsed != null) {
+          nextProgramDateTime = parsed.toUtc();
+        }
         continue;
       }
 
@@ -189,6 +199,7 @@ class TwitchHlsPlaylistParser {
 
       final absoluteUrl = base.resolve(line).toString();
       if (seenUrls.add(absoluteUrl)) {
+        final programDateTime = nextProgramDateTime;
         items.add(
           TwitchHlsSegmentItem(
             url: absoluteUrl,
@@ -199,8 +210,12 @@ class TwitchHlsPlaylistParser {
             sequence: mediaSequence + segmentIndex,
             isPrefetch: false,
             duration: pendingDuration,
+            programDateTime: programDateTime,
           ),
         );
+        if (programDateTime != null) {
+          nextProgramDateTime = programDateTime.add(pendingDuration);
+        }
         lastSegmentDuration = pendingDuration;
         segmentIndex++;
       }

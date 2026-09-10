@@ -942,8 +942,12 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         timelineDuration == null || timelineDuration.inMilliseconds <= 0
         ? null
         : safeTarget.inMilliseconds / 1000;
-    final seekResult = await watchPorts.player.runtime
-        .seekLiveDvrBridgePosition(safeTarget);
+    final startedAt = liveTimelineStartedAt?.toUtc();
+    final targetProgramDateTime = startedAt?.add(safeTarget);
+    final seekResult = await watchPorts.player.runtime.seekLiveDvrBridgePosition(
+      safeTarget,
+      targetProgramDateTime: targetProgramDateTime,
+    );
     if (seekResult == null) return;
     await playerSession.useLiveDvrHlsCacheProfile();
     final playbackUrl = seekResult.playbackUrl;
@@ -1037,21 +1041,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     if (fromLiveMs <= _liveTimelineEdgeTolerance.inMilliseconds) {
       return _LiveTimelineSeekRoute.liveEdge;
     }
-    final measuredDvrDuration = hasUsableLiveDvrArchive
-        ? watchPorts.player.runtime.liveDvrBridgeDuration ??
-              activeGrowingVodVideo?.parsedDuration
-        : null;
-    if (measuredDvrDuration != null && measuredDvrDuration > Duration.zero) {
-      final dvrTailMs = measuredDvrDuration.inMilliseconds.clamp(
-        0,
-        timelineDuration.inMilliseconds,
-      );
-      if (safeTarget.inMilliseconds > dvrTailMs &&
-          fromLiveMs <= _liveReplayCacheDuration.inMilliseconds) {
-        return _LiveTimelineSeekRoute.liveBuffer;
-      }
-      return _LiveTimelineSeekRoute.dvrArchive;
-    }
+    // Keep the routing boundary deterministic even when the growing DVR and
+    // the local replay cache overlap. The data may overlap, but only one source
+    // owns each UI timeline range, so dragging near the boundary cannot flap
+    // between TS and DVR as the DVR tail grows.
     if (fromLiveMs <= _liveReplaySeekWindowDuration.inMilliseconds) {
       return _LiveTimelineSeekRoute.liveBuffer;
     }

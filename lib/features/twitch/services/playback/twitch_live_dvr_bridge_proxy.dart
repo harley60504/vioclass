@@ -20,12 +20,13 @@ class TwitchLiveDvrBridgeProxy {
   HttpServer? _server;
   Uri? _dvrPlaylistUri;
   Duration? _latestDuration;
-  DateTime? _latestDurationObservedAt;
-  List<Duration> _latestSegmentDurations = const <Duration>[];
+  List<TwitchHlsSegmentItem> _latestItems = const <TwitchHlsSegmentItem>[];
   Duration? _seekPosition;
   Duration? _timelinePosition;
   int _streamGeneration = 0;
   int? _dvrSeekStartIndex;
+  Duration _dvrSeekStartOffset = Duration.zero;
+  DateTime? _dvrSeekTargetProgramDateTime;
   DateTime _dvrSeekStartedAt = DateTime.now();
 
   TwitchLiveDvrBridgeProxy({Dio? dio})
@@ -38,13 +39,10 @@ class TwitchLiveDvrBridgeProxy {
             ),
           );
 
-  Duration? get latestDuration {
-    final duration = _latestDuration;
-    final observedAt = _latestDurationObservedAt;
-    if (duration == null || observedAt == null) return duration;
-    final elapsed = DateTime.now().difference(observedAt);
-    return elapsed.isNegative ? duration : duration + elapsed;
-  }
+  /// Duration represented by media segments that are actually present in the
+  /// latest DVR playlist snapshot. Do not extrapolate this value using wall
+  /// clock time: seek indexing must only use media that is really available.
+  Duration? get latestDuration => _latestDuration;
 
   bool get isRunning => _server != null;
   bool get isLiveMode => false;
@@ -71,6 +69,14 @@ class TwitchLiveDvrBridgeProxy {
 
   Future<Uri> open({required Uri dvrPlaylistUri}) async {
     if (_server != null && _dvrPlaylistUri == dvrPlaylistUri) {
+      // A growing DVR URL is stable while its contents continue to grow. Keep
+      // the cached index fresh even when the URL itself has not changed.
+      try {
+        final playlistItems = await _validatePlaylist(dvrPlaylistUri);
+        if (playlistItems.isNotEmpty) _rememberLatestItems(playlistItems);
+      } catch (_) {
+        // Reuse the previous valid snapshot if a single refresh fails.
+      }
       return Uri.parse(playlistUrl);
     }
 
@@ -80,36 +86,83 @@ class TwitchLiveDvrBridgeProxy {
     _seekPosition = null;
     _timelinePosition = null;
     _dvrSeekStartIndex = null;
+    _dvrSeekStartOffset = Duration.zero;
+    _dvrSeekTargetProgramDateTime = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
     final server = await _ensureServer();
     return Uri.parse('http://127.0.0.1:${server.port}/playlist.m3u8');
   }
 
-  Duration seekToPosition(Duration position) {
-    final duration = latestDuration;
-    final maxMs = math.max(
-      duration?.inMilliseconds ?? position.inMilliseconds,
-      1,
-    );
-    final positionMs = position.inMilliseconds.clamp(0, maxMs).toInt();
-    _seekPosition = Duration(milliseconds: positionMs);
-    _timelinePosition = _seekPosition;
-    _dvrSeekStartIndex = _indexForDurations(
-      _latestSegmentDurations,
-      _seekPosition!,
-    );
-    final segmentStartMs = _latestSegmentDurations
-        .take(_dvrSeekStartIndex!)
-        .fold<int>(0, (total, duration) => total + duration.inMilliseconds);
-    final startPosition = Duration(
-      milliseconds: math.max(0, positionMs - segmentStartMs),
-    );
+  /// Resolve a canonical timeline target against a freshly fetched DVR index.
+  ///
+  /// When PROGRAM-DATE-TIME is present, [targetProgramDateTime] is authoritative
+  /// and gives Local TS and DVR a shared absolute clock. Otherwise the bridge
+  /// falls back to cumulative EXTINF durations from the start of the DVR.
+  Future<Duration> seekToPosition(
+    Duration position, {
+    DateTime? targetProgramDateTime,
+  }) async {
+    await _refreshLatestItemsBestEffort();
+
+    final items = _latestItems;
+    if (items.isEmpty) {
+      _seekPosition = position < Duration.zero ? Duration.zero : position;
+      _timelinePosition = _seekPosition;
+      _dvrSeekStartIndex = null;
+      _dvrSeekStartOffset = Duration.zero;
+      _dvrSeekTargetProgramDateTime = targetProgramDateTime?.toUtc();
+      _dvrSeekStartedAt = DateTime.now();
+      _streamGeneration++;
+      return Duration.zero;
+    }
+
+    final canonicalPosition = position < Duration.zero ? Duration.zero : position;
+    final targetUtc = targetProgramDateTime?.toUtc();
+    final programSeek = targetUtc == null
+        ? null
+        : _resolveProgramDateTimeSeek(items, targetUtc);
+
+    late final int index;
+    late final Duration startPosition;
+    late final Duration resolvedTimelinePosition;
+    var usedProgramDateTime = false;
+
+    if (programSeek != null) {
+      index = programSeek.index;
+      startPosition = programSeek.offset;
+      resolvedTimelinePosition = canonicalPosition;
+      usedProgramDateTime = true;
+    } else {
+      final availableMs = math.max(_durationOfItems(items).inMilliseconds, 1);
+      final maxSeekMs = math.max(availableMs - 1, 0);
+      final positionMs = canonicalPosition.inMilliseconds
+          .clamp(0, maxSeekMs)
+          .toInt();
+      resolvedTimelinePosition = Duration(milliseconds: positionMs);
+      index = _indexForPosition(items, resolvedTimelinePosition);
+      final segmentStartMs = _durationBeforeIndex(items, index).inMilliseconds;
+      final segmentDurationMs = math.max(
+        items[index].duration.inMilliseconds,
+        1,
+      );
+      final offsetMs = (positionMs - segmentStartMs)
+          .clamp(0, math.max(segmentDurationMs - 1, 0))
+          .toInt();
+      startPosition = Duration(milliseconds: offsetMs);
+    }
+
+    _seekPosition = resolvedTimelinePosition;
+    _timelinePosition = resolvedTimelinePosition;
+    _dvrSeekStartIndex = index;
+    _dvrSeekStartOffset = startPosition;
+    _dvrSeekTargetProgramDateTime = usedProgramDateTime ? targetUtc : null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
     debugPrint(
-      '[LiveDvrBridge] seek position=${_seekPosition!.inSeconds}s '
-      'segment=$_dvrSeekStartIndex offset=${startPosition.inMilliseconds}ms '
+      '[LiveDvrBridge] seek position=${resolvedTimelinePosition.inSeconds}s '
+      'segment=$index offset=${startPosition.inMilliseconds}ms '
+      'clock=${usedProgramDateTime ? 'program-date-time' : 'extinf'} '
       'generation=$_streamGeneration',
     );
     return startPosition;
@@ -120,6 +173,8 @@ class TwitchLiveDvrBridgeProxy {
     _seekPosition = null;
     _timelinePosition = null;
     _dvrSeekStartIndex = null;
+    _dvrSeekStartOffset = Duration.zero;
+    _dvrSeekTargetProgramDateTime = null;
   }
 
   Future<void> close() async {
@@ -127,11 +182,12 @@ class TwitchLiveDvrBridgeProxy {
     _server = null;
     _dvrPlaylistUri = null;
     _latestDuration = null;
-    _latestDurationObservedAt = null;
-    _latestSegmentDurations = const <Duration>[];
+    _latestItems = const <TwitchHlsSegmentItem>[];
     _seekPosition = null;
     _timelinePosition = null;
     _dvrSeekStartIndex = null;
+    _dvrSeekStartOffset = Duration.zero;
+    _dvrSeekTargetProgramDateTime = null;
     await server?.close(force: true);
     _client.close(force: true);
   }
@@ -148,15 +204,20 @@ class TwitchLiveDvrBridgeProxy {
     return playlist.items.where((item) => !item.isPrefetch).toList();
   }
 
+  Future<void> _refreshLatestItemsBestEffort() async {
+    final uri = _dvrPlaylistUri;
+    if (uri == null) return;
+    try {
+      final items = await _validatePlaylist(uri);
+      if (items.isNotEmpty) _rememberLatestItems(items);
+    } catch (error) {
+      debugPrint('[LiveDvrBridge] seek index refresh failed: $error');
+    }
+  }
+
   void _rememberLatestItems(List<TwitchHlsSegmentItem> items) {
-    _latestSegmentDurations = items
-        .map((item) => item.duration)
-        .toList(growable: false);
-    _latestDuration = _latestSegmentDurations.fold<Duration>(
-      Duration.zero,
-      (total, duration) => total + duration,
-    );
-    _latestDurationObservedAt = DateTime.now();
+    _latestItems = List<TwitchHlsSegmentItem>.unmodifiable(items);
+    _latestDuration = _durationOfItems(items);
   }
 
   Future<HttpServer> _ensureServer() async {
@@ -298,7 +359,8 @@ class TwitchLiveDvrBridgeProxy {
       'ok\n'
       'playlist=$playlistUrl\n'
       'dvr=$_dvrPlaylistUri\n'
-      'duration=${_latestDuration?.inSeconds ?? 0}\n',
+      'duration=${_latestDuration?.inSeconds ?? 0}\n'
+      'clock=${_dvrSeekTargetProgramDateTime != null ? 'program-date-time' : 'extinf'}\n',
     );
     await request.response.close();
   }
@@ -320,27 +382,42 @@ class TwitchLiveDvrBridgeProxy {
     _rememberLatestItems(items);
     if (items.isEmpty) return _emptyPlaylist();
 
-    _dvrSeekStartIndex ??= _indexForCurrentSeek(items);
-    final averageMs = math.max(
-      250,
-      (_latestDuration!.inMilliseconds / items.length).round(),
-    );
-    final elapsedSegments =
-        DateTime.now().difference(_dvrSeekStartedAt).inMilliseconds ~/
-        averageMs;
-    final current = (_dvrSeekStartIndex! + elapsedSegments).clamp(
-      0,
-      items.length - 1,
-    );
-    _timelinePosition = items
-        .take(current + 1)
-        .fold<Duration>(Duration.zero, (total, item) => total + item.duration);
-    final windowStart = current;
-    final windowEnd = math.min(items.length, current + 5);
+    final elapsed = DateTime.now().difference(_dvrSeekStartedAt);
+    final targetProgramDateTime = _dvrSeekTargetProgramDateTime;
+    int current;
+
+    if (targetProgramDateTime != null) {
+      final playbackProgramDateTime = targetProgramDateTime.add(elapsed);
+      current =
+          _indexForProgramDateTime(items, playbackProgramDateTime) ??
+          _indexForCurrentSeek(items);
+      final basePosition = _seekPosition ?? Duration.zero;
+      _timelinePosition = basePosition + elapsed;
+    } else {
+      final start = (_dvrSeekStartIndex ?? _indexForCurrentSeek(items))
+          .clamp(0, items.length - 1)
+          .toInt();
+      final baseMs =
+          _durationBeforeIndex(items, start).inMilliseconds +
+          _dvrSeekStartOffset.inMilliseconds;
+      final availableMs = math.max(_durationOfItems(items).inMilliseconds, 1);
+      final playbackMs = (baseMs + elapsed.inMilliseconds)
+          .clamp(0, math.max(availableMs - 1, 0))
+          .toInt();
+      current = _indexForPosition(
+        items,
+        Duration(milliseconds: playbackMs),
+      );
+      _timelinePosition = Duration(milliseconds: playbackMs);
+    }
+
+    final windowStart = current.clamp(0, items.length - 1).toInt();
+    final windowEnd = math.min(items.length, windowStart + 5).toInt();
     final window = items.sublist(windowStart, windowEnd);
     debugPrint(
-      '[LiveDvrBridge] playlist dvr items=${items.length} index=$current '
-      'position=${_seekPosition?.inSeconds ?? 0}s '
+      '[LiveDvrBridge] playlist dvr items=${items.length} index=$windowStart '
+      'position=${_timelinePosition?.inSeconds ?? _seekPosition?.inSeconds ?? 0}s '
+      'clock=${targetProgramDateTime != null ? 'program-date-time' : 'extinf'} '
       'generation=$_streamGeneration',
     );
     return _segmentPlaylist(
@@ -368,6 +445,12 @@ class TwitchLiveDvrBridgeProxy {
       ..writeln('#EXT-X-DISCONTINUITY');
 
     for (final item in items) {
+      final programDateTime = item.programDateTime;
+      if (programDateTime != null) {
+        buffer.writeln(
+          '#EXT-X-PROGRAM-DATE-TIME:${programDateTime.toUtc().toIso8601String()}',
+        );
+      }
       final durationSeconds = (item.duration.inMilliseconds / 1000)
           .clamp(0.1, 60.0)
           .toStringAsFixed(3);
@@ -415,6 +498,10 @@ class TwitchLiveDvrBridgeProxy {
       final start = nextSequence == null
           ? _dvrSeekStartIndex ?? _indexForCurrentSeek(items)
           : _indexForSequence(items, nextSequence);
+      if (start >= items.length) {
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+        continue;
+      }
       var timelineCursor = items
           .take(start)
           .fold<Duration>(
@@ -495,41 +582,87 @@ class TwitchLiveDvrBridgeProxy {
     return text;
   }
 
+  Duration _durationOfItems(List<TwitchHlsSegmentItem> items) {
+    return items.fold<Duration>(
+      Duration.zero,
+      (total, item) => total + item.duration,
+    );
+  }
+
+  Duration _durationBeforeIndex(List<TwitchHlsSegmentItem> items, int index) {
+    final safeIndex = index.clamp(0, items.length).toInt();
+    return items
+        .take(safeIndex)
+        .fold<Duration>(
+          Duration.zero,
+          (total, item) => total + item.duration,
+        );
+  }
+
+  ({int index, Duration offset})? _resolveProgramDateTimeSeek(
+    List<TwitchHlsSegmentItem> items,
+    DateTime target,
+  ) {
+    final index = _indexForProgramDateTime(items, target);
+    if (index == null) return null;
+    final start = items[index].programDateTime;
+    if (start == null) return null;
+    final durationMs = math.max(items[index].duration.inMilliseconds, 1);
+    final rawOffsetMs = target.difference(start).inMilliseconds;
+    final offsetMs = rawOffsetMs
+        .clamp(0, math.max(durationMs - 1, 0))
+        .toInt();
+    return (index: index, offset: Duration(milliseconds: offsetMs));
+  }
+
+  int? _indexForProgramDateTime(
+    List<TwitchHlsSegmentItem> items,
+    DateTime target,
+  ) {
+    int? firstTimedIndex;
+    int? lastTimedIndex;
+    final targetUtc = target.toUtc();
+
+    for (var i = 0; i < items.length; i++) {
+      final start = items[i].programDateTime?.toUtc();
+      if (start == null) continue;
+      firstTimedIndex ??= i;
+      lastTimedIndex = i;
+      if (targetUtc.isBefore(start)) return i;
+      final end = start.add(items[i].duration);
+      if (targetUtc.isBefore(end)) return i;
+    }
+
+    if (firstTimedIndex == null) return null;
+    final firstStart = items[firstTimedIndex].programDateTime!.toUtc();
+    if (targetUtc.isBefore(firstStart)) return firstTimedIndex;
+    return lastTimedIndex;
+  }
+
   int _indexForCurrentSeek(List<TwitchHlsSegmentItem> items) {
+    final targetProgramDateTime = _dvrSeekTargetProgramDateTime;
+    if (targetProgramDateTime != null) {
+      final index = _indexForProgramDateTime(items, targetProgramDateTime);
+      if (index != null) return index;
+    }
     final position = _seekPosition;
     return _indexForPosition(items, position ?? Duration.zero);
   }
 
   int _indexForPosition(List<TwitchHlsSegmentItem> items, Duration position) {
     if (items.isEmpty) return 0;
-    final duration = items.fold<Duration>(
-      Duration.zero,
-      (total, item) => total + item.duration,
-    );
+    final duration = _durationOfItems(items);
     if (duration.inMilliseconds <= 0) return 0;
-    final targetMs = position.inMilliseconds
-        .clamp(0, duration.inMilliseconds)
-        .toInt();
+    final maxSeekMs = math.max(duration.inMilliseconds - 1, 0);
+    final targetMs = position.inMilliseconds.clamp(0, maxSeekMs).toInt();
     var cursor = 0;
     for (var i = 0; i < items.length; i++) {
       cursor += items[i].duration.inMilliseconds;
       // Segment ranges are [start, end). A target exactly on the boundary
-      // belongs to the next segment, otherwise adjacent 10-second jumps can
-      // resolve to the same segment.
+      // belongs to the next segment.
       if (targetMs < cursor) return i;
     }
     return math.max(0, items.length - 1);
-  }
-
-  int _indexForDurations(List<Duration> items, Duration position) {
-    if (items.isEmpty) return 0;
-    final targetMs = position.inMilliseconds;
-    var cursor = 0;
-    for (var i = 0; i < items.length; i++) {
-      cursor += items[i].inMilliseconds;
-      if (targetMs < cursor) return i;
-    }
-    return items.length - 1;
   }
 
   int _indexForSequence(List<TwitchHlsSegmentItem> items, int sequence) {
