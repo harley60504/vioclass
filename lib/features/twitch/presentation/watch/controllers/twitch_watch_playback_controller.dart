@@ -78,9 +78,10 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
 
       var hrSeekDemuxerOffset = const Duration(seconds: 2);
       if (isLocalDvrSnapshot) {
+        final requestedStart = startPosition!;
         final probe = await TwitchLocalDvrMediaTimingProbe.probe(
           playlistUrl: nextUri,
-          startPosition: startPosition,
+          startPosition: requestedStart,
         );
         if (probe != null) {
           hrSeekDemuxerOffset = probe.suggestedDemuxerOffset;
@@ -120,7 +121,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       if (isLocalDvrSnapshot) {
         debugPrint(
           '[TwitchPlayer] VOD snapshot precise start '
-          'target=${_seconds(startPosition)}s '
+          'target=${_seconds(startPosition!)}s '
           'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
         );
       }
