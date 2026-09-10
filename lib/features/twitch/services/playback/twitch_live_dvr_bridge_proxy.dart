@@ -11,6 +11,8 @@ import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
 class TwitchLiveDvrBridgeProxy {
+  static const int _dvrPrerollSegmentCount = 2;
+
   final Dio _dio;
   final HttpClient _client = HttpClient()
     ..connectionTimeout = const Duration(seconds: 5)
@@ -26,6 +28,7 @@ class TwitchLiveDvrBridgeProxy {
   int _streamGeneration = 0;
   int? _dvrSeekStartIndex;
   Duration _dvrSeekStartOffset = Duration.zero;
+  int? _dvrSeekPlaylistStartIndex;
   DateTime? _dvrSeekTargetProgramDateTime;
   DateTime _dvrSeekStartedAt = DateTime.now();
 
@@ -87,6 +90,7 @@ class TwitchLiveDvrBridgeProxy {
     _timelinePosition = null;
     _dvrSeekStartIndex = null;
     _dvrSeekStartOffset = Duration.zero;
+    _dvrSeekPlaylistStartIndex = null;
     _dvrSeekTargetProgramDateTime = null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
@@ -99,6 +103,11 @@ class TwitchLiveDvrBridgeProxy {
   /// When PROGRAM-DATE-TIME is present, [targetProgramDateTime] is authoritative
   /// and gives Local TS and DVR a shared absolute clock. Otherwise the bridge
   /// falls back to cumulative EXTINF durations from the start of the DVR.
+  ///
+  /// The generated HLS playlist starts up to two segments before the target so
+  /// mpv can decode from an earlier keyframe. The returned position is relative
+  /// to that preroll window, while the stored timeline position remains the
+  /// canonical Twitch stream position.
   Future<Duration> seekToPosition(
     Duration position, {
     DateTime? targetProgramDateTime,
@@ -111,6 +120,7 @@ class TwitchLiveDvrBridgeProxy {
       _timelinePosition = _seekPosition;
       _dvrSeekStartIndex = null;
       _dvrSeekStartOffset = Duration.zero;
+      _dvrSeekPlaylistStartIndex = null;
       _dvrSeekTargetProgramDateTime = targetProgramDateTime?.toUtc();
       _dvrSeekStartedAt = DateTime.now();
       _streamGeneration++;
@@ -124,13 +134,13 @@ class TwitchLiveDvrBridgeProxy {
         : _resolveProgramDateTimeSeek(items, targetUtc);
 
     late final int index;
-    late final Duration startPosition;
+    late final Duration segmentOffset;
     late final Duration resolvedTimelinePosition;
     var usedProgramDateTime = false;
 
     if (programSeek != null) {
       index = programSeek.index;
-      startPosition = programSeek.offset;
+      segmentOffset = programSeek.offset;
       resolvedTimelinePosition = canonicalPosition;
       usedProgramDateTime = true;
     } else {
@@ -149,23 +159,37 @@ class TwitchLiveDvrBridgeProxy {
       final offsetMs = (positionMs - segmentStartMs)
           .clamp(0, math.max(segmentDurationMs - 1, 0))
           .toInt();
-      startPosition = Duration(milliseconds: offsetMs);
+      segmentOffset = Duration(milliseconds: offsetMs);
     }
+
+    final playlistStartIndex = math.max(
+      0,
+      index - _dvrPrerollSegmentCount,
+    );
+    final preroll = _durationBetweenIndexes(
+      items,
+      playlistStartIndex,
+      index,
+    );
+    final playerStartPosition = preroll + segmentOffset;
 
     _seekPosition = resolvedTimelinePosition;
     _timelinePosition = resolvedTimelinePosition;
     _dvrSeekStartIndex = index;
-    _dvrSeekStartOffset = startPosition;
+    _dvrSeekStartOffset = segmentOffset;
+    _dvrSeekPlaylistStartIndex = playlistStartIndex;
     _dvrSeekTargetProgramDateTime = usedProgramDateTime ? targetUtc : null;
     _dvrSeekStartedAt = DateTime.now();
     _streamGeneration++;
     debugPrint(
-      '[LiveDvrBridge] seek position=${resolvedTimelinePosition.inSeconds}s '
-      'segment=$index offset=${startPosition.inMilliseconds}ms '
+      '[LiveDvrBridge] seek position=${_seconds(resolvedTimelinePosition)}s '
+      'segment=$index offset=${segmentOffset.inMilliseconds}ms '
+      'prerollStart=$playlistStartIndex '
+      'playerStart=${playerStartPosition.inMilliseconds}ms '
       'clock=${usedProgramDateTime ? 'program-date-time' : 'extinf'} '
       'generation=$_streamGeneration',
     );
-    return startPosition;
+    return playerStartPosition;
   }
 
   void stopStreaming() {
@@ -174,6 +198,7 @@ class TwitchLiveDvrBridgeProxy {
     _timelinePosition = null;
     _dvrSeekStartIndex = null;
     _dvrSeekStartOffset = Duration.zero;
+    _dvrSeekPlaylistStartIndex = null;
     _dvrSeekTargetProgramDateTime = null;
   }
 
@@ -187,6 +212,7 @@ class TwitchLiveDvrBridgeProxy {
     _timelinePosition = null;
     _dvrSeekStartIndex = null;
     _dvrSeekStartOffset = Duration.zero;
+    _dvrSeekPlaylistStartIndex = null;
     _dvrSeekTargetProgramDateTime = null;
     await server?.close(force: true);
     _client.close(force: true);
@@ -360,6 +386,7 @@ class TwitchLiveDvrBridgeProxy {
       'playlist=$playlistUrl\n'
       'dvr=$_dvrPlaylistUri\n'
       'duration=${_latestDuration?.inSeconds ?? 0}\n'
+      'preroll_segments=$_dvrPrerollSegmentCount\n'
       'clock=${_dvrSeekTargetProgramDateTime != null ? 'program-date-time' : 'extinf'}\n',
     );
     await request.response.close();
@@ -411,12 +438,19 @@ class TwitchLiveDvrBridgeProxy {
       _timelinePosition = Duration(milliseconds: playbackMs);
     }
 
-    final windowStart = current.clamp(0, items.length - 1).toInt();
-    final windowEnd = math.min(items.length, windowStart + 5).toInt();
+    final frozenPrerollStart = _dvrSeekPlaylistStartIndex;
+    final useFrozenPreroll =
+        frozenPrerollStart != null && elapsed <= const Duration(seconds: 3);
+    final windowStart = useFrozenPreroll
+        ? frozenPrerollStart.clamp(0, items.length - 1).toInt()
+        : math.max(0, current - _dvrPrerollSegmentCount);
+    final desiredEnd = math.max(windowStart + 8, current + 6);
+    final windowEnd = math.min(items.length, desiredEnd).toInt();
     final window = items.sublist(windowStart, windowEnd);
     debugPrint(
-      '[LiveDvrBridge] playlist dvr items=${items.length} index=$windowStart '
-      'position=${_timelinePosition?.inSeconds ?? _seekPosition?.inSeconds ?? 0}s '
+      '[LiveDvrBridge] playlist dvr items=${items.length} targetIndex=$current '
+      'windowStart=$windowStart '
+      'position=${_seconds(_timelinePosition ?? _seekPosition ?? Duration.zero)}s '
       'clock=${targetProgramDateTime != null ? 'program-date-time' : 'extinf'} '
       'generation=$_streamGeneration',
     );
@@ -495,6 +529,9 @@ class TwitchLiveDvrBridgeProxy {
         continue;
       }
 
+      // Direct TS mode intentionally starts at the target segment itself. HLS
+      // preroll is a playlist-only optimization because the player receives a
+      // startPosition for that seekable playlist.
       final start = nextSequence == null
           ? _dvrSeekStartIndex ?? _indexForCurrentSeek(items)
           : _indexForSequence(items, nextSequence);
@@ -599,6 +636,22 @@ class TwitchLiveDvrBridgeProxy {
         );
   }
 
+  Duration _durationBetweenIndexes(
+    List<TwitchHlsSegmentItem> items,
+    int startIndex,
+    int endIndex,
+  ) {
+    final safeStart = startIndex.clamp(0, items.length).toInt();
+    final safeEnd = endIndex.clamp(safeStart, items.length).toInt();
+    return items
+        .skip(safeStart)
+        .take(safeEnd - safeStart)
+        .fold<Duration>(
+          Duration.zero,
+          (total, item) => total + item.duration,
+        );
+  }
+
   ({int index, Duration offset})? _resolveProgramDateTimeSeek(
     List<TwitchHlsSegmentItem> items,
     DateTime target,
@@ -672,4 +725,7 @@ class TwitchLiveDvrBridgeProxy {
     }
     return items.length;
   }
+
+  String _seconds(Duration value) =>
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
 }
