@@ -85,6 +85,16 @@ class TwitchWatchChatController extends ChangeNotifier {
             messagesField: startup.recentMessages,
             channelLogin: channel,
           );
+
+      if (kDebugMode) {
+        _debugOfficialHistory(
+          channel: channel,
+          rawObjects: startup.recentMessages,
+          parsed: startupRecentMessages,
+        );
+        unawaited(_debugThirdPartyHistory(channel));
+      }
+
       final nextRuntime = TwitchChatRuntime(
         ircApi: TwitchIrcApiService(),
         writeIrcApi: TwitchIrcApiService(),
@@ -113,10 +123,101 @@ class TwitchWatchChatController extends ChangeNotifier {
         recentMessageLimit: 700,
         startupRecentMessages: startupRecentMessages.messages,
       );
+
+      if (kDebugMode) {
+        _debugMergedHistory(nextRuntime);
+      }
     } finally {
       connectingChat = false;
       notifyListeners();
     }
+  }
+
+  void _debugOfficialHistory({
+    required String channel,
+    required List<Map<String, dynamic>> rawObjects,
+    required TwitchRecentMessageParseResult parsed,
+  }) {
+    debugPrint(
+      '[ChatHistoryDebug] official channel=$channel raw=${rawObjects.length} '
+      'parsed=${parsed.messages.length} issues=${parsed.issues.length}',
+    );
+
+    for (var i = 0; i < rawObjects.length && i < 4; i++) {
+      final item = rawObjects[i];
+      debugPrint(
+        '[ChatHistoryDebug] official.raw[$i] keys=${item.keys.toList()} '
+        'object=$item',
+      );
+    }
+
+    for (var i = 0; i < parsed.messages.length && i < 8; i++) {
+      _debugParsedHistoryMessage('official.parsed[$i]', parsed.messages[i]);
+    }
+  }
+
+  Future<void> _debugThirdPartyHistory(String channel) async {
+    try {
+      final result = await recentMessagesApi.getRecentMessages(
+        channelLogin: channel,
+        limit: 12,
+      );
+      debugPrint(
+        '[ChatHistoryDebug] third_party channel=$channel '
+        'raw=${result.rawMessages.length} objects=${result.rawObjects.length} '
+        'parsed=${result.messages.length} issues=${result.issues.length}',
+      );
+
+      for (var i = 0; i < result.rawMessages.length && i < 4; i++) {
+        debugPrint(
+          '[ChatHistoryDebug] third_party.raw[$i]=${result.rawMessages[i]}',
+        );
+      }
+
+      for (var i = 0; i < result.messages.length && i < 8; i++) {
+        _debugParsedHistoryMessage(
+          'third_party.parsed[$i]',
+          result.messages[i],
+        );
+      }
+    } catch (error) {
+      debugPrint('[ChatHistoryDebug] third_party error=$error');
+    }
+  }
+
+  void _debugMergedHistory(TwitchChatRuntime activeRuntime) {
+    final items = activeRuntime.messages
+        .where((item) => item.source.source != TwitchChatMessageSource.liveIrc)
+        .toList(growable: false);
+
+    debugPrint(
+      '[ChatHistoryDebug] merged_history total=${items.length} '
+      'runtimeRecentCount=${activeRuntime.recentMessageCount} '
+      'parseIssues=${activeRuntime.recentParseIssueCount}',
+    );
+
+    for (var i = 0; i < items.length && i < 12; i++) {
+      _debugParsedHistoryMessage('merged[$i]', items[i].source);
+    }
+  }
+
+  void _debugParsedHistoryMessage(String label, TwitchChatMessage message) {
+    final tags = message.tags;
+    final text = message.message.length > 80
+        ? '${message.message.substring(0, 80)}…'
+        : message.message;
+    debugPrint(
+      '[ChatHistoryDebug] $label '
+      'source=${message.source.name} '
+      'displayName="${message.displayName}" '
+      'login="${message.userLogin}" '
+      'id="${tags['id'] ?? ''}" '
+      'userId="${tags['user-id'] ?? ''}" '
+      'badges="${tags['badges'] ?? ''}" '
+      'emotes="${tags['emotes'] ?? ''}" '
+      'ts="${tags['tmi-sent-ts'] ?? ''}" '
+      'text="$text"',
+    );
   }
 
   void _ensureRedemptionSubscription() {
