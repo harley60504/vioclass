@@ -36,10 +36,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   static const String _legacyQualityChannelPrefix =
       'twitch_fvp_proxy_preferred_quality_';
 
-  // First-run fallback only. User-selected quality always wins through
-  // _loadPreferredQualityName(). This keeps WatchPage behavior client-like:
-  // users decide their default quality, while the app only picks a reasonable
-  // startup quality when no preference exists yet.
   static const int _firstRunMobileFallbackHeight = 1080;
   static const int _firstRunMobileFallbackMaxFps = 60;
   static TwitchStableHlsProxyRouter? _sharedProxy;
@@ -163,10 +159,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Duration? get canonicalLiveElapsed => _canonicalLiveElapsed;
   DateTime? get canonicalTimelineOrigin => _canonicalTimelineOrigin;
 
-  /// Twitch TOTAL is the authoritative live-edge anchor. Between playlist
-  /// snapshots it advances at 1:1 wall-clock rate; every explicit seek refreshes
-  /// the HLS metadata again before resolving media geometry, which bounds drift
-  /// without making the UI timeline freeze between manifest reloads.
   Duration? get canonicalLiveTimelineDuration {
     final total = _canonicalLiveTotal;
     final observedAt = _canonicalTimingObservedAt;
@@ -232,12 +224,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return Uri.parse(_proxyUrl!);
   }
 
-  /// Stable playback URL for media_kit.
-  ///
-  /// The outer HLS router keeps this local URL stable while quality switching
-  /// swaps only the router's inner upstream playlist. The player should open
-  /// this URL once and stay attached; quality changes should not recreate
-  /// Player / VideoController or call Player.open with a different local URL.
   String? get stableProxyPlaybackUrl {
     if (_usingExternalVodPlayback) return null;
     final router = _proxy ?? _sharedProxy;
@@ -829,7 +815,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
 
-    await _refreshCanonicalLiveTimingBestEffort();
+    // The canonical anchor is already refreshed continuously while LIVE is
+    // playing. Do not put another LIVE manifest request on the seek critical
+    // path; interpolate from the latest trusted anchor and refresh in parallel.
+    unawaited(_refreshCanonicalLiveTimingBestEffort());
     final canonicalPosition = _canonicalizeDvrPosition(
       position,
       targetProgramDateTime,
@@ -953,8 +942,6 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _lastPreferredQualityName = name;
     try {
       final prefs = await SharedPreferences.getInstance();
-      // Save both global and channel-scoped preference. Channel-scoped wins on
-      // that channel; global is the user's app-wide default for new channels.
       await prefs.setString(_qualityKey, name);
       await prefs.setString(
         '$_qualityChannelPrefix${login.trim().toLowerCase()}',
