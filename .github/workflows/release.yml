@@ -24,7 +24,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  FLUTTER_VERSION: '3.41.9'
+  # Use a current stable Flutter because the app uses APIs that landed in Flutter 3.44+.
+  FLUTTER_VERSION: 3.47.3
 
 jobs:
   prepare:
