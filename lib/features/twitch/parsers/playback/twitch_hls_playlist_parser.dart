@@ -1,7 +1,14 @@
+import 'package:flutter/foundation.dart';
+
 import '../../models/playback/twitch_hls_proxy_models.dart';
 
 class TwitchHlsPlaylistParser {
   const TwitchHlsPlaylistParser._();
+
+  static const Duration _timingDebugInterval = Duration(seconds: 10);
+  static final Map<String, DateTime> _lastTimingDebugAt = <String, DateTime>{};
+  static final Map<String, String> _lastTimingCapabilitySignature =
+      <String, String>{};
 
   static TwitchParsedMediaPlaylist parse(
     String playlistText, {
@@ -231,6 +238,14 @@ class TwitchHlsPlaylistParser {
         ? const Duration(milliseconds: 160)
         : _halfDuration(targetDuration);
 
+    _debugTimingMetadata(
+      lines: lines,
+      playlistUrl: playlistUrl,
+      items: items,
+      mediaSequence: mediaSequence,
+      targetDuration: targetDuration,
+    );
+
     return TwitchParsedMediaPlaylist(
       items: items,
       reloadDelay: reloadDelay,
@@ -240,6 +255,112 @@ class TwitchHlsPlaylistParser {
       targetDuration: targetDuration,
       hasEndList: hasEndList,
     );
+  }
+
+  static void _debugTimingMetadata({
+    required List<String> lines,
+    required String playlistUrl,
+    required List<TwitchHlsSegmentItem> items,
+    required int mediaSequence,
+    required Duration targetDuration,
+  }) {
+    if (!kDebugMode) return;
+
+    final lowerUrl = playlistUrl.toLowerCase();
+    final kind = lowerUrl.contains('index-dvr.m3u8') ? 'DVR' : 'LIVE';
+    final pdtLines = lines
+        .map((line) => line.trim())
+        .where((line) => line.startsWith('#EXT-X-PROGRAM-DATE-TIME:'))
+        .toList(growable: false);
+    final elapsedSecs = _firstTagValue(lines, '#EXT-X-TWITCH-ELAPSED-SECS:');
+    final totalSecs = _firstTagValue(lines, '#EXT-X-TWITCH-TOTAL-SECS:');
+    final extinfCount = lines
+        .where((line) => line.trim().startsWith('#EXTINF:'))
+        .length;
+    final partCount = lines
+        .where((line) => line.trim().startsWith('#EXT-X-PART:'))
+        .length;
+    final preloadCount = lines
+        .where((line) => line.trim().startsWith('#EXT-X-PRELOAD-HINT:'))
+        .length;
+    final twitchPrefetchCount = lines
+        .where((line) => line.trim().startsWith('#EXT-X-TWITCH-PREFETCH:'))
+        .length;
+    final normalItems = items
+        .where((item) => !item.isPrefetch)
+        .toList(growable: false);
+    final durationMs = normalItems.fold<int>(
+      0,
+      (total, item) => total + item.duration.inMilliseconds,
+    );
+    final firstPdt = normalItems
+        .map((item) => item.programDateTime)
+        .whereType<DateTime>()
+        .firstOrNull;
+    final lastPdt = normalItems
+        .map((item) => item.programDateTime)
+        .whereType<DateTime>()
+        .lastOrNull;
+
+    final capabilitySignature = <Object?>[
+      pdtLines.isNotEmpty,
+      elapsedSecs != null,
+      totalSecs != null,
+      partCount > 0,
+      preloadCount > 0,
+      twitchPrefetchCount > 0,
+    ].join('|');
+    final now = DateTime.now();
+    final lastAt = _lastTimingDebugAt[kind];
+    final capabilityChanged =
+        _lastTimingCapabilitySignature[kind] != capabilitySignature;
+    final intervalElapsed =
+        lastAt == null || now.difference(lastAt) >= _timingDebugInterval;
+    if (!capabilityChanged && !intervalElapsed) return;
+
+    _lastTimingDebugAt[kind] = now;
+    _lastTimingCapabilitySignature[kind] = capabilitySignature;
+
+    debugPrint(
+      '[HlsTimingDebug][$kind] '
+      'pdt=${pdtLines.length} '
+      'firstPdt=${firstPdt?.toUtc().toIso8601String() ?? '-'} '
+      'lastPdt=${lastPdt?.toUtc().toIso8601String() ?? '-'} '
+      'mediaSeq=$mediaSequence '
+      'extinf=$extinfCount '
+      'duration=${(durationMs / 1000).toStringAsFixed(3)}s '
+      'target=${(targetDuration.inMilliseconds / 1000).toStringAsFixed(3)}s '
+      'twitchElapsed=${elapsedSecs ?? '-'} '
+      'twitchTotal=${totalSecs ?? '-'} '
+      'parts=$partCount preload=$preloadCount twitchPrefetch=$twitchPrefetchCount '
+      'url=${_shortPlaylistUrl(playlistUrl)}',
+    );
+  }
+
+  static String? _firstTagValue(List<String> lines, String prefix) {
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.startsWith(prefix)) {
+        final value = line.substring(prefix.length).trim();
+        return value.isEmpty ? null : value;
+      }
+    }
+    return null;
+  }
+
+  static String _shortPlaylistUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return value.length <= 80 ? value : '${value.substring(0, 77)}...';
+    final segments = uri.pathSegments;
+    if (segments.isEmpty) return uri.host;
+    final last = segments.last;
+    final shortLast = last.length <= 48
+        ? last
+        : '${last.substring(0, 20)}...${last.substring(last.length - 20)}';
+    final parent = segments.length >= 2 ? segments[segments.length - 2] : null;
+    return parent == null
+        ? '${uri.host}/$shortLast'
+        : '${uri.host}/$parent/$shortLast';
   }
 
   static Duration _durationForFutureSegment(
