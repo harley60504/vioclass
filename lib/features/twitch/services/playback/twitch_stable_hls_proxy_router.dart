@@ -502,6 +502,9 @@ class TwitchStableHlsProxyRouter {
           final tsAligner = directMode ? null : _MpegTsPacketAligner();
           _activeUpstreamIterator = iterator;
           var handoffTriggered = false;
+          var flushedFirstPacket = false;
+          var bytesSinceFlush = 0;
+          var lastFlushAt = DateTime.now();
           try {
             while (await iterator.moveNext()) {
               final chunk = iterator.current;
@@ -531,6 +534,22 @@ class TwitchStableHlsProxyRouter {
                   packet: packet,
                   attachedTarget: lastAttachedInnerStreamUrl,
                 )) {
+                  // Flush any complete packets already queued for this source,
+                  // then leave the detected PAT/current packet for the new inner
+                  // stream instead of mixing programs across the handoff.
+                  if (bytesSinceFlush > 0) {
+                    try {
+                      await response.flush().timeout(
+                        const Duration(seconds: 1),
+                      );
+                      bytesSinceFlush = 0;
+                      lastFlushAt = DateTime.now();
+                    } catch (error) {
+                      _lastStreamError = 'downstream: $error';
+                      downstreamClosed = true;
+                      break;
+                    }
+                  }
                   handoffTriggered = true;
                   _streamBoundaryHandoffCount++;
                   _completePendingHandoff();
@@ -539,8 +558,24 @@ class TwitchStableHlsProxyRouter {
 
                 try {
                   response.add(packet);
-                  await response.flush().timeout(const Duration(seconds: 1));
                   _streamBytesForwarded += packet.length;
+                  bytesSinceFlush += packet.length;
+
+                  final now = DateTime.now();
+                  final shouldFlush =
+                      !flushedFirstPacket ||
+                      bytesSinceFlush >= 16 * 1024 ||
+                      now.difference(lastFlushAt) >=
+                          const Duration(milliseconds: 15);
+
+                  if (shouldFlush) {
+                    await response.flush().timeout(
+                      const Duration(seconds: 1),
+                    );
+                    flushedFirstPacket = true;
+                    bytesSinceFlush = 0;
+                    lastFlushAt = now;
+                  }
                 } catch (error) {
                   _lastStreamError = 'downstream: $error';
                   downstreamClosed = true;
@@ -549,6 +584,15 @@ class TwitchStableHlsProxyRouter {
               }
 
               if (handoffTriggered || downstreamClosed) break;
+            }
+
+            if (!directMode && !downstreamClosed && bytesSinceFlush > 0) {
+              try {
+                await response.flush().timeout(const Duration(seconds: 1));
+              } catch (error) {
+                _lastStreamError = 'downstream: $error';
+                downstreamClosed = true;
+              }
             }
           } finally {
             if (identical(_activeUpstreamIterator, iterator)) {
