@@ -214,6 +214,7 @@ class TwitchWatchChatController extends ChangeNotifier {
       'login="${message.userLogin}" '
       'id="${tags['id'] ?? ''}" '
       'userId="${tags['user-id'] ?? ''}" '
+      'color="${tags['color'] ?? ''}" '
       'badges="${tags['badges'] ?? ''}" '
       'emotes="${tags['emotes'] ?? ''}" '
       'ts="${tags['tmi-sent-ts'] ?? ''}" '
