@@ -49,8 +49,15 @@ class TwitchStableHlsProxyRouter {
   bool _starting = false;
   bool _switching = false;
   int _switchGeneration = 0;
+  int _switchRequestGeneration = 0;
   int _directStreamGeneration = 0;
   int _streamClientGeneration = 0;
+  int _streamUpstreamAttachCount = 0;
+  int _streamUpstreamRetryCount = 0;
+  int _streamBytesForwarded = 0;
+  String? _lastStreamTarget;
+  String? _lastStreamError;
+  String? _lastSwitchError;
   StreamIterator<List<int>>? _activeUpstreamIterator;
 
   int? get port => _server?.port;
@@ -129,6 +136,8 @@ class TwitchStableHlsProxyRouter {
       );
     }
 
+    final requestGeneration = ++_switchRequestGeneration;
+
     if (_inner != null &&
         _inner!.isRunning &&
         _directStreamUri == null &&
@@ -137,53 +146,85 @@ class TwitchStableHlsProxyRouter {
         _switching = true;
         try {
           await _inner!.reconnectAtSegmentBoundary();
+          if (requestGeneration != _switchRequestGeneration) return;
+          _lastSwitchError = null;
           _switchGeneration++;
+        } catch (error) {
+          if (requestGeneration != _switchRequestGeneration) return;
+          _lastSwitchError = error.toString();
+          rethrow;
         } finally {
-          _switching = false;
-          _switchGeneration++;
+          if (requestGeneration == _switchRequestGeneration) {
+            _switching = false;
+            _switchGeneration++;
+          }
         }
+      } else {
+        // This can intentionally cancel an older in-flight switch and keep the
+        // currently active source.
+        _switching = false;
+        _lastSwitchError = null;
+        _switchGeneration++;
       }
       return;
     }
 
     _switching = true;
-    final previous = _inner;
-    _directStreamUri = null;
     _switchGeneration++;
 
-    try {
-      final next = TwitchDartHlsLowLatencyProxy(
-        upstreamPlaylistUrl: safeUrl,
-        upstreamHeaders: upstreamHeaders,
-        edgeSegmentCount: edgeSegmentCount,
-        prefetchSegmentCount: prefetchSegmentCount,
-        outputFutureSegments: outputFutureSegments,
-        futureOutputSegmentCount: futureOutputSegmentCount,
-        dropBehindLiveEdge: dropBehindLiveEdge,
-        startupEdgeSegmentCount: startupEdgeSegmentCount,
-        startupRequirePrefetchedFirstSegment:
-            startupRequirePrefetchedFirstSegment,
-        startupSkipCurrentLatestSegment: startupSkipCurrentLatestSegment,
-        startupMode: startupMode,
-        verboseLogging: verboseLogging,
-      );
+    final previous = _inner;
+    final next = TwitchDartHlsLowLatencyProxy(
+      upstreamPlaylistUrl: safeUrl,
+      upstreamHeaders: upstreamHeaders,
+      edgeSegmentCount: edgeSegmentCount,
+      prefetchSegmentCount: prefetchSegmentCount,
+      outputFutureSegments: outputFutureSegments,
+      futureOutputSegmentCount: futureOutputSegmentCount,
+      dropBehindLiveEdge: dropBehindLiveEdge,
+      startupEdgeSegmentCount: startupEdgeSegmentCount,
+      startupRequirePrefetchedFirstSegment:
+          startupRequirePrefetchedFirstSegment,
+      startupSkipCurrentLatestSegment: startupSkipCurrentLatestSegment,
+      startupMode: startupMode,
+      verboseLogging: verboseLogging,
+    );
+    var committed = false;
 
+    try {
+      // Make-before-break: keep the current stream alive while the replacement
+      // proxy starts and reaches the configured live edge.
       await next.start();
       await next.waitUntilPrewarmed();
 
-      _inner = next;
-      _upstreamPlaylistUrl = safeUrl;
-      _switchGeneration++;
+      // A newer quality/channel/direct-stream request supersedes this warm-up.
+      // Never allow an older asynchronous switch to overwrite the latest one.
+      if (requestGeneration != _switchRequestGeneration || _server == null) {
+        await _closeInnerQuietly(next);
+        return;
+      }
 
-      await _interruptActiveUpstream();
-      await previous?.close();
-    } catch (_) {
-      _inner = previous;
+      _inner = next;
+      _directStreamUri = null;
+      _upstreamPlaylistUrl = safeUrl;
+      _lastSwitchError = null;
       _switchGeneration++;
+      committed = true;
+
+      // Only cut the old stream after the replacement is ready and published.
+      await _interruptActiveUpstream();
+      await _closeInnerQuietly(previous);
+    } catch (error) {
+      if (!committed) {
+        await _closeInnerQuietly(next);
+      }
+      if (requestGeneration != _switchRequestGeneration) return;
+      _lastSwitchError = error.toString();
       rethrow;
     } finally {
-      _switching = false;
-      _switchGeneration++;
+      if (requestGeneration == _switchRequestGeneration) {
+        _switching = false;
+        _switchGeneration++;
+      }
     }
   }
 
@@ -198,6 +239,8 @@ class TwitchStableHlsProxyRouter {
       return;
     }
 
+    // Invalidate any HLS proxy that is still prewarming.
+    final requestGeneration = ++_switchRequestGeneration;
     _switching = true;
     final previous = _inner;
     _inner = null;
@@ -205,13 +248,21 @@ class TwitchStableHlsProxyRouter {
     _upstreamPlaylistUrl = null;
     _directStreamGeneration++;
     _switchGeneration++;
+    _lastSwitchError = null;
 
     try {
       await _interruptActiveUpstream();
-      await previous?.close();
+      await _closeInnerQuietly(previous);
+    } catch (error) {
+      if (requestGeneration == _switchRequestGeneration) {
+        _lastSwitchError = error.toString();
+      }
+      rethrow;
     } finally {
-      _switching = false;
-      _switchGeneration++;
+      if (requestGeneration == _switchRequestGeneration) {
+        _switching = false;
+        _switchGeneration++;
+      }
     }
   }
 
@@ -221,13 +272,25 @@ class TwitchStableHlsProxyRouter {
       throw StateError('Inner proxy not ready');
     }
     final replayUri = Uri.parse(liveReplayUrl(fromLive: fromLive));
+    final requestGeneration = ++_switchRequestGeneration;
     _switching = true;
     _directStreamUri = replayUri;
     _directStreamGeneration++;
     _switchGeneration++;
-    await _interruptActiveUpstream();
-    _switching = false;
-    _switchGeneration++;
+    _lastSwitchError = null;
+    try {
+      await _interruptActiveUpstream();
+    } catch (error) {
+      if (requestGeneration == _switchRequestGeneration) {
+        _lastSwitchError = error.toString();
+      }
+      rethrow;
+    } finally {
+      if (requestGeneration == _switchRequestGeneration) {
+        _switching = false;
+        _switchGeneration++;
+      }
+    }
   }
 
   Future<void> waitUntilPrewarmed({
@@ -245,6 +308,7 @@ class TwitchStableHlsProxyRouter {
   Future<void> close() async {
     final server = _server;
     _server = null;
+    _switchRequestGeneration++;
     _switchGeneration++;
 
     final inner = _inner;
@@ -346,7 +410,15 @@ class TwitchStableHlsProxyRouter {
       'inner_running=${_inner?.isRunning ?? false}\n'
       'inner_stream=${_inner?.streamTsUrl}\n'
       'switching=$_switching\n'
-      'switch_generation=$_switchGeneration\n',
+      'switch_generation=$_switchGeneration\n'
+      'switch_request_generation=$_switchRequestGeneration\n'
+      'stream_client_generation=$_streamClientGeneration\n'
+      'stream_upstream_attach_count=$_streamUpstreamAttachCount\n'
+      'stream_upstream_retry_count=$_streamUpstreamRetryCount\n'
+      'stream_bytes_forwarded=$_streamBytesForwarded\n'
+      'last_stream_target=$_lastStreamTarget\n'
+      'last_stream_error=$_lastStreamError\n'
+      'last_switch_error=$_lastSwitchError\n',
     );
     await request.response.close();
   }
@@ -373,10 +445,12 @@ class TwitchStableHlsProxyRouter {
     var lastAttachedInnerStreamUrl = '';
     var lastGeneration = -1;
     var lastDirectStreamGeneration = -1;
+    var downstreamClosed = false;
 
     try {
       while (_server != null &&
-          streamClientGeneration == _streamClientGeneration) {
+          streamClientGeneration == _streamClientGeneration &&
+          !downstreamClosed) {
         final target = await _waitForReadyStreamTarget(
           lastGeneration: lastGeneration,
         );
@@ -389,12 +463,23 @@ class TwitchStableHlsProxyRouter {
         lastAttachedInnerStreamUrl = target.toString();
         lastGeneration = _switchGeneration;
         lastDirectStreamGeneration = _directStreamGeneration;
+        _lastStreamTarget = lastAttachedInnerStreamUrl;
 
         try {
           final upstreamRequest = await _client.openUrl('GET', target);
           upstreamRequest.followRedirects = true;
           upstreamRequest.maxRedirects = 4;
           final upstreamResponse = await upstreamRequest.close();
+          if (upstreamResponse.statusCode < HttpStatus.ok ||
+              upstreamResponse.statusCode >= HttpStatus.multipleChoices) {
+            await upstreamResponse.drain();
+            throw HttpException(
+              'Upstream stream returned HTTP ${upstreamResponse.statusCode}',
+              uri: target,
+            );
+          }
+          _streamUpstreamAttachCount++;
+          _lastStreamError = null;
 
           final iterator = StreamIterator<List<int>>(upstreamResponse);
           _activeUpstreamIterator = iterator;
@@ -405,21 +490,47 @@ class TwitchStableHlsProxyRouter {
                   streamClientGeneration != _streamClientGeneration) {
                 break;
               }
-              response.add(chunk);
-              await response.flush().timeout(const Duration(seconds: 1));
+
+              // A failed write/flush means media_kit closed this HTTP response.
+              // That is different from an upstream/CDN failure and must end this
+              // pump so a newer player connection can take ownership.
+              try {
+                response.add(chunk);
+                await response.flush().timeout(const Duration(seconds: 1));
+                _streamBytesForwarded += chunk.length;
+              } catch (error) {
+                _lastStreamError = 'downstream: $error';
+                downstreamClosed = true;
+                break;
+              }
             }
           } finally {
             if (identical(_activeUpstreamIterator, iterator)) {
               _activeUpstreamIterator = null;
             }
-            await iterator.cancel();
+            try {
+              await iterator.cancel();
+            } catch (_) {}
           }
-        } catch (_) {
-          // media_kit closes the old HTTP response when the same stable URL is
-          // force-opened for a new seek. End this request instead of looping a
-          // dead response and piling up stale stream pumps.
-          break;
+        } catch (error) {
+          _lastStreamError = 'upstream: $error';
+
+          if (_server == null ||
+              downstreamClosed ||
+              streamClientGeneration != _streamClientGeneration) {
+            break;
+          }
+
+          // Keep the stable /stream.ts response alive across transient inner
+          // proxy/CDN failures. The next loop re-resolves the current target,
+          // which also picks up a quality/channel switch that completed while
+          // this request was failing.
+          _streamUpstreamRetryCount++;
+          await Future<void>.delayed(const Duration(milliseconds: 120));
+          continue;
         }
+
+        if (downstreamClosed) break;
 
         if (directMode &&
             lastDirectStreamGeneration != _directStreamGeneration) {
@@ -447,6 +558,18 @@ class TwitchStableHlsProxyRouter {
     try {
       await iterator.cancel();
     } catch (_) {}
+  }
+
+  Future<void> _closeInnerQuietly(
+    TwitchDartHlsLowLatencyProxy? inner,
+  ) async {
+    if (inner == null) return;
+    try {
+      await inner.close();
+    } catch (_) {
+      // Closing the retired inner proxy must not roll back a replacement that
+      // is already prewarmed and serving the stable player connection.
+    }
   }
 
   void _applyStreamHeaders(HttpResponse response) {
