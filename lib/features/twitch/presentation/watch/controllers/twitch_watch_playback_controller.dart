@@ -71,28 +71,30 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       final nextUri = uri.trim();
       final session = playerPort.services.playerSession;
       if (startPosition != null) {
-        // A DVR playlist may intentionally include one or two preroll
-        // segments. Let mpv decode forward from an earlier keyframe instead of
-        // snapping to a coarse keyframe-only position.
+        // DVR snapshots include preroll segments. High-resolution seek lets mpv
+        // begin from an earlier keyframe and decode forward to the requested
+        // sub-segment offset.
         await session.ensureReady();
         session.player.setProperty('hr-seek', 'yes');
         session.player.setProperty('hr-seek-demuxer-offset', '2.0');
       }
 
-      final isLocalGrowingDvrPlaylist =
+      final isLocalDvrSnapshot =
           startPosition != null &&
           nextUri.startsWith('http://127.0.0.1:') &&
           nextUri.contains('/playlist.m3u8?v=');
-      final shouldDeferInitialSeek =
-          startPosition != null &&
-          (deferInitialSeek || isLocalGrowingDvrPlaylist);
 
-      if (shouldDeferInitialSeek) {
-        // Do not use Media(start:) for the growing local DVR HLS playlist.
-        // mpv/FFmpeg can receive the initial seek before the HLS demuxer has
-        // built its segment map; larger preroll-relative starts (20-30 s) can
-        // then stall. Open paused first, let the playlist become visible to the
-        // demuxer, then issue a normal precise player.seek().
+      if (isLocalDvrSnapshot) {
+        debugPrint(
+          '[TwitchPlayer] VOD snapshot precise start '
+          'target=${(startPosition.inMilliseconds / 1000).toStringAsFixed(3)}s',
+        );
+      }
+
+      if (startPosition != null && deferInitialSeek) {
+        // Retained for callers that explicitly need a post-open seek. Frozen
+        // DVR snapshots do not use this path: they are finite VOD-style HLS and
+        // can safely use Media(start:).
         await session.openOrResume(
           uri: nextUri,
           play: false,
@@ -134,10 +136,6 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
   }
 
   Future<void> _waitForSeekableMedia(Player player, Duration target) async {
-    // Player.open() only guarantees that the open command was accepted. For a
-    // local HLS playlist the duration/segment map normally appears shortly
-    // afterwards. Keep this bounded so a stream with unknown duration still
-    // proceeds to seek instead of hanging the UI action.
     final deadline = DateTime.now().add(const Duration(milliseconds: 900));
     while (DateTime.now().isBefore(deadline)) {
       final duration = player.state.duration;
