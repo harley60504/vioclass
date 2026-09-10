@@ -55,10 +55,14 @@ class TwitchStableHlsProxyRouter {
   int _streamUpstreamAttachCount = 0;
   int _streamUpstreamRetryCount = 0;
   int _streamBytesForwarded = 0;
+  int _streamBoundaryHandoffCount = 0;
+  int _streamBoundaryFallbackCount = 0;
   String? _lastStreamTarget;
   String? _lastStreamError;
   String? _lastSwitchError;
   StreamIterator<List<int>>? _activeUpstreamIterator;
+  Completer<void>? _streamHandoffCompleter;
+  DateTime? _streamHandoffRequestedAt;
 
   int? get port => _server?.port;
 
@@ -210,8 +214,16 @@ class TwitchStableHlsProxyRouter {
       _switchGeneration++;
       committed = true;
 
-      // Only cut the old stream after the replacement is ready and published.
-      await _interruptActiveUpstream();
+      // For HLS -> HLS quality/source changes, let the active stream pump end
+      // the old transport stream at a decoder-safe MPEG-TS boundary. Prefer a
+      // PAT boundary (normally seen near a segment/program boundary), then fall
+      // back to a complete 188-byte TS packet after a short grace period.
+      if (previous != null) {
+        await _handoffActiveUpstreamAtSafeBoundary();
+      } else {
+        // Direct-stream -> HLS has no retired inner proxy to drain.
+        await _interruptActiveUpstream();
+      }
       await _closeInnerQuietly(previous);
     } catch (error) {
       if (!committed) {
@@ -316,6 +328,7 @@ class TwitchStableHlsProxyRouter {
     _upstreamPlaylistUrl = null;
     _directStreamUri = null;
     _directStreamGeneration++;
+    _completePendingHandoff();
     await _interruptActiveUpstream();
 
     await inner?.close();
@@ -416,6 +429,9 @@ class TwitchStableHlsProxyRouter {
       'stream_upstream_attach_count=$_streamUpstreamAttachCount\n'
       'stream_upstream_retry_count=$_streamUpstreamRetryCount\n'
       'stream_bytes_forwarded=$_streamBytesForwarded\n'
+      'stream_boundary_handoff_count=$_streamBoundaryHandoffCount\n'
+      'stream_boundary_fallback_count=$_streamBoundaryFallbackCount\n'
+      'stream_handoff_pending=${_streamHandoffCompleter != null}\n'
       'last_stream_target=$_lastStreamTarget\n'
       'last_stream_error=$_lastStreamError\n'
       'last_switch_error=$_lastSwitchError\n',
@@ -435,6 +451,7 @@ class TwitchStableHlsProxyRouter {
     // reported the previous socket as closed. Keep only the newest stream pump
     // so stale local clients cannot multiply loopback traffic indefinitely.
     final streamClientGeneration = ++_streamClientGeneration;
+    _completePendingHandoff();
     await _interruptActiveUpstream();
 
     final response = request.response;
@@ -482,7 +499,9 @@ class TwitchStableHlsProxyRouter {
           _lastStreamError = null;
 
           final iterator = StreamIterator<List<int>>(upstreamResponse);
+          final tsAligner = directMode ? null : _MpegTsPacketAligner();
           _activeUpstreamIterator = iterator;
+          var handoffTriggered = false;
           try {
             while (await iterator.moveNext()) {
               final chunk = iterator.current;
@@ -491,18 +510,45 @@ class TwitchStableHlsProxyRouter {
                 break;
               }
 
-              // A failed write/flush means media_kit closed this HTTP response.
-              // That is different from an upstream/CDN failure and must end this
-              // pump so a newer player connection can take ownership.
-              try {
-                response.add(chunk);
-                await response.flush().timeout(const Duration(seconds: 1));
-                _streamBytesForwarded += chunk.length;
-              } catch (error) {
-                _lastStreamError = 'downstream: $error';
-                downstreamClosed = true;
-                break;
+              if (directMode) {
+                try {
+                  response.add(chunk);
+                  await response.flush().timeout(const Duration(seconds: 1));
+                  _streamBytesForwarded += chunk.length;
+                } catch (error) {
+                  _lastStreamError = 'downstream: $error';
+                  downstreamClosed = true;
+                  break;
+                }
+                continue;
               }
+
+              // Inner HLS streams are MPEG-TS. Re-packetize to fixed 188-byte
+              // packets so a router handoff can never expose half a TS packet
+              // to libmpv/FFmpeg even when HttpClient delivers arbitrary chunks.
+              for (final packet in tsAligner!.add(chunk)) {
+                if (_shouldHandoffBeforePacket(
+                  packet: packet,
+                  attachedTarget: lastAttachedInnerStreamUrl,
+                )) {
+                  handoffTriggered = true;
+                  _streamBoundaryHandoffCount++;
+                  _completePendingHandoff();
+                  break;
+                }
+
+                try {
+                  response.add(packet);
+                  await response.flush().timeout(const Duration(seconds: 1));
+                  _streamBytesForwarded += packet.length;
+                } catch (error) {
+                  _lastStreamError = 'downstream: $error';
+                  downstreamClosed = true;
+                  break;
+                }
+              }
+
+              if (handoffTriggered || downstreamClosed) break;
             }
           } finally {
             if (identical(_activeUpstreamIterator, iterator)) {
@@ -545,9 +591,75 @@ class TwitchStableHlsProxyRouter {
         }
       }
     } finally {
+      _completePendingHandoff();
       try {
         await response.close();
       } catch (_) {}
+    }
+  }
+
+  Future<void> _handoffActiveUpstreamAtSafeBoundary() async {
+    if (_activeUpstreamIterator == null) return;
+
+    final previous = _streamHandoffCompleter;
+    if (previous != null && !previous.isCompleted) {
+      previous.complete();
+    }
+
+    final completer = Completer<void>();
+    _streamHandoffCompleter = completer;
+    _streamHandoffRequestedAt = DateTime.now();
+
+    try {
+      // Normal path completes from _proxyStreamLoop at a PAT or complete packet
+      // boundary. Timeout only protects channel-offline/stalled upstream cases.
+      await completer.future.timeout(const Duration(milliseconds: 1200));
+    } catch (_) {
+      _streamBoundaryFallbackCount++;
+      await _interruptActiveUpstream();
+    } finally {
+      if (identical(_streamHandoffCompleter, completer)) {
+        _streamHandoffCompleter = null;
+        _streamHandoffRequestedAt = null;
+      }
+    }
+  }
+
+  bool _shouldHandoffBeforePacket({
+    required List<int> packet,
+    required String attachedTarget,
+  }) {
+    final completer = _streamHandoffCompleter;
+    if (completer == null || completer.isCompleted) return false;
+    if (attachedTarget == _currentStreamTargetLabel()) return false;
+
+    // Prefer beginning of a new PAT/program table, which is commonly emitted at
+    // or near an HLS TS segment boundary. Do not wait indefinitely: after the
+    // short grace period, any complete 188-byte packet boundary is still much
+    // safer than cancelling an arbitrary HttpClient byte chunk.
+    if (_isPatStartPacket(packet)) return true;
+
+    final requestedAt = _streamHandoffRequestedAt;
+    if (requestedAt == null) return true;
+    return DateTime.now().difference(requestedAt) >=
+        const Duration(milliseconds: 450);
+  }
+
+  bool _isPatStartPacket(List<int> packet) {
+    if (packet.length != _MpegTsPacketAligner.packetSize) return false;
+    if (packet[0] != 0x47) return false;
+
+    final payloadUnitStart = (packet[1] & 0x40) != 0;
+    final pid = ((packet[1] & 0x1f) << 8) | packet[2];
+    return payloadUnitStart && pid == 0;
+  }
+
+  void _completePendingHandoff() {
+    final completer = _streamHandoffCompleter;
+    _streamHandoffCompleter = null;
+    _streamHandoffRequestedAt = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
     }
   }
 
@@ -647,5 +759,61 @@ class TwitchStableHlsProxyRouter {
 
     await request.response.addStream(upstreamResponse);
     await request.response.close();
+  }
+}
+
+/// Reassembles arbitrary HttpClient chunks into decoder-safe MPEG-TS packets.
+///
+/// Twitch HLS transport-stream payloads use 188-byte packets. Network chunk
+/// boundaries are unrelated to TS packet boundaries, so forwarding the raw
+/// chunks and cancelling between them can leave FFmpeg with a truncated packet.
+class _MpegTsPacketAligner {
+  static const int packetSize = 188;
+
+  final List<int> _buffer = <int>[];
+
+  Iterable<List<int>> add(List<int> chunk) sync* {
+    if (chunk.isEmpty) return;
+    _buffer.addAll(chunk);
+
+    while (_buffer.length >= packetSize) {
+      final syncIndex = _findSyncOffset();
+      if (syncIndex < 0) {
+        // Preserve a possible partial packet tail while bounding memory if the
+        // upstream unexpectedly returns non-TS data.
+        final keep = packetSize - 1;
+        if (_buffer.length > keep) {
+          _buffer.removeRange(0, _buffer.length - keep);
+        }
+        return;
+      }
+
+      if (syncIndex > 0) {
+        _buffer.removeRange(0, syncIndex);
+        if (_buffer.length < packetSize) return;
+      }
+
+      // If another complete packet is already buffered, require its sync byte
+      // too. This rejects a stray 0x47 found inside payload bytes.
+      if (_buffer.length >= packetSize * 2 && _buffer[packetSize] != 0x47) {
+        _buffer.removeAt(0);
+        continue;
+      }
+
+      final packet = List<int>.of(_buffer.getRange(0, packetSize));
+      _buffer.removeRange(0, packetSize);
+      yield packet;
+    }
+  }
+
+  int _findSyncOffset() {
+    for (var i = 0; i < _buffer.length; i++) {
+      if (_buffer[i] != 0x47) continue;
+      final next = i + packetSize;
+      if (next >= _buffer.length || _buffer[next] == 0x47) {
+        return i;
+      }
+    }
+    return -1;
   }
 }
