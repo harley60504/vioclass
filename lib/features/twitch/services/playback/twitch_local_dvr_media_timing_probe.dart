@@ -26,21 +26,31 @@ class TwitchLocalDvrMediaTimingProbeResult {
   });
 }
 
-/// Reads the finite local DVR snapshot produced by [TwitchLiveDvrBridgeProxy],
-/// resolves the requested player time to one TS segment, then inspects that
-/// segment's MPEG-TS media clock.
+/// Reads the finite local DVR snapshot produced by the DVR bridge, resolves the
+/// requested player time to one TS segment, then inspects that segment's
+/// MPEG-TS media clock.
 ///
 /// The probe is deliberately best-effort. Playback never depends on it: any
-/// timeout, malformed TS, missing PAT/PMT, or unsupported codec returns null
-/// and the player keeps using the normal 2-second high-resolution-seek backoff.
+/// timeout, malformed TS, missing PAT/PMT, or unsupported codec returns null.
 class TwitchLocalDvrMediaTimingProbe {
   TwitchLocalDvrMediaTimingProbe._();
 
   static const Duration _requestTimeout = Duration(milliseconds: 1400);
+  static const Duration _minimumBackoff = Duration(seconds: 2);
+  static const Duration _maximumBackoff = Duration(seconds: 12);
   static const int _maxSegmentBytes = 24 * 1024 * 1024;
   static const int _maxCacheEntries = 64;
   static final Map<String, TwitchTsTimingInfo> _timingCache =
       <String, TwitchTsTimingInfo>{};
+
+  // This is intentionally process-wide. Twitch normally keeps a stable GOP
+  // cadence for one rendition. A completed probe teaches later seeks how far
+  // mpv should ask the demuxer to look backwards, without blocking the next
+  // player.open on another network probe.
+  static Duration _learnedDemuxerOffset = _minimumBackoff;
+
+  static Duration get cachedSuggestedDemuxerOffset =>
+      _learnedDemuxerOffset;
 
   static Future<TwitchLocalDvrMediaTimingProbeResult?> probe({
     required String playlistUrl,
@@ -98,18 +108,25 @@ class TwitchLocalDvrMediaTimingProbe {
       final decodeLead = keyframeOffset == null
           ? null
           : targetOffset - keyframeOffset;
-      final minimumBackoff = const Duration(seconds: 2);
       final desiredBackoff = decodeLead == null
-          ? minimumBackoff
+          ? _minimumBackoff
           : decodeLead + const Duration(milliseconds: 500);
       final suggestedBackoff = Duration(
         milliseconds: desiredBackoff.inMilliseconds
             .clamp(
-              minimumBackoff.inMilliseconds,
-              const Duration(seconds: 12).inMilliseconds,
+              _minimumBackoff.inMilliseconds,
+              _maximumBackoff.inMilliseconds,
             )
             .toInt(),
       );
+
+      // Never reduce the learned safety margin during the process lifetime.
+      // One longer GOP is enough reason for later seeks to keep the larger
+      // demuxer backoff; the cap prevents pathological metadata from growing it
+      // without bound.
+      if (suggestedBackoff > _learnedDemuxerOffset) {
+        _learnedDemuxerOffset = suggestedBackoff;
+      }
 
       return TwitchLocalDvrMediaTimingProbeResult(
         segmentIndex: targetIndex,
