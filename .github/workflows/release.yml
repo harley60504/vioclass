@@ -144,7 +144,9 @@ jobs:
   windows:
     name: Build Windows ZIP
     needs: prepare
-    runs-on: windows-latest
+    # flutter_inappwebview 6.1.5 still uses <experimental/coroutine> on Windows.
+    # VS 18/MSVC 14.51 in windows-latest rejects it, while VS 2022 remains compatible.
+    runs-on: windows-2022
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
