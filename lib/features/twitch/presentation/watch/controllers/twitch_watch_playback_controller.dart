@@ -65,7 +65,17 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
 
     try {
       final nextUri = uri.trim();
-      await playerPort.services.playerSession.openOrResume(
+      final session = playerPort.services.playerSession;
+      if (startPosition != null) {
+        // A DVR playlist may intentionally include one or two preroll
+        // segments. Let mpv seek to the requested timestamp by decoding
+        // forward from an earlier keyframe instead of snapping to a coarse
+        // keyframe-only position.
+        await session.ensureReady();
+        session.player.setProperty('hr-seek', 'yes');
+        session.player.setProperty('hr-seek-demuxer-offset', '2.0');
+      }
+      await session.openOrResume(
         uri: nextUri,
         play: play,
         forceOpen: forceOpen,
