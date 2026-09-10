@@ -3,6 +3,7 @@ import 'dart:io';
 
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import 'twitch_hls_low_latency_proxy.dart';
+import 'twitch_sequential_live_replay_proxy.dart';
 
 /// Stable local URL wrapper for Twitch HLS playback.
 ///
@@ -44,6 +45,7 @@ class TwitchStableHlsProxyRouter {
 
   HttpServer? _server;
   TwitchDartHlsLowLatencyProxy? _inner;
+  TwitchSequentialLiveReplayProxy? _replayProxy;
   String? _upstreamPlaylistUrl;
   Uri? _directStreamUri;
   bool _starting = false;
@@ -79,11 +81,12 @@ class TwitchStableHlsProxyRouter {
     return 'http://127.0.0.1:$p/stream.ts';
   }
 
-  String liveReplayUrl({required Duration fromLive}) {
-    final p = port;
-    if (p == null) throw StateError('Stable HLS proxy router has not started.');
-    final seconds = fromLive.inSeconds.clamp(1, 20).toInt();
-    return 'http://127.0.0.1:$p/live-replay.ts?seconds=$seconds';
+  String liveReplayUrl({required Duration targetPosition}) {
+    final replay = _replayProxy;
+    if (replay == null || !replay.isRunning) {
+      throw StateError('Sequential replay proxy not ready');
+    }
+    return replay.streamUrl(targetPosition: targetPosition);
   }
 
   Future<void> startDirectStream({required String streamUrl}) async {
@@ -131,6 +134,8 @@ class TwitchStableHlsProxyRouter {
 
     if (_inner != null &&
         _inner!.isRunning &&
+        _replayProxy != null &&
+        _replayProxy!.isRunning &&
         _directStreamUri == null &&
         _upstreamPlaylistUrl == safeUrl) {
       if (forceReconnect) {
@@ -148,11 +153,14 @@ class TwitchStableHlsProxyRouter {
 
     _switching = true;
     final previous = _inner;
+    final previousReplay = _replayProxy;
+    TwitchDartHlsLowLatencyProxy? next;
+    TwitchSequentialLiveReplayProxy? nextReplay;
     _directStreamUri = null;
     _switchGeneration++;
 
     try {
-      final next = TwitchDartHlsLowLatencyProxy(
+      next = TwitchDartHlsLowLatencyProxy(
         upstreamPlaylistUrl: safeUrl,
         upstreamHeaders: upstreamHeaders,
         edgeSegmentCount: edgeSegmentCount,
@@ -167,18 +175,28 @@ class TwitchStableHlsProxyRouter {
         startupMode: startupMode,
         verboseLogging: verboseLogging,
       );
+      nextReplay = TwitchSequentialLiveReplayProxy(
+        upstreamPlaylistUrl: safeUrl,
+        upstreamHeaders: upstreamHeaders,
+      );
 
       await next.start();
       await next.waitUntilPrewarmed();
+      await nextReplay.start();
 
       _inner = next;
+      _replayProxy = nextReplay;
       _upstreamPlaylistUrl = safeUrl;
       _switchGeneration++;
 
       await _interruptActiveUpstream();
       await previous?.close();
+      await previousReplay?.close();
     } catch (_) {
+      if (!identical(next, previous)) await next?.close();
+      if (!identical(nextReplay, previousReplay)) await nextReplay?.close();
       _inner = previous;
+      _replayProxy = previousReplay;
       _switchGeneration++;
       rethrow;
     } finally {
@@ -200,7 +218,9 @@ class TwitchStableHlsProxyRouter {
 
     _switching = true;
     final previous = _inner;
+    final previousReplay = _replayProxy;
     _inner = null;
+    _replayProxy = null;
     _directStreamUri = directUri;
     _upstreamPlaylistUrl = null;
     _directStreamGeneration++;
@@ -209,18 +229,24 @@ class TwitchStableHlsProxyRouter {
     try {
       await _interruptActiveUpstream();
       await previous?.close();
+      await previousReplay?.close();
     } finally {
       _switching = false;
       _switchGeneration++;
     }
   }
 
-  Future<void> switchLiveReplayStream({required Duration fromLive}) async {
+  Future<void> switchLiveReplayStream({
+    required Duration targetPosition,
+  }) async {
     final inner = _inner;
-    if (inner == null || !inner.isRunning) {
-      throw StateError('Inner proxy not ready');
+    final replay = _replayProxy;
+    if (inner == null || !inner.isRunning || replay == null || !replay.isRunning) {
+      throw StateError('Live replay source not ready');
     }
-    final replayUri = Uri.parse(liveReplayUrl(fromLive: fromLive));
+    final replayUri = Uri.parse(
+      replay.streamUrl(targetPosition: targetPosition),
+    );
     _switching = true;
     _directStreamUri = replayUri;
     _directStreamGeneration++;
@@ -248,13 +274,16 @@ class TwitchStableHlsProxyRouter {
     _switchGeneration++;
 
     final inner = _inner;
+    final replay = _replayProxy;
     _inner = null;
+    _replayProxy = null;
     _upstreamPlaylistUrl = null;
     _directStreamUri = null;
     _directStreamGeneration++;
     await _interruptActiveUpstream();
 
     await inner?.close();
+    await replay?.close();
     await server?.close(force: true);
     _client.close(force: true);
   }
@@ -293,16 +322,17 @@ class TwitchStableHlsProxyRouter {
       }
 
       if (path == '/live-replay.ts') {
-        if (inner == null || !inner.isRunning) {
+        final replay = _replayProxy;
+        if (replay == null || !replay.isRunning) {
           request.response.statusCode = HttpStatus.badGateway;
-          request.response.write('Inner proxy not ready');
+          request.response.write('Sequential replay proxy not ready');
           await request.response.close();
           return;
         }
         await _proxyToInner(
           request,
           Uri.parse(
-            inner.liveReplayUrl(fromLive: _readReplayDuration(request)),
+            replay.streamUrl(targetPosition: _readReplayTarget(request)),
           ),
         );
         return;
@@ -344,6 +374,7 @@ class TwitchStableHlsProxyRouter {
       'upstream=$_upstreamPlaylistUrl\n'
       'direct=$_directStreamUri\n'
       'inner_running=${_inner?.isRunning ?? false}\n'
+      'replay_running=${_replayProxy?.isRunning ?? false}\n'
       'inner_stream=${_inner?.streamTsUrl}\n'
       'switching=$_switching\n'
       'switch_generation=$_switchGeneration\n',
@@ -457,9 +488,13 @@ class TwitchStableHlsProxyRouter {
     response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
   }
 
-  Duration _readReplayDuration(HttpRequest request) {
-    final raw = int.tryParse(request.uri.queryParameters['seconds'] ?? '');
-    return Duration(seconds: (raw ?? 10).clamp(1, 20).toInt());
+  Duration _readReplayTarget(HttpRequest request) {
+    final targetUs = int.tryParse(request.uri.queryParameters['targetUs'] ?? '');
+    if (targetUs != null) {
+      return Duration(microseconds: targetUs < 0 ? 0 : targetUs);
+    }
+    final targetMs = int.tryParse(request.uri.queryParameters['targetMs'] ?? '');
+    return Duration(milliseconds: targetMs == null || targetMs < 0 ? 0 : targetMs);
   }
 
   Future<Uri?> _waitForReadyStreamTarget({
