@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../models/playback/twitch_hls_proxy_models.dart';
+import '../../models/playback/twitch_segment_timeline_index.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
@@ -23,6 +24,7 @@ class TwitchLiveDvrBridgeProxy {
   Uri? _dvrPlaylistUri;
   Duration? _latestDuration;
   List<TwitchHlsSegmentItem> _latestItems = const <TwitchHlsSegmentItem>[];
+  TwitchSegmentTimelineIndex? _latestTimelineIndex;
 
   Duration? _seekPosition;
   Duration? _timelinePosition;
@@ -94,9 +96,8 @@ class TwitchLiveDvrBridgeProxy {
     return Uri.parse('http://127.0.0.1:${server.port}/playlist.m3u8');
   }
 
-  /// Resolve a canonical timeline target against the current growing DVR, then
-  /// freeze [preroll ... current tail] into a finite VOD-style HLS snapshot.
-  /// The returned start position is relative to that frozen snapshot.
+  /// Resolve one canonical stream position through [TwitchSegmentTimelineIndex],
+  /// then freeze [preroll ... current tail] into a finite VOD-style snapshot.
   Future<Duration> seekToPosition(
     Duration position, {
     DateTime? targetProgramDateTime,
@@ -104,7 +105,8 @@ class TwitchLiveDvrBridgeProxy {
     await _refreshLatestItemsBestEffort();
 
     final items = _latestItems;
-    if (items.isEmpty) {
+    final timeline = _latestTimelineIndex;
+    if (items.isEmpty || timeline == null || timeline.isEmpty) {
       final safe = position < Duration.zero ? Duration.zero : position;
       _seekPosition = safe;
       _timelinePosition = safe;
@@ -121,43 +123,27 @@ class TwitchLiveDvrBridgeProxy {
     final targetUtc = targetProgramDateTime?.toUtc();
     final programSeek = targetUtc == null
         ? null
-        : _resolveProgramDateTimeSeek(items, targetUtc);
-
-    late final int targetIndex;
-    late final Duration segmentOffset;
-    late final Duration resolvedTimelinePosition;
-    var usedProgramDateTime = false;
-
-    if (programSeek != null) {
-      targetIndex = programSeek.index;
-      segmentOffset = programSeek.offset;
-      resolvedTimelinePosition = canonicalPosition;
-      usedProgramDateTime = true;
-    } else {
-      final availableMs = math.max(_durationOfItems(items).inMilliseconds, 1);
-      final maxSeekMs = math.max(availableMs - 1, 0);
-      final positionMs = canonicalPosition.inMilliseconds
-          .clamp(0, maxSeekMs)
-          .toInt();
-      resolvedTimelinePosition = Duration(milliseconds: positionMs);
-      targetIndex = _indexForPosition(items, resolvedTimelinePosition);
-      final segmentStartMs = _durationBeforeIndex(items, targetIndex).inMilliseconds;
-      final segmentDurationMs = math.max(
-        items[targetIndex].duration.inMilliseconds,
-        1,
-      );
-      final offsetMs = (positionMs - segmentStartMs)
-          .clamp(0, math.max(segmentDurationMs - 1, 0))
-          .toInt();
-      segmentOffset = Duration(milliseconds: offsetMs);
+        : timeline.resolveProgramDateTime(targetUtc);
+    final canonicalSeek = timeline.resolveCanonical(canonicalPosition);
+    final resolvedSeek = programSeek ?? canonicalSeek;
+    if (resolvedSeek == null) {
+      return Duration.zero;
     }
+
+    final usedProgramDateTime = programSeek != null;
+    final targetIndex = resolvedSeek.index;
+    final segmentOffset = resolvedSeek.offset;
+    final resolvedTimelinePosition = usedProgramDateTime
+        ? resolvedSeek.canonicalPosition
+        : canonicalPosition == resolvedSeek.canonicalPosition
+        ? canonicalPosition
+        : resolvedSeek.canonicalPosition;
 
     final snapshotStartIndex = math.max(
       0,
       targetIndex - _dvrPrerollSegmentCount,
     ).toInt();
-    final preroll = _durationBetweenIndexes(
-      items,
+    final preroll = timeline.durationBetweenIndexes(
       snapshotStartIndex,
       targetIndex,
     );
@@ -173,13 +159,21 @@ class TwitchLiveDvrBridgeProxy {
     _streamGeneration++;
     _snapshotGeneration = _streamGeneration;
     _snapshotSourceStartIndex = snapshotStartIndex;
-    _snapshotCanonicalStart = _durationBeforeIndex(items, snapshotStartIndex);
+    _snapshotCanonicalStart =
+        timeline.entryAt(snapshotStartIndex)?.canonicalStart ?? Duration.zero;
     _snapshotPlayerStart = playerStartPosition;
     _snapshotItems = List<TwitchHlsSegmentItem>.unmodifiable(
       items.sublist(snapshotStartIndex),
     );
 
     final snapshotDuration = _durationOfItems(_snapshotItems);
+    debugPrint(
+      '[SegmentTimelineIndex][DVR] target=${_seconds(canonicalPosition)}s '
+      'resolved=${_seconds(resolvedTimelinePosition)}s '
+      'sequence=${resolvedSeek.sequence} index=$targetIndex '
+      'offset=${_seconds(segmentOffset)}s '
+      'indexed=${_seconds(timeline.indexedDuration)}s',
+    );
     debugPrint(
       '[LiveDvrBridge] seek position=${_seconds(resolvedTimelinePosition)}s '
       'segment=$targetIndex offset=${segmentOffset.inMilliseconds}ms '
@@ -205,6 +199,7 @@ class TwitchLiveDvrBridgeProxy {
     _dvrPlaylistUri = null;
     _latestDuration = null;
     _latestItems = const <TwitchHlsSegmentItem>[];
+    _latestTimelineIndex = null;
     _resetSeekState();
     _clearSnapshot();
     await server?.close(force: true);
@@ -253,7 +248,9 @@ class TwitchLiveDvrBridgeProxy {
 
   void _rememberLatestItems(List<TwitchHlsSegmentItem> items) {
     _latestItems = List<TwitchHlsSegmentItem>.unmodifiable(items);
-    _latestDuration = _durationOfItems(items);
+    final index = TwitchSegmentTimelineIndex.fromSegments(_latestItems);
+    _latestTimelineIndex = index;
+    _latestDuration = index.indexedDuration;
   }
 
   Future<HttpServer> _ensureServer() async {
