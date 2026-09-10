@@ -417,12 +417,14 @@ class TwitchRecentMessageParser {
             _readFirstPathText(
               item,
               const <List<String>>[
+                <String>['senderChatColor'],
                 <String>['color'],
                 <String>['userColor'],
                 <String>['chatColor'],
                 <String>['sender', 'color'],
                 <String>['sender', 'chatColor'],
                 <String>['user', 'color'],
+                <String>['message', 'senderChatColor'],
                 <String>['message', 'sender', 'color'],
                 <String>['message', 'sender', 'chatColor'],
               ],
@@ -505,11 +507,15 @@ class TwitchRecentMessageParser {
 
   String? _readBadgesTag(Map<String, dynamic> item) {
     for (final path in const <List<String>>[
+      <String>['senderBadges'],
+      <String>['sourceSenderBadges'],
       <String>['badges'],
       <String>['sender', 'badges'],
       <String>['user', 'badges'],
       <String>['author', 'badges'],
       <String>['chatter', 'badges'],
+      <String>['message', 'senderBadges'],
+      <String>['message', 'sourceSenderBadges'],
       <String>['message', 'badges'],
       <String>['message', 'sender', 'badges'],
       <String>['message', 'user', 'badges'],
