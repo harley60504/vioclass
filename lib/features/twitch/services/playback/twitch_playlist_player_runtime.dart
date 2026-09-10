@@ -80,6 +80,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   bool _usingLiveBufferReplay = false;
   Duration? _liveBufferReplayDuration;
   Duration? _liveBufferReplayFromLive;
+  DateTime? _liveBufferReplayStartedAt;
   Uri? _liveDvrPlaylistOverride;
   String? _lastLiveUpstreamPlaylistUrl;
   Duration? _canonicalLiveElapsed;
@@ -132,13 +133,26 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     if (!_usingLiveBufferReplay) return null;
     final duration = _liveBufferReplayDuration;
     final fromLive = _liveBufferReplayFromLive;
-    if (duration == null || duration.inMilliseconds <= 0 || fromLive == null) {
+    final startedAt = _liveBufferReplayStartedAt;
+    if (duration == null || duration <= Duration.zero || fromLive == null) {
       return null;
     }
-    final positionMs = duration.inMilliseconds - fromLive.inMilliseconds;
-    return Duration(
-      milliseconds: positionMs.clamp(0, duration.inMilliseconds).toInt(),
+
+    final startUs = mathMax(
+      0,
+      duration.inMicroseconds - fromLive.inMicroseconds,
     );
+    final elapsed = startedAt == null
+        ? Duration.zero
+        : DateTime.now().toUtc().difference(startedAt);
+    final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
+    final rawPosition = Duration(
+      microseconds: startUs + safeElapsed.inMicroseconds,
+    );
+    final currentDuration = canonicalLiveTimelineDuration ??
+        duration + safeElapsed;
+    if (rawPosition > currentDuration) return currentDuration;
+    return rawPosition;
   }
 
   Duration? get liveDvrBridgeDuration =>
@@ -149,19 +163,16 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Duration? get canonicalLiveElapsed => _canonicalLiveElapsed;
   DateTime? get canonicalTimelineOrigin => _canonicalTimelineOrigin;
 
-  /// Latest Twitch TOTAL clock with only short interpolation between HLS
-  /// snapshots. Every explicit seek refreshes the upstream playlist first, so
-  /// seek geometry never depends on a long-running local wall-clock estimate.
+  /// Twitch TOTAL is the authoritative live-edge anchor. Between playlist
+  /// snapshots it advances at 1:1 wall-clock rate; every explicit seek refreshes
+  /// the HLS metadata again before resolving media geometry, which bounds drift
+  /// without making the UI timeline freeze between manifest reloads.
   Duration? get canonicalLiveTimelineDuration {
     final total = _canonicalLiveTotal;
     final observedAt = _canonicalTimingObservedAt;
     if (total == null || observedAt == null) return total;
     final elapsed = DateTime.now().toUtc().difference(observedAt);
-    if (elapsed.isNegative) return total;
-    final interpolation = elapsed > const Duration(seconds: 3)
-        ? const Duration(seconds: 3)
-        : elapsed;
-    return total + interpolation;
+    return elapsed.isNegative ? total : total + elapsed;
   }
 
   void setLiveDvrPlaylistOverride(Uri? playlistUri) {
@@ -771,7 +782,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _canonicalLiveElapsed = media.twitchElapsed;
       _canonicalLiveTotal = total;
       _canonicalTimelineOrigin = media.timelineOrigin;
-      _canonicalTimingObservedAt = media.timingObservedAt;
+      _canonicalTimingObservedAt = media.timingObservedAt ?? DateTime.now().toUtc();
       debugPrint(
         '[CanonicalTimeline] elapsed=${_formatSeconds(media.twitchElapsed)} '
         'total=${_formatSeconds(total)} '
@@ -878,6 +889,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingLiveBufferReplay = true;
     _liveBufferReplayDuration = timelineDuration;
     _liveBufferReplayFromLive = safeFromLive;
+    _liveBufferReplayStartedAt = DateTime.now().toUtc();
     _bridgeProxy = null;
     _liveDvrPlaylistOverride = null;
     debugPrint(
@@ -1184,6 +1196,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingLiveBufferReplay = false;
     _liveBufferReplayDuration = null;
     _liveBufferReplayFromLive = null;
+    _liveBufferReplayStartedAt = null;
   }
 
   void _clearCanonicalLiveTiming() {
@@ -1247,3 +1260,5 @@ class _PlaybackCandidate {
     required this.variants,
   });
 }
+
+int mathMax(int a, int b) => a > b ? a : b;
