@@ -24,8 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Flutter 3.41.9, matching the revision recorded in this project.
-  FLUTTER_REVISION: 00b0c91f06209d9e4a41f71b7a512d6eb3b9c694
+  FLUTTER_VERSION: '3.41.9'
 
 jobs:
   prepare:
@@ -94,16 +93,12 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install project Flutter revision
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter_dir="${RUNNER_TEMP}/flutter"
-          git init "${flutter_dir}"
-          git -C "${flutter_dir}" remote add origin https://github.com/flutter/flutter.git
-          git -C "${flutter_dir}" fetch --depth 1 origin "${FLUTTER_REVISION}"
-          git -C "${flutter_dir}" checkout --detach FETCH_HEAD
-          echo "${flutter_dir}/bin" >> "${GITHUB_PATH}"
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
 
       - name: Show Flutter version
         run: flutter --version
@@ -162,15 +157,12 @@ jobs:
         shell: pwsh
         run: git config --global core.longpaths true
 
-      - name: Install project Flutter revision
-        shell: pwsh
-        run: |
-          $flutterDir = Join-Path $env:RUNNER_TEMP 'flutter'
-          git init $flutterDir
-          git -C $flutterDir remote add origin https://github.com/flutter/flutter.git
-          git -C $flutterDir fetch --depth 1 origin $env:FLUTTER_REVISION
-          git -C $flutterDir checkout --detach FETCH_HEAD
-          (Join-Path $flutterDir 'bin') | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
 
       - name: Show Flutter version
         shell: pwsh
