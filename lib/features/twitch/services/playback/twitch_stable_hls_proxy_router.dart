@@ -55,8 +55,9 @@ class TwitchStableHlsProxyRouter {
   int _streamUpstreamAttachCount = 0;
   int _streamUpstreamRetryCount = 0;
   int _streamBytesForwarded = 0;
-  int _streamBoundaryHandoffCount = 0;
-  int _streamBoundaryFallbackCount = 0;
+  int _streamPatHandoffCount = 0;
+  int _streamPacketHandoffCount = 0;
+  int _streamBoundaryTimeoutCount = 0;
   String? _lastStreamTarget;
   String? _lastStreamError;
   String? _lastSwitchError;
@@ -429,8 +430,9 @@ class TwitchStableHlsProxyRouter {
       'stream_upstream_attach_count=$_streamUpstreamAttachCount\n'
       'stream_upstream_retry_count=$_streamUpstreamRetryCount\n'
       'stream_bytes_forwarded=$_streamBytesForwarded\n'
-      'stream_boundary_handoff_count=$_streamBoundaryHandoffCount\n'
-      'stream_boundary_fallback_count=$_streamBoundaryFallbackCount\n'
+      'stream_pat_handoff_count=$_streamPatHandoffCount\n'
+      'stream_packet_handoff_count=$_streamPacketHandoffCount\n'
+      'stream_boundary_timeout_count=$_streamBoundaryTimeoutCount\n'
       'stream_handoff_pending=${_streamHandoffCompleter != null}\n'
       'last_stream_target=$_lastStreamTarget\n'
       'last_stream_error=$_lastStreamError\n'
@@ -530,12 +532,13 @@ class TwitchStableHlsProxyRouter {
               // packets so a router handoff can never expose half a TS packet
               // to libmpv/FFmpeg even when HttpClient delivers arbitrary chunks.
               for (final packet in tsAligner!.add(chunk)) {
-                if (_shouldHandoffBeforePacket(
+                final handoffKind = _handoffKindBeforePacket(
                   packet: packet,
                   attachedTarget: lastAttachedInnerStreamUrl,
-                )) {
+                );
+                if (handoffKind != _StreamHandoffKind.none) {
                   // Flush any complete packets already queued for this source,
-                  // then leave the detected PAT/current packet for the new inner
+                  // then leave the detected/current packet for the new inner
                   // stream instead of mixing programs across the handoff.
                   if (bytesSinceFlush > 0) {
                     try {
@@ -551,7 +554,11 @@ class TwitchStableHlsProxyRouter {
                     }
                   }
                   handoffTriggered = true;
-                  _streamBoundaryHandoffCount++;
+                  if (handoffKind == _StreamHandoffKind.pat) {
+                    _streamPatHandoffCount++;
+                  } else {
+                    _streamPacketHandoffCount++;
+                  }
                   _completePendingHandoff();
                   break;
                 }
@@ -659,7 +666,7 @@ class TwitchStableHlsProxyRouter {
       // boundary. Timeout only protects channel-offline/stalled upstream cases.
       await completer.future.timeout(const Duration(milliseconds: 1200));
     } catch (_) {
-      _streamBoundaryFallbackCount++;
+      _streamBoundaryTimeoutCount++;
       await _interruptActiveUpstream();
     } finally {
       if (identical(_streamHandoffCompleter, completer)) {
@@ -669,24 +676,31 @@ class TwitchStableHlsProxyRouter {
     }
   }
 
-  bool _shouldHandoffBeforePacket({
+  _StreamHandoffKind _handoffKindBeforePacket({
     required List<int> packet,
     required String attachedTarget,
   }) {
     final completer = _streamHandoffCompleter;
-    if (completer == null || completer.isCompleted) return false;
-    if (attachedTarget == _currentStreamTargetLabel()) return false;
+    if (completer == null || completer.isCompleted) {
+      return _StreamHandoffKind.none;
+    }
+    if (attachedTarget == _currentStreamTargetLabel()) {
+      return _StreamHandoffKind.none;
+    }
 
     // Prefer beginning of a new PAT/program table, which is commonly emitted at
     // or near an HLS TS segment boundary. Do not wait indefinitely: after the
     // short grace period, any complete 188-byte packet boundary is still much
     // safer than cancelling an arbitrary HttpClient byte chunk.
-    if (_isPatStartPacket(packet)) return true;
+    if (_isPatStartPacket(packet)) return _StreamHandoffKind.pat;
 
     final requestedAt = _streamHandoffRequestedAt;
-    if (requestedAt == null) return true;
-    return DateTime.now().difference(requestedAt) >=
-        const Duration(milliseconds: 450);
+    if (requestedAt == null ||
+        DateTime.now().difference(requestedAt) >=
+            const Duration(milliseconds: 450)) {
+      return _StreamHandoffKind.packet;
+    }
+    return _StreamHandoffKind.none;
   }
 
   bool _isPatStartPacket(List<int> packet) {
@@ -805,6 +819,8 @@ class TwitchStableHlsProxyRouter {
     await request.response.close();
   }
 }
+
+enum _StreamHandoffKind { none, pat, packet }
 
 /// Reassembles arbitrary HttpClient chunks into decoder-safe MPEG-TS packets.
 ///
