@@ -784,7 +784,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       return;
     }
     if (proxyAdvanced) {
-      await reconcileVisibleRoutePlayback(forceOpen: true);
+      await reconcileVisibleRoutePlayback(forceProxyReconnect: true);
       return;
     }
 
@@ -837,7 +837,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       '${proxyAfterReconnectProbe?.lastWrittenSequence}',
     );
     if (!recoveredPlayer) {
-      await reconcileVisibleRoutePlayback(forceOpen: true);
+      await preferencesController.applyPlayerVolume();
+      if (mounted) setState(() {});
     }
   }
 
