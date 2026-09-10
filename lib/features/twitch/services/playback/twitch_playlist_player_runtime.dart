@@ -9,6 +9,7 @@ import '../../api/playback/twitch_playback_api_service.dart';
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
+import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_hls_low_latency_proxy.dart' show TwitchHlsStartupMode;
 import 'twitch_live_dvr_bridge_proxy.dart';
 import 'twitch_stable_hls_proxy_router.dart';
@@ -81,6 +82,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Duration? _liveBufferReplayFromLive;
   Uri? _liveDvrPlaylistOverride;
   String? _lastLiveUpstreamPlaylistUrl;
+  Duration? _canonicalLiveElapsed;
+  Duration? _canonicalLiveTotal;
+  DateTime? _canonicalTimelineOrigin;
+  DateTime? _canonicalTimingObservedAt;
 
   String get channelLogin => _channelLogin;
   Uri? get masterPlaylistUri => _masterPlaylistUri;
@@ -140,6 +145,24 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration;
   bool get usingExternalVodPlayback => _usingExternalVodPlayback;
   bool get hasWarmLiveDvrBridge => _sharedBridgeProxy?.isRunning ?? false;
+  Duration? get canonicalLiveTotal => _canonicalLiveTotal;
+  Duration? get canonicalLiveElapsed => _canonicalLiveElapsed;
+  DateTime? get canonicalTimelineOrigin => _canonicalTimelineOrigin;
+
+  /// Latest Twitch TOTAL clock with only short interpolation between HLS
+  /// snapshots. Every explicit seek refreshes the upstream playlist first, so
+  /// seek geometry never depends on a long-running local wall-clock estimate.
+  Duration? get canonicalLiveTimelineDuration {
+    final total = _canonicalLiveTotal;
+    final observedAt = _canonicalTimingObservedAt;
+    if (total == null || observedAt == null) return total;
+    final elapsed = DateTime.now().toUtc().difference(observedAt);
+    if (elapsed.isNegative) return total;
+    final interpolation = elapsed > const Duration(seconds: 3)
+        ? const Duration(seconds: 3)
+        : elapsed;
+    return total + interpolation;
+  }
 
   void setLiveDvrPlaylistOverride(Uri? playlistUri) {
     _liveDvrPlaylistOverride = playlistUri;
@@ -188,6 +211,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     debugPrint('[LiveDvrBridge] prewarm low-latency live upstream=$upstream');
     await router.switchUpstream(upstream, forceReconnect: forceProxyReconnect);
     await router.waitUntilPrewarmed();
+    unawaited(_refreshCanonicalLiveTimingBestEffort());
 
     _proxy = router;
     _proxyUrl = _routerStreamTsPlaybackUrl(router);
@@ -238,6 +262,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = false;
     _clearLiveBufferReplay();
+    _clearCanonicalLiveTiming();
     notifyListeners();
 
     try {
@@ -400,6 +425,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     );
     if (variant.url.trim().isNotEmpty) {
       _lastLiveUpstreamPlaylistUrl = variant.url;
+      unawaited(_refreshCanonicalLiveTimingBestEffort());
     }
     final upstreamUri = Uri.tryParse(probedVariant.url);
     if (upstreamUri == null) {
@@ -472,6 +498,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
 
     await router.waitUntilPrewarmed();
+    unawaited(_refreshCanonicalLiveTimingBestEffort());
 
     _usingDvrPlaylist = useDvrPlaylist;
     _currentVariant = probedVariant;
@@ -714,6 +741,71 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return status;
   }
 
+  Future<void> refreshCanonicalLiveTiming() async {
+    await _refreshCanonicalLiveTimingBestEffort();
+  }
+
+  Future<void> _refreshCanonicalLiveTimingBestEffort() async {
+    final rawUrl = _lastLiveUpstreamPlaylistUrl?.trim();
+    if (rawUrl == null || rawUrl.isEmpty) return;
+    try {
+      final response = await _dio.getUri<String>(
+        Uri.parse(rawUrl),
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: defaultUpstreamHeaders,
+          receiveTimeout: const Duration(seconds: 4),
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+      final text = response.data ?? '';
+      if ((response.statusCode ?? 0) >= 400 || !text.contains('#EXTM3U')) {
+        return;
+      }
+      final media = TwitchHlsPlaylistParser.parse(
+        text,
+        playlistUrl: response.realUri.toString(),
+      );
+      final total = media.twitchTotal;
+      if (total == null) return;
+      _canonicalLiveElapsed = media.twitchElapsed;
+      _canonicalLiveTotal = total;
+      _canonicalTimelineOrigin = media.timelineOrigin;
+      _canonicalTimingObservedAt = media.timingObservedAt;
+      debugPrint(
+        '[CanonicalTimeline] elapsed=${_formatSeconds(media.twitchElapsed)} '
+        'total=${_formatSeconds(total)} '
+        'origin=${media.timelineOrigin?.toUtc().toIso8601String() ?? '-'}',
+      );
+    } catch (error) {
+      debugPrint('[CanonicalTimeline] refresh failed: $error');
+    }
+  }
+
+  Duration _canonicalizeDvrPosition(
+    Duration fallbackPosition,
+    DateTime? targetProgramDateTime,
+  ) {
+    final origin = _canonicalTimelineOrigin;
+    final targetUtc = targetProgramDateTime?.toUtc();
+    if (origin == null || targetUtc == null) return fallbackPosition;
+
+    final delta = targetUtc.difference(origin.toUtc());
+    final total = _canonicalLiveTotal;
+    if (delta.isNegative) return Duration.zero;
+    if (total == null || total <= Duration.zero) return delta;
+    final maxUs = total.inMicroseconds > 0 ? total.inMicroseconds - 1 : 0;
+    return Duration(
+      microseconds: delta.inMicroseconds.clamp(0, maxUs).toInt(),
+    );
+  }
+
+  String _formatSeconds(Duration? value) {
+    if (value == null) return '-';
+    return (value.inMicroseconds / Duration.microsecondsPerSecond)
+        .toStringAsFixed(3);
+  }
+
   Future<({String playbackUrl, Duration startPosition})?>
   seekLiveDvrBridgePosition(
     Duration position, {
@@ -725,12 +817,19 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       debugPrint('[LiveDvrBridge] seek ignored: bridge not running');
       return null;
     }
+
+    await _refreshCanonicalLiveTimingBestEffort();
+    final canonicalPosition = _canonicalizeDvrPosition(
+      position,
+      targetProgramDateTime,
+    );
     debugPrint(
-      '[LiveDvrBridge] runtime seek position=${position.inSeconds}s '
+      '[LiveDvrBridge] runtime seek position=${_formatSeconds(position)}s '
+      'canonical=${_formatSeconds(canonicalPosition)}s '
       'programTime=${targetProgramDateTime?.toUtc().toIso8601String() ?? '-'}',
     );
     final startPosition = await bridge.seekToPosition(
-      position,
+      canonicalPosition,
       targetProgramDateTime: targetProgramDateTime,
     );
 
@@ -762,7 +861,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
 
     final safeFromLive = Duration(
-      seconds: fromLive.inSeconds.clamp(1, 20).toInt(),
+      microseconds: fromLive.inMicroseconds
+          .clamp(1, const Duration(seconds: 20).inMicroseconds)
+          .toInt(),
     );
     await router.switchLiveReplayStream(fromLive: safeFromLive);
     final playbackUrl = _routerStreamTsPlaybackUrl(router);
@@ -780,7 +881,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _bridgeProxy = null;
     _liveDvrPlaylistOverride = null;
     debugPrint(
-      '[LiveBufferReplay] seek fromLive=${safeFromLive.inSeconds}s '
+      '[LiveBufferReplay] route fromLive=${_formatSeconds(safeFromLive)}s '
       'player=$playbackUrl',
     );
     _notifyListenersAfterFrame();
@@ -1075,6 +1176,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _currentVariant = null;
     _adAwareStatus = '';
     _clearLiveBufferReplay();
+    _clearCanonicalLiveTiming();
     notifyListeners();
   }
 
@@ -1082,6 +1184,13 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingLiveBufferReplay = false;
     _liveBufferReplayDuration = null;
     _liveBufferReplayFromLive = null;
+  }
+
+  void _clearCanonicalLiveTiming() {
+    _canonicalLiveElapsed = null;
+    _canonicalLiveTotal = null;
+    _canonicalTimelineOrigin = null;
+    _canonicalTimingObservedAt = null;
   }
 
   @override
@@ -1114,6 +1223,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'proxyRunning': router?.isRunning ?? false,
       'proxyStablePort': router?.port,
       'proxyStableUpstream': router?.upstreamPlaylistUrl,
+      'canonicalElapsedSeconds': _formatSeconds(_canonicalLiveElapsed),
+      'canonicalTotalSeconds': _formatSeconds(_canonicalLiveTotal),
+      'canonicalTimelineOrigin': _canonicalTimelineOrigin?.toIso8601String(),
+      'canonicalTimingObservedAt': _canonicalTimingObservedAt?.toIso8601String(),
       'error': error?.toString(),
     };
   }
