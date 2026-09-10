@@ -46,6 +46,10 @@ class TwitchParsedMediaPlaylist {
   final int mediaSequence;
   final Duration targetDuration;
   final bool hasEndList;
+  final Duration? twitchElapsed;
+  final Duration? twitchTotal;
+  final DateTime? timelineOrigin;
+  final DateTime timingObservedAt;
 
   const TwitchParsedMediaPlaylist({
     required this.items,
@@ -53,8 +57,12 @@ class TwitchParsedMediaPlaylist {
     required this.normalCount,
     required this.futureCount,
     required this.mediaSequence,
+    required this.timingObservedAt,
     this.targetDuration = const Duration(seconds: 2),
     this.hasEndList = false,
+    this.twitchElapsed,
+    this.twitchTotal,
+    this.timelineOrigin,
   });
 }
 
@@ -72,6 +80,10 @@ class TwitchHlsLiveStatus {
   final Duration safeLivePosition;
   final Duration liveBackoff;
   final DateTime updatedAt;
+  final Duration? twitchElapsed;
+  final Duration? twitchTotal;
+  final DateTime? timelineOrigin;
+  final DateTime? timingObservedAt;
 
   const TwitchHlsLiveStatus({
     required this.running,
@@ -87,6 +99,10 @@ class TwitchHlsLiveStatus {
     required this.safeLivePosition,
     required this.liveBackoff,
     required this.updatedAt,
+    this.twitchElapsed,
+    this.twitchTotal,
+    this.timelineOrigin,
+    this.timingObservedAt,
   });
 
   int get lagSegments {
@@ -112,6 +128,10 @@ class TwitchHlsLiveStatus {
       'safeLivePositionMs': safeLivePosition.inMilliseconds,
       'liveBackoffMs': liveBackoff.inMilliseconds,
       'updatedAtMs': updatedAt.millisecondsSinceEpoch,
+      'twitchElapsedUs': twitchElapsed?.inMicroseconds,
+      'twitchTotalUs': twitchTotal?.inMicroseconds,
+      'timelineOriginMs': timelineOrigin?.millisecondsSinceEpoch,
+      'timingObservedAtMs': timingObservedAt?.millisecondsSinceEpoch,
     };
   }
 
@@ -121,6 +141,14 @@ class TwitchHlsLiveStatus {
       if (value is int) return value;
       if (value is num) return value.round();
       return int.tryParse(value?.toString() ?? '') ?? fallback;
+    }
+
+    int? readNullableInt(String key) {
+      final value = json[key];
+      if (value == null) return null;
+      if (value is int) return value;
+      if (value is num) return value.round();
+      return int.tryParse(value.toString());
     }
 
     bool readBool(String key, [bool fallback = false]) {
@@ -140,6 +168,10 @@ class TwitchHlsLiveStatus {
       'updatedAtMs',
       DateTime.now().millisecondsSinceEpoch,
     );
+    final twitchElapsedUs = readNullableInt('twitchElapsedUs');
+    final twitchTotalUs = readNullableInt('twitchTotalUs');
+    final timelineOriginMs = readNullableInt('timelineOriginMs');
+    final timingObservedAtMs = readNullableInt('timingObservedAtMs');
 
     return TwitchHlsLiveStatus(
       running: readBool('running'),
@@ -155,6 +187,21 @@ class TwitchHlsLiveStatus {
       safeLivePosition: readDuration('safeLivePositionMs'),
       liveBackoff: readDuration('liveBackoffMs'),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAtMs),
+      twitchElapsed: twitchElapsedUs == null
+          ? null
+          : Duration(microseconds: twitchElapsedUs),
+      twitchTotal: twitchTotalUs == null
+          ? null
+          : Duration(microseconds: twitchTotalUs),
+      timelineOrigin: timelineOriginMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(timelineOriginMs, isUtc: true),
+      timingObservedAt: timingObservedAtMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(
+              timingObservedAtMs,
+              isUtc: true,
+            ),
     );
   }
 
