@@ -137,8 +137,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Duration? get liveDvrBridgeDuration =>
-      (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration ??
-      _liveBufferReplayDuration;
+      (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration;
   bool get usingExternalVodPlayback => _usingExternalVodPlayback;
   bool get hasWarmLiveDvrBridge => _sharedBridgeProxy?.isRunning ?? false;
 
@@ -715,7 +714,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     return status;
   }
 
-  Future<String?> seekLiveDvrBridgePosition(Duration position) async {
+  Future<({String playbackUrl, Duration startPosition})?>
+  seekLiveDvrBridgePosition(Duration position) async {
     final requestId = ++_sharedBridgeSeekRequestId;
     final bridge = _bridgeProxy ?? _sharedBridgeProxy;
     if (bridge == null || !bridge.isRunning) {
@@ -723,35 +723,23 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
     debugPrint('[LiveDvrBridge] runtime seek position=${position.inSeconds}s');
-    bridge.seekToPosition(position);
+    final startPosition = bridge.seekToPosition(position);
 
     if (requestId != _sharedBridgeSeekRequestId) {
       debugPrint('[LiveDvrBridge] stale seek ignored request=$requestId');
       return null;
     }
 
-    final bridgePlaybackUrl = bridge.streamTsPlaybackUrl;
-    var router = _proxy ?? _sharedProxy;
-    if (router == null || !router.isRunning) {
-      router = _createStableRouter();
-      _sharedProxy = router;
-      await router.startDirectStream(streamUrl: bridgePlaybackUrl);
-    } else {
-      await router.switchDirectStream(bridgePlaybackUrl);
-    }
-    final playbackUrl = _routerStreamTsPlaybackUrl(router);
-    _proxy = router;
+    final playbackUrl = bridge.playlistPlaybackUrl;
     _bridgeProxy = bridge;
-    _proxyUrl = playbackUrl;
-    _proxyMpvUrl = playbackUrl;
     _usingDvrPlaylist = true;
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = true;
     _clearLiveBufferReplay();
     _liveDvrPlaylistOverride = null;
-    debugPrint('[LiveDvrBridge] stream seek player=$playbackUrl');
+    debugPrint('[LiveDvrBridge] direct playlist seek player=$playbackUrl');
     _notifyListenersAfterFrame();
-    return playbackUrl;
+    return (playbackUrl: playbackUrl, startPosition: startPosition);
   }
 
   Future<String?> seekLiveBufferReplay({

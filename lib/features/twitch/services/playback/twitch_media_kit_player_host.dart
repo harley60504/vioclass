@@ -9,6 +9,8 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
   defaultValue: true,
 );
 
+enum _TwitchHlsCacheProfile { lowLatency, liveDvr }
+
 /// Keep the native media_kit [Player] and its [VideoController] warm for fast
 /// re-entry.
 ///
@@ -28,6 +30,30 @@ class TwitchMediaKitPlayerHost {
   static String? _keepPlayingWithoutSessionUri;
   static Future<void>? _creatingPlayer;
   static Future<void>? _creatingVideoController;
+  static _TwitchHlsCacheProfile _hlsCacheProfile =
+      _TwitchHlsCacheProfile.lowLatency;
+
+  static const Map<String, String> _lowLatencyHlsOptions = <String, String>{
+    'cache': 'no',
+    'cache-pause': 'no',
+    'cache-secs': '0',
+    'demuxer-seekable-cache': 'no',
+    'demuxer-readahead-secs': '0',
+    'demuxer-max-back-bytes': '0',
+    'demuxer-max-bytes': '1048576',
+    'demuxer-donate-buffer': 'yes',
+  };
+
+  static const Map<String, String> _liveDvrHlsOptions = <String, String>{
+    'cache': 'yes',
+    'cache-pause': 'yes',
+    'cache-secs': '22',
+    'demuxer-seekable-cache': 'yes',
+    'demuxer-readahead-secs': '22',
+    'demuxer-max-back-bytes': '8388608',
+    'demuxer-max-bytes': '25165824',
+    'demuxer-donate-buffer': 'no',
+  };
 
   TwitchMediaKitPlayerHost._();
 
@@ -84,6 +110,7 @@ class TwitchMediaKitPlayerHost {
     _creatingPlayer = () async {
       _generation++;
       _currentMediaUri = null;
+      _hlsCacheProfile = _TwitchHlsCacheProfile.lowLatency;
       final player = await Player.create(
         configuration: PlayerConfiguration(
           title: title,
@@ -97,12 +124,7 @@ class TwitchMediaKitPlayerHost {
             'force-seekable': 'yes',
             'video-sync': 'audio',
             'autosync': '0',
-            'cache': 'no',
-            'cache-pause': 'no',
-            'demuxer-seekable-cache': 'no',
-            'demuxer-readahead-secs': '0',
-            'demuxer-max-back-bytes': '0',
-            'demuxer-max-bytes': '1048576',
+            ..._lowLatencyHlsOptions,
           },
         ),
       );
@@ -235,6 +257,25 @@ class TwitchMediaKitPlayerHost {
     await player.pause();
   }
 
+  static Future<void> _applyHlsCacheProfile(
+    TwitchMediaKitPlayerSession session,
+    _TwitchHlsCacheProfile profile,
+  ) async {
+    await session.ensureReady();
+    if (session._released || session.generation != _generation) return;
+    if (_hlsCacheProfile == profile) return;
+
+    final player = session.player;
+    final options = profile == _TwitchHlsCacheProfile.liveDvr
+        ? _liveDvrHlsOptions
+        : _lowLatencyHlsOptions;
+    for (final entry in options.entries) {
+      player.setProperty(entry.key, entry.value);
+    }
+    _hlsCacheProfile = profile;
+    debugPrint('[TwitchPlayer] HLS cache profile=${profile.name}');
+  }
+
   static Future<void> pauseCurrent(TwitchMediaKitPlayerSession session) async {
     await session.ensureReady();
     if (session.generation != _generation) return;
@@ -280,6 +321,7 @@ class TwitchMediaKitPlayerHost {
     _creatingVideoController = null;
     _currentMediaUri = null;
     _keepPlayingWithoutSessionUri = null;
+    _hlsCacheProfile = _TwitchHlsCacheProfile.lowLatency;
     _generation++;
 
     if (player == null) return;
@@ -408,6 +450,18 @@ class TwitchMediaKitPlayerSession {
   }
 
   Future<void> pauseCurrent() => TwitchMediaKitPlayerHost.pauseCurrent(this);
+
+  Future<void> useLiveDvrHlsCacheProfile() =>
+      TwitchMediaKitPlayerHost._applyHlsCacheProfile(
+        this,
+        _TwitchHlsCacheProfile.liveDvr,
+      );
+
+  Future<void> useLowLatencyHlsProfile() =>
+      TwitchMediaKitPlayerHost._applyHlsCacheProfile(
+        this,
+        _TwitchHlsCacheProfile.lowLatency,
+      );
 
   Future<void> stopCurrent() => TwitchMediaKitPlayerHost.stopCurrent(this);
 

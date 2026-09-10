@@ -942,10 +942,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         timelineDuration == null || timelineDuration.inMilliseconds <= 0
         ? null
         : safeTarget.inMilliseconds / 1000;
-    final playbackUrl = await watchPorts.player.runtime
+    final seekResult = await watchPorts.player.runtime
         .seekLiveDvrBridgePosition(safeTarget);
-    if (playbackUrl == null) return;
-    await openLiveDvrBridgeMedia(playbackUrl);
+    if (seekResult == null) return;
+    await playerSession.useLiveDvrHlsCacheProfile();
+    final playbackUrl = seekResult.playbackUrl;
+    await openLiveDvrBridgeMedia(
+      playbackUrl,
+      startPosition: seekResult.startPosition,
+    );
     if (video != null) {
       preferVodReplayChat = true;
       markOwnedPlayback(
@@ -967,11 +972,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     if (mounted) setState(() {});
   }
 
-  Future<void> openLiveDvrBridgeMedia(String playbackUrl) async {
+  Future<void> openLiveDvrBridgeMedia(
+    String playbackUrl, {
+    required Duration startPosition,
+  }) async {
     await playbackController.openMedia(
       uri: playbackUrl,
       play: true,
       forceOpen: true,
+      startPosition: startPosition,
     );
   }
 
@@ -1027,6 +1036,21 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         timelineDuration.inMilliseconds - safeTarget.inMilliseconds;
     if (fromLiveMs <= _liveTimelineEdgeTolerance.inMilliseconds) {
       return _LiveTimelineSeekRoute.liveEdge;
+    }
+    final measuredDvrDuration = hasUsableLiveDvrArchive
+        ? watchPorts.player.runtime.liveDvrBridgeDuration ??
+              activeGrowingVodVideo?.parsedDuration
+        : null;
+    if (measuredDvrDuration != null && measuredDvrDuration > Duration.zero) {
+      final dvrTailMs = measuredDvrDuration.inMilliseconds.clamp(
+        0,
+        timelineDuration.inMilliseconds,
+      );
+      if (safeTarget.inMilliseconds > dvrTailMs &&
+          fromLiveMs <= _liveReplayCacheDuration.inMilliseconds) {
+        return _LiveTimelineSeekRoute.liveBuffer;
+      }
+      return _LiveTimelineSeekRoute.dvrArchive;
     }
     if (fromLiveMs <= _liveReplaySeekWindowDuration.inMilliseconds) {
       return _LiveTimelineSeekRoute.liveBuffer;
@@ -1104,6 +1128,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
   Future<void> switchToLowLatencyLivePlayback() async {
     debugPrint('[LiveDvrBridge] switch to low-latency live');
+    await playerSession.useLowLatencyHlsProfile();
     watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
     vodReplayController.stop();
     preferVodReplayChat = false;
