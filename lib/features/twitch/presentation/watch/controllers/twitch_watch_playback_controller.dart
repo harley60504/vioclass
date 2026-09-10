@@ -76,40 +76,14 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           nextUri.startsWith('http://127.0.0.1:') &&
           nextUri.contains('/playlist.m3u8?v=');
 
-      var hrSeekDemuxerOffset = const Duration(seconds: 2);
-      if (isLocalDvrSnapshot) {
-        final requestedStart = startPosition!;
-        final probe = await TwitchLocalDvrMediaTimingProbe.probe(
-          playlistUrl: nextUri,
-          startPosition: requestedStart,
-        );
-        if (probe != null) {
-          hrSeekDemuxerOffset = probe.suggestedDemuxerOffset;
-          final timing = probe.timing;
-          debugPrint(
-            '[TsSeekIndex] segment=${probe.segmentIndex} '
-            'targetOffset=${_seconds(probe.targetOffset)}s '
-            'firstPts=${timing.firstPts90k ?? -1} '
-            'lastPts=${timing.lastPts90k ?? -1} '
-            'firstPcr=${timing.firstPcr27m ?? -1} '
-            'lastPcr=${timing.lastPcr27m ?? -1} '
-            'keyframes=${timing.keyframePts90k.length} '
-            'keyframeOffset=${probe.keyframeOffset == null ? '-' : '${_seconds(probe.keyframeOffset!)}s'} '
-            'decodeLead=${probe.decodeLead == null ? '-' : '${_seconds(probe.decodeLead!)}s'} '
-            'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
-          );
-        } else {
-          debugPrint(
-            '[TsSeekIndex] unavailable; hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
-          );
-        }
-      }
+      // Do not block Player.open on a remote TS download just to discover GOP
+      // geometry. The previous successful probes teach a safe backoff for later
+      // seeks; Twitch normally keeps that GOP cadence stable for a rendition.
+      final hrSeekDemuxerOffset = isLocalDvrSnapshot
+          ? TwitchLocalDvrMediaTimingProbe.cachedSuggestedDemuxerOffset
+          : const Duration(seconds: 2);
 
       if (startPosition != null) {
-        // Frozen DVR snapshots are finite HLS. High-resolution seek can decode
-        // forward from the nearest random-access point; the TS timing probe
-        // expands the demuxer backoff when the actual GOP requires more than
-        // the conservative 2-second fallback.
         await session.ensureReady();
         session.player.setProperty('hr-seek', 'yes');
         session.player.setProperty(
@@ -122,14 +96,12 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         debugPrint(
           '[TwitchPlayer] VOD snapshot precise start '
           'target=${_seconds(startPosition!)}s '
-          'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s',
+          'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s probe=async',
         );
       }
 
+      final openStopwatch = Stopwatch()..start();
       if (startPosition != null && deferInitialSeek) {
-        // Retained for callers that explicitly need a post-open seek. Frozen
-        // DVR snapshots normally use Media(start:) because they are finite and
-        // immutable for the seek generation.
         await session.openOrResume(
           uri: nextUri,
           play: false,
@@ -153,6 +125,22 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           startPosition: startPosition,
         );
       }
+      openStopwatch.stop();
+
+      if (isLocalDvrSnapshot) {
+        debugPrint(
+          '[PlaybackLatency] dvrPlayerOpen=${openStopwatch.elapsedMilliseconds}ms '
+          'target=${_seconds(startPosition!)}s',
+        );
+        // Let the player start fetching immediately. PTS/PCR/IDR inspection is
+        // diagnostic/adaptive metadata, not a prerequisite for this seek.
+        unawaited(
+          _probeDvrTimingAfterOpen(
+            playlistUrl: nextUri,
+            startPosition: startPosition,
+          ),
+        );
+      }
 
       await applyPlayerVolume();
       if (waitForSettle) {
@@ -168,6 +156,45 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       }
       notifyListeners();
     }
+  }
+
+  Future<void> _probeDvrTimingAfterOpen({
+    required String playlistUrl,
+    required Duration startPosition,
+  }) async {
+    // A short delay gives mpv first access to the snapshot instead of making
+    // the timing probe compete for the first segment request on the critical
+    // Live -> DVR transition.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    final stopwatch = Stopwatch()..start();
+    final probe = await TwitchLocalDvrMediaTimingProbe.probe(
+      playlistUrl: playlistUrl,
+      startPosition: startPosition,
+    );
+    stopwatch.stop();
+    if (probe == null) {
+      debugPrint(
+        '[TsSeekIndex] unavailable probeMs=${stopwatch.elapsedMilliseconds} '
+        'learnedBackoff=${_seconds(TwitchLocalDvrMediaTimingProbe.cachedSuggestedDemuxerOffset)}s',
+      );
+      return;
+    }
+
+    final timing = probe.timing;
+    debugPrint(
+      '[TsSeekIndex] segment=${probe.segmentIndex} '
+      'targetOffset=${_seconds(probe.targetOffset)}s '
+      'firstPts=${timing.firstPts90k ?? -1} '
+      'lastPts=${timing.lastPts90k ?? -1} '
+      'firstPcr=${timing.firstPcr27m ?? -1} '
+      'lastPcr=${timing.lastPcr27m ?? -1} '
+      'keyframes=${timing.keyframePts90k.length} '
+      'keyframeOffset=${probe.keyframeOffset == null ? '-' : '${_seconds(probe.keyframeOffset!)}s'} '
+      'decodeLead=${probe.decodeLead == null ? '-' : '${_seconds(probe.decodeLead!)}s'} '
+      'seekBackoff=${_seconds(probe.suggestedDemuxerOffset)}s '
+      'learnedBackoff=${_seconds(TwitchLocalDvrMediaTimingProbe.cachedSuggestedDemuxerOffset)}s '
+      'probeMs=${stopwatch.elapsedMilliseconds}',
+    );
   }
 
   Future<void> _waitForSeekableMedia(Player player, Duration target) async {
