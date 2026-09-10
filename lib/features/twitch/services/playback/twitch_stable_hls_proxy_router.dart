@@ -81,12 +81,12 @@ class TwitchStableHlsProxyRouter {
     return 'http://127.0.0.1:$p/stream.ts';
   }
 
-  String liveReplayUrl({required Duration targetPosition}) {
+  String liveReplayUrl({required Duration fromLive}) {
     final replay = _replayProxy;
     if (replay == null || !replay.isRunning) {
       throw StateError('Sequential replay proxy not ready');
     }
-    return replay.streamUrl(targetPosition: targetPosition);
+    return replay.streamUrl(fromLive: fromLive);
   }
 
   Future<void> startDirectStream({required String streamUrl}) async {
@@ -236,17 +236,13 @@ class TwitchStableHlsProxyRouter {
     }
   }
 
-  Future<void> switchLiveReplayStream({
-    required Duration targetPosition,
-  }) async {
+  Future<void> switchLiveReplayStream({required Duration fromLive}) async {
     final inner = _inner;
     final replay = _replayProxy;
     if (inner == null || !inner.isRunning || replay == null || !replay.isRunning) {
       throw StateError('Live replay source not ready');
     }
-    final replayUri = Uri.parse(
-      replay.streamUrl(targetPosition: targetPosition),
-    );
+    final replayUri = Uri.parse(replay.streamUrl(fromLive: fromLive));
     _switching = true;
     _directStreamUri = replayUri;
     _directStreamGeneration++;
@@ -332,7 +328,7 @@ class TwitchStableHlsProxyRouter {
         await _proxyToInner(
           request,
           Uri.parse(
-            replay.streamUrl(targetPosition: _readReplayTarget(request)),
+            replay.streamUrl(fromLive: _readReplayDuration(request)),
           ),
         );
         return;
@@ -488,13 +484,29 @@ class TwitchStableHlsProxyRouter {
     response.headers.set(HttpHeaders.accessControlAllowOriginHeader, '*');
   }
 
-  Duration _readReplayTarget(HttpRequest request) {
-    final targetUs = int.tryParse(request.uri.queryParameters['targetUs'] ?? '');
-    if (targetUs != null) {
-      return Duration(microseconds: targetUs < 0 ? 0 : targetUs);
+  Duration _readReplayDuration(HttpRequest request) {
+    final fromLiveUs = int.tryParse(
+      request.uri.queryParameters['fromLiveUs'] ?? '',
+    );
+    if (fromLiveUs != null) {
+      return Duration(
+        microseconds: fromLiveUs
+            .clamp(1, const Duration(seconds: 20).inMicroseconds)
+            .toInt(),
+      );
     }
-    final targetMs = int.tryParse(request.uri.queryParameters['targetMs'] ?? '');
-    return Duration(milliseconds: targetMs == null || targetMs < 0 ? 0 : targetMs);
+    final fromLiveMs = int.tryParse(
+      request.uri.queryParameters['fromLiveMs'] ?? '',
+    );
+    if (fromLiveMs != null) {
+      return Duration(
+        milliseconds: fromLiveMs
+            .clamp(1, const Duration(seconds: 20).inMilliseconds)
+            .toInt(),
+      );
+    }
+    final seconds = int.tryParse(request.uri.queryParameters['seconds'] ?? '');
+    return Duration(seconds: (seconds ?? 10).clamp(1, 20).toInt());
   }
 
   Future<Uri?> _waitForReadyStreamTarget({
