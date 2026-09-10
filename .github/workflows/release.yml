@@ -24,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Keep CI on the same Flutter revision recorded by this project.
+  # Flutter 3.41.9, matching the revision recorded in this project.
   FLUTTER_REVISION: 00b0c91f06209d9e4a41f71b7a512d6eb3b9c694
 
 jobs:
@@ -106,14 +106,12 @@ jobs:
           echo "${flutter_dir}/bin" >> "${GITHUB_PATH}"
 
       - name: Show Flutter version
-        shell: bash
-        run: |
-          flutter --disable-analytics
-          flutter --version
+        run: flutter --version
 
       - name: Apply release version
-        shell: python
+        shell: bash
         run: |
+          python3 - <<'PY'
           import os
           import re
           from pathlib import Path
@@ -125,6 +123,7 @@ jobs:
           if count != 1:
               raise SystemExit('Could not update pubspec version')
           path.write_text(updated, encoding='utf-8')
+          PY
 
       - name: Resolve dependencies
         run: flutter pub get
@@ -176,7 +175,6 @@ jobs:
       - name: Show Flutter version
         shell: pwsh
         run: |
-          flutter --disable-analytics
           flutter --version
           flutter config --enable-windows-desktop
 
