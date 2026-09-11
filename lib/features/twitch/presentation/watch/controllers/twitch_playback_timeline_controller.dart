@@ -28,6 +28,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _seekCommitDelay = Duration(milliseconds: 420);
   static const Duration _playbackTickInterval = Duration(milliseconds: 250);
   static const Duration _mediaRestartTolerance = Duration(milliseconds: 500);
+  static const Duration _initialSeekJumpThreshold = Duration(seconds: 3);
+  static const Duration _initialSeekReanchorWindow = Duration(seconds: 2);
+  static const Duration _canonicalAnchorTolerance = Duration(seconds: 1);
 
   Timer? _pendingSeekTimer;
   Timer? _playbackTimer;
@@ -48,6 +51,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   Duration? _mediaAnchorPosition;
   Duration? _canonicalAnchorPosition;
   Duration? _lastObservedMediaPosition;
+  DateTime? _mediaAnchorObservedAt;
 
   TwitchPlaybackTimelineSnapshot get snapshot {
     final mode = _mode ?? TwitchPlaybackTimelineMode.live;
@@ -108,23 +112,39 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final mediaPosition = player?.state.position;
     final mediaUri = TwitchMediaKitPlayerHost.currentMediaUri;
     final previousMediaPosition = _lastObservedMediaPosition;
+    final now = DateTime.now();
 
     final mediaRestarted =
         mediaPosition != null &&
         previousMediaPosition != null &&
         mediaPosition + _mediaRestartTolerance < previousMediaPosition;
     final sourceChanged = mediaUri != _mediaAnchorUri;
+    final initialSeekJumped = _shouldReanchorInitialSeek(
+      now: now,
+      mediaPosition: mediaPosition,
+      canonicalPosition: canonicalPosition,
+    );
     final needsAnchor =
         modeChanged ||
         sourceChanged ||
         mediaRestarted ||
+        initialSeekJumped ||
         _mediaAnchorPosition == null ||
         _canonicalAnchorPosition == null;
+
+    // A repaint-only timer can observe a source restart before the widget has
+    // supplied the new canonical target. Never continue with the old source's
+    // anchor in that gap.
+    if ((sourceChanged || mediaRestarted) && canonicalPosition == null) {
+      _clearMediaClockAnchor();
+      return;
+    }
 
     if (needsAnchor && canonicalPosition != null && mediaPosition != null) {
       _mediaAnchorUri = mediaUri;
       _mediaAnchorPosition = mediaPosition;
       _canonicalAnchorPosition = canonicalPosition;
+      _mediaAnchorObservedAt = now;
     }
 
     _lastObservedMediaPosition = mediaPosition;
@@ -146,6 +166,42 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     } else if (modeChanged) {
       _position = _clampPosition(_fallbackPosition(_mode!), _duration);
     }
+  }
+
+  bool _shouldReanchorInitialSeek({
+    required DateTime now,
+    required Duration? mediaPosition,
+    required Duration? canonicalPosition,
+  }) {
+    final mediaAnchor = _mediaAnchorPosition;
+    final canonicalAnchor = _canonicalAnchorPosition;
+    final anchoredAt = _mediaAnchorObservedAt;
+    if (mediaPosition == null ||
+        canonicalPosition == null ||
+        mediaAnchor == null ||
+        canonicalAnchor == null ||
+        anchoredAt == null) {
+      return false;
+    }
+
+    final anchorAge = now.difference(anchoredAt);
+    if (anchorAge.isNegative || anchorAge > _initialSeekReanchorWindow) {
+      return false;
+    }
+
+    final mediaAdvance = mediaPosition - mediaAnchor;
+    if (mediaAdvance <= _initialSeekJumpThreshold) return false;
+
+    final canonicalDistance = _durationDistance(
+      canonicalPosition,
+      canonicalAnchor,
+    );
+    return canonicalDistance <= _canonicalAnchorTolerance;
+  }
+
+  Duration _durationDistance(Duration a, Duration b) {
+    final delta = a.inMicroseconds - b.inMicroseconds;
+    return Duration(microseconds: delta < 0 ? -delta : delta);
   }
 
   Duration positionFor(Duration displayDuration) {
@@ -258,6 +314,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _mediaAnchorPosition = null;
     _canonicalAnchorPosition = null;
     _lastObservedMediaPosition = null;
+    _mediaAnchorObservedAt = null;
   }
 
   void _syncPlaybackTimer() {
