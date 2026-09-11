@@ -79,10 +79,11 @@ class TwitchVideoEnhancementRuntime {
       'https://raw.githubusercontent.com/Th-Underscore/Anime4K-Ultra/'
       '$_anime4kCommit/';
 
-  static TwitchVideoEnhancementConfig _config = const TwitchVideoEnhancementConfig(
-    enabled: false,
-    mode: TwitchVideoEnhancementMode.ewaLanczosSharp,
-  );
+  static TwitchVideoEnhancementConfig _config =
+      const TwitchVideoEnhancementConfig(
+        enabled: false,
+        mode: TwitchVideoEnhancementMode.ewaLanczosSharp,
+      );
   static bool _loaded = false;
   static Future<void>? _loading;
   static final Map<TwitchVideoEnhancementMode, Future<String?>> _shaderLoads =
@@ -126,10 +127,8 @@ class TwitchVideoEnhancementRuntime {
     _loaded = true;
 
     final prefs = await SharedPreferences.getInstance();
-    await Future.wait<void>(<Future<void>>[
-      prefs.setBool(enabledPreferenceKey, enabled),
-      prefs.setString(modePreferenceKey, mode.storageValue),
-    ]);
+    await prefs.setBool(enabledPreferenceKey, enabled);
+    await prefs.setString(modePreferenceKey, mode.storageValue);
 
     if (player != null) {
       await applyToPlayer(player, config: _config);
@@ -145,8 +144,8 @@ class TwitchVideoEnhancementRuntime {
     Player player, {
     required TwitchVideoEnhancementConfig config,
   }) async {
-    // glsl-shaders overwrites the full list. Clear it first so changing from an
-    // AI/shader mode to a normal scaler takes effect without reopening media.
+    // glsl-shaders overwrites the full list. Clear it first so changing from a
+    // shader mode to a native scaler takes effect without reopening media.
     player.setProperty('glsl-shaders', '');
 
     if (!config.enabled) {
@@ -165,7 +164,7 @@ class TwitchVideoEnhancementRuntime {
     final shaderPath = await _ensureShader(mode);
     if (shaderPath == null) {
       // A shader download failure must never break Twitch playback. Keep a
-      // high-quality built-in scaler active until the next settings change.
+      // high-quality built-in scaler active until the user retries a shader.
       player.setProperty('scale', 'ewa_lanczossharp');
       debugPrint(
         '[VideoEnhancement] shader unavailable mode=${mode.name}; '
@@ -206,7 +205,9 @@ class TwitchVideoEnhancementRuntime {
 
     try {
       final support = await getApplicationSupportDirectory();
-      final directory = Directory('${support.path}${Platform.pathSeparator}shaders');
+      final directory = Directory(
+        '${support.path}${Platform.pathSeparator}shaders',
+      );
       await directory.create(recursive: true);
       final file = File(
         '${directory.path}${Platform.pathSeparator}${specification.fileName}',
@@ -219,16 +220,17 @@ class TwitchVideoEnhancementRuntime {
         ..connectionTimeout = const Duration(seconds: 8)
         ..idleTimeout = const Duration(seconds: 12);
       try {
-        final request = await client.getUrl(Uri.parse(specification.url));
-        request.headers.set(HttpHeaders.userAgentHeader, 'VioClass/VideoEnhancement');
+        final uri = Uri.parse(specification.url);
+        final request = await client.getUrl(uri);
+        request.headers.set(
+          HttpHeaders.userAgentHeader,
+          'VioClass/VideoEnhancement',
+        );
         request.headers.set(HttpHeaders.acceptHeader, 'text/plain,*/*;q=0.8');
         final response = await request.close();
         if (response.statusCode != HttpStatus.ok) {
           await response.drain<void>();
-          throw HttpException(
-            'shader HTTP ${response.statusCode}',
-            uri: Uri.parse(specification.url),
-          );
+          throw HttpException('shader HTTP ${response.statusCode}', uri: uri);
         }
 
         final temporary = File('${file.path}.part');
@@ -236,7 +238,9 @@ class TwitchVideoEnhancementRuntime {
         await response.pipe(sink);
         final size = await temporary.length();
         if (size <= 1024) {
-          await temporary.delete().catchError((_) => temporary);
+          try {
+            await temporary.delete();
+          } catch (_) {}
           throw StateError('Downloaded shader is unexpectedly small ($size B).');
         }
         if (await file.exists()) await file.delete();
@@ -249,7 +253,9 @@ class TwitchVideoEnhancementRuntime {
         client.close(force: true);
       }
     } catch (error) {
-      debugPrint('[VideoEnhancement] shader load failed mode=${mode.name}: $error');
+      debugPrint(
+        '[VideoEnhancement] shader load failed mode=${mode.name}: $error',
+      );
       _shaderLoads.remove(mode);
       return null;
     }
