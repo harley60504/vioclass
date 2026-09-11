@@ -32,6 +32,7 @@ class TwitchSequentialLiveReplayProxy {
     this.onLog,
   });
 
+  static const bool _verboseReplayDebug = false;
   static const int _maxTimingCacheEntries = 48;
 
   final HttpClient _client = HttpClient()
@@ -621,6 +622,7 @@ class TwitchSequentialLiveReplayProxy {
 
   void _log(String message) {
     if (!kDebugMode) return;
+    if (!_verboseReplayDebug && !message.startsWith('stream error:')) return;
     final line = message.startsWith('[')
         ? message
         : '[LiveBufferReplay] $message';
