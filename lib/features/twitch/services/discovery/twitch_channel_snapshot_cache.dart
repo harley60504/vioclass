@@ -8,6 +8,7 @@ class TwitchChannelSnapshot {
   final String broadcasterLogin;
   final String broadcasterName;
   final String profileImageUrl;
+  final String streamThumbnailUrl;
   final String offlineImageUrl;
   final String description;
   final String streamTitle;
@@ -23,6 +24,7 @@ class TwitchChannelSnapshot {
     this.broadcasterLogin = '',
     this.broadcasterName = '',
     this.profileImageUrl = '',
+    this.streamThumbnailUrl = '',
     this.offlineImageUrl = '',
     this.description = '',
     this.streamTitle = '',
@@ -47,6 +49,7 @@ class TwitchChannelSnapshot {
       broadcasterLogin: stream.channelLogin,
       broadcasterName: stream.displayName,
       profileImageUrl: stream.profileImageUrl,
+      streamThumbnailUrl: stream.thumbnail(),
       streamTitle: stream.title,
       gameName: stream.gameName,
       language: stream.language,
@@ -83,6 +86,7 @@ class TwitchChannelSnapshot {
     String? broadcasterLogin,
     String? broadcasterName,
     String? profileImageUrl,
+    String? streamThumbnailUrl,
     String? offlineImageUrl,
     String? description,
     String? streamTitle,
@@ -98,6 +102,7 @@ class TwitchChannelSnapshot {
       broadcasterLogin: broadcasterLogin ?? this.broadcasterLogin,
       broadcasterName: broadcasterName ?? this.broadcasterName,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      streamThumbnailUrl: streamThumbnailUrl ?? this.streamThumbnailUrl,
       offlineImageUrl: offlineImageUrl ?? this.offlineImageUrl,
       description: description ?? this.description,
       streamTitle: streamTitle ?? this.streamTitle,
@@ -116,6 +121,10 @@ class TwitchChannelSnapshot {
       broadcasterLogin: _prefer(next.broadcasterLogin, broadcasterLogin),
       broadcasterName: _prefer(next.broadcasterName, broadcasterName),
       profileImageUrl: _prefer(next.profileImageUrl, profileImageUrl),
+      streamThumbnailUrl: _prefer(
+        next.streamThumbnailUrl,
+        streamThumbnailUrl,
+      ),
       offlineImageUrl: _prefer(next.offlineImageUrl, offlineImageUrl),
       description: _prefer(next.description, description),
       streamTitle: _prefer(next.streamTitle, streamTitle),
