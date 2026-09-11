@@ -43,7 +43,11 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await playerPort.services.playerSession.useLowLatencyHlsProfile();
+      final session = playerPort.services.playerSession;
+      await session.useLowLatencyHlsProfile();
+      // Normal LIVE keeps FFmpeg's native HLS start policy. Local DVR overrides
+      // this to 0 only while opening its rolling playlist.
+      session.player.setProperty('demuxer-lavf-o', 'live_start_index=-3');
       await playerPort.openLive(
         channelLogin: channelLogin,
         forceOpen: forceOpen,
@@ -91,6 +95,15 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       // playlist. The later liveDvr cache profile introduced cache-pause and
       // demuxer readahead semantics that can visibly stall at HLS boundaries.
       await session.useLowLatencyHlsProfile();
+      await session.ensureReady();
+      // FFmpeg normally starts a live HLS playlist at live_start_index=-3.
+      // DVR's rolling window is anchored at the canonical target segment, so
+      // force index 0 only for this local playlist. Restore -3 for every other
+      // source so normal LIVE latency semantics stay unchanged.
+      session.player.setProperty(
+        'demuxer-lavf-o',
+        isLocalDvrSnapshot ? 'live_start_index=0' : 'live_start_index=-3',
+      );
       if (isLocalDvrSnapshot) {
         dvrTransitionGeneration =
             TwitchDvrTransitionMaskController.instance.begin();
@@ -101,7 +114,6 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           : const Duration(seconds: 2);
 
       if (startPosition != null) {
-        await session.ensureReady();
         session.player.setProperty(
           'hr-seek',
           shouldDeferInitialSeek && isLocalDvrSnapshot ? 'no' : 'yes',
@@ -114,9 +126,10 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
 
       if (isLocalDvrSnapshot) {
         debugPrint(
-          '[TwitchPlayer] VOD snapshot precise start '
+          '[TwitchPlayer] rolling DVR precise start '
           'target=${_seconds(startPosition!)}s '
           'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s '
+          'liveStartIndex=0 '
           'strategy=open-then-seek-no-wait '
           'probe=${_enableDvrTimingProbe ? "async" : "disabled"}',
         );
