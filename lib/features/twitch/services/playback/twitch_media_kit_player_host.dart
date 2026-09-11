@@ -47,9 +47,9 @@ class TwitchMediaKitPlayerHost {
   static const Map<String, String> _liveDvrHlsOptions = <String, String>{
     'cache': 'yes',
     'cache-pause': 'yes',
-    'cache-secs': '22',
+    'cache-secs': '8',
     'demuxer-seekable-cache': 'yes',
-    'demuxer-readahead-secs': '22',
+    'demuxer-readahead-secs': '8',
     'demuxer-max-back-bytes': '8388608',
     'demuxer-max-bytes': '25165824',
     'demuxer-donate-buffer': 'no',
