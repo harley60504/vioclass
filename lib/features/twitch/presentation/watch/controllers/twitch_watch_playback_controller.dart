@@ -188,7 +188,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           unawaited(
             _probeDvrTimingAfterOpen(
               playlistUrl: nextUri,
-              startPosition: startPosition,
+              startPosition: startPosition!,
             ),
           );
         }
