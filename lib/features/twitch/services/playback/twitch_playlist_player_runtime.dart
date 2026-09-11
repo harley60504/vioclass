@@ -754,20 +754,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
   Duration _canonicalizeDvrPosition(
     Duration fallbackPosition,
-    DateTime? targetProgramDateTime,
+    DateTime? _,
   ) {
-    final origin = _canonicalTimelineOrigin;
-    final targetUtc = targetProgramDateTime?.toUtc();
-    if (origin == null || targetUtc == null) return fallbackPosition;
-
-    final delta = targetUtc.difference(origin.toUtc());
-    final total = _canonicalLiveTotal;
-    if (delta.isNegative) return Duration.zero;
-    if (total == null || total <= Duration.zero) return delta;
-    final maxUs = total.inMicroseconds > 0 ? total.inMicroseconds - 1 : 0;
-    return Duration(
-      microseconds: delta.inMicroseconds.clamp(0, maxUs).toInt(),
-    );
+    // The UI/controller already owns the absolute HLS canonical target. Do not
+    // reinterpret it through a possibly older live-total snapshot here.
+    return fallbackPosition.isNegative ? Duration.zero : fallbackPosition;
   }
 
   String _formatSeconds(Duration? value) {
@@ -788,9 +779,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
 
-    // The canonical anchor is already refreshed continuously while LIVE is
-    // playing. Do not put another LIVE manifest request on the seek critical
-    // path; interpolate from the latest trusted anchor and refresh in parallel.
+    // Refresh timing in parallel for future seeks, but preserve this seek's
+    // already-selected absolute canonical position exactly.
     unawaited(_refreshCanonicalLiveTimingBestEffort());
     final canonicalPosition = _canonicalizeDvrPosition(
       position,
@@ -838,7 +828,13 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
           .clamp(1, const Duration(seconds: 20).inMicroseconds)
           .toInt(),
     );
-    await router.switchLiveReplayStream(fromLive: safeFromLive);
+    final canonicalTarget = Duration(
+      microseconds:
+          (timelineDuration.inMicroseconds - safeFromLive.inMicroseconds)
+              .clamp(0, timelineDuration.inMicroseconds)
+              .toInt(),
+    );
+    await router.switchLiveReplayStream(canonicalTarget: canonicalTarget);
     final playbackUrl = _routerStreamTsPlaybackUrl(router);
 
     _proxy = router;
@@ -855,8 +851,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _bridgeProxy = null;
     _liveDvrPlaylistOverride = null;
     debugPrint(
-      '[LiveBufferReplay] route fromLive=${_formatSeconds(safeFromLive)}s '
-      'player=$playbackUrl',
+      '[LiveBufferReplay] route target=${_formatSeconds(canonicalTarget)}s '
+      'fromLive=${_formatSeconds(safeFromLive)}s player=$playbackUrl',
     );
     _notifyListenersAfterFrame();
     return playbackUrl;
@@ -1209,14 +1205,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
 class _PlaybackCandidate {
   final String sourceTag;
-  final Uri masterUri;
+  final Uri masterPlaylistUri;
   final String masterPlaylistText;
   final TwitchPlaybackAccessToken token;
   final List<TwitchM3u8Variant> variants;
 
   const _PlaybackCandidate({
     required this.sourceTag,
-    required this.masterUri,
+    required this.masterPlaylistUri,
     required this.masterPlaylistText,
     required this.token,
     required this.variants,
