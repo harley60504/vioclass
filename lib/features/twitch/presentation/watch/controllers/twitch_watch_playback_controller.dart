@@ -86,12 +86,14 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       final shouldDeferInitialSeek =
           startPosition != null && (deferInitialSeek || isLocalDvrSnapshot);
 
+      // Match the proven 1.1.9 playback behavior: keep the shared mpv player
+      // on the low-latency/no-cache profile even while playing the local DVR
+      // playlist. The later liveDvr cache profile introduced cache-pause and
+      // demuxer readahead semantics that can visibly stall at HLS boundaries.
+      await session.useLowLatencyHlsProfile();
       if (isLocalDvrSnapshot) {
-        await session.useLiveDvrHlsCacheProfile();
         dvrTransitionGeneration =
             TwitchDvrTransitionMaskController.instance.begin();
-      } else {
-        await session.useLowLatencyHlsProfile();
       }
 
       final hrSeekDemuxerOffset = isLocalDvrSnapshot
