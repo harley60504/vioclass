@@ -236,13 +236,17 @@ class TwitchStableHlsProxyRouter {
     }
   }
 
-  Future<void> switchLiveReplayStream({required Duration fromLive}) async {
+  Future<void> switchLiveReplayStream({
+    required Duration canonicalTarget,
+  }) async {
     final inner = _inner;
     final replay = _replayProxy;
     if (inner == null || !inner.isRunning || replay == null || !replay.isRunning) {
       throw StateError('Live replay source not ready');
     }
-    final replayUri = Uri.parse(replay.streamUrl(fromLive: fromLive));
+    final replayUri = Uri.parse(
+      replay.streamUrlForCanonicalTarget(canonicalTarget: canonicalTarget),
+    );
     _switching = true;
     _directStreamUri = replayUri;
     _directStreamGeneration++;
