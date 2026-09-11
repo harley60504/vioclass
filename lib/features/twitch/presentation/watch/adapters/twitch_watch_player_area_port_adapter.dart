@@ -103,6 +103,12 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final port = TwitchWatchPortScope.playerOf(context);
+    final usesLiveTimeline =
+        playbackKind == TwitchWatchPlaybackKind.live ||
+        playbackKind == TwitchWatchPlaybackKind.liveDvr;
+    final effectiveLiveDvrDuration = usesLiveTimeline
+        ? port.runtime.canonicalLiveTimelineDuration ?? liveDvrDuration
+        : liveDvrDuration;
     return TwitchWatchPlayerArea(
       playerRuntime: port.runtime,
       player: port.playerOrNull,
@@ -142,7 +148,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
       hasDvrReplay: hasDvrReplay,
       hasFullLiveDvr: hasFullLiveDvr,
       showLiveEdgeLabel: showLiveEdgeLabel,
-      liveDvrDuration: liveDvrDuration,
+      liveDvrDuration: effectiveLiveDvrDuration,
       liveDvrStartedAt: liveDvrStartedAt,
       onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
       onReturnToLive: onReturnToLive,
