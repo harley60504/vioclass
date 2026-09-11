@@ -56,6 +56,13 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   Duration? _lastObservedMediaPosition;
   DateTime? _mediaAnchorObservedAt;
 
+  // The stable /stream.ts URL deliberately survives Local TS route changes,
+  // so neither media URI nor native player.position can identify a new seek.
+  // The replay proxy increments this revision for every resolved replay request.
+  // Keep it separate from _clearMediaClockAnchor(): while a new seek is being
+  // committed we must not re-bind the old replay revision to its old target.
+  int? _localReplayAnchorRevision;
+
   TwitchPlaybackTimelineSnapshot get snapshot {
     final mode = _mode ?? TwitchPlaybackTimelineMode.live;
     final duration = _duration;
@@ -136,13 +143,19 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       return;
     }
 
-    // Local near-live replay outputs the complete resolved TS segment. Its
-    // canonical segment start is known exactly by SegmentTimelineIndex, while
-    // media_kit reports elapsed playback from that local TS stream.
+    // Local near-live replay is routed through one stable /stream.ts response.
+    // media_kit therefore keeps a continuous native position across replay
+    // switches. Never treat that absolute native position as elapsed time from
+    // the newly resolved segment start: doing so turns a requested -10s target
+    // into roughly -5s when the native stream clock has already accumulated 5s.
+    // Instead, bind the current native position to the runtime's committed
+    // canonical target once per replay revision, then advance by native delta.
     final localReplayStart =
         TwitchCanonicalPlaybackClockRegistry.localReplayCanonicalStart;
     final localReplaySequence =
         TwitchCanonicalPlaybackClockRegistry.localReplaySequence;
+    final localReplayRevision =
+        TwitchCanonicalPlaybackClockRegistry.localReplayRevision;
     final looksLikeTsSource = mediaUri != null && mediaUri.contains('/stream.ts');
     final behindLive =
         canonicalPosition != null &&
@@ -154,24 +167,35 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         mediaPosition != null &&
         !_dragging &&
         _pendingSeekTarget == null) {
-      // A 20-second Local TS source is ephemeral. After foreground resume the
-      // old segment/media anchor may no longer describe the bytes media_kit is
-      // receiving. The runtime's canonicalPosition preserves the requested
-      // from-live delay, so re-anchor the *current* media position to it once.
-      // This does not fabricate elapsed playback time and avoids carrying the
-      // stale pre-background anchor forward.
-      if (_foregroundReanchorPending && canonicalPosition != null) {
+      final localMediaRestarted =
+          previousMediaPosition != null &&
+          mediaPosition + _mediaRestartTolerance < previousMediaPosition;
+      final localSourceChanged = mediaUri != _mediaAnchorUri;
+      final replayChanged =
+          _localReplayAnchorRevision != localReplayRevision;
+      final firstLocalAnchor = _localReplayAnchorRevision == null;
+      final shouldReanchor =
+          replayChanged ||
+          firstLocalAnchor ||
+          _foregroundReanchorPending ||
+          localSourceChanged ||
+          localMediaRestarted;
+
+      if (shouldReanchor && canonicalPosition != null) {
         _mediaAnchorUri = mediaUri;
         _mediaAnchorPosition = mediaPosition;
         _canonicalAnchorPosition = canonicalPosition;
         _mediaAnchorObservedAt = now;
         _lastObservedMediaPosition = mediaPosition;
+        _localReplayAnchorRevision = localReplayRevision;
         _position = _clampPosition(canonicalPosition, duration);
         _foregroundReanchorPending = false;
         if (kDebugMode) {
           debugPrint(
-            '[CanonicalPlaybackClock][LOCAL-FOREGROUND] '
+            '[CanonicalPlaybackClock][LOCAL-ANCHOR] '
+            'revision=$localReplayRevision '
             'sequence=${localReplaySequence ?? -1} '
+            'segmentStart=${_seconds(localReplayStart)}s '
             'media=${_seconds(mediaPosition)}s '
             'canonical=${_seconds(canonicalPosition)}s',
           );
@@ -179,20 +203,24 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         return;
       }
 
-      _mediaAnchorUri = mediaUri;
-      _mediaAnchorPosition = Duration.zero;
-      _canonicalAnchorPosition = localReplayStart;
-      _mediaAnchorObservedAt = now;
       _lastObservedMediaPosition = mediaPosition;
-      _position = _clampPosition(localReplayStart + mediaPosition, duration);
-      if (kDebugMode && localReplaySequence != null) {
-        debugPrint(
-          '[CanonicalPlaybackClock][LOCAL-UI] '
-          'sequence=$localReplaySequence '
-          'segmentStart=${_seconds(localReplayStart)}s '
-          'media=${_seconds(mediaPosition)}s '
-          'canonical=${_seconds(_position ?? Duration.zero)}s',
-        );
+      final mediaAnchor = _mediaAnchorPosition;
+      final canonicalAnchor = _canonicalAnchorPosition;
+      if (mediaAnchor != null && canonicalAnchor != null) {
+        final mapped = canonicalAnchor + (mediaPosition - mediaAnchor);
+        _position = _clampPosition(mapped, duration);
+        if (kDebugMode && localReplaySequence != null) {
+          debugPrint(
+            '[CanonicalPlaybackClock][LOCAL-UI] '
+            'revision=$localReplayRevision '
+            'sequence=$localReplaySequence '
+            'segmentStart=${_seconds(localReplayStart)}s '
+            'mediaAnchor=${_seconds(mediaAnchor)}s '
+            'media=${_seconds(mediaPosition)}s '
+            'canonicalAnchor=${_seconds(canonicalAnchor)}s '
+            'canonical=${_seconds(_position ?? Duration.zero)}s',
+          );
+        }
       }
       return;
     }
@@ -405,6 +433,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _dragging = false;
     _advancing = false;
     _foregroundReanchorPending = false;
+    _localReplayAnchorRevision = null;
     _clearMediaClockAnchor();
     notifyListeners();
   }
