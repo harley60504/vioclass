@@ -45,8 +45,6 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     try {
       final session = playerPort.services.playerSession;
       await session.useLowLatencyHlsProfile();
-      // Normal LIVE keeps FFmpeg's native HLS start policy. Local DVR overrides
-      // this to 0 only while opening its rolling playlist.
       session.player.setProperty('demuxer-lavf-o', 'live_start_index=-3');
       await playerPort.openLive(
         channelLogin: channelLogin,
@@ -83,40 +81,59 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     try {
       final nextUri = uri.trim();
       final session = playerPort.services.playerSession;
+      final isLoopback = nextUri.startsWith('http://127.0.0.1:');
       final isLocalDvrSnapshot =
           startPosition != null &&
-          nextUri.startsWith('http://127.0.0.1:') &&
+          isLoopback &&
           nextUri.contains('/playlist.m3u8?v=');
-      final shouldDeferInitialSeek =
-          startPosition != null && (deferInitialSeek || isLocalDvrSnapshot);
+      final isLocalDvrStream =
+          startPosition != null &&
+          isLoopback &&
+          nextUri.contains('/stream.ts?v=');
+      final isLocalDvr = isLocalDvrSnapshot || isLocalDvrStream;
 
-      // Match the proven 1.1.9 playback behavior: keep the shared mpv player
-      // on the low-latency/no-cache profile even while playing the local DVR
-      // playlist. The later liveDvr cache profile introduced cache-pause and
-      // demuxer readahead semantics that can visibly stall at HLS boundaries.
+      // A raw sequential DVR stream must not be reopened by the old deferred
+      // HLS seek/retry path. Media.start handles the intra-segment offset while
+      // the bridge keeps one continuous upstream segment pump.
+      final shouldDeferInitialSeek =
+          startPosition != null &&
+          !isLocalDvrStream &&
+          (deferInitialSeek || isLocalDvrSnapshot);
+
+      if (isLocalDvrStream) {
+        // Stop any near-live stable-router pump before the independent DVR TS
+        // source opens. This prevents an old replay request from continuing to
+        // consume Twitch bandwidth beside the new sequential downloader.
+        await playerPort.runtime.proxy?.interruptPlaybackStream();
+      }
+
+      // Keep the shared mpv player on the low-latency/no-cache profile. The DVR
+      // bridge now owns buffering and upstream ordering itself.
       await session.useLowLatencyHlsProfile();
       await session.ensureReady();
-      // FFmpeg normally starts a live HLS playlist at live_start_index=-3.
-      // DVR's rolling window is anchored at the canonical target segment, so
-      // force index 0 only for this local playlist. Restore -3 for every other
-      // source so normal LIVE latency semantics stay unchanged.
       session.player.setProperty(
         'demuxer-lavf-o',
         isLocalDvrSnapshot ? 'live_start_index=0' : 'live_start_index=-3',
       );
-      if (isLocalDvrSnapshot) {
+      if (isLocalDvr) {
         dvrTransitionGeneration =
             TwitchDvrTransitionMaskController.instance.begin();
       }
 
-      final hrSeekDemuxerOffset = isLocalDvrSnapshot
+      final hrSeekDemuxerOffset = isLocalDvrStream
+          ? Duration.zero
+          : isLocalDvrSnapshot
           ? TwitchLocalDvrMediaTimingProbe.cachedSuggestedDemuxerOffset
           : const Duration(seconds: 2);
 
       if (startPosition != null) {
         session.player.setProperty(
           'hr-seek',
-          shouldDeferInitialSeek && isLocalDvrSnapshot ? 'no' : 'yes',
+          isLocalDvrStream
+              ? 'no'
+              : shouldDeferInitialSeek && isLocalDvrSnapshot
+              ? 'no'
+              : 'yes',
         );
         session.player.setProperty(
           'hr-seek-demuxer-offset',
@@ -124,7 +141,13 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         );
       }
 
-      if (isLocalDvrSnapshot) {
+      if (isLocalDvrStream) {
+        debugPrint(
+          '[TwitchPlayer] sequential DVR start '
+          'target=${_seconds(startPosition!)}s '
+          'strategy=media-start-single-stream',
+        );
+      } else if (isLocalDvrSnapshot) {
         debugPrint(
           '[TwitchPlayer] rolling DVR precise start '
           'target=${_seconds(startPosition!)}s '
@@ -218,10 +241,35 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           forceOpen: forceOpen,
           startPosition: startPosition,
         );
+
+        if (isLocalDvrStream) {
+          final transitionGeneration = dvrTransitionGeneration;
+          if (transitionGeneration != null) {
+            if (play) {
+              unawaited(
+                TwitchDvrTransitionMaskController.instance.revealWhenReady(
+                  player: session.player,
+                  target: startPosition!,
+                  generation: transitionGeneration,
+                ),
+              );
+            } else {
+              TwitchDvrTransitionMaskController.instance.cancel(
+                transitionGeneration,
+                reason: 'paused',
+              );
+            }
+          }
+        }
       }
       openStopwatch.stop();
 
-      if (isLocalDvrSnapshot) {
+      if (isLocalDvrStream) {
+        debugPrint(
+          '[PlaybackLatency] dvrSequentialStartup=${openStopwatch.elapsedMilliseconds}ms '
+          'target=${_seconds(startPosition!)}s',
+        );
+      } else if (isLocalDvrSnapshot) {
         debugPrint(
           '[PlaybackLatency] dvrStartupTotal=${openStopwatch.elapsedMilliseconds}ms '
           'target=${_seconds(startPosition!)}s',
