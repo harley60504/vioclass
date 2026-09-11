@@ -56,6 +56,7 @@ class TwitchLiveDvrBridgeProxy {
   Future<HttpClientResponse?>? _prefetchedSegmentResponse;
   DateTime? _prefetchedSegmentStartedAt;
   bool _prefetchedSegmentClaimed = false;
+  int _prefetchHighWaterSnapshotIndex = -1;
 
   TwitchLiveDvrBridgeProxy({Dio? dio})
     : _dio =
@@ -188,8 +189,10 @@ class TwitchLiveDvrBridgeProxy {
     _snapshotItems = List<TwitchHlsSegmentItem>.unmodifiable(
       items.sublist(snapshotStartIndex),
     );
+    _prefetchHighWaterSnapshotIndex = -1;
 
     if (_snapshotItems.isNotEmpty) {
+      _prefetchHighWaterSnapshotIndex = 0;
       _startFirstSegmentPrefetch(
         Uri.parse(_snapshotItems.first.url),
         _streamGeneration,
@@ -252,6 +255,7 @@ class TwitchLiveDvrBridgeProxy {
     _snapshotSourceStartIndex = null;
     _snapshotCanonicalStart = Duration.zero;
     _snapshotPlayerStart = Duration.zero;
+    _prefetchHighWaterSnapshotIndex = -1;
     _clearFirstSegmentPrefetch(cancelPending: true);
   }
 
@@ -311,12 +315,24 @@ class TwitchLiveDvrBridgeProxy {
     final index = _snapshotItems.indexWhere((item) => item.url == source);
     if (index < 0 || index + 1 >= _snapshotItems.length) return;
 
-    final next = Uri.parse(_snapshotItems[index + 1].url);
+    final nextIndex = index + 1;
+    if (nextIndex <= _prefetchHighWaterSnapshotIndex) {
+      debugPrint(
+        '[LiveDvrBridge][Prefetch] skip-regression generation=$generation '
+        'from=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last} '
+        'nextIndex=$nextIndex highWater=$_prefetchHighWaterSnapshotIndex',
+      );
+      return;
+    }
+
+    _prefetchHighWaterSnapshotIndex = nextIndex;
+    final next = Uri.parse(_snapshotItems[nextIndex].url);
     _startFirstSegmentPrefetch(next, generation);
     debugPrint(
       '[LiveDvrBridge][Prefetch] rolling generation=$generation '
       'from=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last} '
-      'next=${next.pathSegments.isEmpty ? next.path : next.pathSegments.last}',
+      'next=${next.pathSegments.isEmpty ? next.path : next.pathSegments.last} '
+      'index=$nextIndex',
     );
   }
 
@@ -592,6 +608,7 @@ class TwitchLiveDvrBridgeProxy {
       'snapshot_player_start_ms=${_snapshotPlayerStart.inMilliseconds}\n'
       'prefetch_generation=${_prefetchedSegmentGeneration ?? -1}\n'
       'prefetch_claimed=$_prefetchedSegmentClaimed\n'
+      'prefetch_high_water_index=$_prefetchHighWaterSnapshotIndex\n'
       'preroll_policy=dynamic-${_dvrPrerollBackoff.inMilliseconds}ms\n'
       'clock=${_dvrSeekTargetProgramDateTime != null ? 'program-date-time' : 'extinf'}\n',
     );
