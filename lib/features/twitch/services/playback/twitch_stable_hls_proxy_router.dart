@@ -252,6 +252,17 @@ class TwitchStableHlsProxyRouter {
     _switchGeneration++;
   }
 
+  /// Stops the currently attached stable stream without tearing down the warm
+  /// low-latency/live-replay proxies. Used when playback moves to the separate
+  /// DVR TS bridge so a stale near-live pump cannot keep consuming bandwidth.
+  Future<void> interruptPlaybackStream() async {
+    _streamClientGeneration++;
+    _directStreamUri = null;
+    _directStreamGeneration++;
+    _switchGeneration++;
+    await _interruptActiveUpstream();
+  }
+
   Future<void> waitUntilPrewarmed({
     Duration timeout = const Duration(milliseconds: 700),
   }) async {
