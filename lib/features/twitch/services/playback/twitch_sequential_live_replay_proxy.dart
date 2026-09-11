@@ -43,6 +43,7 @@ class TwitchSequentialLiveReplayProxy {
       <String, TwitchTsTimingInfo>{};
 
   HttpServer? _server;
+  int _seekGeneration = 0;
 
   bool get isRunning => _server != null;
 
@@ -55,7 +56,15 @@ class TwitchSequentialLiveReplayProxy {
       1,
       const Duration(seconds: 20).inMicroseconds,
     );
-    return 'http://127.0.0.1:${server.port}/stream.ts?fromLiveUs=$fromLiveUs';
+    final generation = ++_seekGeneration;
+
+    // A new absolute timeline seek immediately invalidates every older replay
+    // request. Keep the registry empty until this generation resolves its own
+    // segment so an old segment anchor cannot be rebound during the switch.
+    TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
+
+    return 'http://127.0.0.1:${server.port}/stream.ts'
+        '?fromLiveUs=$fromLiveUs&generation=$generation';
   }
 
   Future<void> start() async {
@@ -69,6 +78,7 @@ class TwitchSequentialLiveReplayProxy {
   Future<void> close() async {
     final server = _server;
     _server = null;
+    _seekGeneration++;
     _timingCache.clear();
     TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
     await server?.close(force: true);
@@ -99,6 +109,16 @@ class TwitchSequentialLiveReplayProxy {
       final rawUs = int.tryParse(
         request.uri.queryParameters['fromLiveUs'] ?? '',
       );
+      final generation = int.tryParse(
+            request.uri.queryParameters['generation'] ?? '',
+          ) ??
+          _seekGeneration;
+      if (generation != _seekGeneration) {
+        request.response.statusCode = HttpStatus.gone;
+        await request.response.close();
+        return;
+      }
+
       final fromLive = Duration(
         microseconds: (rawUs ?? const Duration(seconds: 10).inMicroseconds)
             .clamp(1, const Duration(seconds: 20).inMicroseconds)
@@ -106,7 +126,14 @@ class TwitchSequentialLiveReplayProxy {
       );
       request.response.statusCode = HttpStatus.ok;
       request.response.bufferOutput = false;
-      await _streamSequentialReplay(request.response, fromLive);
+      await _streamSequentialReplay(
+        request.response,
+        fromLive,
+        generation,
+      );
+      try {
+        await request.response.close();
+      } catch (_) {}
     } catch (error) {
       try {
         request.response.statusCode = HttpStatus.internalServerError;
@@ -121,8 +148,11 @@ class TwitchSequentialLiveReplayProxy {
   Future<void> _streamSequentialReplay(
     HttpResponse response,
     Duration fromLive,
+    int generation,
   ) async {
     var playlist = await _loadPlaylist();
+    if (generation != _seekGeneration || _server == null) return;
+
     var items = _orderedItems(playlist);
     if (items.isEmpty) return;
 
@@ -137,16 +167,20 @@ class TwitchSequentialLiveReplayProxy {
       items: items,
       targetPosition: target,
     );
+    if (generation != _seekGeneration || _server == null) return;
+
     var nextSequence = resolved.item.sequence;
     String? lastMapUrl;
     final targetSequence = resolved.item.sequence;
 
     TwitchCanonicalPlaybackClockRegistry.setLocalReplayAnchor(
       canonicalStart: resolved.segmentStart,
+      intraSegment: resolved.intraSegment,
       sequence: targetSequence,
     );
     _log(
       '[CanonicalPlaybackClock][LOCAL] '
+      'generation=$generation '
       'segment=$targetSequence '
       'canonicalStart=${_seconds(resolved.segmentStart)}s '
       'requested=${_seconds(target)}s '
@@ -154,14 +188,14 @@ class TwitchSequentialLiveReplayProxy {
     );
 
     _log(
-      'seek fromLive=${_seconds(fromLive)}s '
+      'seek generation=$generation fromLive=${_seconds(fromLive)}s '
       'target=${_seconds(target)}s segment=$nextSequence '
       'segmentStart=${_seconds(resolved.segmentStart)}s '
       'intra=${_seconds(resolved.intraSegment)}s '
       'clock=${resolved.usedCanonicalIndex ? 'segment-index' : resolved.usedTwitchElapsed ? 'twitch-total/elapsed' : 'tail-fallback'}',
     );
 
-    while (_server != null) {
+    while (_server != null && generation == _seekGeneration) {
       items = _orderedItems(playlist);
       TwitchHlsSegmentItem? item;
       for (final candidate in items) {
@@ -183,13 +217,16 @@ class TwitchSequentialLiveReplayProxy {
         }
 
         await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (generation != _seekGeneration || _server == null) return;
         playlist = await _loadPlaylistBestEffort(playlist);
         continue;
       }
 
+      if (generation != _seekGeneration) return;
       final mapUrl = item.mapUrl;
       if (mapUrl != null && mapUrl != lastMapUrl) {
         await _pipeUrlWithRetry(response, mapUrl, futureLike: false);
+        if (generation != _seekGeneration) return;
         lastMapUrl = mapUrl;
       }
 
@@ -200,6 +237,7 @@ class TwitchSequentialLiveReplayProxy {
             ? resolved.intraSegment
             : null,
       );
+      if (generation != _seekGeneration) return;
       nextSequence = item.sequence + 1;
 
       final hasNextInSnapshot = items.any(
@@ -207,6 +245,7 @@ class TwitchSequentialLiveReplayProxy {
       );
       if (!hasNextInSnapshot) {
         await Future<void>.delayed(const Duration(milliseconds: 70));
+        if (generation != _seekGeneration || _server == null) return;
         playlist = await _loadPlaylistBestEffort(playlist);
       }
     }
@@ -432,7 +471,7 @@ class TwitchSequentialLiveReplayProxy {
 
   void _rememberTiming(String url, TwitchTsTimingInfo timing) {
     _timingCache.remove(url);
-    _timingCache[url] = timing;
+    _timingCache[item.url] = timing;
     while (_timingCache.length > _maxTimingCacheEntries) {
       _timingCache.remove(_timingCache.keys.first);
     }
