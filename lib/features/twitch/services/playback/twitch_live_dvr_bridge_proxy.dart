@@ -12,9 +12,9 @@ import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
 class TwitchLiveDvrBridgeProxy {
-  static const Duration _dvrPrerollBackoff = Duration(milliseconds: 2500);
   static const Duration _freshIndexReuseWindow = Duration(seconds: 4);
-  static const int _slidingWindowSize = 6;
+  static const int _eventInitialSegmentCount = 6;
+  static const int _eventAheadSegmentCount = 5;
 
   final Dio _dio;
   final HttpClient _client = HttpClient()
@@ -37,13 +37,16 @@ class TwitchLiveDvrBridgeProxy {
   DateTime? _dvrSeekTargetProgramDateTime;
   DateTime _dvrSeekStartedAt = DateTime.now();
 
-  // A DVR seek keeps a stable list of archive segments for canonical/PDT seek
-  // geometry, but mpv is only shown a small live-style sliding HLS window. This
-  // matches the smooth 1.1.9 playback behavior while preserving the newer
-  // canonical timeline and precise seek resolution.
+  // Canonical time and media time intentionally use different clocks.
+  // Canonical/PDT resolves the requested target to one archive segment and an
+  // offset inside that segment. mpv then sees an EVENT playlist whose local
+  // media time starts at that segment. The event playlist keeps a fixed first
+  // media sequence and only appends segments, so player time never has to track
+  // the full Twitch archive duration.
   List<TwitchHlsSegmentItem> _snapshotItems = const <TwitchHlsSegmentItem>[];
   int? _snapshotGeneration;
   int? _snapshotSourceStartIndex;
+  int? _snapshotStartSequence;
   Duration _snapshotCanonicalStart = Duration.zero;
   Duration _snapshotPlayerStart = Duration.zero;
   int _snapshotPlaybackIndex = 0;
@@ -137,17 +140,11 @@ class TwitchLiveDvrBridgeProxy {
         ? canonicalPosition
         : resolvedSeek.canonicalPosition;
 
-    final needsPreviousSegment =
-        targetIndex > 0 && segmentOffset < _dvrPrerollBackoff;
-    final snapshotStartIndex = needsPreviousSegment
-        ? targetIndex - 1
-        : targetIndex;
-    final prerollSegments = targetIndex - snapshotStartIndex;
-    final preroll = timeline.durationBetweenIndexes(
-      snapshotStartIndex,
-      targetIndex,
-    );
-    final playerStartPosition = preroll + segmentOffset;
+    // Important: the player source begins exactly at the target segment. Never
+    // carry previous-segment preroll into player time. The only seek mpv sees is
+    // the offset within this first segment.
+    final snapshotStartIndex = targetIndex;
+    final playerStartPosition = segmentOffset;
 
     _seekPosition = resolvedTimelinePosition;
     _timelinePosition = resolvedTimelinePosition;
@@ -159,6 +156,7 @@ class TwitchLiveDvrBridgeProxy {
     _streamGeneration++;
     _snapshotGeneration = _streamGeneration;
     _snapshotSourceStartIndex = snapshotStartIndex;
+    _snapshotStartSequence = items[snapshotStartIndex].sequence;
     _snapshotCanonicalStart =
         timeline.entryAt(snapshotStartIndex)?.canonicalStart ?? Duration.zero;
     _snapshotPlayerStart = playerStartPosition;
@@ -178,11 +176,11 @@ class TwitchLiveDvrBridgeProxy {
     debugPrint(
       '[LiveDvrBridge] seek position=${_seconds(resolvedTimelinePosition)}s '
       'segment=$targetIndex offset=${segmentOffset.inMilliseconds}ms '
-      'prerollStart=$snapshotStartIndex prerollSegments=$prerollSegments '
+      'eventStart=$snapshotStartIndex '
       'playerStart=${playerStartPosition.inMilliseconds}ms '
       'snapshotItems=${_snapshotItems.length} '
       'snapshotDuration=${_seconds(snapshotDuration)}s '
-      'output=sliding-hls window=$_slidingWindowSize '
+      'output=event-hls '
       'clock=${usedProgramDateTime ? 'program-date-time' : 'extinf'} '
       'generation=$_streamGeneration',
     );
@@ -222,6 +220,7 @@ class TwitchLiveDvrBridgeProxy {
     _snapshotItems = const <TwitchHlsSegmentItem>[];
     _snapshotGeneration = null;
     _snapshotSourceStartIndex = null;
+    _snapshotStartSequence = null;
     _snapshotCanonicalStart = Duration.zero;
     _snapshotPlayerStart = Duration.zero;
     _snapshotPlaybackIndex = 0;
@@ -269,6 +268,20 @@ class TwitchLiveDvrBridgeProxy {
     _latestTimelineIndex = index;
     _latestDuration = index.indexedDuration;
     _latestItemsObservedAt = DateTime.now().toUtc();
+  }
+
+  void _syncEventItemsFromLatest() {
+    final startSequence = _snapshotStartSequence;
+    if (startSequence == null || _latestItems.isEmpty) return;
+
+    final start = _latestItems.indexWhere(
+      (item) => item.sequence == startSequence,
+    );
+    if (start < 0) return;
+
+    final candidate = _latestItems.sublist(start);
+    if (candidate.length <= _snapshotItems.length) return;
+    _snapshotItems = List<TwitchHlsSegmentItem>.unmodifiable(candidate);
   }
 
   Future<HttpServer> _ensureServer() async {
@@ -397,7 +410,7 @@ class TwitchLiveDvrBridgeProxy {
       _snapshotPlaybackIndex = index;
     }
     debugPrint(
-      '[DvrSlidingWindow] request generation=$generation '
+      '[DvrEvent] request generation=$generation '
       'index=$index highWater=$_snapshotPlaybackIndex '
       'segment=${_segmentName(sourceUri)}',
     );
@@ -441,8 +454,7 @@ class TwitchLiveDvrBridgeProxy {
       'snapshot_duration_ms=${snapshotDuration.inMilliseconds}\n'
       'snapshot_player_start_ms=${_snapshotPlayerStart.inMilliseconds}\n'
       'snapshot_playback_index=$_snapshotPlaybackIndex\n'
-      'playlist_mode=sliding-hls\n'
-      'preroll_policy=dynamic-${_dvrPrerollBackoff.inMilliseconds}ms\n'
+      'playlist_mode=event-hls\n'
       'clock=${_dvrSeekTargetProgramDateTime != null ? 'program-date-time' : 'extinf'}\n',
     );
     await request.response.close();
@@ -450,40 +462,46 @@ class TwitchLiveDvrBridgeProxy {
 
   Future<String> _buildPlaylist(int generation) async {
     if (_snapshotGeneration == generation && _snapshotItems.isNotEmpty) {
-      return _slidingSnapshotPlaylist(generation);
+      return _eventSnapshotPlaylist(generation);
     }
     return _buildGrowingDvrPlaylist(generation);
   }
 
-  String _slidingSnapshotPlaylist(int generation) {
+  Future<String> _eventSnapshotPlaylist(int generation) async {
+    await _refreshLatestItemsBestEffort();
+    _syncEventItemsFromLatest();
+
     final items = _snapshotItems;
     if (items.isEmpty) return _emptyPlaylist();
 
-    final current = _snapshotPlaybackIndex.clamp(0, items.length - 1).toInt();
-    final windowStart = math.max(0, current - 1).toInt();
-    final windowEnd = math.min(items.length, windowStart + _slidingWindowSize).toInt();
-    final window = items.sublist(windowStart, windowEnd);
-    final maxDurationMs = window.fold<int>(
+    final visibleCount = math.min(
+      items.length,
+      math.max(
+        _eventInitialSegmentCount,
+        _snapshotPlaybackIndex + _eventAheadSegmentCount + 1,
+      ),
+    ).toInt();
+    final visible = items.sublist(0, visibleCount);
+    final maxDurationMs = visible.fold<int>(
       1000,
       (currentMax, item) =>
           math.max(currentMax, item.duration.inMilliseconds).toInt(),
     );
 
     debugPrint(
-      '[LiveDvrBridge] playlist sliding generation=$generation '
+      '[LiveDvrBridge] playlist event generation=$generation '
       'sourceStart=${_snapshotSourceStartIndex ?? -1} '
-      'current=$current window=$windowStart..${windowEnd - 1} '
-      'mediaSeq=${window.first.sequence} '
+      'mediaSeq=${visible.first.sequence} visible=$visibleCount '
+      'highWater=$_snapshotPlaybackIndex '
       'playerStart=${_seconds(_snapshotPlayerStart)}s endlist=false',
     );
 
     return _segmentPlaylist(
-      items: window,
-      mediaSequence: window.first.sequence,
+      items: visible,
+      mediaSequence: visible.first.sequence,
       targetDuration: Duration(milliseconds: maxDurationMs),
       generation: generation,
-      endList: false,
-      playlistTypeVod: false,
+      playlistTypeEvent: true,
     );
   }
 
@@ -507,8 +525,7 @@ class TwitchLiveDvrBridgeProxy {
       mediaSequence: items[start].sequence,
       targetDuration: playlist.targetDuration,
       generation: generation,
-      endList: false,
-      playlistTypeVod: false,
+      playlistTypeEvent: false,
     );
   }
 
@@ -517,8 +534,7 @@ class TwitchLiveDvrBridgeProxy {
     required int mediaSequence,
     required Duration targetDuration,
     required int generation,
-    required bool endList,
-    required bool playlistTypeVod,
+    required bool playlistTypeEvent,
   }) {
     final targetSeconds = math.max(
       1,
@@ -530,12 +546,8 @@ class TwitchLiveDvrBridgeProxy {
       ..writeln('#EXT-X-TARGETDURATION:$targetSeconds')
       ..writeln('#EXT-X-MEDIA-SEQUENCE:$mediaSequence');
 
-    if (playlistTypeVod) {
-      buffer.writeln('#EXT-X-PLAYLIST-TYPE:VOD');
-    } else {
-      buffer
-        ..writeln('#EXT-X-DISCONTINUITY-SEQUENCE:$generation')
-        ..writeln('#EXT-X-DISCONTINUITY');
+    if (playlistTypeEvent) {
+      buffer.writeln('#EXT-X-PLAYLIST-TYPE:EVENT');
     }
 
     for (final item in items) {
@@ -554,7 +566,6 @@ class TwitchLiveDvrBridgeProxy {
         ..writeln(_segmentProxyPath(item.url, generation));
     }
 
-    if (endList) buffer.writeln('#EXT-X-ENDLIST');
     return buffer.toString();
   }
 
