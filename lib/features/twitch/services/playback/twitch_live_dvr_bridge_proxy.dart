@@ -45,12 +45,12 @@ class TwitchLiveDvrBridgeProxy {
   Duration _snapshotCanonicalStart = Duration.zero;
   Duration _snapshotPlayerStart = Duration.zero;
 
-  // Prime only the first segment connection of the current frozen snapshot.
-  // We intentionally do not read the body into RAM. The upstream response is
-  // held until mpv asks the local proxy for that exact segment, then its body is
-  // streamed directly to mpv. This overlaps DNS/TLS/request latency with
-  // Player.open without adding a second segment download or a large memory
-  // cache.
+  // Keep one upstream DVR segment response primed ahead of mpv. Startup primes
+  // the first snapshot segment; once mpv begins consuming segment N, the proxy
+  // immediately primes N+1. Only headers/the live response are retained here;
+  // the body is streamed directly to mpv when requested, so this removes the
+  // repeated DNS/TLS/request stall at HLS boundaries without building a large
+  // in-memory segment cache.
   int? _prefetchedSegmentGeneration;
   Uri? _prefetchedSegmentUri;
   Future<HttpClientResponse?>? _prefetchedSegmentResponse;
@@ -252,19 +252,41 @@ class TwitchLiveDvrBridgeProxy {
     _snapshotSourceStartIndex = null;
     _snapshotCanonicalStart = Duration.zero;
     _snapshotPlayerStart = Duration.zero;
-    _clearFirstSegmentPrefetch();
+    _clearFirstSegmentPrefetch(cancelPending: true);
   }
 
-  void _clearFirstSegmentPrefetch() {
+  void _clearFirstSegmentPrefetch({bool cancelPending = false}) {
+    final pending = _prefetchedSegmentResponse;
+    final claimed = _prefetchedSegmentClaimed;
     _prefetchedSegmentGeneration = null;
     _prefetchedSegmentUri = null;
     _prefetchedSegmentResponse = null;
     _prefetchedSegmentStartedAt = null;
     _prefetchedSegmentClaimed = false;
+    if (cancelPending && pending != null && !claimed) {
+      unawaited(_cancelPrefetchedResponse(pending));
+    }
+  }
+
+  Future<void> _cancelPrefetchedResponse(
+    Future<HttpClientResponse?> pending,
+  ) async {
+    try {
+      final upstream = await pending;
+      if (upstream == null) return;
+      final subscription = upstream.listen((_) {});
+      await subscription.cancel();
+    } catch (_) {}
   }
 
   void _startFirstSegmentPrefetch(Uri sourceUri, int generation) {
-    _clearFirstSegmentPrefetch();
+    if (generation != _streamGeneration) return;
+    if (_prefetchedSegmentGeneration == generation &&
+        _prefetchedSegmentUri == sourceUri &&
+        !_prefetchedSegmentClaimed) {
+      return;
+    }
+    _clearFirstSegmentPrefetch(cancelPending: true);
     _prefetchedSegmentGeneration = generation;
     _prefetchedSegmentUri = sourceUri;
     _prefetchedSegmentStartedAt = DateTime.now();
@@ -275,6 +297,26 @@ class TwitchLiveDvrBridgeProxy {
     debugPrint(
       '[LiveDvrBridge][Prefetch] start generation=$generation '
       'segment=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last}',
+    );
+  }
+
+  void _startNextSnapshotSegmentPrefetch(Uri sourceUri, int generation) {
+    if (generation != _streamGeneration ||
+        _snapshotGeneration != generation ||
+        _snapshotItems.length < 2) {
+      return;
+    }
+
+    final source = sourceUri.toString();
+    final index = _snapshotItems.indexWhere((item) => item.url == source);
+    if (index < 0 || index + 1 >= _snapshotItems.length) return;
+
+    final next = Uri.parse(_snapshotItems[index + 1].url);
+    _startFirstSegmentPrefetch(next, generation);
+    debugPrint(
+      '[LiveDvrBridge][Prefetch] rolling generation=$generation '
+      'from=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last} '
+      'next=${next.pathSegments.isEmpty ? next.path : next.pathSegments.last}',
     );
   }
 
@@ -297,7 +339,8 @@ class TwitchLiveDvrBridgeProxy {
       }
       debugPrint(
         '[LiveDvrBridge][Prefetch] headers-ready '
-        'generation=$generation ms=${stopwatch.elapsedMilliseconds}',
+        'generation=$generation ms=${stopwatch.elapsedMilliseconds} '
+        'segment=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last}',
       );
       return upstream;
     } catch (error) {
@@ -338,7 +381,8 @@ class TwitchLiveDvrBridgeProxy {
       debugPrint(
         '[PlaybackLatency] dvrSegmentPrefetchHit '
         'wait=${waitStopwatch.elapsedMilliseconds}ms age=${ageMs}ms '
-        'generation=$generation',
+        'generation=$generation '
+        'segment=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last}',
       );
     }
 
@@ -739,6 +783,12 @@ class TwitchLiveDvrBridgeProxy {
   ) async {
     final prefetched = await _takePrefetchedSegment(sourceUri, generation);
     final upstream = prefetched ?? await _openUpstreamSegment(sourceUri);
+
+    // The current response can take roughly one segment duration to drain. Use
+    // that playback/download time to overlap the next segment's connection
+    // setup instead of waiting for mpv to reach the HLS boundary first.
+    _startNextSnapshotSegmentPrefetch(sourceUri, generation);
+
     await for (final chunk in upstream) {
       if (generation != _streamGeneration || _server == null) return;
       response.add(chunk);
