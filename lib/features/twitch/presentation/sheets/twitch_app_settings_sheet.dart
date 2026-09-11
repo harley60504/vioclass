@@ -11,6 +11,7 @@ import '../settings/vioclass_update_controller.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import '../widgets/settings/twitch_video_enhancement_settings_card.dart';
 
 enum _TwitchSettingsTab { account, chat, player, appearance, updates }
 
@@ -743,6 +744,8 @@ class _PlayerSettingsPane extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 12),
+            TwitchVideoEnhancementSettingsCard(controller: controller),
           ],
         );
       },
