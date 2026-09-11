@@ -36,14 +36,35 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     playerError = null;
     notifyListeners();
 
+    int? liveTransitionGeneration;
     try {
       final session = playerPort.services.playerSession;
+      final previousMediaUri = session.currentMediaUri?.trim();
+      final isReplacingVisiblePlayback =
+          forceOpen && previousMediaUri != null && previousMediaUri.isNotEmpty;
+      if (isReplacingVisiblePlayback) {
+        liveTransitionGeneration =
+            TwitchDvrTransitionMaskController.instance.begin();
+      }
+
       await session.useLowLatencyHlsProfile();
       session.player.setProperty('demuxer-lavf-o', 'live_start_index=-3');
       await playerPort.openLive(
         channelLogin: channelLogin,
         forceOpen: forceOpen,
       );
+
+      final transitionGeneration = liveTransitionGeneration;
+      if (transitionGeneration != null) {
+        unawaited(
+          TwitchDvrTransitionMaskController.instance
+              .revealWhenLivePlaybackAdvances(
+                player: session.player,
+                generation: transitionGeneration,
+              ),
+        );
+      }
+
       await applyPlayerVolume();
       // Player.open() has already handed the stream to mpv. Do not hold the
       // watch-page loading state for the optional first-frame settle window.
@@ -51,6 +72,13 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       // continues in the background.
       unawaited(waitForInitialPlaybackSettle().catchError((_) {}));
     } catch (error) {
+      final transitionGeneration = liveTransitionGeneration;
+      if (transitionGeneration != null) {
+        TwitchDvrTransitionMaskController.instance.cancel(
+          transitionGeneration,
+          reason: 'live-open-error',
+        );
+      }
       playerError = error.toString();
       notifyListeners();
       rethrow;
