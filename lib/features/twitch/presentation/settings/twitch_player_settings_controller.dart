@@ -19,6 +19,9 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool _videoEnhancementEnabled = false;
   TwitchVideoEnhancementMode _videoEnhancementMode =
       TwitchVideoEnhancementMode.ewaLanczosSharp;
+  bool _videoChromaEnhance = false;
+  bool _videoDeband = false;
+  bool _videoSharpen = false;
   bool _videoEnhancementBusy = false;
   bool _loaded = false;
 
@@ -30,6 +33,13 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool get videoEnhancementEnabled => _videoEnhancementEnabled;
   TwitchVideoEnhancementMode get videoEnhancementMode =>
       _videoEnhancementMode;
+  bool get videoChromaEnhance => _videoChromaEnhance;
+  bool get videoDeband => _videoDeband;
+  bool get videoSharpen => _videoSharpen;
+  bool get videoEnhancementUsesShader =>
+      _videoEnhancementMode.usesShader ||
+      _videoChromaEnhance ||
+      _videoSharpen;
   bool get videoEnhancementBusy => _videoEnhancementBusy;
   bool get loaded => _loaded;
 
@@ -67,6 +77,9 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     final enhancement = await TwitchVideoEnhancementRuntime.loadPreferences();
     _videoEnhancementEnabled = enhancement.enabled;
     _videoEnhancementMode = enhancement.mode;
+    _videoChromaEnhance = enhancement.chromaEnhance;
+    _videoDeband = enhancement.deband;
+    _videoSharpen = enhancement.sharpen;
 
     _loaded = true;
     notifyListeners();
@@ -129,6 +142,27 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     await _saveAndApplyVideoEnhancement();
   }
 
+  Future<void> setVideoChromaEnhance(bool value) async {
+    if (_videoEnhancementBusy || _videoChromaEnhance == value) return;
+    _videoChromaEnhance = value;
+    notifyListeners();
+    await _saveAndApplyVideoEnhancement();
+  }
+
+  Future<void> setVideoDeband(bool value) async {
+    if (_videoEnhancementBusy || _videoDeband == value) return;
+    _videoDeband = value;
+    notifyListeners();
+    await _saveAndApplyVideoEnhancement();
+  }
+
+  Future<void> setVideoSharpen(bool value) async {
+    if (_videoEnhancementBusy || _videoSharpen == value) return;
+    _videoSharpen = value;
+    notifyListeners();
+    await _saveAndApplyVideoEnhancement();
+  }
+
   Future<void> _saveAndApplyVideoEnhancement() async {
     _videoEnhancementBusy = true;
     notifyListeners();
@@ -137,6 +171,9 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
         player: TwitchMediaKitPlayerHost.playerOrNull,
         enabled: _videoEnhancementEnabled,
         mode: _videoEnhancementMode,
+        chromaEnhance: _videoChromaEnhance,
+        deband: _videoDeband,
+        sharpen: _videoSharpen,
       );
     } finally {
       _videoEnhancementBusy = false;
@@ -149,6 +186,9 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     _muted = false;
     _videoEnhancementEnabled = false;
     _videoEnhancementMode = TwitchVideoEnhancementMode.ewaLanczosSharp;
+    _videoChromaEnhance = false;
+    _videoDeband = false;
+    _videoSharpen = false;
     notifyListeners();
     await _savePlayback();
     await _saveAndApplyVideoEnhancement();
