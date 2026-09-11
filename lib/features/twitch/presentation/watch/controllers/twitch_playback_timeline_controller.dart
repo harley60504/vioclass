@@ -26,7 +26,6 @@ class TwitchPlaybackTimelineSnapshot {
 }
 
 class TwitchPlaybackTimelineController extends ChangeNotifier {
-  static const Duration _seekCommitDelay = Duration(milliseconds: 420);
   static const Duration _playbackTickInterval = Duration(milliseconds: 250);
   static const Duration _mediaRestartTolerance = Duration(milliseconds: 500);
   static const Duration _initialSeekJumpThreshold = Duration(seconds: 3);
@@ -34,13 +33,12 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _initialSeekReanchorWindow = Duration(seconds: 2);
   static const Duration _canonicalAnchorTolerance = Duration(seconds: 1);
   static const Duration _liveEdgeTolerance = Duration(milliseconds: 750);
+  static const Duration _localMediaSeekTolerance = Duration(milliseconds: 250);
 
-  Timer? _pendingSeekTimer;
   Timer? _playbackTimer;
   TwitchPlaybackTimelineMode? _mode;
   Duration? _position;
   Duration? _duration;
-  Duration? _pendingSeekTarget;
   Duration? _explicitSeekAnchorPosition;
   DateTime? _lastPlaybackTickAt;
   bool _dragging = false;
@@ -57,6 +55,14 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   Duration? _canonicalAnchorPosition;
   Duration? _lastObservedMediaPosition;
   DateTime? _mediaAnchorObservedAt;
+
+  // Near-live replay streams the whole resolved TS segment. The canonical
+  // resolver also exposes the segment start, so the timeline controller can
+  // seek the native player to the exact intra-segment target before binding the
+  // media clock. This gives Local TS and archive DVR the same target semantics.
+  Duration? _pendingLocalMediaSeekPosition;
+  Duration? _pendingLocalCanonicalTarget;
+  int? _pendingLocalMediaSeekRevision;
 
   // The stable /stream.ts URL deliberately survives Local TS route changes,
   // so neither media URI nor native player.position can identify a new seek.
@@ -107,7 +113,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       _explicitSeekAnchorPosition = null;
       _clearMediaClockAnchor();
       _duration = duration;
-      if (!_dragging && _pendingSeekTarget == null) {
+      if (!_dragging) {
         _position = _clampPosition(
           position ?? _fallbackPosition(mode),
           _duration,
@@ -134,7 +140,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         duration != null &&
         _durationDistance(canonicalPosition, duration) <= _liveEdgeTolerance;
 
-    if (followsLiveEdge && !_dragging && _pendingSeekTarget == null) {
+    if (followsLiveEdge && !_dragging) {
       _foregroundReanchorPending = false;
       _explicitSeekAnchorPosition = null;
       _clearMediaClockAnchor();
@@ -148,23 +154,59 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         TwitchCanonicalPlaybackClockRegistry.localReplaySequence;
     final localReplayRevision =
         TwitchCanonicalPlaybackClockRegistry.localReplayRevision;
-    final looksLikeTsSource = mediaUri != null && mediaUri.contains('/stream.ts');
+    final looksLikeLocalReplaySource =
+        mediaUri != null &&
+        mediaUri.contains('/stream.ts') &&
+        !mediaUri.contains('/stream.ts?v=');
     final behindLive =
         canonicalPosition != null &&
         duration != null &&
         canonicalPosition + const Duration(milliseconds: 500) < duration;
     if (localReplayStart != null &&
-        looksLikeTsSource &&
+        looksLikeLocalReplaySource &&
         behindLive &&
         mediaPosition != null &&
-        !_dragging &&
-        _pendingSeekTarget == null) {
+        !_dragging) {
+      final pendingMediaSeek = _pendingLocalMediaSeekPosition;
+      final pendingCanonicalTarget = _pendingLocalCanonicalTarget;
+      final pendingRevisionMatches =
+          pendingMediaSeek != null &&
+          pendingCanonicalTarget != null &&
+          _pendingLocalMediaSeekRevision == localReplayRevision;
+      if (pendingRevisionMatches) {
+        _lastObservedMediaPosition = mediaPosition;
+        final reachedTarget =
+            mediaPosition + _localMediaSeekTolerance >= pendingMediaSeek;
+        if (!reachedTarget) {
+          _position = _clampPosition(pendingCanonicalTarget, duration);
+          return;
+        }
+
+        _mediaAnchorUri = mediaUri;
+        _mediaAnchorPosition = mediaPosition;
+        _canonicalAnchorPosition = pendingCanonicalTarget;
+        _mediaAnchorObservedAt = now;
+        _localReplayAnchorRevision = localReplayRevision;
+        _position = _clampPosition(pendingCanonicalTarget, duration);
+        _clearPendingLocalMediaSeek();
+        if (kDebugMode) {
+          debugPrint(
+            '[CanonicalPlaybackClock][LOCAL-SEEK-READY] '
+            'revision=$localReplayRevision '
+            'sequence=${localReplaySequence ?? -1} '
+            'segmentStart=${_seconds(localReplayStart)}s '
+            'media=${_seconds(mediaPosition)}s '
+            'canonical=${_seconds(pendingCanonicalTarget)}s',
+          );
+        }
+        return;
+      }
+
       final localMediaRestarted =
           previousMediaPosition != null &&
           mediaPosition + _mediaRestartTolerance < previousMediaPosition;
       final localSourceChanged = mediaUri != _mediaAnchorUri;
-      final replayChanged =
-          _localReplayAnchorRevision != localReplayRevision;
+      final replayChanged = _localReplayAnchorRevision != localReplayRevision;
       final firstLocalAnchor = _localReplayAnchorRevision == null;
       final shouldReanchor =
           replayChanged ||
@@ -176,15 +218,44 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       if (shouldReanchor && canonicalPosition != null) {
         final explicitAnchor = _explicitSeekAnchorPosition;
         final canonicalAnchor = explicitAnchor ?? canonicalPosition;
-        _mediaAnchorUri = mediaUri;
-        _mediaAnchorPosition = mediaPosition;
-        _canonicalAnchorPosition = canonicalAnchor;
-        _mediaAnchorObservedAt = now;
+        final rawMediaTarget = canonicalAnchor - localReplayStart;
+        final mediaTarget = rawMediaTarget.isNegative
+            ? Duration.zero
+            : rawMediaTarget;
+        final requiresIntraSegmentSeek =
+            mediaTarget > _localMediaSeekTolerance &&
+            _durationDistance(mediaPosition, mediaTarget) >
+                _localMediaSeekTolerance;
+
         _lastObservedMediaPosition = mediaPosition;
         _localReplayAnchorRevision = localReplayRevision;
         _position = _clampPosition(canonicalAnchor, duration);
         _explicitSeekAnchorPosition = null;
         _foregroundReanchorPending = false;
+
+        if (requiresIntraSegmentSeek && player != null) {
+          _pendingLocalMediaSeekPosition = mediaTarget;
+          _pendingLocalCanonicalTarget = canonicalAnchor;
+          _pendingLocalMediaSeekRevision = localReplayRevision;
+          if (kDebugMode) {
+            debugPrint(
+              '[CanonicalPlaybackClock][LOCAL-SEEK] '
+              'revision=$localReplayRevision '
+              'sequence=${localReplaySequence ?? -1} '
+              'segmentStart=${_seconds(localReplayStart)}s '
+              'target=${_seconds(canonicalAnchor)}s '
+              'mediaTarget=${_seconds(mediaTarget)}s '
+              'media=${_seconds(mediaPosition)}s',
+            );
+          }
+          unawaited(player.seek(mediaTarget));
+          return;
+        }
+
+        _mediaAnchorUri = mediaUri;
+        _mediaAnchorPosition = mediaPosition;
+        _canonicalAnchorPosition = canonicalAnchor;
+        _mediaAnchorObservedAt = now;
         if (kDebugMode) {
           debugPrint(
             '[CanonicalPlaybackClock][LOCAL-ANCHOR] '
@@ -222,6 +293,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     }
 
     _foregroundReanchorPending = false;
+    _clearPendingLocalMediaSeek();
 
     final mediaRestarted =
         mediaPosition != null &&
@@ -257,7 +329,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
     _lastObservedMediaPosition = mediaPosition;
 
-    if (_dragging || _pendingSeekTarget != null) return;
+    if (_dragging) return;
 
     final mediaAnchor = _mediaAnchorPosition;
     final canonicalAnchor = _canonicalAnchorPosition;
@@ -327,6 +399,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   void beginDrag(Duration position) {
     _dragging = true;
     _explicitSeekAnchorPosition = null;
+    _clearPendingLocalMediaSeek();
     _position = _clampPosition(position, _duration);
     _syncPlaybackTimer();
     notifyListeners();
@@ -338,8 +411,6 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }
 
   void commitPosition(Duration position) {
-    _pendingSeekTimer?.cancel();
-    _pendingSeekTarget = null;
     _dragging = false;
     _position = _clampPosition(position, _duration);
     _explicitSeekAnchorPosition = _position;
@@ -356,13 +427,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     required ValueChanged<Duration> onCommit,
     Duration minimum = Duration.zero,
   }) {
-    final base =
-        _pendingSeekTarget ??
-        (fromLiveEdge && delta.isNegative ? duration : current);
-
-    // Step buttons first resolve one absolute UI/canonical target, then reuse
-    // the exact same seek path as timeline dragging. Native playback latency is
-    // transport state and must not become part of the next +/-10 second base.
+    final base = fromLiveEdge && delta.isNegative ? duration : current;
     final minimumMs = _mode == TwitchPlaybackTimelineMode.liveDvr
         ? 0
         : minimum.inMilliseconds.clamp(0, duration.inMilliseconds).toInt();
@@ -370,33 +435,20 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         .clamp(minimumMs, duration.inMilliseconds)
         .toInt();
     final target = Duration(milliseconds: targetMs);
-    _pendingSeekTarget = target;
-    _position = target;
-    _explicitSeekAnchorPosition = target;
-    _clearMediaClockAnchor();
-    _syncPlaybackTimer();
-    notifyListeners();
 
-    _pendingSeekTimer?.cancel();
-    _pendingSeekTimer = Timer(_seekCommitDelay, () {
-      final committedTarget = _pendingSeekTarget;
-      if (committedTarget == null) return;
-      commitPosition(committedTarget);
-      onCommit(committedTarget);
-    });
+    // Step buttons now use the exact same absolute seek path as timeline taps,
+    // drags and direct time entry. Transport latency never participates in the
+    // next +/-10 second calculation.
+    seekTo(target, onCommit);
     return target;
   }
 
   void seekTo(Duration target, ValueChanged<Duration> onCommit) {
-    _pendingSeekTimer?.cancel();
-    _pendingSeekTarget = null;
     commitPosition(target);
     onCommit(_position ?? target);
   }
 
   void returnToLive() {
-    _pendingSeekTimer?.cancel();
-    _pendingSeekTarget = null;
     _explicitSeekAnchorPosition = null;
     _dragging = false;
     _position = _duration;
@@ -418,14 +470,11 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }
 
   void reset() {
-    _pendingSeekTimer?.cancel();
-    _pendingSeekTimer = null;
     _playbackTimer?.cancel();
     _playbackTimer = null;
     _mode = null;
     _position = null;
     _duration = null;
-    _pendingSeekTarget = null;
     _explicitSeekAnchorPosition = null;
     _lastPlaybackTickAt = null;
     _dragging = false;
@@ -436,19 +485,24 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _clearPendingLocalMediaSeek() {
+    _pendingLocalMediaSeekPosition = null;
+    _pendingLocalCanonicalTarget = null;
+    _pendingLocalMediaSeekRevision = null;
+  }
+
   void _clearMediaClockAnchor() {
     _mediaAnchorUri = null;
     _mediaAnchorPosition = null;
     _canonicalAnchorPosition = null;
     _lastObservedMediaPosition = null;
     _mediaAnchorObservedAt = null;
+    _clearPendingLocalMediaSeek();
   }
 
   void _syncPlaybackTimer() {
     final shouldTick =
-        _mode == TwitchPlaybackTimelineMode.liveDvr &&
-        !_dragging &&
-        _pendingSeekTarget == null;
+        _mode == TwitchPlaybackTimelineMode.liveDvr && !_dragging;
     if (!shouldTick) {
       _playbackTimer?.cancel();
       _playbackTimer = null;
@@ -489,7 +543,6 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
   @override
   void dispose() {
-    _pendingSeekTimer?.cancel();
     _playbackTimer?.cancel();
     super.dispose();
   }
