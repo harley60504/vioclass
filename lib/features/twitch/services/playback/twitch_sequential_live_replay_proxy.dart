@@ -14,12 +14,13 @@ import 'twitch_canonical_playback_clock_registry.dart';
 
 /// Near-live TS replay source.
 ///
-/// The caller supplies an exact behind-live duration. Each request fetches the
-/// current Twitch media playlist, converts that delay to a canonical stream
-/// position, resolves the matching segment through [TwitchSegmentTimelineIndex],
-/// then emits sequence N, N+1, N+2... without jumping into unrelated live
-/// bytes. MPEG-TS PTS/PCR/keyframes are indexed while bytes are already being
-/// streamed, so media-clock enrichment never blocks replay startup.
+/// The main playback path supplies one exact canonical stream position. Each
+/// request fetches the current Twitch media playlist only to resolve that fixed
+/// position to a segment plus an intra-segment offset; a newer live edge never
+/// changes an already-selected seek target. The legacy behind-live entry point
+/// remains available for diagnostics. MPEG-TS PTS/PCR/keyframes are indexed
+/// while bytes are already being streamed, so media-clock enrichment never
+/// blocks replay startup.
 class TwitchSequentialLiveReplayProxy {
   final String upstreamPlaylistUrl;
   final Map<String, String> upstreamHeaders;
@@ -44,27 +45,47 @@ class TwitchSequentialLiveReplayProxy {
 
   HttpServer? _server;
   int _seekGeneration = 0;
+  int? _publishedAnchorGeneration;
 
   bool get isRunning => _server != null;
 
+  /// Legacy relative entry point retained for diagnostics only.
   String streamUrl({required Duration fromLive}) {
-    final server = _server;
-    if (server == null) {
-      throw StateError('Sequential live replay proxy has not started.');
-    }
     final fromLiveUs = fromLive.inMicroseconds.clamp(
       1,
       const Duration(seconds: 20).inMicroseconds,
     );
+    return _buildStreamUrl(fromLiveUs: fromLiveUs.toInt());
+  }
+
+  /// Playback entry point. [canonicalTarget] is immutable for this generation.
+  String streamUrlForCanonicalTarget({required Duration canonicalTarget}) {
+    final targetUs = math.max(0, canonicalTarget.inMicroseconds).toInt();
+    return _buildStreamUrl(canonicalTargetUs: targetUs);
+  }
+
+  String _buildStreamUrl({int? fromLiveUs, int? canonicalTargetUs}) {
+    final server = _server;
+    if (server == null) {
+      throw StateError('Sequential live replay proxy has not started.');
+    }
+    if (fromLiveUs == null && canonicalTargetUs == null) {
+      throw ArgumentError('A replay target is required.');
+    }
+
     final generation = ++_seekGeneration;
+    _publishedAnchorGeneration = null;
 
     // A new absolute timeline seek immediately invalidates every older replay
     // request. Keep the registry empty until this generation resolves its own
     // segment so an old segment anchor cannot be rebound during the switch.
     TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
 
+    final targetQuery = canonicalTargetUs != null
+        ? 'canonicalTargetUs=$canonicalTargetUs'
+        : 'fromLiveUs=$fromLiveUs';
     return 'http://127.0.0.1:${server.port}/stream.ts'
-        '?fromLiveUs=$fromLiveUs&generation=$generation';
+        '?$targetQuery&generation=$generation';
   }
 
   Future<void> start() async {
@@ -79,6 +100,7 @@ class TwitchSequentialLiveReplayProxy {
     final server = _server;
     _server = null;
     _seekGeneration++;
+    _publishedAnchorGeneration = null;
     _timingCache.clear();
     TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
     await server?.close(force: true);
@@ -106,8 +128,11 @@ class TwitchSequentialLiveReplayProxy {
         return;
       }
 
-      final rawUs = int.tryParse(
+      final rawFromLiveUs = int.tryParse(
         request.uri.queryParameters['fromLiveUs'] ?? '',
+      );
+      final rawCanonicalTargetUs = int.tryParse(
+        request.uri.queryParameters['canonicalTargetUs'] ?? '',
       );
       final generation = int.tryParse(
             request.uri.queryParameters['generation'] ?? '',
@@ -120,16 +145,21 @@ class TwitchSequentialLiveReplayProxy {
       }
 
       final fromLive = Duration(
-        microseconds: (rawUs ?? const Duration(seconds: 10).inMicroseconds)
-            .clamp(1, const Duration(seconds: 20).inMicroseconds)
-            .toInt(),
+        microseconds:
+            (rawFromLiveUs ?? const Duration(seconds: 10).inMicroseconds)
+                .clamp(1, const Duration(seconds: 20).inMicroseconds)
+                .toInt(),
       );
+      final canonicalTarget = rawCanonicalTargetUs == null
+          ? null
+          : Duration(microseconds: math.max(0, rawCanonicalTargetUs).toInt());
       request.response.statusCode = HttpStatus.ok;
       request.response.bufferOutput = false;
       await _streamSequentialReplay(
         request.response,
         fromLive,
         generation,
+        canonicalTarget: canonicalTarget,
       );
       try {
         await request.response.close();
@@ -148,8 +178,9 @@ class TwitchSequentialLiveReplayProxy {
   Future<void> _streamSequentialReplay(
     HttpResponse response,
     Duration fromLive,
-    int generation,
-  ) async {
+    int generation, {
+    Duration? canonicalTarget,
+  }) async {
     var playlist = await _loadPlaylist();
     if (generation != _seekGeneration || _server == null) return;
 
@@ -157,11 +188,14 @@ class TwitchSequentialLiveReplayProxy {
     if (items.isEmpty) return;
 
     final total = _canonicalTotal(playlist, items);
-    final targetUs = math.max(
-      0,
-      total.inMicroseconds - fromLive.inMicroseconds,
-    );
-    final target = Duration(microseconds: targetUs);
+    final target =
+        canonicalTarget ??
+        Duration(
+          microseconds: math.max(
+            0,
+            total.inMicroseconds - fromLive.inMicroseconds,
+          ).toInt(),
+        );
     final resolved = _resolveTargetWithCanonicalIndex(
       playlist: playlist,
       items: items,
@@ -173,22 +207,27 @@ class TwitchSequentialLiveReplayProxy {
     String? lastMapUrl;
     final targetSequence = resolved.item.sequence;
 
-    TwitchCanonicalPlaybackClockRegistry.setLocalReplayAnchor(
-      canonicalStart: resolved.segmentStart,
-      intraSegment: resolved.intraSegment,
-      sequence: targetSequence,
-    );
-    _log(
-      '[CanonicalPlaybackClock][LOCAL] '
-      'generation=$generation '
-      'segment=$targetSequence '
-      'canonicalStart=${_seconds(resolved.segmentStart)}s '
-      'requested=${_seconds(target)}s '
-      'intra=${_seconds(resolved.intraSegment)}s',
-    );
+    if (_publishedAnchorGeneration != generation) {
+      TwitchCanonicalPlaybackClockRegistry.setLocalReplayAnchor(
+        canonicalStart: resolved.segmentStart,
+        intraSegment: resolved.intraSegment,
+        sequence: targetSequence,
+      );
+      _publishedAnchorGeneration = generation;
+      _log(
+        '[CanonicalPlaybackClock][LOCAL] '
+        'generation=$generation '
+        'segment=$targetSequence '
+        'canonicalStart=${_seconds(resolved.segmentStart)}s '
+        'requested=${_seconds(target)}s '
+        'intra=${_seconds(resolved.intraSegment)}s',
+      );
+    }
 
     _log(
-      'seek generation=$generation fromLive=${_seconds(fromLive)}s '
+      'seek generation=$generation '
+      'source=${canonicalTarget == null ? 'from-live' : 'canonical-target'} '
+      'fromLive=${_seconds(fromLive)}s '
       'target=${_seconds(target)}s segment=$nextSequence '
       'segmentStart=${_seconds(resolved.segmentStart)}s '
       'intra=${_seconds(resolved.intraSegment)}s '
