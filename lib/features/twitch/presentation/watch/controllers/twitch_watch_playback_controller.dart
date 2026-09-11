@@ -120,6 +120,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
 
       final openStopwatch = Stopwatch()..start();
       if (shouldDeferInitialSeek) {
+        final seekTarget = startPosition!;
         final sourceOpenStopwatch = Stopwatch()..start();
         await session.openOrResume(
           uri: nextUri,
@@ -129,7 +130,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         sourceOpenStopwatch.stop();
 
         final seekWaitStopwatch = Stopwatch()..start();
-        await _waitForSeekableMedia(session.player, startPosition!);
+        await _waitForSeekableMedia(session.player, seekTarget);
         seekWaitStopwatch.stop();
 
         if (isLocalDvrSnapshot) {
@@ -142,19 +143,19 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
             '[PlaybackLatency] '
             'dvrSourceOpen=${sourceOpenStopwatch.elapsedMilliseconds}ms '
             'dvrSeekWait=${seekWaitStopwatch.elapsedMilliseconds}ms '
-            'target=${_seconds(startPosition)}s '
+            'target=${_seconds(seekTarget)}s '
             'duration=${_seconds(session.player.state.duration)}s',
           );
         } else {
           debugPrint(
             '[TwitchPlayer] deferred precise seek '
-            'target=${_seconds(startPosition)}s '
+            'target=${_seconds(seekTarget)}s '
             'duration=${_seconds(session.player.state.duration)}s',
           );
         }
 
         final preciseSeekStopwatch = Stopwatch()..start();
-        await session.player.seek(startPosition);
+        await session.player.seek(seekTarget);
         preciseSeekStopwatch.stop();
         if (play) {
           await session.player.play();
@@ -163,7 +164,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           debugPrint(
             '[PlaybackLatency] '
             'dvrPreciseSeek=${preciseSeekStopwatch.elapsedMilliseconds}ms '
-            'target=${_seconds(startPosition)}s',
+            'target=${_seconds(seekTarget)}s',
           );
         }
       } else {
