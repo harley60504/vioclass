@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../services/playback/twitch_canonical_playback_clock_registry.dart';
 import '../../../services/playback/twitch_media_kit_player_host.dart';
 
 enum TwitchPlaybackTimelineMode { live, liveDvr, vod, clip }
@@ -114,6 +115,45 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final previousMediaPosition = _lastObservedMediaPosition;
     final now = DateTime.now();
 
+    // Local near-live replay outputs the complete resolved TS segment. Its
+    // canonical segment start is known exactly by SegmentTimelineIndex, while
+    // media_kit reports elapsed playback from that local TS stream. Mapping the
+    // two directly keeps the displayed position on the actual video frame,
+    // including the segment portion before the originally requested intra-point.
+    final localReplayStart =
+        TwitchCanonicalPlaybackClockRegistry.localReplayCanonicalStart;
+    final localReplaySequence =
+        TwitchCanonicalPlaybackClockRegistry.localReplaySequence;
+    final looksLikeTsSource =
+        mediaUri != null && mediaUri.contains('/stream.ts');
+    final behindLive =
+        canonicalPosition != null &&
+        _duration != null &&
+        canonicalPosition + const Duration(milliseconds: 500) < _duration!;
+    if (localReplayStart != null &&
+        looksLikeTsSource &&
+        behindLive &&
+        mediaPosition != null &&
+        !_dragging &&
+        _pendingSeekTarget == null) {
+      _mediaAnchorUri = mediaUri;
+      _mediaAnchorPosition = Duration.zero;
+      _canonicalAnchorPosition = localReplayStart;
+      _mediaAnchorObservedAt = now;
+      _lastObservedMediaPosition = mediaPosition;
+      _position = _clampPosition(localReplayStart + mediaPosition, _duration);
+      if (kDebugMode && localReplaySequence != null) {
+        debugPrint(
+          '[CanonicalPlaybackClock][LOCAL-UI] '
+          'sequence=$localReplaySequence '
+          'segmentStart=${_seconds(localReplayStart)}s '
+          'media=${_seconds(mediaPosition)}s '
+          'canonical=${_seconds(_position ?? Duration.zero)}s',
+        );
+      }
+      return;
+    }
+
     final mediaRestarted =
         mediaPosition != null &&
         previousMediaPosition != null &&
@@ -203,6 +243,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final delta = a.inMicroseconds - b.inMicroseconds;
     return Duration(microseconds: delta < 0 ? -delta : delta);
   }
+
+  String _seconds(Duration value) =>
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
 
   Duration positionFor(Duration displayDuration) {
     return _clampPosition(_position ?? Duration.zero, displayDuration);
