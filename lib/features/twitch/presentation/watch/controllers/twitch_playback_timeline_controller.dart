@@ -56,10 +56,10 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   Duration? _lastObservedMediaPosition;
   DateTime? _mediaAnchorObservedAt;
 
-  // Near-live replay streams the whole resolved TS segment. The canonical
-  // resolver also exposes the segment start, so the timeline controller can
-  // seek the native player to the exact intra-segment target before binding the
-  // media clock. This gives Local TS and archive DVR the same target semantics.
+  // Near-live replay streams the whole resolved TS segment. The replay proxy
+  // publishes the exact intra-segment target, so the native player can seek to
+  // that offset before the canonical media clock is bound. Local TS and archive
+  // DVR therefore share the same absolute-target semantics.
   Duration? _pendingLocalMediaSeekPosition;
   Duration? _pendingLocalCanonicalTarget;
   int? _pendingLocalMediaSeekRevision;
@@ -150,6 +150,8 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
     final localReplayStart =
         TwitchCanonicalPlaybackClockRegistry.localReplayCanonicalStart;
+    final localReplayIntra =
+        TwitchCanonicalPlaybackClockRegistry.localReplayIntraSegment;
     final localReplaySequence =
         TwitchCanonicalPlaybackClockRegistry.localReplaySequence;
     final localReplayRevision =
@@ -168,6 +170,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         duration != null &&
         effectiveCanonicalPosition + const Duration(milliseconds: 500) < duration;
     if (localReplayStart != null &&
+        localReplayIntra != null &&
         looksLikeLocalReplaySource &&
         behindLive &&
         mediaPosition != null &&
@@ -200,6 +203,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
             'revision=$localReplayRevision '
             'sequence=${localReplaySequence ?? -1} '
             'segmentStart=${_seconds(localReplayStart)}s '
+            'intra=${_seconds(localReplayIntra)}s '
             'media=${_seconds(mediaPosition)}s '
             'canonical=${_seconds(pendingCanonicalTarget)}s',
           );
@@ -223,10 +227,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       if (shouldReanchor && effectiveCanonicalPosition != null) {
         final explicitAnchor = _explicitSeekAnchorPosition;
         final canonicalAnchor = explicitAnchor ?? effectiveCanonicalPosition;
-        final rawMediaTarget = canonicalAnchor - localReplayStart;
-        final mediaTarget = rawMediaTarget.isNegative
-            ? Duration.zero
-            : rawMediaTarget;
+        final mediaTarget = localReplayIntra;
         final requiresIntraSegmentSeek =
             mediaTarget > _localMediaSeekTolerance &&
             _durationDistance(mediaPosition, mediaTarget) >
@@ -267,6 +268,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
             'revision=$localReplayRevision '
             'sequence=${localReplaySequence ?? -1} '
             'segmentStart=${_seconds(localReplayStart)}s '
+            'intra=${_seconds(localReplayIntra)}s '
             'media=${_seconds(mediaPosition)}s '
             'canonical=${_seconds(canonicalAnchor)}s '
             'runtimeCanonical=${_seconds(effectiveCanonicalPosition)}s',
