@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../../services/playback/twitch_video_enhancement.dart';
 import '../watch/controllers/twitch_watch_preferences_controller.dart';
 
 class TwitchPlayerSettingsController extends ChangeNotifier {
@@ -14,6 +16,10 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool _chatVisible = true;
   bool _androidPipEnabled = true;
   bool _homeKeepsMiniPlayer = true;
+  bool _videoEnhancementEnabled = false;
+  TwitchVideoEnhancementMode _videoEnhancementMode =
+      TwitchVideoEnhancementMode.ewaLanczosSharp;
+  bool _videoEnhancementBusy = false;
   bool _loaded = false;
 
   double get volume => _volume;
@@ -21,6 +27,10 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool get chatVisible => _chatVisible;
   bool get androidPipEnabled => _androidPipEnabled;
   bool get homeKeepsMiniPlayer => _homeKeepsMiniPlayer;
+  bool get videoEnhancementEnabled => _videoEnhancementEnabled;
+  TwitchVideoEnhancementMode get videoEnhancementMode =>
+      _videoEnhancementMode;
+  bool get videoEnhancementBusy => _videoEnhancementBusy;
   bool get loaded => _loaded;
 
   Future<void> load() async {
@@ -53,6 +63,11 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     _androidPipEnabled = prefs.getBool(androidPipEnabledPreferenceKey) ?? true;
     _homeKeepsMiniPlayer =
         prefs.getBool(homeKeepsMiniPlayerPreferenceKey) ?? true;
+
+    final enhancement = await TwitchVideoEnhancementRuntime.loadPreferences();
+    _videoEnhancementEnabled = enhancement.enabled;
+    _videoEnhancementMode = enhancement.mode;
+
     _loaded = true;
     notifyListeners();
   }
@@ -100,11 +115,43 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     await prefs.setBool(homeKeepsMiniPlayerPreferenceKey, _homeKeepsMiniPlayer);
   }
 
+  Future<void> setVideoEnhancementEnabled(bool value) async {
+    if (_videoEnhancementBusy || _videoEnhancementEnabled == value) return;
+    _videoEnhancementEnabled = value;
+    notifyListeners();
+    await _saveAndApplyVideoEnhancement();
+  }
+
+  Future<void> setVideoEnhancementMode(TwitchVideoEnhancementMode mode) async {
+    if (_videoEnhancementBusy || _videoEnhancementMode == mode) return;
+    _videoEnhancementMode = mode;
+    notifyListeners();
+    await _saveAndApplyVideoEnhancement();
+  }
+
+  Future<void> _saveAndApplyVideoEnhancement() async {
+    _videoEnhancementBusy = true;
+    notifyListeners();
+    try {
+      await TwitchVideoEnhancementRuntime.saveAndApply(
+        player: TwitchMediaKitPlayerHost.playerOrNull,
+        enabled: _videoEnhancementEnabled,
+        mode: _videoEnhancementMode,
+      );
+    } finally {
+      _videoEnhancementBusy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> resetPlayback() async {
     _volume = 100.0;
     _muted = false;
+    _videoEnhancementEnabled = false;
+    _videoEnhancementMode = TwitchVideoEnhancementMode.ewaLanczosSharp;
     notifyListeners();
     await _savePlayback();
+    await _saveAndApplyVideoEnhancement();
   }
 
   Future<void> _savePlayback() async {
