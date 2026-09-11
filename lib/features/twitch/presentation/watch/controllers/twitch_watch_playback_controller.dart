@@ -43,6 +43,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await playerPort.services.playerSession.useLowLatencyHlsProfile();
       await playerPort.openLive(
         channelLogin: channelLogin,
         forceOpen: forceOpen,
@@ -86,8 +87,11 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           startPosition != null && (deferInitialSeek || isLocalDvrSnapshot);
 
       if (isLocalDvrSnapshot) {
+        await session.useLiveDvrHlsCacheProfile();
         dvrTransitionGeneration =
             TwitchDvrTransitionMaskController.instance.begin();
+      } else {
+        await session.useLowLatencyHlsProfile();
       }
 
       final hrSeekDemuxerOffset = isLocalDvrSnapshot
