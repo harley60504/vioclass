@@ -26,6 +26,7 @@ class TwitchPlaybackTimelineSnapshot {
 }
 
 class TwitchPlaybackTimelineController extends ChangeNotifier {
+  static const bool _verboseTimelineDebug = false;
   static const Duration _playbackTickInterval = Duration(milliseconds: 250);
   static const Duration _mediaRestartTolerance = Duration(milliseconds: 500);
   static const Duration _initialSeekJumpThreshold = Duration(seconds: 3);
@@ -202,7 +203,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         _localReplayAnchorRevision = localReplayRevision;
         _position = _clampPosition(pendingCanonicalTarget, duration);
         _clearPendingLocalMediaSeek();
-        if (kDebugMode) {
+        if (kDebugMode && _verboseTimelineDebug) {
           debugPrint(
             '[CanonicalPlaybackClock][LOCAL-SEEK-READY] '
             'revision=$localReplayRevision '
@@ -249,7 +250,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
           _pendingLocalMediaSeekPosition = mediaTarget;
           _pendingLocalCanonicalTarget = canonicalAnchor;
           _pendingLocalMediaSeekRevision = localReplayRevision;
-          if (kDebugMode) {
+          if (kDebugMode && _verboseTimelineDebug) {
             debugPrint(
               '[CanonicalPlaybackClock][LOCAL-SEEK] '
               'revision=$localReplayRevision '
@@ -268,7 +269,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         _mediaAnchorPosition = mediaPosition;
         _canonicalAnchorPosition = canonicalAnchor;
         _mediaAnchorObservedAt = now;
-        if (kDebugMode) {
+        if (kDebugMode && _verboseTimelineDebug) {
           final runtimeCanonicalLabel = canonicalPosition == null
               ? '-'
               : '${_seconds(canonicalPosition)}s';
@@ -292,7 +293,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       if (mediaAnchor != null && canonicalAnchor != null) {
         final mapped = canonicalAnchor + (mediaPosition - mediaAnchor);
         _position = _clampPosition(mapped, duration);
-        if (kDebugMode && localReplaySequence != null) {
+        if (kDebugMode &&
+            _verboseTimelineDebug &&
+            localReplaySequence != null) {
           debugPrint(
             '[CanonicalPlaybackClock][LOCAL-UI] '
             'revision=$_localReplayAnchorRevision '
