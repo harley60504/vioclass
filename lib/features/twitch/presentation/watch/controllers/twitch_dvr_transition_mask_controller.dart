@@ -103,12 +103,18 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
 
     timeoutTimer.cancel();
     stabilityTimer?.cancel();
-    await positionSubscription.cancel();
-    await bufferingSubscription.cancel();
-    await playingSubscription.cancel();
+    await positionSubscription?.cancel();
+    await bufferingSubscription?.cancel();
+    await playingSubscription?.cancel();
 
     if (generation != _generation) return;
-    _hide(generation, reason: reason, elapsed: stopwatch.elapsed, player: player, target: target);
+    _hide(
+      generation,
+      reason: reason,
+      elapsed: stopwatch.elapsed,
+      player: player,
+      target: target,
+    );
   }
 
   void _hide(
