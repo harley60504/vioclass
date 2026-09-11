@@ -172,6 +172,12 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
             'dvrPreciseSeek=${preciseSeekStopwatch.elapsedMilliseconds}ms '
             'target=${_seconds(seekTarget)}s',
           );
+          if (play) {
+            await _ensureDvrSeekLanded(
+              player: session.player,
+              target: seekTarget,
+            );
+          }
           final transitionGeneration = dvrTransitionGeneration;
           if (transitionGeneration != null) {
             if (play) {
@@ -236,6 +242,75 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       }
       notifyListeners();
     }
+  }
+
+  Future<void> _ensureDvrSeekLanded({
+    required Player player,
+    required Duration target,
+  }) async {
+    const tolerance = Duration(milliseconds: 650);
+    const clockStartThreshold = Duration(milliseconds: 80);
+    const firstRetryAfter = Duration(milliseconds: 140);
+    const retrySpacing = Duration(milliseconds: 180);
+    const timeout = Duration(milliseconds: 900);
+    const maxRetries = 2;
+
+    final stopwatch = Stopwatch()..start();
+    var retries = 0;
+    var nextRetryAt = firstRetryAfter;
+
+    bool landed() {
+      final deltaUs =
+          player.state.position.inMicroseconds - target.inMicroseconds;
+      final distanceUs = deltaUs < 0 ? -deltaUs : deltaUs;
+      return distanceUs <= tolerance.inMicroseconds;
+    }
+
+    while (stopwatch.elapsed < timeout) {
+      if (landed()) {
+        debugPrint(
+          '[PlaybackLatency] dvrSeekLanding=${stopwatch.elapsedMilliseconds}ms '
+          'result=landed retries=$retries '
+          'target=${_seconds(target)}s '
+          'position=${_seconds(player.state.position)}s',
+        );
+        return;
+      }
+
+      final position = player.state.position;
+      final demuxerIsMoving =
+          position >= clockStartThreshold && !player.state.buffering;
+      if (retries < maxRetries &&
+          stopwatch.elapsed >= nextRetryAt &&
+          (demuxerIsMoving ||
+              stopwatch.elapsed >= const Duration(milliseconds: 260))) {
+        retries++;
+        final before = player.state.position;
+        final retryStopwatch = Stopwatch()..start();
+        await player.seek(target);
+        retryStopwatch.stop();
+        debugPrint(
+          '[PlaybackLatency] dvrSeekRetry=$retries '
+          'call=${retryStopwatch.elapsedMilliseconds}ms '
+          'elapsed=${stopwatch.elapsedMilliseconds}ms '
+          'target=${_seconds(target)}s '
+          'before=${_seconds(before)}s '
+          'after=${_seconds(player.state.position)}s '
+          'buffering=${player.state.buffering}',
+        );
+        nextRetryAt = stopwatch.elapsed + retrySpacing;
+      }
+
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+
+    debugPrint(
+      '[PlaybackLatency] dvrSeekLanding=${stopwatch.elapsedMilliseconds}ms '
+      'result=timeout retries=$retries '
+      'target=${_seconds(target)}s '
+      'position=${_seconds(player.state.position)}s '
+      'buffering=${player.state.buffering}',
+    );
   }
 
   Future<void> _probeDvrTimingAfterOpen({
