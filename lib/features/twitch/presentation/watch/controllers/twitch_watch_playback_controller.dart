@@ -80,6 +80,8 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           startPosition != null &&
           nextUri.startsWith('http://127.0.0.1:') &&
           nextUri.contains('/playlist.m3u8?v=');
+      final shouldDeferInitialSeek =
+          startPosition != null && (deferInitialSeek || isLocalDvrSnapshot);
 
       // Do not block Player.open on a remote TS download just to discover GOP
       // geometry. The previous successful probes teach a safe backoff for later
@@ -90,7 +92,16 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
 
       if (startPosition != null) {
         await session.ensureReady();
-        session.player.setProperty('hr-seek', 'yes');
+        // A local frozen DVR snapshot is already trimmed to the target segment
+        // (or one preroll segment). Do not combine source open + Media(start:)
+        // + high-resolution seek: on Android that can cause the H.264 decoder
+        // to be created, flushed and recreated before the first useful frame.
+        // Open the source at zero first, then enable precise seeking once the
+        // demuxer has described the finite VOD snapshot.
+        session.player.setProperty(
+          'hr-seek',
+          shouldDeferInitialSeek && isLocalDvrSnapshot ? 'no' : 'yes',
+        );
         session.player.setProperty(
           'hr-seek-demuxer-offset',
           _seconds(hrSeekDemuxerOffset),
@@ -102,26 +113,58 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           '[TwitchPlayer] VOD snapshot precise start '
           'target=${_seconds(startPosition!)}s '
           'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s '
+          'strategy=open-then-seek '
           'probe=${_enableDvrTimingProbe ? "async" : "disabled"}',
         );
       }
 
       final openStopwatch = Stopwatch()..start();
-      if (startPosition != null && deferInitialSeek) {
+      if (shouldDeferInitialSeek) {
+        final sourceOpenStopwatch = Stopwatch()..start();
         await session.openOrResume(
           uri: nextUri,
           play: false,
           forceOpen: forceOpen,
         );
-        await _waitForSeekableMedia(session.player, startPosition);
-        debugPrint(
-          '[TwitchPlayer] deferred precise seek '
-          'target=${_seconds(startPosition)}s '
-          'duration=${_seconds(session.player.state.duration)}s',
-        );
+        sourceOpenStopwatch.stop();
+
+        final seekWaitStopwatch = Stopwatch()..start();
+        await _waitForSeekableMedia(session.player, startPosition!);
+        seekWaitStopwatch.stop();
+
+        if (isLocalDvrSnapshot) {
+          session.player.setProperty('hr-seek', 'yes');
+          session.player.setProperty(
+            'hr-seek-demuxer-offset',
+            _seconds(hrSeekDemuxerOffset),
+          );
+          debugPrint(
+            '[PlaybackLatency] '
+            'dvrSourceOpen=${sourceOpenStopwatch.elapsedMilliseconds}ms '
+            'dvrSeekWait=${seekWaitStopwatch.elapsedMilliseconds}ms '
+            'target=${_seconds(startPosition)}s '
+            'duration=${_seconds(session.player.state.duration)}s',
+          );
+        } else {
+          debugPrint(
+            '[TwitchPlayer] deferred precise seek '
+            'target=${_seconds(startPosition)}s '
+            'duration=${_seconds(session.player.state.duration)}s',
+          );
+        }
+
+        final preciseSeekStopwatch = Stopwatch()..start();
         await session.player.seek(startPosition);
+        preciseSeekStopwatch.stop();
         if (play) {
           await session.player.play();
+        }
+        if (isLocalDvrSnapshot) {
+          debugPrint(
+            '[PlaybackLatency] '
+            'dvrPreciseSeek=${preciseSeekStopwatch.elapsedMilliseconds}ms '
+            'target=${_seconds(startPosition)}s',
+          );
         }
       } else {
         await session.openOrResume(
@@ -135,7 +178,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
 
       if (isLocalDvrSnapshot) {
         debugPrint(
-          '[PlaybackLatency] dvrPlayerOpen=${openStopwatch.elapsedMilliseconds}ms '
+          '[PlaybackLatency] dvrStartupTotal=${openStopwatch.elapsedMilliseconds}ms '
           'target=${_seconds(startPosition!)}s',
         );
         // The TS timing probe downloads the target segment again. Keep it off
