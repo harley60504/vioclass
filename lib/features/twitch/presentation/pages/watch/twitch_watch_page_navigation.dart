@@ -8,7 +8,6 @@ import '../../mini_player/twitch_mini_player_controller.dart';
 import '../../settings/twitch_player_settings_controller.dart';
 import '../twitch_watch_page.dart';
 import 'twitch_watch_playback_state.dart';
-import 'twitch_watch_page_startup.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
