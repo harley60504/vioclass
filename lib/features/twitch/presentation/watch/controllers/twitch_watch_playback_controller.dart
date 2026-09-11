@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 import '../../../services/playback/twitch_local_dvr_media_timing_probe.dart';
 import '../twitch_watch_feature_ports.dart';
+import 'twitch_dvr_transition_mask_controller.dart';
 
 const bool _enableDvrTimingProbe = bool.fromEnvironment(
   'TWITCH_ENABLE_DVR_TIMING_PROBE',
@@ -72,6 +73,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       notifyListeners();
     }
     playerError = null;
+    int? dvrTransitionGeneration;
 
     try {
       final nextUri = uri.trim();
@@ -82,6 +84,11 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           nextUri.contains('/playlist.m3u8?v=');
       final shouldDeferInitialSeek =
           startPosition != null && (deferInitialSeek || isLocalDvrSnapshot);
+
+      if (isLocalDvrSnapshot) {
+        dvrTransitionGeneration =
+            TwitchDvrTransitionMaskController.instance.begin();
+      }
 
       final hrSeekDemuxerOffset = isLocalDvrSnapshot
           ? TwitchLocalDvrMediaTimingProbe.cachedSuggestedDemuxerOffset
@@ -161,6 +168,23 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
             'dvrPreciseSeek=${preciseSeekStopwatch.elapsedMilliseconds}ms '
             'target=${_seconds(seekTarget)}s',
           );
+          final transitionGeneration = dvrTransitionGeneration;
+          if (transitionGeneration != null) {
+            if (play) {
+              unawaited(
+                TwitchDvrTransitionMaskController.instance.revealWhenReady(
+                  player: session.player,
+                  target: seekTarget,
+                  generation: transitionGeneration,
+                ),
+              );
+            } else {
+              TwitchDvrTransitionMaskController.instance.cancel(
+                transitionGeneration,
+                reason: 'paused',
+              );
+            }
+          }
         }
       } else {
         await session.openOrResume(
@@ -192,6 +216,13 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         await waitForInitialPlaybackSettle();
       }
     } catch (error) {
+      final transitionGeneration = dvrTransitionGeneration;
+      if (transitionGeneration != null) {
+        TwitchDvrTransitionMaskController.instance.cancel(
+          transitionGeneration,
+          reason: 'open-error',
+        );
+      }
       playerError = error.toString();
       notifyListeners();
       rethrow;
