@@ -83,21 +83,12 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       final shouldDeferInitialSeek =
           startPosition != null && (deferInitialSeek || isLocalDvrSnapshot);
 
-      // Do not block Player.open on a remote TS download just to discover GOP
-      // geometry. The previous successful probes teach a safe backoff for later
-      // seeks; Twitch normally keeps that GOP cadence stable for a rendition.
       final hrSeekDemuxerOffset = isLocalDvrSnapshot
           ? TwitchLocalDvrMediaTimingProbe.cachedSuggestedDemuxerOffset
           : const Duration(seconds: 2);
 
       if (startPosition != null) {
         await session.ensureReady();
-        // A local frozen DVR snapshot is already trimmed to the target segment
-        // (or one preroll segment). Do not combine source open + Media(start:)
-        // + high-resolution seek: on Android that can cause the H.264 decoder
-        // to be created, flushed and recreated before the first useful frame.
-        // Open the source at zero first, then enable precise seeking once the
-        // demuxer has described the finite VOD snapshot.
         session.player.setProperty(
           'hr-seek',
           shouldDeferInitialSeek && isLocalDvrSnapshot ? 'no' : 'yes',
@@ -113,7 +104,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           '[TwitchPlayer] VOD snapshot precise start '
           'target=${_seconds(startPosition!)}s '
           'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s '
-          'strategy=open-then-seek '
+          'strategy=open-then-seek-no-wait '
           'probe=${_enableDvrTimingProbe ? "async" : "disabled"}',
         );
       }
@@ -129,9 +120,13 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         );
         sourceOpenStopwatch.stop();
 
-        final seekWaitStopwatch = Stopwatch()..start();
-        await _waitForSeekableMedia(session.player, seekTarget);
-        seekWaitStopwatch.stop();
+        var seekWaitMs = 0;
+        if (!isLocalDvrSnapshot) {
+          final seekWaitStopwatch = Stopwatch()..start();
+          await _waitForSeekableMedia(session.player, seekTarget);
+          seekWaitStopwatch.stop();
+          seekWaitMs = seekWaitStopwatch.elapsedMilliseconds;
+        }
 
         if (isLocalDvrSnapshot) {
           session.player.setProperty('hr-seek', 'yes');
@@ -142,7 +137,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           debugPrint(
             '[PlaybackLatency] '
             'dvrSourceOpen=${sourceOpenStopwatch.elapsedMilliseconds}ms '
-            'dvrSeekWait=${seekWaitStopwatch.elapsedMilliseconds}ms '
+            'dvrSeekWait=${seekWaitMs}ms '
             'target=${_seconds(seekTarget)}s '
             'duration=${_seconds(session.player.state.duration)}s',
           );
@@ -182,8 +177,6 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           '[PlaybackLatency] dvrStartupTotal=${openStopwatch.elapsedMilliseconds}ms '
           'target=${_seconds(startPosition!)}s',
         );
-        // The TS timing probe downloads the target segment again. Keep it off
-        // during normal playback so it cannot compete with mpv for startup I/O.
         if (_enableDvrTimingProbe) {
           unawaited(
             _probeDvrTimingAfterOpen(
@@ -214,9 +207,6 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     required String playlistUrl,
     required Duration startPosition,
   }) async {
-    // A short delay gives mpv first access to the snapshot instead of making
-    // the timing probe compete for the first segment request on the critical
-    // Live -> DVR transition.
     await Future<void>.delayed(const Duration(milliseconds: 250));
     final stopwatch = Stopwatch()..start();
     final probe = await TwitchLocalDvrMediaTimingProbe.probe(
