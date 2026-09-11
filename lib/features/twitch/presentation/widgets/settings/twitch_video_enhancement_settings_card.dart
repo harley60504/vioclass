@@ -147,11 +147,37 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                   Text(
                     _modeDescription(l10n, controller.videoEnhancementMode),
                     style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.48),
+                      color: Colors.white.withValues(alpha: 0.52),
                       fontSize: 11,
-                      height: 1.35,
+                      height: 1.42,
                       fontWeight: FontWeight.w700,
                     ),
+                  ),
+                  const SizedBox(height: 7),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 1),
+                        child: Icon(
+                          Icons.info_outline_rounded,
+                          color: Colors.white30,
+                          size: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          l10n.t('來源解析度低於螢幕解析度時最有感；來源已接近原生解析度時，超分收益會變小。'),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.36),
+                            fontSize: 10.25,
+                            height: 1.35,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 14),
                   Divider(
@@ -194,7 +220,7 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                   ),
                   _EnhancementToggle(
                     title: l10n.t('Adaptive Sharpen'),
-                    subtitle: l10n.t('超分後再做自適應銳化；可能增加高頻細節與 GPU 負載。'),
+                    subtitle: l10n.t('超分後再做自適應銳化；讓邊緣更清楚，但過強可能放大壓縮雜訊。'),
                     loadLabel: l10n.t('中負載'),
                     value: controller.videoSharpen,
                     onChanged: controller.setVideoSharpen,
@@ -240,20 +266,20 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
     TwitchVideoEnhancementMode mode,
   ) {
     return switch (mode) {
-      TwitchVideoEnhancementMode.lanczos => l10n.t('Lanczos（低負載）'),
-      TwitchVideoEnhancementMode.ewaLanczos => l10n.t('EWA Lanczos（高品質）'),
+      TwitchVideoEnhancementMode.lanczos => l10n.t('Lanczos｜最快、最穩'),
+      TwitchVideoEnhancementMode.ewaLanczos => l10n.t('EWA Lanczos｜自然平滑'),
       TwitchVideoEnhancementMode.ewaLanczosSharp =>
-        l10n.t('EWA Lanczos Sharp（推薦）'),
+        l10n.t('EWA Sharp｜均衡推薦'),
       TwitchVideoEnhancementMode.ewaLanczos4Sharpest =>
-        l10n.t('EWA Lanczos 4 Sharpest（最銳利）'),
-      TwitchVideoEnhancementMode.fsr => l10n.t('AMD FSR 1.0（低～中負載）'),
+        l10n.t('EWA 4 Sharpest｜文字最銳利'),
+      TwitchVideoEnhancementMode.fsr => l10n.t('AMD FSR 1.0｜低解析放大'),
       TwitchVideoEnhancementMode.ssimSuperRes =>
-        l10n.t('SSimSuperRes（中負載）'),
-      TwitchVideoEnhancementMode.artCnn => l10n.t('ArtCNN C4F16（高負載）'),
+        l10n.t('SSimSuperRes｜自然細節修復'),
+      TwitchVideoEnhancementMode.artCnn => l10n.t('ArtCNN C4F16｜AI 細節強化'),
       TwitchVideoEnhancementMode.anime4kFast =>
-        l10n.t('Anime4K Fast（中負載）'),
+        l10n.t('Anime4K Fast｜動畫輕量'),
       TwitchVideoEnhancementMode.anime4kHigh =>
-        l10n.t('Anime4K High（高負載）'),
+        l10n.t('Anime4K High｜動畫高品質'),
     };
   }
 
@@ -262,24 +288,33 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
     TwitchVideoEnhancementMode mode,
   ) {
     return switch (mode) {
-      TwitchVideoEnhancementMode.lanczos =>
-        l10n.t('基本 GPU 縮放，效能消耗最低，適合平板、低階裝置或高幀率直播。'),
-      TwitchVideoEnhancementMode.ewaLanczos =>
-        l10n.t('比一般 Lanczos 更平滑，適合真人、遊戲與攝影內容。'),
-      TwitchVideoEnhancementMode.ewaLanczosSharp =>
-        l10n.t('兼顧細節與效能的銳化縮放，適合大多數直播內容。'),
-      TwitchVideoEnhancementMode.ewaLanczos4Sharpest =>
-        l10n.t('更強的銳利度，文字與遊戲 UI 清楚，但可能增加 ringing。'),
-      TwitchVideoEnhancementMode.fsr =>
-        l10n.t('AMD FidelityFX FSR 1.0 shader，適合 480p/720p 放大到高解析螢幕。'),
-      TwitchVideoEnhancementMode.ssimSuperRes =>
-        l10n.t('修正一般縮放造成的 ringing 並恢復局部細節；真人與遊戲都適合。'),
-      TwitchVideoEnhancementMode.artCnn =>
-        l10n.t('CNN 2× luma 超分模式，低解析來源細節較強，但 GPU 負載明顯較高。'),
-      TwitchVideoEnhancementMode.anime4kFast =>
-        l10n.t('Anime4K 輕量模式，針對動畫線條與低解析動畫來源。'),
-      TwitchVideoEnhancementMode.anime4kHigh =>
-        l10n.t('Anime4K 高品質模式，GPU 負載最高；桌機或高階 GPU 建議使用。'),
+      TwitchVideoEnhancementMode.lanczos => l10n.t(
+        '負載：低。特點：傳統高品質縮放，畫面乾淨、延遲與 GPU 消耗最低。適合：平板、低階 GPU、1080p60/1440p 高幀率直播。缺點：不會主動補出新細節。',
+      ),
+      TwitchVideoEnhancementMode.ewaLanczos => l10n.t(
+        '負載：低～中。特點：比 Lanczos 更自然平滑，斜線與曲線較柔順。適合：真人、攝影、一般遊戲。缺點：銳利感較保守，文字與細小 HUD 不會特別突出。',
+      ),
+      TwitchVideoEnhancementMode.ewaLanczosSharp => l10n.t(
+        '負載：中。特點：在自然感與銳利度之間取得平衡，是一般直播最通用的選擇。適合：遊戲、真人、聊天台。缺點：不是 AI 超分，低解析來源的細節提升有限。',
+      ),
+      TwitchVideoEnhancementMode.ewaLanczos4Sharpest => l10n.t(
+        '負載：中。特點：EWA 系列最強銳化，文字、遊戲 UI、細線最清楚。適合：策略遊戲、介面很多的遊戲、桌面內容。缺點：高對比邊緣較容易出現 ringing／白邊。',
+      ),
+      TwitchVideoEnhancementMode.fsr => l10n.t(
+        '負載：低～中。特點：AMD FSR 1.0 空間超分，放大速度快並帶有邊緣強化。適合：480p／720p 遊戲直播放大到 1080p 或更高。缺點：壓縮雜訊也可能一起被銳化，真人畫面有時偏硬。',
+      ),
+      TwitchVideoEnhancementMode.ssimSuperRes => l10n.t(
+        '負載：中。特點：著重結構與局部對比，能抑制一般縮放的 ringing，同時恢復較自然的細節。適合：真人、攝影、3D 遊戲。缺點：提升較自然，不會像 ArtCNN 或 Anime4K 那麼「一眼變銳」。',
+      ),
+      TwitchVideoEnhancementMode.artCnn => l10n.t(
+        '負載：高。特點：CNN 亮度細節重建，對低解析紋理、細線與文字的提升最明顯。適合：480p／720p、舊遊戲或低 bitrate 來源。缺點：GPU 消耗最高之一，平板可能掉幀或發熱。',
+      ),
+      TwitchVideoEnhancementMode.anime4kFast => l10n.t(
+        '負載：中。特點：針對 2D 線稿、字幕與色塊做快速強化，邊線會比一般 scaler 更乾淨。適合：動畫、VTuber、2D 遊戲。缺點：真人皮膚與自然影像可能顯得不自然。',
+      ),
+      TwitchVideoEnhancementMode.anime4kHigh => l10n.t(
+        '負載：高。特點：比 Fast 更積極地重建動畫線條與細節，2D 內容最銳利。適合：低解析動畫、VTuber、桌機高階 GPU。缺點：負載高，真人／3D 內容可能過度銳化。',
+      ),
     };
   }
 }
