@@ -14,7 +14,10 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
   static final TwitchDvrTransitionMaskController instance =
       TwitchDvrTransitionMaskController._();
 
-  static const Duration _readyStabilityWindow = Duration(milliseconds: 100);
+  // A decoded frame that is already playing, non-buffering and on target does
+  // not need a full 100 ms confirmation window. 40 ms still spans multiple
+  // display frames while reducing the visible delay after timeline seeks.
+  static const Duration _readyStabilityWindow = Duration(milliseconds: 40);
   static const Duration _revealTimeout = Duration(milliseconds: 1200);
   static const int _targetToleranceMs = 650;
 
