@@ -101,7 +101,7 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
     final reason = await completer.future;
     stopwatch.stop();
 
-    timeoutTimer.cancel();
+    timeoutTimer?.cancel();
     stabilityTimer?.cancel();
     await positionSubscription?.cancel();
     await bufferingSubscription?.cancel();
