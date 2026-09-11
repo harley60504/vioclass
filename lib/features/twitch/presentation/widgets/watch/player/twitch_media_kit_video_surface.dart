@@ -105,9 +105,13 @@ class _TwitchMediaKitVideoSurfaceState
                     children: [
                       video ?? const SizedBox.shrink(),
                       if (transitionMask.visible)
-                        const Positioned.fill(
+                        Positioned.fill(
                           child: IgnorePointer(
-                            child: ColoredBox(color: Colors.black),
+                            child: _PlaybackTransitionOverlay(
+                              previewImageUrl:
+                                  transitionMask.previewImageUrl,
+                              showLoading: transitionMask.showLoading,
+                            ),
                           ),
                         ),
                     ],
@@ -118,6 +122,56 @@ class _TwitchMediaKitVideoSurfaceState
           );
         },
       ),
+    );
+  }
+}
+
+class _PlaybackTransitionOverlay extends StatelessWidget {
+  final String previewImageUrl;
+  final bool showLoading;
+
+  const _PlaybackTransitionOverlay({
+    required this.previewImageUrl,
+    required this.showLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = previewImageUrl.trim();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: Colors.black),
+        if (imageUrl.isNotEmpty)
+          Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        if (imageUrl.isNotEmpty)
+          ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
+        if (showLoading)
+          Center(
+            child: Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.48),
+                shape: BoxShape.circle,
+              ),
+              child: const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: TwitchUiColors.primarySoft,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
