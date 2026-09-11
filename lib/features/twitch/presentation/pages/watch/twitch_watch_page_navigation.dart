@@ -44,13 +44,10 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
     required bool respectMiniPreference,
     required bool popToRoot,
   }) async {
-    if (!isPushedMediaPlayback && activeGrowingVodVideo == null) {
-      await prepareActiveGrowingVod(
-        channel: channelLogin,
-        generation: watchLoadGeneration,
-      );
-    }
-
+    // Do not block route navigation on a network-backed growing-VOD lookup.
+    // The currently playing live stream is already enough to hand off to the
+    // mini player. DVR metadata can be reacquired when the watch page is opened
+    // again, while the visible route transition stays immediate.
     final snapshot = buildPlaybackSnapshot();
     if (snapshot == null) {
       handedOffToMiniPlayer = false;
@@ -71,10 +68,8 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
     if (!shouldKeepMini) {
       handedOffToMiniPlayer = false;
       TwitchMiniPlayerController.instance.close();
-      try {
-        await stopCurrentSession(cancelDeferredTasks: true);
-        await playerSession.stopCurrent();
-      } catch (_) {}
+      // The route's dispose path already releases the runtime and pauses the
+      // shared player. Pop first so teardown work cannot hold the transition.
       popWatchPage(popToRoot: popToRoot);
       return;
     }
@@ -96,5 +91,4 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
       Navigator.of(context).pop();
     }
   }
-
 }
