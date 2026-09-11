@@ -10,6 +10,7 @@ import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_segment_timeline_index.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import '../../parsers/playback/twitch_ts_timing_parser.dart';
+import 'twitch_canonical_playback_clock_registry.dart';
 
 /// Near-live TS replay source.
 ///
@@ -59,6 +60,7 @@ class TwitchSequentialLiveReplayProxy {
 
   Future<void> start() async {
     if (_server != null) return;
+    TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server = server;
     unawaited(_serve(server));
@@ -68,6 +70,7 @@ class TwitchSequentialLiveReplayProxy {
     final server = _server;
     _server = null;
     _timingCache.clear();
+    TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
     await server?.close(force: true);
     _client.close(force: true);
   }
@@ -137,6 +140,18 @@ class TwitchSequentialLiveReplayProxy {
     var nextSequence = resolved.item.sequence;
     String? lastMapUrl;
     final targetSequence = resolved.item.sequence;
+
+    TwitchCanonicalPlaybackClockRegistry.setLocalReplayAnchor(
+      canonicalStart: resolved.segmentStart,
+      sequence: targetSequence,
+    );
+    _log(
+      '[CanonicalPlaybackClock][LOCAL] '
+      'segment=$targetSequence '
+      'canonicalStart=${_seconds(resolved.segmentStart)}s '
+      'requested=${_seconds(target)}s '
+      'intra=${_seconds(resolved.intraSegment)}s',
+    );
 
     _log(
       'seek fromLive=${_seconds(fromLive)}s '
