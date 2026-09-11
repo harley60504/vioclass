@@ -148,7 +148,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
             unawaited(
               TwitchDvrTransitionMaskController.instance.revealWhenReady(
                 player: session.player,
-                target: startPosition,
+                target: startPosition!,
                 generation: transitionGeneration,
               ),
             );
