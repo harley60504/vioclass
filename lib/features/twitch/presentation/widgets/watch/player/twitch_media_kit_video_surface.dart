@@ -181,18 +181,30 @@ class TwitchMediaKitVideoWaitingSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.black,
-      child: Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            color: TwitchUiColors.primarySoft,
+    final transitionMask = TwitchDvrTransitionMaskController.instance;
+    return AnimatedBuilder(
+      animation: transitionMask,
+      builder: (context, _) {
+        if (transitionMask.visible) {
+          return _PlaybackTransitionOverlay(
+            previewImageUrl: transitionMask.previewImageUrl,
+            showLoading: transitionMask.showLoading,
+          );
+        }
+        return const ColoredBox(
+          color: Colors.black,
+          child: Center(
+            child: SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: TwitchUiColors.primarySoft,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
