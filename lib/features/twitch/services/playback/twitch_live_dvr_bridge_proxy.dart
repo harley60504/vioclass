@@ -10,13 +10,15 @@ import '../../models/playback/twitch_segment_timeline_index.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
-/// DVR transport that keeps canonical time resolution separate from media I/O.
+/// Sequential DVR transport with canonical time resolution separated from I/O.
 ///
 /// [seekToPosition] resolves canonical/PDT time to one Twitch archive segment
-/// plus an offset inside that segment. Playback is then exposed as one
-/// continuous MPEG-TS HTTP response. Only this proxy chooses which upstream
-/// segment is downloaded, so mpv/FFmpeg cannot fan out concurrent DVR segment
-/// requests as it can with an HLS media playlist.
+/// plus an offset inside that segment. Playback is exposed as one continuous
+/// MPEG-TS HTTP response. Only this proxy chooses which upstream segment is
+/// downloaded, so mpv/FFmpeg cannot fan out concurrent DVR segment requests.
+///
+/// The legacy class name is retained because it is used by the playback runtime,
+/// but the active transport no longer exposes an HLS media playlist to mpv.
 class TwitchLiveDvrBridgeProxy {
   static const Duration _freshIndexReuseWindow = Duration(seconds: 4);
   static const Duration _emptyPlaylistRetryDelay = Duration(milliseconds: 250);
@@ -45,7 +47,6 @@ class TwitchLiveDvrBridgeProxy {
   int? _dvrSeekStartIndex;
   int? _dvrSeekStartSequence;
   Duration _dvrSeekStartOffset = Duration.zero;
-  Duration? _dvrSeekCanonicalSegmentStart;
   DateTime? _dvrSeekTargetProgramDateTime;
 
   TwitchLiveDvrBridgeProxy({Dio? dio})
@@ -63,20 +64,12 @@ class TwitchLiveDvrBridgeProxy {
   bool get isLiveMode => false;
   Duration? get timelinePosition => _timelinePosition ?? _seekPosition;
 
-  /// Kept for callers that used the previous HLS bridge API. DVR playback is
-  /// intentionally TS-only now, so this compatibility getter points at the
-  /// same sequential stream as [streamTsPlaybackUrl].
-  String get playlistPlaybackUrl => streamTsPlaybackUrl;
-
   String get streamTsPlaybackUrl => '$streamTsUrl?v=$_streamGeneration';
-
-  /// Compatibility alias. The active DVR transport no longer serves HLS.
-  String get playlistUrl => streamTsUrl;
 
   String get streamTsUrl {
     final server = _server;
     if (server == null) {
-      throw StateError('Live DVR bridge proxy has not started.');
+      throw StateError('Sequential DVR proxy has not started.');
     }
     return 'http://127.0.0.1:${server.port}/stream.ts';
   }
@@ -97,11 +90,11 @@ class TwitchLiveDvrBridgeProxy {
     return Uri.parse('http://127.0.0.1:${server.port}/stream.ts');
   }
 
-  /// Resolves the requested canonical time but does not download media.
+  /// Resolves the requested canonical time without downloading media.
   ///
-  /// The returned duration is relative to the first TS segment that will be
-  /// emitted for this generation. The player therefore only needs to skip the
-  /// intra-segment offset while this proxy keeps full control of segment order.
+  /// The returned duration is relative to the first TS segment emitted for this
+  /// generation. The player only skips the intra-segment offset while this proxy
+  /// retains full control of upstream segment order.
   Future<Duration> seekToPosition(
     Duration position, {
     DateTime? targetProgramDateTime,
@@ -117,7 +110,6 @@ class TwitchLiveDvrBridgeProxy {
       _dvrSeekStartIndex = null;
       _dvrSeekStartSequence = null;
       _dvrSeekStartOffset = Duration.zero;
-      _dvrSeekCanonicalSegmentStart = null;
       _dvrSeekTargetProgramDateTime = targetProgramDateTime?.toUtc();
       _streamGeneration++;
       _streamClientGeneration++;
@@ -141,19 +133,16 @@ class TwitchLiveDvrBridgeProxy {
         : canonicalPosition == resolvedSeek.canonicalPosition
         ? canonicalPosition
         : resolvedSeek.canonicalPosition;
-    final canonicalSegmentStart =
-        resolvedSeek.canonicalPosition - segmentOffset;
 
     _seekPosition = resolvedTimelinePosition;
     _timelinePosition = resolvedTimelinePosition;
     _dvrSeekStartIndex = targetIndex;
     _dvrSeekStartSequence = resolvedSeek.sequence;
     _dvrSeekStartOffset = segmentOffset;
-    _dvrSeekCanonicalSegmentStart = canonicalSegmentStart;
     _dvrSeekTargetProgramDateTime = usedProgramDateTime ? targetUtc : null;
 
     // Every seek owns a new stream generation. Existing /stream.ts readers and
-    // their active upstream segment stop as soon as their next chunk arrives.
+    // their active upstream segment become stale immediately.
     _streamGeneration++;
     _streamClientGeneration++;
 
@@ -165,11 +154,10 @@ class TwitchLiveDvrBridgeProxy {
       'indexed=${_seconds(timeline.indexedDuration)}s',
     );
     debugPrint(
-      '[LiveDvrBridge] seek position=${_seconds(resolvedTimelinePosition)}s '
+      '[DvrSequential] seek position=${_seconds(resolvedTimelinePosition)}s '
       'segment=$targetIndex sequence=${resolvedSeek.sequence} '
       'offset=${segmentOffset.inMilliseconds}ms '
       'playerStart=${segmentOffset.inMilliseconds}ms '
-      'output=sequential-ts '
       'clock=${usedProgramDateTime ? 'program-date-time' : 'extinf'} '
       'generation=$_streamGeneration',
     );
@@ -203,14 +191,13 @@ class TwitchLiveDvrBridgeProxy {
     _dvrSeekStartIndex = null;
     _dvrSeekStartSequence = null;
     _dvrSeekStartOffset = Duration.zero;
-    _dvrSeekCanonicalSegmentStart = null;
     _dvrSeekTargetProgramDateTime = null;
   }
 
   Future<List<TwitchHlsSegmentItem>> _validatePlaylist(Uri uri) async {
     final text = await _fetchPlaylist(uri);
     if (!text.contains('#EXTM3U') || !text.contains('#EXTINF')) {
-      throw StateError('Live DVR bridge playlist 載入失敗。');
+      throw StateError('DVR archive playlist 載入失敗。');
     }
     final playlist = TwitchHlsPlaylistParser.parse(
       text,
@@ -228,7 +215,7 @@ class TwitchLiveDvrBridgeProxy {
       final age = DateTime.now().toUtc().difference(observedAt);
       if (!age.isNegative && age <= _freshIndexReuseWindow) {
         debugPrint(
-          '[LiveDvrBridge] reuse fresh DVR index age=${age.inMilliseconds}ms '
+          '[DvrSequential] reuse DVR index age=${age.inMilliseconds}ms '
           'items=${_latestItems.length}',
         );
         return;
@@ -239,7 +226,7 @@ class TwitchLiveDvrBridgeProxy {
       final items = await _validatePlaylist(uri);
       if (items.isNotEmpty) _rememberLatestItems(items);
     } catch (error) {
-      debugPrint('[LiveDvrBridge] seek index refresh failed: $error');
+      debugPrint('[DvrSequential] DVR index refresh failed: $error');
     }
   }
 
@@ -415,15 +402,6 @@ class TwitchLiveDvrBridgeProxy {
         );
         if (!_isActiveStream(generation, clientGeneration)) return;
 
-        final segmentStart = firstSegment
-            ? _dvrSeekCanonicalSegmentStart
-            : _canonicalStartForSequence(items, item.sequence);
-        if (segmentStart != null) {
-          _timelinePosition = segmentStart + item.duration;
-        } else if (_timelinePosition != null) {
-          _timelinePosition = _timelinePosition! + item.duration;
-        }
-
         firstSegment = false;
         nextSequence = item.sequence + 1;
       }
@@ -514,17 +492,6 @@ class TwitchLiveDvrBridgeProxy {
       _server != null &&
       generation == _streamGeneration &&
       clientGeneration == _streamClientGeneration;
-
-  Duration? _canonicalStartForSequence(
-    List<TwitchHlsSegmentItem> items,
-    int sequence,
-  ) {
-    final timeline = _latestTimelineIndex;
-    if (timeline == null || timeline.isEmpty) return null;
-    final index = items.indexWhere((item) => item.sequence == sequence);
-    if (index < 0) return null;
-    return timeline.entryAt(index)?.canonicalStart;
-  }
 
   String _segmentName(Uri uri) =>
       uri.pathSegments.isEmpty ? uri.path : uri.pathSegments.last;
