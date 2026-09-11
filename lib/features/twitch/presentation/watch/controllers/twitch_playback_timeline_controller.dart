@@ -158,10 +158,15 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         mediaUri != null &&
         mediaUri.contains('/stream.ts') &&
         !mediaUri.contains('/stream.ts?v=');
+    final effectiveCanonicalPosition =
+        canonicalPosition ??
+        _pendingLocalCanonicalTarget ??
+        _canonicalAnchorPosition ??
+        _position;
     final behindLive =
-        canonicalPosition != null &&
+        effectiveCanonicalPosition != null &&
         duration != null &&
-        canonicalPosition + const Duration(milliseconds: 500) < duration;
+        effectiveCanonicalPosition + const Duration(milliseconds: 500) < duration;
     if (localReplayStart != null &&
         looksLikeLocalReplaySource &&
         behindLive &&
@@ -215,9 +220,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
           localSourceChanged ||
           localMediaRestarted;
 
-      if (shouldReanchor && canonicalPosition != null) {
+      if (shouldReanchor && effectiveCanonicalPosition != null) {
         final explicitAnchor = _explicitSeekAnchorPosition;
-        final canonicalAnchor = explicitAnchor ?? canonicalPosition;
+        final canonicalAnchor = explicitAnchor ?? effectiveCanonicalPosition;
         final rawMediaTarget = canonicalAnchor - localReplayStart;
         final mediaTarget = rawMediaTarget.isNegative
             ? Duration.zero
@@ -264,7 +269,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
             'segmentStart=${_seconds(localReplayStart)}s '
             'media=${_seconds(mediaPosition)}s '
             'canonical=${_seconds(canonicalAnchor)}s '
-            'runtimeCanonical=${_seconds(canonicalPosition)}s',
+            'runtimeCanonical=${_seconds(effectiveCanonicalPosition)}s',
           );
         }
         return;
