@@ -6,6 +6,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../../../watch/controllers/twitch_dvr_transition_mask_controller.dart';
 
 const double twitchWatchVideoAspectRatio = 16 / 9;
 
@@ -85,15 +86,33 @@ class _TwitchMediaKitVideoSurfaceState
             (_) => _reportSourceRectHint(),
           );
 
+          final transitionMask = TwitchDvrTransitionMaskController.instance;
           return Center(
             child: SizedBox(
               key: _videoSurfaceKey,
               width: width,
               height: height,
-              child: Video(
-                controller: widget.controller,
-                fit: widget.fit,
-                controls: widget.controls,
+              child: AnimatedBuilder(
+                animation: transitionMask,
+                child: Video(
+                  controller: widget.controller,
+                  fit: widget.fit,
+                  controls: widget.controls,
+                ),
+                builder: (context, video) {
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      video ?? const SizedBox.shrink(),
+                      if (transitionMask.visible)
+                        const Positioned.fill(
+                          child: IgnorePointer(
+                            child: ColoredBox(color: Colors.black),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           );
