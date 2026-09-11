@@ -45,6 +45,18 @@ class TwitchLiveDvrBridgeProxy {
   Duration _snapshotCanonicalStart = Duration.zero;
   Duration _snapshotPlayerStart = Duration.zero;
 
+  // Prime only the first segment connection of the current frozen snapshot.
+  // We intentionally do not read the body into RAM. The upstream response is
+  // held until mpv asks the local proxy for that exact segment, then its body is
+  // streamed directly to mpv. This overlaps DNS/TLS/request latency with
+  // Player.open without adding a second segment download or a large memory
+  // cache.
+  int? _prefetchedSegmentGeneration;
+  Uri? _prefetchedSegmentUri;
+  Future<HttpClientResponse?>? _prefetchedSegmentResponse;
+  DateTime? _prefetchedSegmentStartedAt;
+  bool _prefetchedSegmentClaimed = false;
+
   TwitchLiveDvrBridgeProxy({Dio? dio})
     : _dio =
           dio ??
@@ -177,6 +189,13 @@ class TwitchLiveDvrBridgeProxy {
       items.sublist(snapshotStartIndex),
     );
 
+    if (_snapshotItems.isNotEmpty) {
+      _startFirstSegmentPrefetch(
+        Uri.parse(_snapshotItems.first.url),
+        _streamGeneration,
+      );
+    }
+
     final snapshotDuration = _durationOfItems(_snapshotItems);
     debugPrint(
       '[SegmentTimelineIndex][DVR] target=${_seconds(canonicalPosition)}s '
@@ -233,6 +252,101 @@ class TwitchLiveDvrBridgeProxy {
     _snapshotSourceStartIndex = null;
     _snapshotCanonicalStart = Duration.zero;
     _snapshotPlayerStart = Duration.zero;
+    _clearFirstSegmentPrefetch();
+  }
+
+  void _clearFirstSegmentPrefetch() {
+    _prefetchedSegmentGeneration = null;
+    _prefetchedSegmentUri = null;
+    _prefetchedSegmentResponse = null;
+    _prefetchedSegmentStartedAt = null;
+    _prefetchedSegmentClaimed = false;
+  }
+
+  void _startFirstSegmentPrefetch(Uri sourceUri, int generation) {
+    _clearFirstSegmentPrefetch();
+    _prefetchedSegmentGeneration = generation;
+    _prefetchedSegmentUri = sourceUri;
+    _prefetchedSegmentStartedAt = DateTime.now();
+    _prefetchedSegmentResponse = _openPrefetchedSegment(
+      sourceUri,
+      generation,
+    );
+    debugPrint(
+      '[LiveDvrBridge][Prefetch] start generation=$generation '
+      'segment=${sourceUri.pathSegments.isEmpty ? sourceUri.path : sourceUri.pathSegments.last}',
+    );
+  }
+
+  Future<HttpClientResponse?> _openPrefetchedSegment(
+    Uri sourceUri,
+    int generation,
+  ) async {
+    final stopwatch = Stopwatch()..start();
+    try {
+      final upstream = await _openUpstreamSegment(sourceUri);
+      stopwatch.stop();
+      final stillCurrent =
+          generation == _streamGeneration &&
+          _prefetchedSegmentGeneration == generation &&
+          _prefetchedSegmentUri == sourceUri;
+      if (!stillCurrent) {
+        final subscription = upstream.listen((_) {});
+        await subscription.cancel();
+        return null;
+      }
+      debugPrint(
+        '[LiveDvrBridge][Prefetch] headers-ready '
+        'generation=$generation ms=${stopwatch.elapsedMilliseconds}',
+      );
+      return upstream;
+    } catch (error) {
+      stopwatch.stop();
+      if (_prefetchedSegmentGeneration == generation &&
+          _prefetchedSegmentUri == sourceUri) {
+        debugPrint(
+          '[LiveDvrBridge][Prefetch] failed generation=$generation '
+          'ms=${stopwatch.elapsedMilliseconds} error=$error',
+        );
+      }
+      return null;
+    }
+  }
+
+  Future<HttpClientResponse?> _takePrefetchedSegment(
+    Uri sourceUri,
+    int generation,
+  ) async {
+    if (_prefetchedSegmentGeneration != generation ||
+        _prefetchedSegmentUri != sourceUri ||
+        _prefetchedSegmentClaimed) {
+      return null;
+    }
+    final future = _prefetchedSegmentResponse;
+    if (future == null) return null;
+
+    _prefetchedSegmentClaimed = true;
+    final startedAt = _prefetchedSegmentStartedAt;
+    final waitStopwatch = Stopwatch()..start();
+    final upstream = await future;
+    waitStopwatch.stop();
+
+    final ageMs = startedAt == null
+        ? -1
+        : DateTime.now().difference(startedAt).inMilliseconds;
+    if (upstream != null) {
+      debugPrint(
+        '[PlaybackLatency] dvrSegmentPrefetchHit '
+        'wait=${waitStopwatch.elapsedMilliseconds}ms age=${ageMs}ms '
+        'generation=$generation',
+      );
+    }
+
+    if (_prefetchedSegmentGeneration == generation &&
+        _prefetchedSegmentUri == sourceUri) {
+      _clearFirstSegmentPrefetch();
+    }
+    return upstream;
   }
 
   Future<List<TwitchHlsSegmentItem>> _validatePlaylist(Uri uri) async {
@@ -432,6 +546,8 @@ class TwitchLiveDvrBridgeProxy {
       'snapshot_items=${_snapshotItems.length}\n'
       'snapshot_duration_ms=${snapshotDuration.inMilliseconds}\n'
       'snapshot_player_start_ms=${_snapshotPlayerStart.inMilliseconds}\n'
+      'prefetch_generation=${_prefetchedSegmentGeneration ?? -1}\n'
+      'prefetch_claimed=$_prefetchedSegmentClaimed\n'
       'preroll_policy=dynamic-${_dvrPrerollBackoff.inMilliseconds}ms\n'
       'clock=${_dvrSeekTargetProgramDateTime != null ? 'program-date-time' : 'extinf'}\n',
     );
@@ -604,11 +720,7 @@ class TwitchLiveDvrBridgeProxy {
     }
   }
 
-  Future<void> _writeSegment(
-    HttpResponse response,
-    Uri sourceUri,
-    int generation,
-  ) async {
+  Future<HttpClientResponse> _openUpstreamSegment(Uri sourceUri) async {
     final upstreamRequest = await _client.openUrl('GET', sourceUri);
     upstreamRequest.followRedirects = true;
     upstreamRequest.maxRedirects = 5;
@@ -617,8 +729,16 @@ class TwitchLiveDvrBridgeProxy {
       upstreamRequest.headers.set(entry.key, entry.value);
     }
     upstreamRequest.headers.set(HttpHeaders.acceptEncodingHeader, 'identity');
+    return upstreamRequest.close();
+  }
 
-    final upstream = await upstreamRequest.close();
+  Future<void> _writeSegment(
+    HttpResponse response,
+    Uri sourceUri,
+    int generation,
+  ) async {
+    final prefetched = await _takePrefetchedSegment(sourceUri, generation);
+    final upstream = prefetched ?? await _openUpstreamSegment(sourceUri);
     await for (final chunk in upstream) {
       if (generation != _streamGeneration || _server == null) return;
       response.add(chunk);
