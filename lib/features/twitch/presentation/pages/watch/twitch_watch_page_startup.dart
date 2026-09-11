@@ -942,8 +942,8 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         timelineDuration == null || timelineDuration.inMilliseconds <= 0
         ? null
         : safeTarget.inMilliseconds / 1000;
-    final startedAt = liveTimelineStartedAt?.toUtc();
-    final targetProgramDateTime = startedAt?.add(safeTarget);
+    final timelineOrigin = watchPorts.player.runtime.canonicalTimelineOrigin;
+    final targetProgramDateTime = timelineOrigin?.add(safeTarget);
     final seekResult = await watchPorts.player.runtime.seekLiveDvrBridgePosition(
       safeTarget,
       targetProgramDateTime: targetProgramDateTime,
@@ -1064,10 +1064,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   }
 
   Duration? currentLiveTimelineDuration() {
-    final startedAt = liveTimelineStartedAt;
-    if (startedAt == null) return null;
-    final elapsed = DateTime.now().toUtc().difference(startedAt.toUtc());
-    return elapsed.isNegative ? null : elapsed;
+    return watchPorts.player.runtime.canonicalLiveTimelineDuration;
   }
 
   Duration? currentLiveTimelinePosition() {
