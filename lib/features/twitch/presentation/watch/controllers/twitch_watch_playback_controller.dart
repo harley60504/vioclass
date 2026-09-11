@@ -45,7 +45,11 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         forceOpen: forceOpen,
       );
       await applyPlayerVolume();
-      await waitForInitialPlaybackSettle();
+      // Player.open() has already handed the stream to mpv. Do not hold the
+      // watch-page loading state for the optional first-frame settle window.
+      // The warm player surface can become visible immediately while settle
+      // continues in the background.
+      unawaited(waitForInitialPlaybackSettle().catchError((_) {}));
     } catch (error) {
       playerError = error.toString();
       notifyListeners();
@@ -89,9 +93,19 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         await playerPort.runtime.proxy?.interruptPlaybackStream();
       }
 
-      await session.useLowLatencyHlsProfile();
-      await session.ensureReady();
-      session.player.setProperty('demuxer-lavf-o', 'live_start_index=-3');
+      // Keep archive DVR on its readahead/cache profile. Previously the caller
+      // selected liveDvr and openMedia immediately overwrote it with the
+      // low-latency LIVE profile, adding property churn and using the wrong
+      // buffering policy for timeline seeks.
+      if (isSequentialDvr) {
+        await session.useLiveDvrHlsCacheProfile();
+      } else {
+        await session.useLowLatencyHlsProfile();
+      }
+
+      if (!isSequentialDvr) {
+        session.player.setProperty('demuxer-lavf-o', 'live_start_index=-3');
+      }
 
       if (isSequentialDvr) {
         dvrTransitionGeneration =
