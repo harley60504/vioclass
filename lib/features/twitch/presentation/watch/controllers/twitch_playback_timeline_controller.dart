@@ -30,6 +30,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _playbackTickInterval = Duration(milliseconds: 250);
   static const Duration _mediaRestartTolerance = Duration(milliseconds: 500);
   static const Duration _initialSeekJumpThreshold = Duration(seconds: 3);
+  static const Duration _dvrInitialSeekJumpThreshold = Duration(milliseconds: 80);
   static const Duration _initialSeekReanchorWindow = Duration(seconds: 2);
   static const Duration _canonicalAnchorTolerance = Duration(seconds: 1);
   static const Duration _liveEdgeTolerance = Duration(milliseconds: 750);
@@ -212,7 +213,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         if (kDebugMode && localReplaySequence != null) {
           debugPrint(
             '[CanonicalPlaybackClock][LOCAL-UI] '
-            'revision=$localReplayRevision '
+            'revision=$_localReplayAnchorRevision '
             'sequence=$localReplaySequence '
             'segmentStart=${_seconds(localReplayStart)}s '
             'mediaAnchor=${_seconds(mediaAnchor)}s '
@@ -306,7 +307,12 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     }
 
     final mediaAdvance = mediaPosition - mediaAnchor;
-    if (mediaAdvance <= _initialSeekJumpThreshold) return false;
+    final isLocalDvrPlaylist =
+        _mediaAnchorUri?.contains('/playlist.m3u8?v=') ?? false;
+    final jumpThreshold = isLocalDvrPlaylist
+        ? _dvrInitialSeekJumpThreshold
+        : _initialSeekJumpThreshold;
+    if (mediaAdvance <= jumpThreshold) return false;
 
     final canonicalDistance = _durationDistance(
       canonicalPosition,
