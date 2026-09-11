@@ -5,7 +5,7 @@ import 'package:media_kit/media_kit.dart';
 
 /// Keeps stale/preroll decoder frames hidden while playback is transitioning.
 ///
-/// The video surface itself stays mounted. Only a black overlay is toggled, so
+/// The video surface itself stays mounted. Only an overlay is toggled, so
 /// Android MediaCodec/SurfaceTexture ownership is not disturbed by the mask.
 /// The same mask is used both for DVR seeks and live-source switches.
 class TwitchDvrTransitionMaskController extends ChangeNotifier {
@@ -26,15 +26,19 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
 
   bool _visible = false;
   int _generation = 0;
+  String _previewImageUrl = '';
+  bool _showLoading = false;
 
   bool get visible => _visible;
+  String get previewImageUrl => _previewImageUrl;
+  bool get showLoading => _showLoading;
 
-  int begin() {
+  int begin({String? previewImageUrl, bool showLoading = false}) {
     final generation = ++_generation;
-    if (!_visible) {
-      _visible = true;
-      notifyListeners();
-    }
+    _previewImageUrl = previewImageUrl?.trim() ?? '';
+    _showLoading = showLoading;
+    _visible = true;
+    notifyListeners();
     debugPrint('[PlaybackTransitionMask] begin generation=$generation');
     return generation;
   }
@@ -218,6 +222,8 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
   }) {
     if (generation != _generation || !_visible) return;
     _visible = false;
+    _previewImageUrl = '';
+    _showLoading = false;
     notifyListeners();
 
     final position = player?.state.position;
