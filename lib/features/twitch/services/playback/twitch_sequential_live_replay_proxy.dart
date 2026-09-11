@@ -471,7 +471,7 @@ class TwitchSequentialLiveReplayProxy {
 
   void _rememberTiming(String url, TwitchTsTimingInfo timing) {
     _timingCache.remove(url);
-    _timingCache[item.url] = timing;
+    _timingCache[url] = timing;
     while (_timingCache.length > _maxTimingCacheEntries) {
       _timingCache.remove(_timingCache.keys.first);
     }
