@@ -791,7 +791,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<String?> seekLiveBufferReplay({
-    required Duration canonicalTarget,
+    Duration? canonicalTarget,
+    Duration? fromLive,
     required Duration timelineDuration,
   }) async {
     final router = _proxy ?? _sharedProxy;
@@ -800,8 +801,22 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
 
+    final requestedTarget = canonicalTarget ??
+        (fromLive == null
+            ? null
+            : Duration(
+                microseconds:
+                    (timelineDuration.inMicroseconds - fromLive.inMicroseconds)
+                        .clamp(0, timelineDuration.inMicroseconds)
+                        .toInt(),
+              ));
+    if (requestedTarget == null) {
+      debugPrint('[LiveBufferReplay] seek ignored: target missing');
+      return null;
+    }
+
     final safeTarget = Duration(
-      microseconds: canonicalTarget.inMicroseconds
+      microseconds: requestedTarget.inMicroseconds
           .clamp(0, timelineDuration.inMicroseconds)
           .toInt(),
     );
