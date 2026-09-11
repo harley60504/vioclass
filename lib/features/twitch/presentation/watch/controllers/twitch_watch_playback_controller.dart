@@ -6,6 +6,11 @@ import 'package:media_kit/media_kit.dart';
 import '../../../services/playback/twitch_local_dvr_media_timing_probe.dart';
 import '../twitch_watch_feature_ports.dart';
 
+const bool _enableDvrTimingProbe = bool.fromEnvironment(
+  'TWITCH_ENABLE_DVR_TIMING_PROBE',
+  defaultValue: false,
+);
+
 class TwitchWatchPlaybackController extends ChangeNotifier {
   final TwitchWatchPlayerPort playerPort;
   final Future<void> Function() applyPlayerVolume;
@@ -96,7 +101,8 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         debugPrint(
           '[TwitchPlayer] VOD snapshot precise start '
           'target=${_seconds(startPosition!)}s '
-          'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s probe=async',
+          'hrBackoff=${_seconds(hrSeekDemuxerOffset)}s '
+          'probe=${_enableDvrTimingProbe ? "async" : "disabled"}',
         );
       }
 
@@ -132,14 +138,16 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           '[PlaybackLatency] dvrPlayerOpen=${openStopwatch.elapsedMilliseconds}ms '
           'target=${_seconds(startPosition!)}s',
         );
-        // Let the player start fetching immediately. PTS/PCR/IDR inspection is
-        // diagnostic/adaptive metadata, not a prerequisite for this seek.
-        unawaited(
-          _probeDvrTimingAfterOpen(
-            playlistUrl: nextUri,
-            startPosition: startPosition,
-          ),
-        );
+        // The TS timing probe downloads the target segment again. Keep it off
+        // during normal playback so it cannot compete with mpv for startup I/O.
+        if (_enableDvrTimingProbe) {
+          unawaited(
+            _probeDvrTimingAfterOpen(
+              playlistUrl: nextUri,
+              startPosition: startPosition,
+            ),
+          );
+        }
       }
 
       await applyPlayerVolume();
