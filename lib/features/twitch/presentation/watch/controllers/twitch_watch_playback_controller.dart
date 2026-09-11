@@ -40,10 +40,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
     int? liveTransitionGeneration;
     try {
       final session = playerPort.services.playerSession;
-      final previousMediaUri = session.currentMediaUri?.trim();
-      final isReplacingVisiblePlayback =
-          forceOpen && previousMediaUri != null && previousMediaUri.isNotEmpty;
-      if (isReplacingVisiblePlayback) {
+      if (forceOpen) {
         final snapshot = TwitchChannelSnapshotCache.instance.find(
           login: channelLogin,
         );
