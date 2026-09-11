@@ -10,6 +10,7 @@ import '../../models/playback/twitch_hls_proxy_models.dart';
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
+import 'twitch_canonical_playback_clock_registry.dart';
 import 'twitch_hls_low_latency_proxy.dart' show TwitchHlsStartupMode;
 import 'twitch_live_dvr_bridge_proxy.dart';
 import 'twitch_stable_hls_proxy_router.dart';
@@ -179,14 +180,15 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         _sharedBridgeProxy = bridge;
       }
       await bridge.open(dvrPlaylistUri: dvrPlaylistUri);
-      debugPrint('[LiveDvrBridge] warmed dvr=$dvrPlaylistUri');
+      _bridgeProxy = bridge;
+      debugPrint('[DvrSequential] warmed archive=$dvrPlaylistUri');
       return true;
     } catch (error) {
       final bridge = _sharedBridgeProxy;
       _sharedBridgeProxy = null;
       if (identical(_bridgeProxy, bridge)) _bridgeProxy = null;
       await bridge?.close();
-      debugPrint('[LiveDvrBridge] warm failed: $error');
+      debugPrint('[DvrSequential] warm failed: $error');
       return false;
     }
   }
@@ -211,7 +213,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
 
-    debugPrint('[LiveDvrBridge] prewarm low-latency live upstream=$upstream');
+    debugPrint('[DvrSequential] return live upstream=$upstream');
     await router.switchUpstream(upstream, forceReconnect: forceProxyReconnect);
     await router.waitUntilPrewarmed();
     unawaited(_refreshCanonicalLiveTimingBestEffort());
@@ -401,7 +403,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     bool probeDvr = true,
   }) async {
     final overrideDvrUri = probeDvr ? _liveDvrPlaylistOverride : null;
-    final probedVariant = overrideDvrUri == null
+    final dvrCandidate = overrideDvrUri == null
         ? probeDvr
               ? await _probeDvrVariant(variant)
               : variant
@@ -411,98 +413,69 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
                 ? 'dvr-override'
                 : '${variant.sourceTag}+dvr-override',
           );
-    final useDvrPlaylist =
-        probedVariant.sourceTag.contains('+dvr') ||
-        probedVariant.sourceTag == 'dvr' ||
-        probedVariant.sourceTag == 'dvr-override';
+    final hasDvrArchive =
+        dvrCandidate.sourceTag.contains('+dvr') ||
+        dvrCandidate.sourceTag == 'dvr' ||
+        dvrCandidate.sourceTag == 'dvr-override';
+
     debugPrint(
-      '[LiveDvrBridge] variant=${variant.name} '
-      'source=${variant.sourceTag} useDvr=$useDvrPlaylist '
-      'override=${overrideDvrUri != null} url=${variant.url}',
+      '[DvrSequential] variant=${variant.name} '
+      'source=${variant.sourceTag} archive=$hasDvrArchive '
+      'override=${overrideDvrUri != null} live=${variant.url}',
     );
+
+    final liveUpstreamUri = Uri.tryParse(variant.url);
+    if (liveUpstreamUri == null) {
+      throw StateError('Invalid variant URL: ${variant.url}');
+    }
+
     if (variant.url.trim().isNotEmpty) {
       _lastLiveUpstreamPlaylistUrl = variant.url;
       unawaited(_refreshCanonicalLiveTimingBestEffort());
     }
-    final upstreamUri = Uri.tryParse(probedVariant.url);
-    if (upstreamUri == null) {
-      throw StateError('Invalid variant URL: ${probedVariant.url}');
-    }
-    if (useDvrPlaylist) {
-      var bridge = _sharedBridgeProxy;
-      if (bridge == null || !bridge.isRunning) {
-        bridge = TwitchLiveDvrBridgeProxy();
-        _sharedBridgeProxy = bridge;
-      }
-      try {
-        await bridge.open(dvrPlaylistUri: upstreamUri);
-      } catch (_) {
-        if (identical(_sharedBridgeProxy, bridge)) _sharedBridgeProxy = null;
-        if (identical(_bridgeProxy, bridge)) _bridgeProxy = null;
-        await bridge.close();
-        bridge = TwitchLiveDvrBridgeProxy();
-        _sharedBridgeProxy = bridge;
-        await bridge.open(dvrPlaylistUri: upstreamUri);
-      }
-      debugPrint(
-        '[LiveDvrBridge] started dvr=$upstreamUri '
-        'playlist=${bridge.playlistPlaybackUrl}',
-      );
-      var router = _sharedProxy;
-      final bridgePlaylistUrl = bridge.playlistPlaybackUrl;
-      if (router == null || !router.isRunning) {
-        router = _createStableRouter();
-        _sharedProxy = router;
-        await router.start(upstreamPlaylistUrl: bridgePlaylistUrl);
-      } else {
-        await router.switchUpstream(bridgePlaylistUrl);
-      }
-      await router.waitUntilPrewarmed();
 
-      _proxy = router;
-      _bridgeProxy = bridge;
-      _currentVariant = probedVariant;
-      _upstreamPlaylistUri = upstreamUri;
-      _usingDvrPlaylist = true;
-      _usingExternalVodPlayback = false;
-      _usingLiveDvrReplay = false;
-      _clearLiveBufferReplay();
-      _proxyUrl = _routerStreamTsPlaybackUrl(router);
-      _proxyMpvUrl = _proxyUrl;
-      _proxyLiveStatus = null;
-      _adAwareStatus = '${_adAwareStatus.trim()} dvr=bridge'.trim();
-      debugPrint(
-        '[LiveDvrBridge] routed player=$_proxyUrl '
-        'upstream=${router.upstreamPlaylistUrl}',
-      );
-      return Uri.parse(_proxyUrl!);
+    var dvrWarmed = false;
+    if (hasDvrArchive) {
+      final dvrUri = Uri.tryParse(dvrCandidate.url);
+      if (dvrUri != null) {
+        dvrWarmed = await warmLiveDvrBridge(dvrPlaylistUri: dvrUri);
+      }
     }
 
-    debugPrint('[LiveDvrBridge] fallback live proxy useDvr=$useDvrPlaylist');
-    _bridgeProxy = null;
-    _usingLiveDvrReplay = false;
-    _clearLiveBufferReplay();
-
+    // LIVE and archive DVR are deliberately separate transports. The stable
+    // router always follows the selected LIVE media playlist. The DVR proxy is
+    // only warmed here and is opened directly when the timeline seeks backward.
     var router = _sharedProxy;
     if (router == null || !router.isRunning) {
       router = _createStableRouter();
       _sharedProxy = router;
       _proxy = router;
-      await router.start(upstreamPlaylistUrl: probedVariant.url);
+      await router.start(upstreamPlaylistUrl: variant.url);
     } else {
       _proxy = router;
-      await router.switchUpstream(probedVariant.url);
+      await router.switchUpstream(variant.url);
     }
 
     await router.waitUntilPrewarmed();
     unawaited(_refreshCanonicalLiveTimingBestEffort());
 
-    _usingDvrPlaylist = useDvrPlaylist;
-    _currentVariant = probedVariant;
+    _currentVariant = variant;
+    _upstreamPlaylistUri = liveUpstreamUri;
+    _usingDvrPlaylist = false;
+    _usingExternalVodPlayback = false;
+    _usingLiveDvrReplay = false;
+    _clearLiveBufferReplay();
     _proxyUrl = _routerStreamTsPlaybackUrl(router);
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
-    return Uri.tryParse(_proxyUrl!) ?? upstreamUri;
+    if (dvrWarmed) {
+      _adAwareStatus = '${_adAwareStatus.trim()} dvr=warm'.trim();
+    }
+    debugPrint(
+      '[DvrSequential] live player=$_proxyUrl '
+      'dvrWarm=$dvrWarmed upstream=${router.upstreamPlaylistUrl}',
+    );
+    return Uri.tryParse(_proxyUrl!) ?? liveUpstreamUri;
   }
 
   String _routerStreamTsPlaybackUrl(TwitchStableHlsProxyRouter router) {
@@ -811,7 +784,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     final requestId = ++_sharedBridgeSeekRequestId;
     final bridge = _bridgeProxy ?? _sharedBridgeProxy;
     if (bridge == null || !bridge.isRunning) {
-      debugPrint('[LiveDvrBridge] seek ignored: bridge not running');
+      debugPrint('[DvrSequential] seek ignored: proxy not running');
       return null;
     }
 
@@ -824,7 +797,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       targetProgramDateTime,
     );
     debugPrint(
-      '[LiveDvrBridge] runtime seek position=${_formatSeconds(position)}s '
+      '[DvrSequential] runtime seek position=${_formatSeconds(position)}s '
       'canonical=${_formatSeconds(canonicalPosition)}s '
       'programTime=${targetProgramDateTime?.toUtc().toIso8601String() ?? '-'}',
     );
@@ -834,18 +807,18 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     );
 
     if (requestId != _sharedBridgeSeekRequestId) {
-      debugPrint('[LiveDvrBridge] stale seek ignored request=$requestId');
+      debugPrint('[DvrSequential] stale seek ignored request=$requestId');
       return null;
     }
 
-    final playbackUrl = bridge.playlistPlaybackUrl;
+    final playbackUrl = bridge.streamTsPlaybackUrl;
     _bridgeProxy = bridge;
     _usingDvrPlaylist = true;
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = true;
     _clearLiveBufferReplay();
     _liveDvrPlaylistOverride = null;
-    debugPrint('[LiveDvrBridge] direct playlist seek player=$playbackUrl');
+    debugPrint('[DvrSequential] direct TS seek player=$playbackUrl');
     _notifyListenersAfterFrame();
     return (playbackUrl: playbackUrl, startPosition: startPosition);
   }
@@ -905,6 +878,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _proxyMpvUrl = null;
     _proxyLiveStatus = null;
     _usingLiveDvrReplay = false;
+    _clearLiveBufferReplay();
 
     if (closeShared && router != null) {
       if (identical(_sharedProxy, router)) _sharedProxy = null;
@@ -1184,6 +1158,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _liveBufferReplayDuration = null;
     _liveBufferReplayFromLive = null;
     _liveBufferReplayStartedAt = null;
+    TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
   }
 
   void _clearCanonicalLiveTiming() {
