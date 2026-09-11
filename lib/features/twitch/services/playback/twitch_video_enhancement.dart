@@ -11,6 +11,8 @@ enum TwitchVideoEnhancementMode {
   ewaLanczosSharp,
   ewaLanczos4Sharpest,
   fsr,
+  ssimSuperRes,
+  artCnn,
   anime4kFast,
   anime4kHigh,
 }
@@ -20,6 +22,8 @@ extension TwitchVideoEnhancementModeStorage on TwitchVideoEnhancementMode {
 
   bool get usesShader => switch (this) {
     TwitchVideoEnhancementMode.fsr ||
+    TwitchVideoEnhancementMode.ssimSuperRes ||
+    TwitchVideoEnhancementMode.artCnn ||
     TwitchVideoEnhancementMode.anime4kFast ||
     TwitchVideoEnhancementMode.anime4kHigh => true,
     _ => false,
@@ -31,6 +35,8 @@ extension TwitchVideoEnhancementModeStorage on TwitchVideoEnhancementMode {
     TwitchVideoEnhancementMode.ewaLanczosSharp => 'ewa_lanczossharp',
     TwitchVideoEnhancementMode.ewaLanczos4Sharpest =>
       'ewa_lanczos4sharpest',
+    TwitchVideoEnhancementMode.ssimSuperRes => 'ewa_lanczossharp',
+    TwitchVideoEnhancementMode.artCnn => 'ewa_lanczos',
     TwitchVideoEnhancementMode.fsr ||
     TwitchVideoEnhancementMode.anime4kFast ||
     TwitchVideoEnhancementMode.anime4kHigh => 'lanczos',
@@ -47,11 +53,27 @@ extension TwitchVideoEnhancementModeStorage on TwitchVideoEnhancementMode {
 class TwitchVideoEnhancementConfig {
   final bool enabled;
   final TwitchVideoEnhancementMode mode;
+  final bool chromaEnhance;
+  final bool deband;
+  final bool sharpen;
 
   const TwitchVideoEnhancementConfig({
     required this.enabled,
     required this.mode,
+    required this.chromaEnhance,
+    required this.deband,
+    required this.sharpen,
   });
+}
+
+enum _TwitchVideoShaderAsset {
+  fsr,
+  anime4kFast,
+  anime4kHigh,
+  ssimSuperRes,
+  artCnn,
+  chromaCfL,
+  adaptiveSharpen,
 }
 
 /// Owns mpv GPU scaler / GLSL shader configuration.
@@ -64,6 +86,12 @@ class TwitchVideoEnhancementRuntime {
   static const String enabledPreferenceKey =
       'twitch_video_enhancement_enabled_v1';
   static const String modePreferenceKey = 'twitch_video_enhancement_mode_v1';
+  static const String chromaEnhancePreferenceKey =
+      'twitch_video_enhancement_chroma_v1';
+  static const String debandPreferenceKey =
+      'twitch_video_enhancement_deband_v1';
+  static const String sharpenPreferenceKey =
+      'twitch_video_enhancement_sharpen_v1';
 
   // AMD FidelityFX FSR 1.0.2 port for mpv by agyild. MIT licensed.
   static const String _fsrUrl =
@@ -79,15 +107,27 @@ class TwitchVideoEnhancementRuntime {
       'https://raw.githubusercontent.com/Th-Underscore/Anime4K-Ultra/'
       '$_anime4kCommit/';
 
+  // Keep the general-purpose mpv shader set on one immutable revision. It
+  // provides ArtCNN C4F16, SSimSuperRes, CfL chroma reconstruction, and
+  // adaptive sharpening without allowing an upstream update to change output.
+  static const String _shaderPackCommit =
+      '61b09a0ab9ccfd42c7066474b0e41c9883f82fc2';
+  static const String _shaderPackBaseUrl =
+      'https://raw.githubusercontent.com/classicjazz/mpv-config/'
+      '$_shaderPackCommit/shaders/';
+
   static TwitchVideoEnhancementConfig _config =
       const TwitchVideoEnhancementConfig(
         enabled: false,
         mode: TwitchVideoEnhancementMode.ewaLanczosSharp,
+        chromaEnhance: false,
+        deband: false,
+        sharpen: false,
       );
   static bool _loaded = false;
   static Future<void>? _loading;
-  static final Map<TwitchVideoEnhancementMode, Future<String?>> _shaderLoads =
-      <TwitchVideoEnhancementMode, Future<String?>>{};
+  static final Map<_TwitchVideoShaderAsset, Future<String?>> _shaderLoads =
+      <_TwitchVideoShaderAsset, Future<String?>>{};
 
   static TwitchVideoEnhancementConfig get config => _config;
 
@@ -106,6 +146,9 @@ class TwitchVideoEnhancementRuntime {
         mode: TwitchVideoEnhancementModeStorage.parse(
           prefs.getString(modePreferenceKey),
         ),
+        chromaEnhance: prefs.getBool(chromaEnhancePreferenceKey) ?? false,
+        deband: prefs.getBool(debandPreferenceKey) ?? false,
+        sharpen: prefs.getBool(sharpenPreferenceKey) ?? false,
       );
       _loaded = true;
     }();
@@ -122,13 +165,25 @@ class TwitchVideoEnhancementRuntime {
     required Player? player,
     required bool enabled,
     required TwitchVideoEnhancementMode mode,
+    required bool chromaEnhance,
+    required bool deband,
+    required bool sharpen,
   }) async {
-    _config = TwitchVideoEnhancementConfig(enabled: enabled, mode: mode);
+    _config = TwitchVideoEnhancementConfig(
+      enabled: enabled,
+      mode: mode,
+      chromaEnhance: chromaEnhance,
+      deband: deband,
+      sharpen: sharpen,
+    );
     _loaded = true;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(enabledPreferenceKey, enabled);
     await prefs.setString(modePreferenceKey, mode.storageValue);
+    await prefs.setBool(chromaEnhancePreferenceKey, chromaEnhance);
+    await prefs.setBool(debandPreferenceKey, deband);
+    await prefs.setBool(sharpenPreferenceKey, sharpen);
 
     if (player != null) {
       await applyToPlayer(player, config: _config);
@@ -144,63 +199,109 @@ class TwitchVideoEnhancementRuntime {
     Player player, {
     required TwitchVideoEnhancementConfig config,
   }) async {
-    // glsl-shaders overwrites the full list. Clear it first so changing from a
-    // shader mode to a native scaler takes effect without reopening media.
+    // glsl-shaders is a path-list option. Clear the whole chain first so stale
+    // shaders from a previous mode cannot survive a live settings change.
     player.setProperty('glsl-shaders', '');
+    player.setProperty('deband', config.enabled && config.deband ? 'yes' : 'no');
 
     if (!config.enabled) {
       player.setProperty('scale', 'lanczos');
-      debugPrint('[VideoEnhancement] disabled scale=lanczos');
+      debugPrint('[VideoEnhancement] disabled scale=lanczos deband=no');
       return;
     }
 
     final mode = config.mode;
-    player.setProperty('scale', mode.mpvScale);
-    if (!mode.usesShader) {
-      debugPrint('[VideoEnhancement] mode=${mode.name} scale=${mode.mpvScale}');
-      return;
+    var activeScale = mode.mpvScale;
+    player.setProperty('scale', activeScale);
+
+    final assets = <_TwitchVideoShaderAsset>[];
+    final mainAsset = _shaderAssetForMode(mode);
+    if (mainAsset != null) assets.add(mainAsset);
+    if (config.chromaEnhance) assets.add(_TwitchVideoShaderAsset.chromaCfL);
+    if (config.sharpen) assets.add(_TwitchVideoShaderAsset.adaptiveSharpen);
+
+    final shaderPaths = <String>[];
+    for (final asset in assets) {
+      final shaderPath = await _ensureShader(asset);
+      if (shaderPath != null) {
+        shaderPaths.add(shaderPath);
+        continue;
+      }
+
+      if (asset == mainAsset) {
+        // A main upscaler failure should never break playback. Optional
+        // post-processors can still run on top of the built-in fallback.
+        activeScale = 'ewa_lanczossharp';
+        player.setProperty('scale', activeScale);
+      }
     }
 
-    final shaderPath = await _ensureShader(mode);
-    if (shaderPath == null) {
-      // A shader download failure must never break Twitch playback. Keep a
-      // high-quality built-in scaler active until the user retries a shader.
-      player.setProperty('scale', 'ewa_lanczossharp');
-      debugPrint(
-        '[VideoEnhancement] shader unavailable mode=${mode.name}; '
-        'fallback=ewa_lanczossharp',
-      );
-      return;
+    if (shaderPaths.isNotEmpty) {
+      player.setProperty('glsl-shaders', _joinShaderPaths(shaderPaths));
     }
 
-    player.setProperty('glsl-shaders', shaderPath);
     debugPrint(
-      '[VideoEnhancement] mode=${mode.name} shader=$shaderPath '
-      'scale=${mode.mpvScale}',
+      '[VideoEnhancement] mode=${mode.name} scale=$activeScale '
+      'shaders=${shaderPaths.length} chroma=${config.chromaEnhance} '
+      'deband=${config.deband} sharpen=${config.sharpen}',
     );
   }
 
-  static Future<String?> _ensureShader(TwitchVideoEnhancementMode mode) {
-    return _shaderLoads.putIfAbsent(mode, () => _downloadShader(mode));
+  static _TwitchVideoShaderAsset? _shaderAssetForMode(
+    TwitchVideoEnhancementMode mode,
+  ) {
+    return switch (mode) {
+      TwitchVideoEnhancementMode.fsr => _TwitchVideoShaderAsset.fsr,
+      TwitchVideoEnhancementMode.ssimSuperRes =>
+        _TwitchVideoShaderAsset.ssimSuperRes,
+      TwitchVideoEnhancementMode.artCnn => _TwitchVideoShaderAsset.artCnn,
+      TwitchVideoEnhancementMode.anime4kFast =>
+        _TwitchVideoShaderAsset.anime4kFast,
+      TwitchVideoEnhancementMode.anime4kHigh =>
+        _TwitchVideoShaderAsset.anime4kHigh,
+      _ => null,
+    };
   }
 
-  static Future<String?> _downloadShader(
-    TwitchVideoEnhancementMode mode,
-  ) async {
-    final specification = switch (mode) {
-      TwitchVideoEnhancementMode.fsr => (
+  static String _joinShaderPaths(List<String> paths) {
+    final separator = Platform.isWindows ? ';' : ':';
+    return paths.join(separator);
+  }
+
+  static Future<String?> _ensureShader(_TwitchVideoShaderAsset asset) {
+    return _shaderLoads.putIfAbsent(asset, () => _downloadShader(asset));
+  }
+
+  static Future<String?> _downloadShader(_TwitchVideoShaderAsset asset) async {
+    final specification = switch (asset) {
+      _TwitchVideoShaderAsset.fsr => (
         fileName: 'FSR_1_0_2.glsl',
         url: _fsrUrl,
       ),
-      TwitchVideoEnhancementMode.anime4kFast => (
+      _TwitchVideoShaderAsset.anime4kFast => (
         fileName: 'Anime4K-Ultra.glsl',
         url: '${_anime4kBaseUrl}Anime4K-Ultra.glsl',
       ),
-      TwitchVideoEnhancementMode.anime4kHigh => (
+      _TwitchVideoShaderAsset.anime4kHigh => (
         fileName: 'Anime4K-Ultra_DbL.glsl',
         url: '${_anime4kBaseUrl}Anime4K-Ultra_DbL.glsl',
       ),
-      _ => throw StateError('Mode ${mode.name} does not use a shader.'),
+      _TwitchVideoShaderAsset.ssimSuperRes => (
+        fileName: 'SSimSuperRes.glsl',
+        url: '${_shaderPackBaseUrl}SSimSuperRes.glsl',
+      ),
+      _TwitchVideoShaderAsset.artCnn => (
+        fileName: 'ArtCNN_C4F16.glsl',
+        url: '${_shaderPackBaseUrl}ArtCNN_C4F16.glsl',
+      ),
+      _TwitchVideoShaderAsset.chromaCfL => (
+        fileName: 'CfL_Prediction.glsl',
+        url: '${_shaderPackBaseUrl}CfL_Prediction.glsl',
+      ),
+      _TwitchVideoShaderAsset.adaptiveSharpen => (
+        fileName: 'adaptive-sharpen.glsl',
+        url: '${_shaderPackBaseUrl}adaptive-sharpen.glsl',
+      ),
     };
 
     try {
@@ -246,7 +347,7 @@ class TwitchVideoEnhancementRuntime {
         if (await file.exists()) await file.delete();
         await temporary.rename(file.path);
         debugPrint(
-          '[VideoEnhancement] cached shader mode=${mode.name} bytes=$size',
+          '[VideoEnhancement] cached shader asset=${asset.name} bytes=$size',
         );
         return file.path;
       } finally {
@@ -254,9 +355,9 @@ class TwitchVideoEnhancementRuntime {
       }
     } catch (error) {
       debugPrint(
-        '[VideoEnhancement] shader load failed mode=${mode.name}: $error',
+        '[VideoEnhancement] shader load failed asset=${asset.name}: $error',
       );
-      _shaderLoads.remove(mode);
+      _shaderLoads.remove(asset);
       return null;
     }
   }
