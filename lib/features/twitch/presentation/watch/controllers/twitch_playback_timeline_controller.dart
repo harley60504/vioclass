@@ -33,7 +33,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _initialSeekReanchorWindow = Duration(seconds: 2);
   static const Duration _canonicalAnchorTolerance = Duration(seconds: 1);
   static const Duration _liveEdgeTolerance = Duration(milliseconds: 750);
-  static const Duration _localMediaSeekTolerance = Duration(milliseconds: 250);
+  static const Duration _localMediaSeekTolerance = Duration(milliseconds: 40);
 
   Timer? _playbackTimer;
   TwitchPlaybackTimelineMode? _mode;
@@ -156,11 +156,16 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         TwitchCanonicalPlaybackClockRegistry.localReplaySequence;
     final localReplayRevision =
         TwitchCanonicalPlaybackClockRegistry.localReplayRevision;
+    final resolvedLocalCanonicalTarget =
+        localReplayStart != null && localReplayIntra != null
+        ? localReplayStart + localReplayIntra
+        : null;
     final looksLikeLocalReplaySource =
         mediaUri != null &&
         mediaUri.contains('/stream.ts') &&
         !mediaUri.contains('/stream.ts?v=');
     final effectiveCanonicalPosition =
+        resolvedLocalCanonicalTarget ??
         canonicalPosition ??
         _pendingLocalCanonicalTarget ??
         _canonicalAnchorPosition ??
@@ -226,7 +231,8 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
       if (shouldReanchor && effectiveCanonicalPosition != null) {
         final explicitAnchor = _explicitSeekAnchorPosition;
-        final canonicalAnchor = explicitAnchor ?? effectiveCanonicalPosition;
+        final canonicalAnchor =
+            explicitAnchor ?? resolvedLocalCanonicalTarget ?? effectiveCanonicalPosition;
         final mediaTarget = localReplayIntra;
         final requiresIntraSegmentSeek =
             mediaTarget > _localMediaSeekTolerance &&
@@ -263,6 +269,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         _canonicalAnchorPosition = canonicalAnchor;
         _mediaAnchorObservedAt = now;
         if (kDebugMode) {
+          final runtimeCanonicalLabel = canonicalPosition == null
+              ? '-'
+              : '${_seconds(canonicalPosition)}s';
           debugPrint(
             '[CanonicalPlaybackClock][LOCAL-ANCHOR] '
             'revision=$localReplayRevision '
@@ -271,7 +280,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
             'intra=${_seconds(localReplayIntra)}s '
             'media=${_seconds(mediaPosition)}s '
             'canonical=${_seconds(canonicalAnchor)}s '
-            'runtimeCanonical=${_seconds(effectiveCanonicalPosition)}s',
+            'runtimeCanonical=$runtimeCanonicalLabel',
           );
         }
         return;
@@ -435,13 +444,13 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     Duration minimum = Duration.zero,
   }) {
     final base = fromLiveEdge && delta.isNegative ? duration : current;
-    final minimumMs = _mode == TwitchPlaybackTimelineMode.liveDvr
+    final minimumUs = _mode == TwitchPlaybackTimelineMode.liveDvr
         ? 0
-        : minimum.inMilliseconds.clamp(0, duration.inMilliseconds).toInt();
-    final targetMs = (base + delta).inMilliseconds
-        .clamp(minimumMs, duration.inMilliseconds)
+        : minimum.inMicroseconds.clamp(0, duration.inMicroseconds).toInt();
+    final targetUs = (base + delta).inMicroseconds
+        .clamp(minimumUs, duration.inMicroseconds)
         .toInt();
-    final target = Duration(milliseconds: targetMs);
+    final target = Duration(microseconds: targetUs);
 
     // Step buttons now use the exact same absolute seek path as timeline taps,
     // drags and direct time entry. Transport latency never participates in the
@@ -539,12 +548,12 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }
 
   Duration _clampPosition(Duration position, Duration? duration) {
-    final maxMs = duration?.inMilliseconds;
-    if (maxMs == null || maxMs <= 0) {
+    final maxUs = duration?.inMicroseconds;
+    if (maxUs == null || maxUs <= 0) {
       return position < Duration.zero ? Duration.zero : position;
     }
     return Duration(
-      milliseconds: position.inMilliseconds.clamp(0, maxMs).toInt(),
+      microseconds: position.inMicroseconds.clamp(0, maxUs).toInt(),
     );
   }
 
