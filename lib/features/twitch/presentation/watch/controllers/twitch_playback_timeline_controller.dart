@@ -32,6 +32,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _initialSeekJumpThreshold = Duration(seconds: 3);
   static const Duration _initialSeekReanchorWindow = Duration(seconds: 2);
   static const Duration _canonicalAnchorTolerance = Duration(seconds: 1);
+  static const Duration _liveEdgeTolerance = Duration(milliseconds: 750);
 
   Timer? _pendingSeekTimer;
   Timer? _playbackTimer;
@@ -43,6 +44,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   bool _dragging = false;
   bool _timelineEnabled = true;
   bool _advancing = false;
+  bool _foregroundReanchorPending = false;
 
   // Live/DVR uses the player's media clock as the authoritative moving clock.
   // The canonical position supplied by the playback runtime is only an anchor.
@@ -92,6 +94,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         canonicalPosition: position,
       );
     } else {
+      _foregroundReanchorPending = false;
       _clearMediaClockAnchor();
       _duration = duration;
       if (!_dragging && _pendingSeekTarget == null) {
@@ -115,11 +118,29 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final previousMediaPosition = _lastObservedMediaPosition;
     final now = DateTime.now();
 
+    final duration = _duration;
+    final followsLiveEdge =
+        canonicalPosition != null &&
+        duration != null &&
+        _durationDistance(canonicalPosition, duration) <= _liveEdgeTolerance;
+
+    // Plain LIVE is not a pauseable media position. Android may pause the
+    // native player while the app is backgrounded, but when the live source is
+    // visible again it is expected to represent the newest live edge. Always
+    // bind the UI timeline to the canonical Twitch live edge instead of the
+    // pre-background media position.
+    if (followsLiveEdge &&
+        !_dragging &&
+        _pendingSeekTarget == null) {
+      _foregroundReanchorPending = false;
+      _clearMediaClockAnchor();
+      _position = _clampPosition(duration, duration);
+      return;
+    }
+
     // Local near-live replay outputs the complete resolved TS segment. Its
     // canonical segment start is known exactly by SegmentTimelineIndex, while
-    // media_kit reports elapsed playback from that local TS stream. Mapping the
-    // two directly keeps the displayed position on the actual video frame,
-    // including the segment portion before the originally requested intra-point.
+    // media_kit reports elapsed playback from that local TS stream.
     final localReplayStart =
         TwitchCanonicalPlaybackClockRegistry.localReplayCanonicalStart;
     final localReplaySequence =
@@ -128,20 +149,45 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         mediaUri != null && mediaUri.contains('/stream.ts');
     final behindLive =
         canonicalPosition != null &&
-        _duration != null &&
-        canonicalPosition + const Duration(milliseconds: 500) < _duration!;
+        duration != null &&
+        canonicalPosition + const Duration(milliseconds: 500) < duration;
     if (localReplayStart != null &&
         looksLikeTsSource &&
         behindLive &&
         mediaPosition != null &&
         !_dragging &&
         _pendingSeekTarget == null) {
+      // A 20-second Local TS source is ephemeral. After foreground resume the
+      // old segment/media anchor may no longer describe the bytes media_kit is
+      // receiving. The runtime's canonicalPosition preserves the requested
+      // from-live delay, so re-anchor the *current* media position to it once.
+      // This does not fabricate elapsed playback time and avoids carrying the
+      // stale pre-background anchor forward.
+      if (_foregroundReanchorPending && canonicalPosition != null) {
+        _mediaAnchorUri = mediaUri;
+        _mediaAnchorPosition = mediaPosition;
+        _canonicalAnchorPosition = canonicalPosition;
+        _mediaAnchorObservedAt = now;
+        _lastObservedMediaPosition = mediaPosition;
+        _position = _clampPosition(canonicalPosition, duration);
+        _foregroundReanchorPending = false;
+        if (kDebugMode) {
+          debugPrint(
+            '[CanonicalPlaybackClock][LOCAL-FOREGROUND] '
+            'sequence=${localReplaySequence ?? -1} '
+            'media=${_seconds(mediaPosition)}s '
+            'canonical=${_seconds(canonicalPosition)}s',
+          );
+        }
+        return;
+      }
+
       _mediaAnchorUri = mediaUri;
       _mediaAnchorPosition = Duration.zero;
       _canonicalAnchorPosition = localReplayStart;
       _mediaAnchorObservedAt = now;
       _lastObservedMediaPosition = mediaPosition;
-      _position = _clampPosition(localReplayStart + mediaPosition, _duration);
+      _position = _clampPosition(localReplayStart + mediaPosition, duration);
       if (kDebugMode && localReplaySequence != null) {
         debugPrint(
           '[CanonicalPlaybackClock][LOCAL-UI] '
@@ -153,6 +199,11 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       }
       return;
     }
+
+    // DVR is genuinely pauseable. Do not snap it to a newer canonical target
+    // merely because the app returned from the background; preserve its media
+    // clock mapping and continue from the actual player position.
+    _foregroundReanchorPending = false;
 
     final mediaRestarted =
         mediaPosition != null &&
@@ -321,6 +372,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _pendingSeekTarget = null;
     _dragging = false;
     _position = _duration;
+    _foregroundReanchorPending = false;
     _clearMediaClockAnchor();
     _syncPlaybackTimer();
     notifyListeners();
@@ -331,6 +383,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }
 
   void resumeClock() {
+    // Lifecycle resume changes the semantics for non-pauseable live sources.
+    // Consume this flag on the next authoritative configure() sample.
+    _foregroundReanchorPending = true;
     if (_playbackTimer != null) {
       _lastPlaybackTickAt = DateTime.now();
     }
@@ -348,6 +403,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _lastPlaybackTickAt = null;
     _dragging = false;
     _advancing = false;
+    _foregroundReanchorPending = false;
     _clearMediaClockAnchor();
     notifyListeners();
   }
@@ -361,8 +417,8 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }
 
   void _syncPlaybackTimer() {
-    // The timer is now repaint-only for a growing live timeline. It must never
-    // advance playback position; the media player's clock is authoritative.
+    // The timer is repaint-only for a growing live timeline. It must never
+    // advance playback position; the native media player's clock is authoritative.
     final shouldTick =
         _mode == TwitchPlaybackTimelineMode.liveDvr &&
         !_dragging &&
@@ -379,9 +435,6 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _playbackTimer = Timer.periodic(_playbackTickInterval, (_) {
       _lastPlaybackTickAt = DateTime.now();
       if (_advancing) {
-        // Re-sample the native player state. This is safe after foreground
-        // resume because a skipped Flutter timer does not create fake elapsed
-        // playback time.
         _syncLiveDvrPosition(
           modeChanged: false,
           canonicalPosition: null,
