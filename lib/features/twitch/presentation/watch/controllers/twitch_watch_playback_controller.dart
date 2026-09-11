@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
+import '../../../services/discovery/twitch_channel_snapshot_cache.dart';
 import '../twitch_watch_feature_ports.dart';
 import 'twitch_dvr_transition_mask_controller.dart';
 
@@ -43,8 +44,16 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       final isReplacingVisiblePlayback =
           forceOpen && previousMediaUri != null && previousMediaUri.isNotEmpty;
       if (isReplacingVisiblePlayback) {
-        liveTransitionGeneration =
-            TwitchDvrTransitionMaskController.instance.begin();
+        final snapshot = TwitchChannelSnapshotCache.instance.find(
+          login: channelLogin,
+        );
+        final streamPreview = snapshot?.streamThumbnailUrl.trim() ?? '';
+        final profilePreview = snapshot?.profileImageUrl.trim() ?? '';
+        final previewImageUrl = streamPreview.isNotEmpty
+            ? streamPreview
+            : profilePreview;
+        liveTransitionGeneration = TwitchDvrTransitionMaskController.instance
+            .begin(previewImageUrl: previewImageUrl, showLoading: true);
       }
 
       await session.useLowLatencyHlsProfile();
