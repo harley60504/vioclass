@@ -129,9 +129,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     // visible again it is expected to represent the newest live edge. Always
     // bind the UI timeline to the canonical Twitch live edge instead of the
     // pre-background media position.
-    if (followsLiveEdge &&
-        !_dragging &&
-        _pendingSeekTarget == null) {
+    if (followsLiveEdge && !_dragging && _pendingSeekTarget == null) {
       _foregroundReanchorPending = false;
       _clearMediaClockAnchor();
       _position = _clampPosition(duration, duration);
@@ -145,8 +143,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         TwitchCanonicalPlaybackClockRegistry.localReplayCanonicalStart;
     final localReplaySequence =
         TwitchCanonicalPlaybackClockRegistry.localReplaySequence;
-    final looksLikeTsSource =
-        mediaUri != null && mediaUri.contains('/stream.ts');
+    final looksLikeTsSource = mediaUri != null && mediaUri.contains('/stream.ts');
     final behindLive =
         canonicalPosition != null &&
         duration != null &&
@@ -336,9 +333,13 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         _pendingSeekTarget ??
         _position ??
         (fromLiveEdge && delta.isNegative ? duration : current);
-    final minimumMs = minimum.inMilliseconds
-        .clamp(0, duration.inMilliseconds)
-        .toInt();
+
+    // Live/DVR step buttons operate in the canonical Twitch timeline. The
+    // 20-second Local TS window is a transport choice, not a timeline limit;
+    // once a target crosses that window the commit callback selects DVR HLS.
+    final minimumMs = _mode == TwitchPlaybackTimelineMode.liveDvr
+        ? 0
+        : minimum.inMilliseconds.clamp(0, duration.inMilliseconds).toInt();
     final targetMs = (base + delta).inMilliseconds
         .clamp(minimumMs, duration.inMilliseconds)
         .toInt();
