@@ -75,9 +75,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   bool _usingExternalVodPlayback = false;
   bool _usingLiveDvrReplay = false;
   bool _usingLiveBufferReplay = false;
-  Duration? _liveBufferReplayDuration;
-  Duration? _liveBufferReplayFromLive;
-  DateTime? _liveBufferReplayStartedAt;
+  Duration? _liveBufferReplayCanonicalTarget;
   Uri? _liveDvrPlaylistOverride;
   String? _lastLiveUpstreamPlaylistUrl;
   Duration? _canonicalLiveElapsed;
@@ -128,28 +126,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
         : null;
     if (bridgePosition != null) return bridgePosition;
     if (!_usingLiveBufferReplay) return null;
-    final duration = _liveBufferReplayDuration;
-    final fromLive = _liveBufferReplayFromLive;
-    final startedAt = _liveBufferReplayStartedAt;
-    if (duration == null || duration <= Duration.zero || fromLive == null) {
-      return null;
-    }
-
-    final startUs = mathMax(
-      0,
-      duration.inMicroseconds - fromLive.inMicroseconds,
-    );
-    final elapsed = startedAt == null
-        ? Duration.zero
-        : DateTime.now().toUtc().difference(startedAt);
-    final safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;
-    final rawPosition = Duration(
-      microseconds: startUs + safeElapsed.inMicroseconds,
-    );
-    final currentDuration = canonicalLiveTimelineDuration ??
-        duration + safeElapsed;
-    if (rawPosition > currentDuration) return currentDuration;
-    return rawPosition;
+    return _liveBufferReplayCanonicalTarget;
   }
 
   Duration? get liveDvrBridgeDuration =>
@@ -814,7 +791,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<String?> seekLiveBufferReplay({
-    required Duration fromLive,
+    required Duration canonicalTarget,
     required Duration timelineDuration,
   }) async {
     final router = _proxy ?? _sharedProxy;
@@ -823,18 +800,18 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       return null;
     }
 
-    final safeFromLive = Duration(
-      microseconds: fromLive.inMicroseconds
-          .clamp(1, const Duration(seconds: 20).inMicroseconds)
+    final safeTarget = Duration(
+      microseconds: canonicalTarget.inMicroseconds
+          .clamp(0, timelineDuration.inMicroseconds)
           .toInt(),
     );
-    final canonicalTarget = Duration(
+    final safeFromLive = Duration(
       microseconds:
-          (timelineDuration.inMicroseconds - safeFromLive.inMicroseconds)
-              .clamp(0, timelineDuration.inMicroseconds)
+          (timelineDuration.inMicroseconds - safeTarget.inMicroseconds)
+              .clamp(0, const Duration(seconds: 20).inMicroseconds)
               .toInt(),
     );
-    await router.switchLiveReplayStream(canonicalTarget: canonicalTarget);
+    await router.switchLiveReplayStream(canonicalTarget: safeTarget);
     final playbackUrl = _routerStreamTsPlaybackUrl(router);
 
     _proxy = router;
@@ -845,13 +822,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = false;
     _usingLiveBufferReplay = true;
-    _liveBufferReplayDuration = timelineDuration;
-    _liveBufferReplayFromLive = safeFromLive;
-    _liveBufferReplayStartedAt = DateTime.now().toUtc();
+    _liveBufferReplayCanonicalTarget = safeTarget;
     _bridgeProxy = null;
     _liveDvrPlaylistOverride = null;
     debugPrint(
-      '[LiveBufferReplay] route target=${_formatSeconds(canonicalTarget)}s '
+      '[LiveBufferReplay] route target=${_formatSeconds(safeTarget)}s '
       'fromLive=${_formatSeconds(safeFromLive)}s player=$playbackUrl',
     );
     _notifyListenersAfterFrame();
@@ -1151,9 +1126,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
   void _clearLiveBufferReplay() {
     _usingLiveBufferReplay = false;
-    _liveBufferReplayDuration = null;
-    _liveBufferReplayFromLive = null;
-    _liveBufferReplayStartedAt = null;
+    _liveBufferReplayCanonicalTarget = null;
     TwitchCanonicalPlaybackClockRegistry.clearLocalReplayAnchor();
   }
 
@@ -1218,5 +1191,3 @@ class _PlaybackCandidate {
     required this.variants,
   });
 }
-
-int mathMax(int a, int b) => a > b ? a : b;
