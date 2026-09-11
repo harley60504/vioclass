@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../../services/connectivity/vioclass_connectivity_service.dart';
+import '../../../services/playback/twitch_media_kit_player_host.dart';
 
 enum TwitchPlaybackTimelineMode { live, liveDvr, vod, clip }
 
@@ -27,6 +27,7 @@ class TwitchPlaybackTimelineSnapshot {
 class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _seekCommitDelay = Duration(milliseconds: 420);
   static const Duration _playbackTickInterval = Duration(milliseconds: 250);
+  static const Duration _mediaRestartTolerance = Duration(milliseconds: 500);
 
   Timer? _pendingSeekTimer;
   Timer? _playbackTimer;
@@ -38,6 +39,15 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   bool _dragging = false;
   bool _timelineEnabled = true;
   bool _advancing = false;
+
+  // Live/DVR uses the player's media clock as the authoritative moving clock.
+  // The canonical position supplied by the playback runtime is only an anchor.
+  // This avoids drifting when Flutter timers are throttled in the background,
+  // while still keeping all UI positions in the canonical Twitch timeline.
+  String? _mediaAnchorUri;
+  Duration? _mediaAnchorPosition;
+  Duration? _canonicalAnchorPosition;
+  Duration? _lastObservedMediaPosition;
 
   TwitchPlaybackTimelineSnapshot get snapshot {
     final mode = _mode ?? TwitchPlaybackTimelineMode.live;
@@ -71,17 +81,13 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _advancing = advancing;
 
     if (mode == TwitchPlaybackTimelineMode.liveDvr) {
-      if (modeChanged) {
-        _duration = duration;
-        _position = _clampPosition(
-          position ?? _fallbackPosition(mode),
-          _duration,
-        );
-      } else if (duration != null && duration != _duration) {
-        _duration = duration;
-        _position = _clampPosition(_position ?? Duration.zero, _duration);
-      }
+      _duration = duration ?? _duration;
+      _syncLiveDvrPosition(
+        modeChanged: modeChanged,
+        canonicalPosition: position,
+      );
     } else {
+      _clearMediaClockAnchor();
       _duration = duration;
       if (!_dragging && _pendingSeekTarget == null) {
         _position = _clampPosition(
@@ -92,6 +98,54 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     }
 
     _syncPlaybackTimer();
+  }
+
+  void _syncLiveDvrPosition({
+    required bool modeChanged,
+    required Duration? canonicalPosition,
+  }) {
+    final player = TwitchMediaKitPlayerHost.playerOrNull;
+    final mediaPosition = player?.state.position;
+    final mediaUri = TwitchMediaKitPlayerHost.currentMediaUri;
+    final previousMediaPosition = _lastObservedMediaPosition;
+
+    final mediaRestarted =
+        mediaPosition != null &&
+        previousMediaPosition != null &&
+        mediaPosition + _mediaRestartTolerance < previousMediaPosition;
+    final sourceChanged = mediaUri != _mediaAnchorUri;
+    final needsAnchor =
+        modeChanged ||
+        sourceChanged ||
+        mediaRestarted ||
+        _mediaAnchorPosition == null ||
+        _canonicalAnchorPosition == null;
+
+    if (needsAnchor && canonicalPosition != null && mediaPosition != null) {
+      _mediaAnchorUri = mediaUri;
+      _mediaAnchorPosition = mediaPosition;
+      _canonicalAnchorPosition = canonicalPosition;
+    }
+
+    _lastObservedMediaPosition = mediaPosition;
+
+    if (_dragging || _pendingSeekTarget != null) return;
+
+    final mediaAnchor = _mediaAnchorPosition;
+    final canonicalAnchor = _canonicalAnchorPosition;
+    if (mediaPosition != null &&
+        mediaAnchor != null &&
+        canonicalAnchor != null) {
+      final mapped = canonicalAnchor + (mediaPosition - mediaAnchor);
+      _position = _clampPosition(mapped, _duration);
+      return;
+    }
+
+    if (canonicalPosition != null) {
+      _position = _clampPosition(canonicalPosition, _duration);
+    } else if (modeChanged) {
+      _position = _clampPosition(_fallbackPosition(_mode!), _duration);
+    }
   }
 
   Duration positionFor(Duration displayDuration) {
@@ -115,6 +169,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _pendingSeekTarget = null;
     _dragging = false;
     _position = _clampPosition(position, _duration);
+    _clearMediaClockAnchor();
     _syncPlaybackTimer();
     notifyListeners();
   }
@@ -140,6 +195,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final target = Duration(milliseconds: targetMs);
     _pendingSeekTarget = target;
     _position = target;
+    _clearMediaClockAnchor();
     _syncPlaybackTimer();
     notifyListeners();
 
@@ -166,6 +222,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _pendingSeekTarget = null;
     _dragging = false;
     _position = _duration;
+    _clearMediaClockAnchor();
     _syncPlaybackTimer();
     notifyListeners();
   }
@@ -192,10 +249,20 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _lastPlaybackTickAt = null;
     _dragging = false;
     _advancing = false;
+    _clearMediaClockAnchor();
     notifyListeners();
   }
 
+  void _clearMediaClockAnchor() {
+    _mediaAnchorUri = null;
+    _mediaAnchorPosition = null;
+    _canonicalAnchorPosition = null;
+    _lastObservedMediaPosition = null;
+  }
+
   void _syncPlaybackTimer() {
+    // The timer is now repaint-only for a growing live timeline. It must never
+    // advance playback position; the media player's clock is authoritative.
     final shouldTick =
         _mode == TwitchPlaybackTimelineMode.liveDvr &&
         !_dragging &&
@@ -210,18 +277,14 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
     _lastPlaybackTickAt = DateTime.now();
     _playbackTimer = Timer.periodic(_playbackTickInterval, (_) {
-      final now = DateTime.now();
-      final previous = _lastPlaybackTickAt ?? now;
-      _lastPlaybackTickAt = now;
-      final elapsed = now.difference(previous);
-      _duration = (_duration ?? Duration.zero) + elapsed;
-      final connectivity = VioClassConnectivityService.instance;
-      final hasNetwork =
-          !connectivity.initialized || connectivity.hasInternetAccess;
-      if (_advancing && hasNetwork) {
-        _position = _clampPosition(
-          (_position ?? Duration.zero) + elapsed,
-          _duration,
+      _lastPlaybackTickAt = DateTime.now();
+      if (_advancing) {
+        // Re-sample the native player state. This is safe after foreground
+        // resume because a skipped Flutter timer does not create fake elapsed
+        // playback time.
+        _syncLiveDvrPosition(
+          modeChanged: false,
+          canonicalPosition: null,
         );
       }
       notifyListeners();
