@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_notice.dart';
+import 'twitch_chat_input_emote_state.dart';
 import 'twitch_chat_text_style.dart';
 
 class TwitchChatInputBar extends StatelessWidget {
@@ -41,7 +42,11 @@ class TwitchChatInputBar extends StatelessWidget {
       (_inputRowHeight - _inputFontSize * _inputLineHeight) / 2;
 
   Future<void> _submitIfPossible(BuildContext context) async {
-    if (!enabled || sending || controller.text.trim().isEmpty) return;
+    if (!enabled ||
+        sending ||
+        TwitchChatInputEmoteState.serialize(controller).trim().isEmpty) {
+      return;
+    }
 
     try {
       await Future<void>.sync(onSend);
@@ -143,6 +148,10 @@ class _SelfDrawnInputField extends StatelessWidget {
         fontWeight: FontWeight.w700,
       ),
     );
+    final transparentInputStyle = textStyle.copyWith(
+      color: Colors.transparent,
+      decorationColor: Colors.transparent,
+    );
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
@@ -168,33 +177,70 @@ class _SelfDrawnInputField extends StatelessWidget {
                 ]
               : const <BoxShadow>[],
         ),
-        child: TextField(
-          controller: controller,
-          enabled: enabled,
-          maxLines: 1,
-          textInputAction: TextInputAction.send,
-          onSubmitted: (_) => onSubmit(),
-          textAlignVertical: TextAlignVertical.center,
-          style: textStyle,
-          strutStyle: StrutStyle(
-            fontSize: fontSize,
-            height: lineHeight,
-            forceStrutHeight: true,
-          ),
-          cursorColor: TwitchUiColors.primarySoft,
-          decoration: InputDecoration(
-            isCollapsed: true,
-            hintText: l10n.t('輸入聊天室訊息...'),
-            hintStyle: textStyle.copyWith(color: Colors.white38),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 13,
-              vertical: verticalPadding,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            IgnorePointer(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: verticalPadding,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: AnimatedBuilder(
+                    animation: controller,
+                    builder: (context, _) {
+                      return RichText(
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        softWrap: false,
+                        strutStyle: StrutStyle(
+                          fontSize: fontSize,
+                          height: lineHeight,
+                          forceStrutHeight: true,
+                        ),
+                        text: TwitchChatInputEmoteState.buildTextSpan(
+                          controller,
+                          textStyle,
+                          emoteSize: fontSize * 1.45,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
-          ),
+            TextField(
+              controller: controller,
+              enabled: enabled,
+              maxLines: 1,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => onSubmit(),
+              textAlignVertical: TextAlignVertical.center,
+              style: transparentInputStyle,
+              strutStyle: StrutStyle(
+                fontSize: fontSize,
+                height: lineHeight,
+                forceStrutHeight: true,
+              ),
+              cursorColor: TwitchUiColors.primarySoft,
+              selectionControls: materialTextSelectionControls,
+              decoration: InputDecoration(
+                isCollapsed: true,
+                hintText: l10n.t('輸入聊天室訊息...'),
+                hintStyle: textStyle.copyWith(color: Colors.white38),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: verticalPadding,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
