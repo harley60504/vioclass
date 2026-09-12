@@ -9,6 +9,7 @@ import '../../sheets/channel_points/twitch_channel_points_sheet_models.dart';
 import '../../sheets/twitch_emote_picker_sheet.dart';
 import '../../sheets/twitch_prediction_bet_sheet.dart';
 import '../../widgets/channel_points/twitch_channel_points_sheet_utils.dart';
+import '../../widgets/chat/twitch_chat_input_emote_state.dart';
 import '../twitch_watch_feature_ports.dart';
 
 class TwitchWatchSheetPortLauncher {
@@ -63,6 +64,42 @@ class TwitchWatchSheetPortLauncher {
       onEmoteSelected: (emoteText) {
         final clean = emoteText.trim();
         if (clean.isEmpty) return;
+
+        final official = emotes.official.lookupRenderableByName(clean);
+        if (official != null) {
+          insertMessageText(
+            TwitchChatInputEmotePayload.encode(
+              TwitchChatInputEmote(
+                id: official.id,
+                name: official.name,
+                imageUrl: official.preferredImageUrl(),
+                staticImageUrl: official.officialStaticImageUrl(),
+                providerLabel: official.sourceLabel,
+                isOfficial: true,
+                isAnimated: official.supportsAnimation,
+              ),
+            ),
+          );
+          return;
+        }
+
+        final thirdParty = emotes.thirdParty.lookupLoose(clean);
+        if (thirdParty != null) {
+          insertMessageText(
+            TwitchChatInputEmotePayload.encode(
+              TwitchChatInputEmote(
+                id: thirdParty.id,
+                name: thirdParty.name,
+                imageUrl: thirdParty.imageUrl,
+                staticImageUrl: thirdParty.effectiveStaticImageUrl,
+                providerLabel: thirdParty.providerLabel,
+                isAnimated: thirdParty.isAnimated,
+              ),
+            ),
+          );
+          return;
+        }
+
         insertMessageText('$clean ');
       },
     );
