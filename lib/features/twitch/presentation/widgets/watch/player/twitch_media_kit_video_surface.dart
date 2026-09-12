@@ -228,6 +228,7 @@ class _TwitchMediaKitVideoSurfaceState
           controller.addListener(_onOfficialVideoChanged);
           await controller.initialize();
           await controller.play();
+          break;
         case _AndroidDiagnosticEngine.libVlc:
           final controller = VlcPlayerController.network(
             uri,
@@ -238,6 +239,7 @@ class _TwitchMediaKitVideoSurfaceState
           );
           _vlcController = controller;
           controller.addListener(_onVlcChanged);
+          break;
       }
 
       if (!mounted) return;
@@ -292,6 +294,7 @@ class _TwitchMediaKitVideoSurfaceState
           'buffering=${player?.state.buffering} '
           'position=${player?.state.position.inMilliseconds}ms',
         );
+        break;
       case _AndroidDiagnosticEngine.videoPlayer:
         final value = _officialVideoController?.value;
         debugPrint(
@@ -302,6 +305,7 @@ class _TwitchMediaKitVideoSurfaceState
           'position=${value?.position.inMilliseconds}ms '
           'error=${value?.errorDescription}',
         );
+        break;
       case _AndroidDiagnosticEngine.libVlc:
         final value = _vlcController?.value;
         debugPrint(
@@ -312,6 +316,7 @@ class _TwitchMediaKitVideoSurfaceState
           'position=${value?.position.inMilliseconds}ms '
           'error=${value?.errorDescription}',
         );
+        break;
     }
   }
 
