@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../services/playback/twitch_media_kit_player_host.dart';
+import '../../../services/playback/twitch_player_engine_diagnostic_state.dart';
 import '../../watch/twitch_playback_session_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
 import '../twitch_watch_page.dart';
@@ -141,6 +142,14 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     bool forceOpen = false,
     bool forceProxyReconnect = false,
   }) async {
+    if (TwitchPlayerEngineDiagnosticState.externalPlaybackActive) {
+      debugPrint(
+        '[PlayerEngineTest] skip media_kit reconcile while '
+        '${TwitchPlayerEngineDiagnosticState.engineLabel} owns playback',
+      );
+      return;
+    }
+
     final session = TwitchPlaybackSessionController.instance;
     if (!session.isTopRouteOwner(playbackRouteOwner)) return;
 
