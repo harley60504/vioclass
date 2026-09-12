@@ -11,7 +11,19 @@ import '../twitch_watch_page.dart';
 extension TwitchWatchPageChatMethods on TwitchWatchPageState {
   Future<void> runDeferredChatStartup(String channel, int generation) async {
     try {
-      await connectChat(channel);
+      final activeRuntime = chatController.runtime;
+      final cleanChannel = channel.trim().toLowerCase();
+      final canReuseRuntime =
+          activeRuntime != null && activeRuntime.channelLogin == cleanChannel;
+      if (canReuseRuntime) {
+        // Foreground resume should keep the existing message list and IRC
+        // runtime. If the socket survived, this is a no-op; if it dropped while
+        // backgrounded, reconnect() preserves messages and skips recent-history
+        // bootstrap instead of rebuilding the whole chat session.
+        await chatController.reconnectAfterNetworkRestored();
+      } else {
+        await connectChat(channel);
+      }
     } catch (error) {
       if (isCurrentWatchTask(generation, channel)) {
         showSnack('聊天室暫時連線失敗，稍後再試。');
