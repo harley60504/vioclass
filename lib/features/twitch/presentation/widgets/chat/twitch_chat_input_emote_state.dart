@@ -89,8 +89,10 @@ class TwitchChatInputEmoteState {
     final selection = current.selection;
     final rawStart = selection.start < 0 ? text.length : selection.start;
     final rawEnd = selection.end < 0 ? text.length : selection.end;
-    final start = rawStart.clamp(0, text.length);
-    final end = rawEnd.clamp(start, text.length);
+    final start = rawStart > text.length ? text.length : rawStart;
+    final end = rawEnd < start
+        ? start
+        : (rawEnd > text.length ? text.length : rawEnd);
     final replacement = '$placeholder${appendSpace ? ' ' : ''}';
     final delta = replacement.length - (end - start);
 
