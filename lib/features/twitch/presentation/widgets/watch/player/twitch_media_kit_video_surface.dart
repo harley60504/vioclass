@@ -61,6 +61,8 @@ class _TwitchMediaKitVideoSurfaceState
     extends State<TwitchMediaKitVideoSurface>
     with WidgetsBindingObserver {
   final GlobalKey _videoSurfaceKey = GlobalKey();
+  final OverlayPortalController _diagnosticOverlayController =
+      OverlayPortalController();
   late Widget _stableVideo;
   late _AndroidDiagnosticEngine _diagnosticEngine;
 
@@ -78,6 +80,9 @@ class _TwitchMediaKitVideoSurfaceState
     );
     _attachExternalListeners();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && Platform.isAndroid) {
+        _diagnosticOverlayController.show();
+      }
       _reportSourceRectHint();
       unawaited(_initializeDiagnosticEngine());
     });
@@ -362,7 +367,7 @@ class _TwitchMediaKitVideoSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
+    final videoSurface = ColoredBox(
       color: Colors.black,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -415,17 +420,6 @@ class _TwitchMediaKitVideoSurfaceState
                             ),
                           ),
                         ),
-                      if (Platform.isAndroid)
-                        Positioned(
-                          left: 8,
-                          top: 8,
-                          child: _DiagnosticEnginePanel(
-                            selected: _diagnosticEngine,
-                            switching: _switchingEngine,
-                            error: _diagnosticError,
-                            onSelected: _selectDiagnosticEngine,
-                          ),
-                        ),
                     ],
                   );
                 },
@@ -434,6 +428,27 @@ class _TwitchMediaKitVideoSurfaceState
           );
         },
       ),
+    );
+
+    if (!Platform.isAndroid) return videoSurface;
+
+    return OverlayPortal(
+      controller: _diagnosticOverlayController,
+      overlayChildBuilder: (context) {
+        return Positioned(
+          left: 8,
+          top: 8,
+          child: SafeArea(
+            child: _DiagnosticEnginePanel(
+              selected: _diagnosticEngine,
+              switching: _switchingEngine,
+              error: _diagnosticError,
+              onSelected: _selectDiagnosticEngine,
+            ),
+          ),
+        );
+      },
+      child: videoSurface,
     );
   }
 }
