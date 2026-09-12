@@ -29,6 +29,11 @@ dependencies:
   flutter_cache_manager: ^3.4.1
   super_sliver_list: ^0.4.1
 
+  # Temporary Android A/B diagnostics. These dependencies only live on the
+  # test/android-player-engines branch and are not part of the production app.
+  video_player: 2.11.1
+  flutter_vlc_player: 7.4.4
+
   # Stage 220F: PiliPlus-style media_kit fork test.
   # Keep normal hosted constraints here because media_kit_video's pubspec
   # declares hosted media_kit dependencies. Actual fork sources are forced in
