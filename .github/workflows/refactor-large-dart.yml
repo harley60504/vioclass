@@ -58,6 +58,12 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      - name: Print DVR extension diagnostics
+        shell: bash
+        run: |
+          file=lib/features/twitch/services/playback/twitch_playlist_player_runtime_parts/04_twitch_playlist_player_runtime_dvr_ops.dart
+          nl -ba "$file" | sed -n '355,395p;495,512p'
+
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
