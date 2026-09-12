@@ -43,11 +43,22 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
 
         final previousStreamId = state.liveTimelineStreamId?.trim() ?? '';
         final previousStartedAt = state.liveTimelineStartedAt;
-        final live = await state.refreshLiveTimelineStartedAt(
-          allowWithoutLivePlayback: true,
-          preserveStateWhenOffline: true,
-        );
-        if (!state.mounted || live != true) return;
+        final live = await state.refreshLiveStatusForRecovery();
+        if (!state.mounted) return;
+
+        if (live == false) {
+          if (!state.showOfflineChannelPlaceholder) {
+            debugPrint(
+              '[LiveWatch] channel is offline; showing offline placeholder',
+            );
+            await state.showLiveWatchOfflineState(
+              channel: state.channelLogin,
+              generation: state.watchLoadGeneration,
+            );
+          }
+          return;
+        }
+        if (live != true) return;
 
         final nextStreamId = state.liveTimelineStreamId?.trim() ?? '';
         final nextStartedAt = state.liveTimelineStartedAt;
