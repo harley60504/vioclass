@@ -1,11 +1,77 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../services/playback/twitch_media_kit_player_host.dart';
 import '../../watch/twitch_playback_session_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
 import '../twitch_watch_page.dart';
+import 'twitch_live_watch_recovery.dart';
+import 'twitch_watch_page_startup.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
+
+final Expando<TwitchLiveWatchRecovery> _liveWatchRecoveryByPage =
+    Expando<TwitchLiveWatchRecovery>('twitch-live-watch-recovery');
+
+TwitchWatchMode _resolvedWatchMode(TwitchWatchPageState state) {
+  final widget = state.widget;
+  final recorded =
+      widget.initialClip != null ||
+      widget.initialVodVideo != null ||
+      widget.initialVodPlaybackOnly;
+  return recorded ? TwitchWatchMode.recordedWatch : TwitchWatchMode.liveWatch;
+}
+
+void _ensureLiveWatchDiscovery(TwitchWatchPageState state) {
+  final mode = _resolvedWatchMode(state);
+  var recovery = _liveWatchRecoveryByPage[state];
+
+  if (recovery == null) {
+    if (mode != TwitchWatchMode.liveWatch) return;
+    late final TwitchLiveWatchRecovery created;
+    created = TwitchLiveWatchRecovery(
+      onPoll: () async {
+        if (!state.mounted) {
+          created.stop();
+          return;
+        }
+        if (!TwitchPlaybackSessionController.instance.isTopRouteOwner(
+          state.playbackRouteOwner,
+        )) {
+          return;
+        }
+
+        final previousStreamId = state.liveTimelineStreamId?.trim() ?? '';
+        final previousStartedAt = state.liveTimelineStartedAt;
+        final live = await state.refreshLiveTimelineStartedAt(
+          allowWithoutLivePlayback: true,
+          preserveStateWhenOffline: true,
+        );
+        if (!state.mounted || live != true) return;
+
+        final nextStreamId = state.liveTimelineStreamId?.trim() ?? '';
+        final nextStartedAt = state.liveTimelineStartedAt;
+        final changed =
+            nextStreamId != previousStreamId ||
+            nextStartedAt != previousStartedAt;
+        if (!changed) return;
+
+        debugPrint(
+          '[LiveWatch] discovered new live generation '
+          'stream=$previousStreamId->$nextStreamId '
+          'startedAt=$previousStartedAt->$nextStartedAt; '
+          'restarting unified live/DVR startup',
+        );
+        await state.loadWatch();
+      },
+    );
+    _liveWatchRecoveryByPage[state] = created;
+    recovery = created;
+  }
+
+  recovery.setMode(mode);
+}
 
 extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   void markOwnedPlayback({
@@ -167,12 +233,6 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
         final liveStatus = await watchPorts.player.runtime.refreshProxyLiveStatus(
           notify: false,
         );
-        // Android may temporarily detach the local media client while the app
-        // is backgrounded, making activeClientCount drop to zero even though
-        // the upstream writer is still healthy. Reconnecting that healthy
-        // upstream after resume can feed the decoder from a partial GOP and
-        // produce a visibly corrupted frame. Keep the warm connection whenever
-        // the upstream writer itself is still running.
         final existingConnectionIsHealthy =
             liveStatus != null && liveStatus.running && liveStatus.hasWriter;
         if (existingConnectionIsHealthy) {
@@ -218,7 +278,14 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     if (mounted) setState(() {});
   }
 
+  TwitchWatchMode get watchMode {
+    final mode = _resolvedWatchMode(this);
+    _ensureLiveWatchDiscovery(this);
+    return mode;
+  }
+
   TwitchWatchPlaybackKind get currentPlaybackKind {
+    _ensureLiveWatchDiscovery(this);
     if (currentClipQualityClip != null) return TwitchWatchPlaybackKind.clip;
     if (watchPorts.player.runtime.usingLiveTimelineReplay) {
       return TwitchWatchPlaybackKind.liveDvr;
