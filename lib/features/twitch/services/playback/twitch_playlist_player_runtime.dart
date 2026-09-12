@@ -15,6 +15,15 @@ import 'twitch_hls_low_latency_proxy.dart' show TwitchHlsStartupMode;
 import 'twitch_live_dvr_bridge_proxy.dart';
 import 'twitch_stable_hls_proxy_router.dart';
 
+enum TwitchDvrHealthState {
+  inactive,
+  probing,
+  healthy,
+  stale,
+  recovering,
+  unavailable,
+}
+
 class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   final TwitchPlaybackApiService playbackApi;
   final Dio _dio;
@@ -39,6 +48,9 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
 
   static const int _firstRunMobileFallbackHeight = 1080;
   static const int _firstRunMobileFallbackMaxFps = 60;
+  static const Duration _dvrHealthyCheckInterval = Duration(seconds: 12);
+  static const Duration _dvrUnavailableRetryInterval = Duration(seconds: 45);
+  static const int _dvrFailuresBeforeRecovery = 3;
   static TwitchStableHlsProxyRouter? _sharedProxy;
   static TwitchLiveDvrBridgeProxy? _sharedBridgeProxy;
   static int _sharedBridgeSeekRequestId = 0;
@@ -82,6 +94,16 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   Duration? _canonicalLiveTotal;
   DateTime? _canonicalTimelineOrigin;
   DateTime? _canonicalTimingObservedAt;
+  Timer? _dvrHealthTimer;
+  bool _dvrHealthCheckRunning = false;
+  int _dvrHealthGeneration = 0;
+  TwitchDvrHealthState _dvrHealthState = TwitchDvrHealthState.inactive;
+  DateTime? _lastDvrHealthCheck;
+  DateTime? _lastDvrHealthyAt;
+  int _dvrConsecutiveFailures = 0;
+  Uri? _dvrArchiveUri;
+  Duration? _latestDvrDuration;
+  int? _latestDvrSequence;
 
   String get channelLogin => _channelLogin;
   Uri? get masterPlaylistUri => _masterPlaylistUri;
@@ -133,6 +155,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       (_bridgeProxy ?? _sharedBridgeProxy)?.latestDuration;
   bool get usingExternalVodPlayback => _usingExternalVodPlayback;
   bool get hasWarmLiveDvrBridge => _sharedBridgeProxy?.isRunning ?? false;
+  TwitchDvrHealthState get dvrHealthState => _dvrHealthState;
+  DateTime? get lastDvrHealthCheck => _lastDvrHealthCheck;
+  DateTime? get lastDvrHealthyAt => _lastDvrHealthyAt;
+  int get dvrConsecutiveFailures => _dvrConsecutiveFailures;
+  Uri? get dvrArchiveUri => _dvrArchiveUri;
+  Duration? get latestDvrDuration => _latestDvrDuration;
   Duration? get canonicalLiveTotal => _canonicalLiveTotal;
   Duration? get canonicalLiveElapsed => _canonicalLiveElapsed;
   DateTime? get canonicalTimelineOrigin => _canonicalTimelineOrigin;
@@ -158,6 +186,11 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       }
       await bridge.open(dvrPlaylistUri: dvrPlaylistUri);
       _bridgeProxy = bridge;
+      _recordDvrHealthy(
+        dvrPlaylistUri,
+        duration: bridge.latestDuration,
+        scheduleNextCheck: _currentVariant != null,
+      );
       debugPrint('[DvrSequential] warmed archive=$dvrPlaylistUri');
       return true;
     } catch (error) {
@@ -165,6 +198,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _sharedBridgeProxy = null;
       if (identical(_bridgeProxy, bridge)) _bridgeProxy = null;
       await bridge?.close();
+      _recordDvrUnavailable(scheduleRetry: _currentVariant != null);
       debugPrint('[DvrSequential] warm failed: $error');
       return false;
     }
@@ -225,6 +259,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       );
     }
 
+    _stopDvrHealthMonitoring();
     _channelLogin = login;
     _loading = true;
     _switchingQuality = false;
@@ -336,6 +371,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<Uri?> startProxyForVariant(TwitchM3u8Variant variant) async {
+    _stopDvrHealthMonitoring();
     _switchingQuality = true;
     _error = null;
     notifyListeners();
@@ -356,6 +392,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   void markExternalVodPlayback({required String channelLogin}) {
+    _stopDvrHealthMonitoring();
     _channelLogin = channelLogin.trim().toLowerCase();
     _loading = false;
     _switchingQuality = false;
@@ -412,10 +449,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     }
 
     var dvrWarmed = false;
+    Uri? warmedDvrUri;
     if (hasDvrArchive) {
       final dvrUri = Uri.tryParse(dvrCandidate.url);
       if (dvrUri != null) {
         dvrWarmed = await warmLiveDvrBridge(dvrPlaylistUri: dvrUri);
+        if (dvrWarmed) warmedDvrUri = dvrUri;
       }
     }
 
@@ -447,6 +486,14 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _proxyLiveStatus = null;
     if (dvrWarmed) {
       _adAwareStatus = '${_adAwareStatus.trim()} dvr=warm'.trim();
+      _beginDvrHealthMonitoring(
+        archiveUri: warmedDvrUri,
+        initiallyHealthy: true,
+      );
+    } else if (_dvrProbeEnabled && !variant.isAudioOnly) {
+      _beginDvrHealthMonitoring(initiallyHealthy: false);
+    } else {
+      _stopDvrHealthMonitoring();
     }
     debugPrint(
       '[DvrSequential] live player=$_proxyUrl '
@@ -525,6 +572,227 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   void _debugDvr(String message) {
     if (!kDebugMode) return;
     debugPrint('[TwitchDvrDirect] $message');
+  }
+
+  void _beginDvrHealthMonitoring({
+    Uri? archiveUri,
+    required bool initiallyHealthy,
+  }) {
+    _dvrHealthTimer?.cancel();
+    _dvrHealthGeneration++;
+    _dvrConsecutiveFailures = 0;
+    _lastDvrHealthCheck = null;
+    _latestDvrSequence = null;
+    if (archiveUri != null) _dvrArchiveUri = archiveUri;
+    if (initiallyHealthy) {
+      _dvrHealthState = TwitchDvrHealthState.healthy;
+      _lastDvrHealthyAt = DateTime.now().toUtc();
+      _latestDvrDuration = _sharedBridgeProxy?.latestDuration;
+    } else {
+      _dvrArchiveUri = null;
+      _latestDvrDuration = null;
+      _dvrHealthState = TwitchDvrHealthState.unavailable;
+    }
+    _scheduleDvrHealthCheck(
+      initiallyHealthy
+          ? _dvrHealthyCheckInterval
+          : _dvrUnavailableRetryInterval,
+      _dvrHealthGeneration,
+    );
+    _notifyListenersAfterFrame();
+  }
+
+  void _scheduleDvrHealthCheck(Duration delay, int generation) {
+    _dvrHealthTimer?.cancel();
+    if (_disposed || generation != _dvrHealthGeneration) return;
+    final variant = _currentVariant;
+    if (variant == null || variant.isAudioOnly || _usingExternalVodPlayback) {
+      return;
+    }
+    _dvrHealthTimer = Timer(
+      delay,
+      () => unawaited(_runDvrHealthCheck(generation)),
+    );
+  }
+
+  Future<void> _runDvrHealthCheck(int generation) async {
+    if (_disposed ||
+        generation != _dvrHealthGeneration ||
+        _dvrHealthCheckRunning ||
+        _usingExternalVodPlayback) {
+      return;
+    }
+    final variant = _currentVariant;
+    if (variant == null || variant.isAudioOnly) return;
+
+    _dvrHealthCheckRunning = true;
+    final stateBeforeCheck = _dvrHealthState;
+    _lastDvrHealthCheck = DateTime.now().toUtc();
+    var nextDelay = _dvrHealthyCheckInterval;
+    try {
+      final bridge = _sharedBridgeProxy;
+      if (bridge == null || !bridge.isRunning || _dvrArchiveUri == null) {
+        await _recoverDvrArchive(variant, generation);
+      } else {
+        final health = await bridge.probeArchiveHealth();
+        if (generation != _dvrHealthGeneration || _disposed) return;
+        _dvrArchiveUri = health.playlistUri;
+        _latestDvrDuration = health.indexedDuration;
+        _latestDvrSequence = health.latestSequence;
+        if (health.advanced) {
+          _dvrConsecutiveFailures = 0;
+          _dvrHealthState = TwitchDvrHealthState.healthy;
+          _lastDvrHealthyAt = DateTime.now().toUtc();
+          _debugDvr(
+            'health healthy sequence=${health.latestSequence} '
+            'duration=${health.indexedDuration.inSeconds}s',
+          );
+        } else {
+          await _recordDvrHealthFailure(
+            variant,
+            generation,
+            reason: 'archive did not advance',
+          );
+        }
+      }
+    } catch (error) {
+      if (generation == _dvrHealthGeneration && !_disposed) {
+        await _recordDvrHealthFailure(
+          variant,
+          generation,
+          reason: error.toString(),
+        );
+      }
+    } finally {
+      _dvrHealthCheckRunning = false;
+      if (generation == _dvrHealthGeneration && !_disposed) {
+        if (_dvrHealthState == TwitchDvrHealthState.unavailable) {
+          nextDelay = _dvrUnavailableRetryInterval;
+        }
+        _scheduleDvrHealthCheck(nextDelay, generation);
+        if (_dvrHealthState != stateBeforeCheck) {
+          _notifyListenersAfterFrame();
+        }
+      }
+    }
+  }
+
+  Future<void> _recordDvrHealthFailure(
+    TwitchM3u8Variant variant,
+    int generation, {
+    required String reason,
+  }) async {
+    _dvrConsecutiveFailures++;
+    _dvrHealthState = TwitchDvrHealthState.stale;
+    _debugDvr('health stale failures=$_dvrConsecutiveFailures reason=$reason');
+    if (_dvrConsecutiveFailures < _dvrFailuresBeforeRecovery) return;
+    if (_usingLiveDvrReplay) {
+      _debugDvr('health recovery deferred while DVR replay is active');
+      return;
+    }
+    await _recoverDvrArchive(variant, generation);
+  }
+
+  Future<void> _recoverDvrArchive(
+    TwitchM3u8Variant variant,
+    int generation,
+  ) async {
+    if (generation != _dvrHealthGeneration || _disposed) return;
+    _dvrHealthState = _dvrArchiveUri == null
+        ? TwitchDvrHealthState.probing
+        : TwitchDvrHealthState.recovering;
+    _debugDvr('health ${_dvrHealthState.name} variant=${variant.name}');
+
+    final resolvedUri = await _resolveDvrPlaylistUri(variant);
+    if (generation != _dvrHealthGeneration || _disposed) return;
+    if (resolvedUri == null) {
+      _recordDvrUnavailable(scheduleRetry: false);
+      return;
+    }
+
+    final replacement = TwitchLiveDvrBridgeProxy();
+    TwitchLiveDvrBridgeProxy? previous;
+    try {
+      await replacement.open(dvrPlaylistUri: resolvedUri);
+      if (generation != _dvrHealthGeneration || _disposed) {
+        await replacement.close();
+        return;
+      }
+      previous = _sharedBridgeProxy;
+      _sharedBridgeProxy = replacement;
+      if (!_usingLiveDvrReplay &&
+          (_bridgeProxy == null || identical(_bridgeProxy, previous))) {
+        _bridgeProxy = replacement;
+      }
+      _recordDvrHealthy(
+        resolvedUri,
+        duration: replacement.latestDuration,
+        scheduleNextCheck: false,
+      );
+      _debugDvr(
+        'health recovered archive=$resolvedUri '
+        'duration=${replacement.latestDuration?.inSeconds ?? 0}s',
+      );
+    } catch (error) {
+      await replacement.close();
+      _recordDvrUnavailable(scheduleRetry: false);
+      _debugDvr('health recovery failed: $error');
+      return;
+    }
+    if (previous != null && !identical(previous, replacement)) {
+      try {
+        await previous.close();
+      } catch (error) {
+        _debugDvr('retired DVR bridge close failed: $error');
+      }
+    }
+  }
+
+  void _recordDvrHealthy(
+    Uri playlistUri, {
+    Duration? duration,
+    required bool scheduleNextCheck,
+  }) {
+    _dvrArchiveUri = playlistUri;
+    _latestDvrDuration = duration;
+    _dvrConsecutiveFailures = 0;
+    _dvrHealthState = TwitchDvrHealthState.healthy;
+    _lastDvrHealthyAt = DateTime.now().toUtc();
+    if (scheduleNextCheck) {
+      _dvrHealthGeneration++;
+      _scheduleDvrHealthCheck(_dvrHealthyCheckInterval, _dvrHealthGeneration);
+      _notifyListenersAfterFrame();
+    }
+  }
+
+  void _recordDvrUnavailable({required bool scheduleRetry}) {
+    _dvrArchiveUri = null;
+    _latestDvrDuration = null;
+    _latestDvrSequence = null;
+    _dvrConsecutiveFailures = 0;
+    _dvrHealthState = TwitchDvrHealthState.unavailable;
+    if (scheduleRetry) {
+      _dvrHealthGeneration++;
+      _scheduleDvrHealthCheck(
+        _dvrUnavailableRetryInterval,
+        _dvrHealthGeneration,
+      );
+      _notifyListenersAfterFrame();
+    }
+  }
+
+  void _stopDvrHealthMonitoring() {
+    _dvrHealthTimer?.cancel();
+    _dvrHealthTimer = null;
+    _dvrHealthGeneration++;
+    _dvrHealthCheckRunning = false;
+    _dvrHealthState = TwitchDvrHealthState.inactive;
+    _lastDvrHealthCheck = null;
+    _lastDvrHealthyAt = null;
+    _dvrConsecutiveFailures = 0;
+    _dvrArchiveUri = null;
+    _latestDvrDuration = null;
+    _latestDvrSequence = null;
   }
 
   Future<Uri?> _resolveDvrPlaylistUri(TwitchM3u8Variant variant) async {
@@ -856,6 +1124,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<void> _stopProxy({bool notify = true, bool closeShared = true}) async {
+    _stopDvrHealthMonitoring();
     final router = _proxy ?? _sharedProxy;
     final bridge = _bridgeProxy ?? _sharedBridgeProxy;
     _proxy = null;
@@ -1168,6 +1437,13 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'switchingQuality': switchingQuality,
       'hasPlaylist': hasPlaylist,
       'adAwareStatus': adAwareStatus,
+      'dvrHealthState': dvrHealthState.name,
+      'lastDvrHealthCheck': lastDvrHealthCheck?.toIso8601String(),
+      'lastDvrHealthyAt': lastDvrHealthyAt?.toIso8601String(),
+      'dvrConsecutiveFailures': dvrConsecutiveFailures,
+      'dvrArchiveUri': dvrArchiveUri?.toString(),
+      'latestDvrDurationSeconds': latestDvrDuration?.inSeconds,
+      'latestDvrSequence': _latestDvrSequence,
       'lastPreferredQualityName': lastPreferredQualityName,
       'masterPlaylistUriPreview': masterPlaylistUri?.toString(),
       'playlistUriPreview': playlistUri?.toString(),

@@ -10,6 +10,20 @@ import '../../models/playback/twitch_segment_timeline_index.dart';
 import '../../parsers/playback/twitch_hls_playlist_parser.dart';
 import 'twitch_playlist_player_runtime.dart';
 
+class TwitchLiveDvrArchiveHealthSnapshot {
+  final Uri playlistUri;
+  final Duration indexedDuration;
+  final int latestSequence;
+  final bool advanced;
+
+  const TwitchLiveDvrArchiveHealthSnapshot({
+    required this.playlistUri,
+    required this.indexedDuration,
+    required this.latestSequence,
+    required this.advanced,
+  });
+}
+
 /// Sequential DVR transport with canonical time resolution separated from I/O.
 ///
 /// [seekToPosition] resolves canonical/PDT time to one Twitch archive segment
@@ -88,6 +102,38 @@ class TwitchLiveDvrBridgeProxy {
     _streamClientGeneration++;
     final server = await _ensureServer();
     return Uri.parse('http://127.0.0.1:${server.port}/stream.ts');
+  }
+
+  /// Performs a playlist-only archive health probe without touching the active
+  /// sequential TS stream or the separate LIVE router.
+  Future<TwitchLiveDvrArchiveHealthSnapshot> probeArchiveHealth() async {
+    final uri = _dvrPlaylistUri;
+    if (uri == null || _server == null) {
+      throw StateError('Sequential DVR proxy has not started.');
+    }
+
+    final previousDuration = _latestDuration;
+    final previousLatestSequence = _latestItems.isEmpty
+        ? null
+        : _latestItems.last.sequence;
+    final items = await _validatePlaylist(uri);
+    if (items.isEmpty) {
+      throw StateError('DVR archive playlist has no playable segments.');
+    }
+    _rememberLatestItems(items);
+
+    final indexedDuration = _latestDuration ?? Duration.zero;
+    final latestSequence = items.last.sequence;
+    final advanced =
+        previousLatestSequence == null ||
+        latestSequence > previousLatestSequence ||
+        (previousDuration != null && indexedDuration > previousDuration);
+    return TwitchLiveDvrArchiveHealthSnapshot(
+      playlistUri: uri,
+      indexedDuration: indexedDuration,
+      latestSequence: latestSequence,
+      advanced: advanced,
+    );
   }
 
   /// Resolves the requested canonical time without downloading media.
