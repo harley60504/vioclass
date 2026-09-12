@@ -4,6 +4,7 @@ import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../sheets/twitch_special_message_sheet.dart';
+import '../../widgets/chat/twitch_chat_input_emote_state.dart';
 import '../twitch_watch_page.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
@@ -40,7 +41,9 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
   }
 
   Future<void> sendMessage() async {
-    final message = messageController.text.trim();
+    final message = TwitchChatInputEmoteState.serialize(
+      messageController,
+    ).trim();
     if (message.isEmpty) return;
 
     try {
@@ -167,6 +170,16 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
   }
 
   void insertMessageText(String text) {
+    final emote = TwitchChatInputEmotePayload.tryDecode(text);
+    if (emote != null) {
+      TwitchChatInputEmoteState.insert(
+        messageController,
+        emote,
+        appendSpace: true,
+      );
+      return;
+    }
+
     final current = messageController.text;
     final selection = messageController.selection;
     final start = selection.start < 0 ? current.length : selection.start;
