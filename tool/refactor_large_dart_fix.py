@@ -3,44 +3,19 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
-def matching_brace(text: str, open_index: int) -> int:
-    depth = 0
-    in_string = None
-    escaped = False
-    i = open_index
-    while i < len(text):
-        c = text[i]
-        if in_string is not None:
-            if escaped:
-                escaped = False
-            elif c == '\\':
-                escaped = True
-            elif c == in_string:
-                in_string = None
-            i += 1
-            continue
-        if c in "'\"":
-            in_string = c
-        elif c == '{':
-            depth += 1
-        elif c == '}':
-            depth -= 1
-            if depth == 0:
-                return i
-        i += 1
-    raise RuntimeError('unmatched class brace')
+from refactor_large_dart import mask_code, matching_brace
 
 
 def add_change_notifier_bridges(class_file: Path, class_name: str, need_notify: bool, need_has: bool) -> None:
     if not need_notify and not need_has:
         return
     text = class_file.read_text(encoding='utf-8')
-    m = re.search(r'\bclass\s+' + re.escape(class_name) + r'\b', text)
+    masked = mask_code(text)
+    m = re.search(r'\bclass\s+' + re.escape(class_name) + r'\b', masked)
     if not m:
         raise RuntimeError(f'class {class_name} not found in {class_file}')
-    open_index = text.find('{', m.end())
-    close_index = matching_brace(text, open_index)
+    open_index = masked.find('{', m.end())
+    close_index = matching_brace(masked, open_index)
     additions = []
     if need_notify and '_notifyPartListeners' not in text:
         additions.append('  void _notifyPartListeners() => notifyListeners();')
@@ -53,21 +28,18 @@ def add_change_notifier_bridges(class_file: Path, class_name: str, need_notify: 
 
 
 def qualify_static_refs(text: str, class_name: str, names: list[str]) -> str:
+    masked = mask_code(text)
+    replacements: list[tuple[int, int, str]] = []
     for name in sorted(names, key=len, reverse=True):
-        text = re.sub(
-            r'(?<![A-Za-z0-9_.])' + re.escape(name) + r'\b',
-            class_name + '.' + name,
-            text,
-        )
+        pattern = r'(?<![A-Za-z0-9_.])' + re.escape(name) + r'\b'
+        for match in re.finditer(pattern, masked):
+            replacements.append((match.start(), match.end(), class_name + '.' + name))
+    for start, end, replacement in sorted(replacements, reverse=True):
+        text = text[:start] + replacement + text[end:]
     return text
 
 
-def fix_extensions(
-    part_dir: Path,
-    class_file_name: str,
-    class_name: str,
-    static_names: list[str],
-) -> None:
+def fix_extensions(part_dir: Path, class_name: str, static_names: list[str]) -> None:
     extension_files = []
     need_notify = False
     need_has = False
@@ -76,16 +48,27 @@ def fix_extensions(
         if f'on {class_name}' not in text or 'extension ' not in text:
             continue
         extension_files.append(path)
-        if 'notifyListeners()' in text:
+        masked = mask_code(text)
+        if re.search(r'(?<![A-Za-z0-9_.])notifyListeners\s*\(\s*\)', masked) or 'this.notifyListeners()' in masked:
             need_notify = True
+            text = text.replace('this.notifyListeners()', 'this._notifyPartListeners()')
             text = text.replace('notifyListeners()', '_notifyPartListeners()')
-        if re.search(r'(?<![A-Za-z0-9_.])hasListeners\b', text):
+        masked = mask_code(text)
+        if re.search(r'(?<![A-Za-z0-9_.])hasListeners\b', masked) or 'this.hasListeners' in masked:
             need_has = True
+            text = text.replace('this.hasListeners', 'this._partHasListeners')
             text = re.sub(r'(?<![A-Za-z0-9_.])hasListeners\b', '_partHasListeners', text)
         text = qualify_static_refs(text, class_name, static_names)
         path.write_text(text, encoding='utf-8')
 
-    class_file = next((p for p in part_dir.glob('*.dart') if f'class {class_name}' in p.read_text(encoding='utf-8')), None)
+    class_file = next(
+        (
+            p
+            for p in part_dir.glob('*.dart')
+            if re.search(r'\bclass\s+' + re.escape(class_name) + r'\b', mask_code(p.read_text(encoding='utf-8')))
+        ),
+        None,
+    )
     if class_file is None:
         raise RuntimeError(f'class part for {class_name} not found in {part_dir}')
     add_change_notifier_bridges(class_file, class_name, need_notify, need_has)
@@ -95,7 +78,6 @@ def fix_extensions(
 def main() -> None:
     fix_extensions(
         Path('lib/features/twitch/services/playback/twitch_playlist_player_runtime_parts'),
-        'twitch_playlist_player_runtime.dart',
         'TwitchPlaylistPlayerRuntime',
         [
             '_qualityKey',
@@ -114,7 +96,6 @@ def main() -> None:
     )
     fix_extensions(
         Path('lib/features/twitch/services/chat/twitch_chat_runtime_parts'),
-        'twitch_chat_runtime.dart',
         'TwitchChatRuntime',
         [
             'initialUserStateWait',
