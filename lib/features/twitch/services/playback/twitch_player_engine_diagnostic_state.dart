@@ -43,7 +43,15 @@ class TwitchPlayerEngineDiagnosticState {
     final safeUri = uri.trim();
     if (safeUri.isEmpty) return;
 
-    final sameSelection = selectedEngineKey == engineKey && mediaUri == safeUri;
+    final hasReusableEngine = switch (engineKey) {
+      videoPlayerKey => videoPlayerController != null,
+      libVlcKey => vlcController != null,
+      _ => true,
+    };
+    final sameSelection =
+        selectedEngineKey == engineKey &&
+        mediaUri == safeUri &&
+        hasReusableEngine;
     if (sameSelection) {
       externalPlaybackActive = engineKey != mediaKitKey;
       engineLabel = labelFor(engineKey);
