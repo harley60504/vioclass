@@ -167,11 +167,14 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
         final liveStatus = await watchPorts.player.runtime.refreshProxyLiveStatus(
           notify: false,
         );
+        // Android may temporarily detach the local media client while the app
+        // is backgrounded, making activeClientCount drop to zero even though
+        // the upstream writer is still healthy. Reconnecting that healthy
+        // upstream after resume can feed the decoder from a partial GOP and
+        // produce a visibly corrupted frame. Keep the warm connection whenever
+        // the upstream writer itself is still running.
         final existingConnectionIsHealthy =
-            liveStatus != null &&
-            liveStatus.running &&
-            liveStatus.hasWriter &&
-            liveStatus.activeClientCount > 0;
+            liveStatus != null && liveStatus.running && liveStatus.hasWriter;
         if (existingConnectionIsHealthy) {
           shouldForceProxyReconnect = false;
           debugPrint(
