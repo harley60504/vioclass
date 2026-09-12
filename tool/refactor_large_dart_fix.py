@@ -80,6 +80,7 @@ def main() -> None:
         Path('lib/features/twitch/services/playback/twitch_playlist_player_runtime_parts'),
         'TwitchPlaylistPlayerRuntime',
         [
+            'defaultUpstreamHeaders',
             '_qualityKey',
             '_qualityChannelPrefix',
             '_legacyQualityKey',
