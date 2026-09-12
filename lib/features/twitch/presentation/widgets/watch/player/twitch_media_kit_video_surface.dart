@@ -34,10 +34,12 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
 class _TwitchMediaKitVideoSurfaceState
     extends State<TwitchMediaKitVideoSurface> {
   final GlobalKey _videoSurfaceKey = GlobalKey();
+  late Widget _stableVideo;
 
   @override
   void initState() {
     super.initState();
+    _stableVideo = _buildVideo();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reportSourceRectHint(),
     );
@@ -46,8 +48,21 @@ class _TwitchMediaKitVideoSurfaceState
   @override
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller) ||
+        oldWidget.fit != widget.fit ||
+        oldWidget.controls != widget.controls) {
+      _stableVideo = _buildVideo();
+    }
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reportSourceRectHint(),
+    );
+  }
+
+  Widget _buildVideo() {
+    return Video(
+      controller: widget.controller,
+      fit: widget.fit,
+      controls: widget.controls,
     );
   }
 
@@ -58,7 +73,11 @@ class _TwitchMediaKitVideoSurfaceState
     final context = _videoSurfaceKey.currentContext;
     if (context == null) return;
     final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox || !renderObject.hasSize) return;
+    if (renderObject is! RenderBox ||
+        !renderObject.hasSize ||
+        renderObject.size.isEmpty) {
+      return;
+    }
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final rect = topLeft & renderObject.size;
     unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
@@ -72,16 +91,24 @@ class _TwitchMediaKitVideoSurfaceState
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
-          if (maxWidth <= 0 || maxHeight <= 0) return const SizedBox.shrink();
 
-          var width = maxWidth;
-          var height = width / widget.aspectRatio;
-          if (height > maxHeight) {
-            height = maxHeight;
-            width = height * widget.aspectRatio;
+          // Keep the native Video widget mounted even when an interactive
+          // layout resize briefly produces a zero-sized constraint. Removing
+          // it from the tree detaches/re-attaches the texture and can expose a
+          // black frame while dragging the chat/player divider.
+          var width = 0.0;
+          var height = 0.0;
+          if (maxWidth > 0 && maxHeight > 0) {
+            width = maxWidth;
+            height = width / widget.aspectRatio;
+            if (height > maxHeight) {
+              height = maxHeight;
+              width = height * widget.aspectRatio;
+            }
+            width = width.clamp(1.0, maxWidth).toDouble();
+            height = height.clamp(1.0, maxHeight).toDouble();
           }
-          width = width.clamp(1.0, maxWidth).toDouble();
-          height = height.clamp(1.0, maxHeight).toDouble();
+
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _reportSourceRectHint(),
           );
@@ -94,11 +121,7 @@ class _TwitchMediaKitVideoSurfaceState
               height: height,
               child: AnimatedBuilder(
                 animation: transitionMask,
-                child: Video(
-                  controller: widget.controller,
-                  fit: widget.fit,
-                  controls: widget.controls,
-                ),
+                child: _stableVideo,
                 builder: (context, video) {
                   return Stack(
                     fit: StackFit.expand,
