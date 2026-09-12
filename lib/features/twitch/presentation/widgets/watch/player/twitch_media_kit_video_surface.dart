@@ -232,7 +232,7 @@ class _TwitchMediaKitVideoSurfaceState
         case _AndroidDiagnosticEngine.libVlc:
           final controller = VlcPlayerController.network(
             uri,
-            hwAcc: HwAcc.FULL,
+            hwAcc: HwAcc.full,
             autoInitialize: true,
             autoPlay: true,
             options: VlcPlayerOptions(),
