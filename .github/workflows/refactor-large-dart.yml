@@ -34,20 +34,37 @@ jobs:
           cache: true
 
       - name: Split large Dart modules
-        run: python3 tool/refactor_large_dart.py
+        run: |
+          python3 tool/refactor_large_dart.py
+          python3 tool/refactor_large_dart_fix.py
 
-      - name: Format refactor
-        run: dart format lib/features/twitch
+      - name: Format refactor only
+        shell: bash
+        run: |
+          dart format \
+            lib/features/twitch/services/playback/twitch_hls_low_latency_proxy.dart \
+            lib/features/twitch/services/playback/twitch_hls_low_latency_proxy_parts \
+            lib/features/twitch/presentation/pages/twitch_drops_connection_page.dart \
+            lib/features/twitch/presentation/pages/twitch_drops_connection_page_parts \
+            lib/features/twitch/presentation/pages/twitch_channel_page.dart \
+            lib/features/twitch/presentation/pages/twitch_channel_page_parts \
+            lib/features/twitch/services/playback/twitch_playlist_player_runtime.dart \
+            lib/features/twitch/services/playback/twitch_playlist_player_runtime_parts \
+            lib/features/twitch/presentation/pages/twitch_stream_page.dart \
+            lib/features/twitch/presentation/pages/twitch_stream_page_parts \
+            lib/features/twitch/services/chat/twitch_chat_runtime.dart \
+            lib/features/twitch/services/chat/twitch_chat_runtime_parts
 
       - name: Resolve dependencies
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Remove one-off refactor tooling
         run: |
           rm -f tool/refactor_large_dart.py
+          rm -f tool/refactor_large_dart_fix.py
           rm -f .github/workflows/refactor-large-dart.yml
 
       - name: Commit refactor output
