@@ -8,6 +8,7 @@ import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../localization/vioclass_localizations.dart';
 import '../pages/twitch_watch_route_guard.dart';
+import '../widgets/shared/twitch_notice.dart';
 import '../widgets/watch/player/twitch_player_only_surface.dart';
 import '../widgets/watch/player/twitch_media_kit_video_surface.dart';
 import '../watch/twitch_watch_playback_kind.dart';
@@ -350,9 +351,11 @@ class _MiniPlayerFooter extends StatelessWidget {
                       aspectRatioHeight: 9,
                     );
                 if (entered || !context.mounted) return;
-                ScaffoldMessenger.maybeOf(
+                showTwitchNotice(
                   context,
-                )?.showSnackBar(SnackBar(content: Text(l10n.t('目前裝置不支援子母畫面'))));
+                  l10n.t('目前裝置不支援子母畫面'),
+                  tone: TwitchNoticeTone.warning,
+                );
               },
               icon: const Icon(Icons.picture_in_picture_alt_rounded),
               color: Colors.white70,

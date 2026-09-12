@@ -13,6 +13,7 @@ import '../../../pages/twitch_watch_page.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../twitch_chat_text_style.dart';
 import '../../shared/twitch_cached_image_layer.dart';
+import '../../shared/twitch_notice.dart';
 import 'twitch_chat_link_preview_models.dart';
 import 'twitch_chat_link_preview_policy.dart';
 
@@ -1053,10 +1054,9 @@ Future<void> copyTwitchChatLink(BuildContext context, String rawUrl) async {
 }
 
 void _showLinkSnack(BuildContext context, String message) {
-  ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-    SnackBar(
-      content: Text(context.vio.t(message)),
-      duration: const Duration(milliseconds: 1200),
-    ),
+  showTwitchNotice(
+    context,
+    message,
+    duration: const Duration(milliseconds: 1200),
   );
 }

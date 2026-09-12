@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../shared/twitch_notice.dart';
 import 'twitch_chat_text_style.dart';
 
 class TwitchChatInputBar extends StatelessWidget {
@@ -53,8 +54,11 @@ class TwitchChatInputBar extends StatelessWidget {
       final message = _formatSendError(error);
       if (message.isEmpty) return;
 
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+      showTwitchNotice(
+        context,
+        message,
+        tone: TwitchNoticeTone.error,
+        duration: const Duration(seconds: 3),
       );
     }
   }

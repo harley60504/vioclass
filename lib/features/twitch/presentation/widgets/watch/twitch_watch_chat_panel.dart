@@ -25,6 +25,8 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
   final String? viewerId;
+  final bool viewerIsFollowing;
+  final DateTime? viewerFollowedAt;
   final String fallbackProfileImageUrl;
   final String fallbackDisplayName;
   final String fallbackUserId;
@@ -57,6 +59,8 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.runtime,
     required this.viewerLogin,
     required this.viewerId,
+    required this.viewerIsFollowing,
+    required this.viewerFollowedAt,
     this.fallbackProfileImageUrl = '',
     this.fallbackDisplayName = '',
     this.fallbackUserId = '',
@@ -550,6 +554,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 ),
                 TwitchWatchChatInputSection(
                   channelPoints: widget.channelPoints,
+                  runtime: currentRuntime,
+                  viewerIsFollowing: widget.viewerIsFollowing,
+                  viewerFollowedAt: widget.viewerFollowedAt,
                   pendingSpecialMessage: widget.pendingSpecialMessage,
                   messageController: widget.messageController,
                   loadingEmotes: widget.loadingEmotes,

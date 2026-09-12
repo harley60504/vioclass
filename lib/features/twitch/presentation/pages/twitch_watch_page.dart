@@ -51,6 +51,7 @@ import '../watch/twitch_playback_session_controller.dart';
 import '../dialogs/twitch_clip_editor_dialog.dart';
 import '../widgets/channel/twitch_channel_about_section.dart';
 import '../widgets/watch/chat/twitch_vod_replay_chat_panel.dart';
+import '../widgets/shared/twitch_notice.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import 'twitch_channel_page.dart';
@@ -373,9 +374,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   void showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    showTwitchNotice(context, message);
   }
 
   Future<void> createLiveClip() async {
@@ -565,6 +564,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       relationshipController.seedKnownFollowStatus(
         knownFollowStatus,
         resolvedUserId: widget.resolvedInitialOfflineChannel?.broadcasterId,
+        followedAt: widget.resolvedInitialOfflineChannel?.followedAt,
       );
     }
     playbackController = TwitchWatchPlaybackController(
@@ -1327,6 +1327,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         runtime: runtime,
         viewerLogin: viewerLogin,
         viewerId: viewerId,
+        viewerIsFollowing: effectiveIsFollowing,
+        viewerFollowedAt: relationshipController.followedAt,
         metadata: metadata,
         channelPoints: channelPointsSnapshot,
         pendingSpecialMessage: pendingSpecialMessage,

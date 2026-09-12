@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../settings/twitch_player_settings_controller.dart';
+import '../../shared/twitch_notice.dart';
 import 'twitch_player_common_buttons.dart';
 
 class AndroidPipButton extends StatefulWidget {
@@ -55,9 +56,11 @@ class _AndroidPipButtonState extends State<AndroidPipButton> {
       aspectRatioHeight: 9,
     );
     if (!entered && mounted) {
-      ScaffoldMessenger.maybeOf(
+      showTwitchNotice(
         context,
-      )?.showSnackBar(SnackBar(content: Text(context.vio.t('目前裝置不支援系統子母畫面'))));
+        '目前裝置不支援系統子母畫面',
+        tone: TwitchNoticeTone.warning,
+      );
     }
   }
 

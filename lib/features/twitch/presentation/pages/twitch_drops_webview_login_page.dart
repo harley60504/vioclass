@@ -10,6 +10,7 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/shared/twitch_notice.dart';
 
 /// Drops / Android token login through an embedded WebView OAuth page.
 ///
@@ -309,9 +310,11 @@ class _TwitchDropsWebViewLoginPageState
     final uri = _buildAuthorizationUri();
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(
+    showTwitchNotice(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已複製 Drops OAuth 連結')));
+      '已複製 Drops OAuth 連結',
+      tone: TwitchNoticeTone.success,
+    );
   }
 
   Future<void> _tryManualInput() async {

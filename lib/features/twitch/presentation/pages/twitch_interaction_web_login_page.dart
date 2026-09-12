@@ -13,6 +13,7 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/shared/twitch_notice.dart';
 
 /// Official Twitch Web session + kimne Web GQL token capture.
 ///
@@ -106,9 +107,7 @@ class _TwitchInteractionWebLoginPageState
     if (url == null || url.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已複製目前連結')));
+    showTwitchNotice(context, '已複製目前連結', tone: TwitchNoticeTone.success);
   }
 
   void _startProbeTimer() {

@@ -11,6 +11,7 @@ import '../../../theme/twitch_ui_tokens.dart';
 import '../links/twitch_chat_link_preview.dart';
 import '../twitch_chat_text_style.dart';
 import '../message/twitch_chat_message_visual_metrics.dart';
+import '../../shared/twitch_notice.dart';
 import '../../shared/twitch_ui_avatar.dart';
 
 class TwitchPinnedMessageBanner extends StatefulWidget {
@@ -50,11 +51,11 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.vio.t('已複製置頂留言')),
-        duration: const Duration(milliseconds: 1100),
-      ),
+    showTwitchNotice(
+      context,
+      '已複製置頂留言',
+      tone: TwitchNoticeTone.success,
+      duration: const Duration(milliseconds: 1100),
     );
   }
 

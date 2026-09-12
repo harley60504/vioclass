@@ -17,6 +17,7 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/shared/twitch_notice.dart';
 import 'twitch_interaction_web_login_page.dart';
 
 /// Main Twitch OAuth login.
@@ -733,9 +734,11 @@ query ChannelPointsContext($channelLogin: String!) {
     final uri = _buildAuthorizationUri();
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     if (!mounted) return;
-    ScaffoldMessenger.of(
+    showTwitchNotice(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已複製 Twitch 登入連結')));
+      '已複製 Twitch 登入連結',
+      tone: TwitchNoticeTone.success,
+    );
   }
 
   Future<void> _tryManualInput() async {

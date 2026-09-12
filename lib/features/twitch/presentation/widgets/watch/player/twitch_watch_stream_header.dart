@@ -7,6 +7,7 @@ import '../../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
+import '../../shared/twitch_notice.dart';
 
 class WatchCompactAvatarTile extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
@@ -462,8 +463,10 @@ class _WatchInfoPill extends StatelessWidget {
                     ClipboardData(text: copyText!.trim()),
                   );
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${context.vio.t('已複製：')}$label')),
+                  showTwitchNotice(
+                    context,
+                    '${context.vio.t('已複製：')}$label',
+                    tone: TwitchNoticeTone.success,
                   );
                 }
               : null,

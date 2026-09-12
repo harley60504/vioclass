@@ -60,7 +60,10 @@ class TwitchChatRuntime extends ChangeNotifier {
   final Set<String> _seenMessageFingerprints = <String>{};
   final Set<String> _deletedMessageIds = <String>{};
   final Map<String, String> _ownUserStateTags = <String, String>{};
+  final Map<String, String> _roomStateTags = <String, String>{};
   final TwitchChatRuntimeNotifyBatcher _notifyBatcher;
+  final StreamController<TwitchChatSendRejection> _sendRejectionsController =
+      StreamController<TwitchChatSendRejection>.broadcast();
 
   StreamSubscription<TwitchChatMessage>? _messageSubscription;
   StreamSubscription<TwitchChatMessage>? _writeMessageSubscription;
@@ -98,6 +101,24 @@ class TwitchChatRuntime extends ChangeNotifier {
   int get pendingOutgoingCount => _pendingOutgoingMessages.length;
   int get serverEchoMatchCount => _serverEchoMatchCount;
   int get rejectedOutgoingCount => _rejectedOutgoingCount;
+  Stream<TwitchChatSendRejection> get sendRejections =>
+      _sendRejectionsController.stream;
+  Set<String> get ownBadgeNames => (_ownUserStateTags['badges'] ?? '')
+      .split(',')
+      .map((badge) => badge.split('/').first.trim().toLowerCase())
+      .where((badge) => badge.isNotEmpty)
+      .toSet();
+  bool get viewerIsModerator =>
+      _ownUserStateTags['mod'] == '1' ||
+      ownBadgeNames.contains('broadcaster') ||
+      ownBadgeNames.contains('moderator');
+  bool get viewerIsVip => ownBadgeNames.contains('vip');
+  bool get viewerIsSubscriber =>
+      _ownUserStateTags['subscriber'] == '1' ||
+      ownBadgeNames.contains('subscriber') ||
+      ownBadgeNames.contains('founder');
+  TwitchChatRoomState get roomState =>
+      TwitchChatRoomState.fromTags(_roomStateTags);
 
   TwitchChatMessageNormalizer get normalizer {
     return TwitchChatMessageNormalizer(badgeCache: badgeCache);
@@ -158,6 +179,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
     _clearPendingOutgoingMessages();
     _ownUserStateTags.clear();
+    _roomStateTags.clear();
 
     notifyListeners();
 
@@ -402,6 +424,7 @@ class TwitchChatRuntime extends ChangeNotifier {
         return;
 
       case 'ROOMSTATE':
+        _handleRoomState(message);
         return;
 
       case 'PRIVMSG':
@@ -431,6 +454,17 @@ class TwitchChatRuntime extends ChangeNotifier {
       case 'PRIVMSG':
         _handleVisiblePrivMsg(message);
         return;
+    }
+  }
+
+  void _handleRoomState(TwitchChatMessage message) {
+    final previous = Map<String, String>.of(_roomStateTags);
+    for (final key in TwitchChatRoomState.tagNames) {
+      final value = message.tags[key];
+      if (value != null) _roomStateTags[key] = value;
+    }
+    if (!mapEquals(previous, _roomStateTags)) {
+      notifyListeners();
     }
   }
 
@@ -554,6 +588,14 @@ class TwitchChatRuntime extends ChangeNotifier {
 
     _error = reason;
     _rejectedOutgoingCount += 1;
+    if (!_sendRejectionsController.isClosed) {
+      _sendRejectionsController.add(
+        TwitchChatSendRejection(
+          messageId: noticeMessage.tags['msg-id'] ?? '',
+          reason: reason,
+        ),
+      );
+    }
 
     if (pending != null) {
       _removePending(pending);
@@ -833,6 +875,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     await writeIrcApi?.disconnect();
 
     _ownUserStateTags.clear();
+    _roomStateTags.clear();
 
     _connecting = false;
     _connected = false;
@@ -845,6 +888,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     await disconnect();
     await ircApi.dispose();
     await writeIrcApi?.dispose();
+    await _sendRejectionsController.close();
   }
 
   Map<String, dynamic> toJson() {
@@ -868,6 +912,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       'seenMessageIdCount': _seenMessageIds.length,
       'deletedMessageIdCount': _deletedMessageIds.length,
       'ownUserStateTags': _ownUserStateTags,
+      'roomState': roomState.toJson(),
       'readCurrentUserStateTags': ircApi.currentUserStateTags,
       'writeCurrentUserStateTags': writeIrcApi?.currentUserStateTags,
       'messageCount': messages.length,
@@ -875,6 +920,72 @@ class TwitchChatRuntime extends ChangeNotifier {
       'notifyDebounceMs': notifyDebounce.inMilliseconds,
       'messages': messages.map((message) => message.toJson()).toList(),
       'badgeCache': badgeCache.toJson(),
+    };
+  }
+}
+
+class TwitchChatSendRejection {
+  final String messageId;
+  final String reason;
+
+  const TwitchChatSendRejection({
+    required this.messageId,
+    required this.reason,
+  });
+}
+
+class TwitchChatRoomState {
+  static const Set<String> tagNames = <String>{
+    'emote-only',
+    'followers-only',
+    'r9k',
+    'slow',
+    'subs-only',
+  };
+
+  final bool known;
+  final bool emoteOnly;
+  final int followersOnlyMinutes;
+  final bool uniqueChat;
+  final int slowModeSeconds;
+  final bool subscribersOnly;
+
+  const TwitchChatRoomState({
+    this.known = false,
+    this.emoteOnly = false,
+    this.followersOnlyMinutes = -1,
+    this.uniqueChat = false,
+    this.slowModeSeconds = 0,
+    this.subscribersOnly = false,
+  });
+
+  factory TwitchChatRoomState.fromTags(Map<String, String> tags) {
+    if (tags.isEmpty) return const TwitchChatRoomState();
+    return TwitchChatRoomState(
+      known: true,
+      emoteOnly: tags['emote-only'] == '1',
+      followersOnlyMinutes: int.tryParse(tags['followers-only'] ?? '') ?? -1,
+      uniqueChat: tags['r9k'] == '1',
+      slowModeSeconds: int.tryParse(tags['slow'] ?? '') ?? 0,
+      subscribersOnly: tags['subs-only'] == '1',
+    );
+  }
+
+  bool get hasRestrictions =>
+      emoteOnly ||
+      followersOnlyMinutes >= 0 ||
+      uniqueChat ||
+      slowModeSeconds > 0 ||
+      subscribersOnly;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'known': known,
+      'emoteOnly': emoteOnly,
+      'followersOnlyMinutes': followersOnlyMinutes,
+      'uniqueChat': uniqueChat,
+      'slowModeSeconds': slowModeSeconds,
+      'subscribersOnly': subscribersOnly,
     };
   }
 }

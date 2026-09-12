@@ -173,6 +173,8 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
   final String? viewerId;
+  final bool viewerIsFollowing;
+  final DateTime? viewerFollowedAt;
   final TwitchStreamHeaderMetadata metadata;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
   final TwitchPendingSpecialMessage? pendingSpecialMessage;
@@ -199,6 +201,8 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.runtime,
     required this.viewerLogin,
     required this.viewerId,
+    required this.viewerIsFollowing,
+    required this.viewerFollowedAt,
     required this.metadata,
     required this.channelPoints,
     this.pendingSpecialMessage,
@@ -229,6 +233,8 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       runtime: runtime,
       viewerLogin: viewerLogin,
       viewerId: viewerId,
+      viewerIsFollowing: viewerIsFollowing,
+      viewerFollowedAt: viewerFollowedAt,
       fallbackProfileImageUrl: metadata.profileImageUrl,
       fallbackDisplayName: metadata.displayName,
       fallbackUserId: metadata.channelId,

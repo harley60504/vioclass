@@ -5,11 +5,13 @@ import '../../../services/discovery/twitch_channel_snapshot_cache.dart';
 class _CachedRelationshipStatus {
   final bool isFollowing;
   final String? userId;
+  final DateTime? followedAt;
   final DateTime storedAt;
 
   const _CachedRelationshipStatus({
     required this.isFollowing,
     required this.userId,
+    required this.followedAt,
     required this.storedAt,
   });
 
@@ -43,6 +45,7 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
   bool checkingRelationship = false;
   bool followBusy = false;
   bool isFollowing = false;
+  DateTime? followedAt;
   bool hasResolvedRelationshipStatus = false;
   String? relationshipError;
 
@@ -57,11 +60,19 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
 
   bool get busy => checkingRelationship || followBusy;
 
-  void seedKnownFollowStatus(bool following, {String? resolvedUserId}) {
+  void seedKnownFollowStatus(
+    bool following, {
+    String? resolvedUserId,
+    DateTime? followedAt,
+  }) {
     final login = channelLogin().trim().toLowerCase();
     if (login.isEmpty) return;
 
-    _applySnapshot(following: following, resolvedUserId: resolvedUserId);
+    _applySnapshot(
+      following: following,
+      resolvedUserId: resolvedUserId,
+      followedAt: followedAt,
+    );
     hasResolvedRelationshipStatus = false;
     relationshipError = null;
   }
@@ -76,6 +87,7 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       _applySnapshot(
         following: cached.isFollowing,
         resolvedUserId: cached.userId,
+        followedAt: cached.followedAt,
       );
       hasResolvedRelationshipStatus = true;
       relationshipError = null;
@@ -95,13 +107,18 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       );
       final following = snapshot.isFollowing == true;
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
-      _applySnapshot(following: following, resolvedUserId: resolvedUserId);
+      _applySnapshot(
+        following: following,
+        resolvedUserId: resolvedUserId,
+        followedAt: snapshot.followedAt as DateTime?,
+      );
       hasResolvedRelationshipStatus = true;
       _rememberRelationship(
         cacheKey,
         _CachedRelationshipStatus(
           isFollowing: following,
           userId: resolvedUserId.isEmpty ? null : resolvedUserId,
+          followedAt: snapshot.followedAt as DateTime?,
           storedAt: DateTime.now(),
         ),
       );
@@ -144,13 +161,18 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
             );
       final following = snapshot.isFollowing == true;
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
-      _applySnapshot(following: following, resolvedUserId: resolvedUserId);
+      _applySnapshot(
+        following: following,
+        resolvedUserId: resolvedUserId,
+        followedAt: snapshot.followedAt as DateTime?,
+      );
       hasResolvedRelationshipStatus = true;
       _rememberRelationship(
         _cacheKey(login),
         _CachedRelationshipStatus(
           isFollowing: following,
           userId: resolvedUserId.isEmpty ? null : resolvedUserId,
+          followedAt: snapshot.followedAt as DateTime?,
           storedAt: DateTime.now(),
         ),
       );
@@ -180,6 +202,7 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
     checkingRelationship = false;
     followBusy = false;
     isFollowing = false;
+    followedAt = null;
     hasResolvedRelationshipStatus = false;
     relationshipError = null;
     notifyListeners();
@@ -190,8 +213,13 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
     return '${viewer == null || viewer.isEmpty ? 'anonymous' : viewer}|$login';
   }
 
-  void _applySnapshot({required bool following, String? resolvedUserId}) {
+  void _applySnapshot({
+    required bool following,
+    String? resolvedUserId,
+    DateTime? followedAt,
+  }) {
     isFollowing = following;
+    this.followedAt = following ? followedAt : null;
     final cleanUserId = resolvedUserId?.trim() ?? '';
     final currentChannelId = channelId();
     if ((currentChannelId == null || currentChannelId.trim().isEmpty) &&

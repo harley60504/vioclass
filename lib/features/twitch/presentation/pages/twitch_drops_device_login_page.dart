@@ -10,6 +10,7 @@ import '../../api/auth/twitch_device_auth_api_service.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/shared/twitch_notice.dart';
 
 /// Drops / Android token login using Twitch Device Flow.
 ///
@@ -356,9 +357,7 @@ class _TwitchDropsDeviceLoginPageState
     if (code == null || code.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: code));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已複製 Drops 授權代碼')));
+    showTwitchNotice(context, '已複製 Drops 授權代碼', tone: TwitchNoticeTone.success);
   }
 
   Future<void> _copyUrl() async {
@@ -366,9 +365,7 @@ class _TwitchDropsDeviceLoginPageState
     if (url == null || url.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('已複製 Drops 授權網址')));
+    showTwitchNotice(context, '已複製 Drops 授權網址', tone: TwitchNoticeTone.success);
   }
 
   @override
