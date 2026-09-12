@@ -17,12 +17,24 @@ const double twitchWatchVideoAspectRatio = 16 / 9;
 enum _AndroidDiagnosticEngine { mediaKit, videoPlayer, libVlc }
 
 extension on _AndroidDiagnosticEngine {
-  String get label => switch (this) {
-    _AndroidDiagnosticEngine.mediaKit => 'media_kit / libmpv',
-    _AndroidDiagnosticEngine.videoPlayer => 'video_player / ExoPlayer',
-    _AndroidDiagnosticEngine.libVlc => 'LibVLC',
+  String get key => switch (this) {
+    _AndroidDiagnosticEngine.mediaKit =>
+      TwitchPlayerEngineDiagnosticState.mediaKitKey,
+    _AndroidDiagnosticEngine.videoPlayer =>
+      TwitchPlayerEngineDiagnosticState.videoPlayerKey,
+    _AndroidDiagnosticEngine.libVlc =>
+      TwitchPlayerEngineDiagnosticState.libVlcKey,
   };
+
+  String get label => TwitchPlayerEngineDiagnosticState.labelFor(key);
 }
+
+_AndroidDiagnosticEngine _diagnosticEngineFromKey(String key) => switch (key) {
+  TwitchPlayerEngineDiagnosticState.videoPlayerKey =>
+    _AndroidDiagnosticEngine.videoPlayer,
+  TwitchPlayerEngineDiagnosticState.libVlcKey => _AndroidDiagnosticEngine.libVlc,
+  _ => _AndroidDiagnosticEngine.mediaKit,
+};
 
 class TwitchMediaKitVideoSurface extends StatefulWidget {
   final VideoController controller;
@@ -50,14 +62,10 @@ class _TwitchMediaKitVideoSurfaceState
     with WidgetsBindingObserver {
   final GlobalKey _videoSurfaceKey = GlobalKey();
   late Widget _stableVideo;
+  late _AndroidDiagnosticEngine _diagnosticEngine;
 
-  _AndroidDiagnosticEngine _diagnosticEngine =
-      _AndroidDiagnosticEngine.mediaKit;
-  official_video.VideoPlayerController? _officialVideoController;
-  VlcPlayerController? _vlcController;
   String? _diagnosticUri;
   String? _diagnosticError;
-  bool _choiceOffered = false;
   bool _switchingEngine = false;
 
   @override
@@ -65,9 +73,13 @@ class _TwitchMediaKitVideoSurfaceState
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _stableVideo = _buildVideo();
+    _diagnosticEngine = _diagnosticEngineFromKey(
+      TwitchPlayerEngineDiagnosticState.selectedEngineKey,
+    );
+    _attachExternalListeners();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reportSourceRectHint();
-      unawaited(_offerAndroidEngineChoice());
+      unawaited(_initializeDiagnosticEngine());
     });
   }
 
@@ -105,23 +117,7 @@ class _TwitchMediaKitVideoSurfaceState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    TwitchPlayerEngineDiagnosticState.externalPlaybackActive = false;
-    TwitchPlayerEngineDiagnosticState.engineLabel = 'media_kit';
-
-    final official = _officialVideoController;
-    _officialVideoController = null;
-    if (official != null) {
-      official.removeListener(_onOfficialVideoChanged);
-      unawaited(official.dispose());
-    }
-
-    final vlc = _vlcController;
-    _vlcController = null;
-    if (vlc != null) {
-      vlc.removeListener(_onVlcChanged);
-      unawaited(vlc.dispose());
-    }
-
+    _detachExternalListeners();
     super.dispose();
   }
 
@@ -133,118 +129,108 @@ class _TwitchMediaKitVideoSurfaceState
     );
   }
 
-  Future<void> _offerAndroidEngineChoice() async {
-    if (!Platform.isAndroid || _choiceOffered || !mounted) return;
-    _choiceOffered = true;
+  void _attachExternalListeners() {
+    final official = TwitchPlayerEngineDiagnosticState.videoPlayerController;
+    official?.removeListener(_onOfficialVideoChanged);
+    official?.addListener(_onOfficialVideoChanged);
 
-    String? uri;
+    final vlc = TwitchPlayerEngineDiagnosticState.vlcController;
+    vlc?.removeListener(_onVlcChanged);
+    vlc?.addListener(_onVlcChanged);
+  }
+
+  void _detachExternalListeners() {
+    TwitchPlayerEngineDiagnosticState.videoPlayerController?.removeListener(
+      _onOfficialVideoChanged,
+    );
+    TwitchPlayerEngineDiagnosticState.vlcController?.removeListener(
+      _onVlcChanged,
+    );
+  }
+
+  Future<String?> _waitForCurrentMediaUri() async {
     for (var attempt = 0; attempt < 30 && mounted; attempt++) {
       final candidate = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
-      if (candidate != null && candidate.isNotEmpty) {
-        uri = candidate;
-        break;
-      }
+      if (candidate != null && candidate.isNotEmpty) return candidate;
+      final remembered = TwitchPlayerEngineDiagnosticState.mediaUri?.trim();
+      if (remembered != null && remembered.isNotEmpty) return remembered;
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }
+    return null;
+  }
 
+  Future<void> _initializeDiagnosticEngine() async {
+    if (!Platform.isAndroid || !mounted) return;
+    final uri = await _waitForCurrentMediaUri();
     if (!mounted) return;
     if (uri == null || uri.isEmpty) {
       debugPrint('[PlayerEngineTest] no current media URI; keep media_kit');
       return;
     }
 
-    final selection = await showDialog<_AndroidDiagnosticEngine>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Android 播放引擎 A/B 測試'),
-          content: const Text(
-            '請每次只選一個引擎，播放約 5 秒後切到背景 10–30 秒，再回來觀察是否卡頓或出現殘缺畫面。\n\n'
-            '三個選項都會使用目前 VioClass 的同一條 media URI。',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(
-                _AndroidDiagnosticEngine.mediaKit,
-              ),
-              child: const Text('media_kit'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(
-                _AndroidDiagnosticEngine.videoPlayer,
-              ),
-              child: const Text('video_player'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(
-                _AndroidDiagnosticEngine.libVlc,
-              ),
-              child: const Text('LibVLC'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (!mounted || selection == null) return;
     _diagnosticUri = uri;
-    if (selection == _AndroidDiagnosticEngine.mediaKit) {
-      debugPrint('[PlayerEngineTest] engine=media_kit uri=$uri');
-      _logDiagnosticSnapshot('selected');
+    final selected = _diagnosticEngineFromKey(
+      TwitchPlayerEngineDiagnosticState.selectedEngineKey,
+    );
+    try {
+      await TwitchPlayerEngineDiagnosticState.selectEngine(
+        engineKey: selected.key,
+        uri: uri,
+      );
+      if (!mounted) return;
+      _attachExternalListeners();
+      setState(() {
+        _diagnosticEngine = selected;
+        _diagnosticError = null;
+      });
+      debugPrint(
+        '[PlayerEngineTest] restore engine=${selected.label} uri=$uri',
+      );
+      _logDiagnosticSnapshot('restored');
+    } catch (error, stackTrace) {
+      debugPrint('[PlayerEngineTest] restore failed: $error');
+      debugPrint('$stackTrace');
+      if (!mounted) return;
+      setState(() {
+        _diagnosticError = '$error';
+      });
+    }
+  }
+
+  Future<void> _selectDiagnosticEngine(
+    _AndroidDiagnosticEngine engine,
+  ) async {
+    if (!Platform.isAndroid || !mounted || _switchingEngine) return;
+    final uri =
+        TwitchMediaKitPlayerHost.currentMediaUri?.trim() ??
+        _diagnosticUri?.trim() ??
+        TwitchPlayerEngineDiagnosticState.mediaUri?.trim();
+    if (uri == null || uri.isEmpty) {
+      setState(() => _diagnosticError = 'No active media URI');
       return;
     }
 
-    await _activateExternalEngine(selection, uri);
-  }
+    if (_diagnosticEngine == engine &&
+        TwitchPlayerEngineDiagnosticState.selectedEngineKey == engine.key) {
+      return;
+    }
 
-  Future<void> _activateExternalEngine(
-    _AndroidDiagnosticEngine engine,
-    String uri,
-  ) async {
-    if (!mounted || _switchingEngine) return;
     setState(() {
       _switchingEngine = true;
       _diagnosticError = null;
     });
-
-    TwitchPlayerEngineDiagnosticState.externalPlaybackActive = true;
-    TwitchPlayerEngineDiagnosticState.engineLabel = engine.label;
+    _detachExternalListeners();
 
     try {
-      await TwitchMediaKitPlayerHost.pauseShared();
-
-      switch (engine) {
-        case _AndroidDiagnosticEngine.mediaKit:
-          break;
-        case _AndroidDiagnosticEngine.videoPlayer:
-          final controller = official_video.VideoPlayerController.networkUrl(
-            Uri.parse(uri),
-            videoPlayerOptions: official_video.VideoPlayerOptions(
-              mixWithOthers: false,
-            ),
-          );
-          _officialVideoController = controller;
-          controller.addListener(_onOfficialVideoChanged);
-          await controller.initialize();
-          await controller.play();
-          break;
-        case _AndroidDiagnosticEngine.libVlc:
-          final controller = VlcPlayerController.network(
-            uri,
-            hwAcc: HwAcc.full,
-            autoInitialize: true,
-            autoPlay: true,
-            options: VlcPlayerOptions(),
-          );
-          _vlcController = controller;
-          controller.addListener(_onVlcChanged);
-          break;
-      }
-
+      await TwitchPlayerEngineDiagnosticState.selectEngine(
+        engineKey: engine.key,
+        uri: uri,
+      );
       if (!mounted) return;
+      _attachExternalListeners();
       setState(() {
         _diagnosticEngine = engine;
+        _diagnosticUri = uri;
         _switchingEngine = false;
       });
       debugPrint('[PlayerEngineTest] engine=${engine.label} uri=$uri');
@@ -252,19 +238,15 @@ class _TwitchMediaKitVideoSurfaceState
     } catch (error, stackTrace) {
       debugPrint('[PlayerEngineTest] failed engine=${engine.label}: $error');
       debugPrint('$stackTrace');
-      TwitchPlayerEngineDiagnosticState.externalPlaybackActive = false;
-      TwitchPlayerEngineDiagnosticState.engineLabel = 'media_kit';
       if (!mounted) return;
+      _attachExternalListeners();
       setState(() {
-        _diagnosticEngine = _AndroidDiagnosticEngine.mediaKit;
+        _diagnosticEngine = _diagnosticEngineFromKey(
+          TwitchPlayerEngineDiagnosticState.selectedEngineKey,
+        );
         _switchingEngine = false;
         _diagnosticError = '$error';
       });
-      await TwitchMediaKitPlayerHost.restoreSharedMedia(
-        uri: uri,
-        play: true,
-        forceOpen: false,
-      );
     }
   }
 
@@ -296,7 +278,8 @@ class _TwitchMediaKitVideoSurfaceState
         );
         break;
       case _AndroidDiagnosticEngine.videoPlayer:
-        final value = _officialVideoController?.value;
+        final value =
+            TwitchPlayerEngineDiagnosticState.videoPlayerController?.value;
         debugPrint(
           '[PlayerEngineTest][video_player] $event '
           'initialized=${value?.isInitialized} '
@@ -307,7 +290,7 @@ class _TwitchMediaKitVideoSurfaceState
         );
         break;
       case _AndroidDiagnosticEngine.libVlc:
-        final value = _vlcController?.value;
+        final value = TwitchPlayerEngineDiagnosticState.vlcController?.value;
         debugPrint(
           '[PlayerEngineTest][LibVLC] $event '
           'initialized=${value?.isInitialized} '
@@ -327,7 +310,8 @@ class _TwitchMediaKitVideoSurfaceState
       case _AndroidDiagnosticEngine.mediaKit:
         return mediaKitVideo;
       case _AndroidDiagnosticEngine.videoPlayer:
-        final controller = _officialVideoController;
+        final controller =
+            TwitchPlayerEngineDiagnosticState.videoPlayerController;
         if (controller == null || !controller.value.isInitialized) {
           return const _DiagnosticWaitingSurface(label: 'video_player');
         }
@@ -344,7 +328,7 @@ class _TwitchMediaKitVideoSurfaceState
           ),
         );
       case _AndroidDiagnosticEngine.libVlc:
-        final controller = _vlcController;
+        final controller = TwitchPlayerEngineDiagnosticState.vlcController;
         if (controller == null) {
           return const _DiagnosticWaitingSurface(label: 'LibVLC');
         }
@@ -385,10 +369,6 @@ class _TwitchMediaKitVideoSurfaceState
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
 
-          // Keep the native Video widget mounted even when an interactive
-          // layout resize briefly produces a zero-sized constraint. Removing
-          // it from the tree detaches/re-attaches the texture and can expose a
-          // black frame while dragging the chat/player divider.
           var width = 0.0;
           var height = 0.0;
           if (maxWidth > 0 && maxHeight > 0) {
@@ -439,12 +419,11 @@ class _TwitchMediaKitVideoSurfaceState
                         Positioned(
                           left: 8,
                           top: 8,
-                          child: IgnorePointer(
-                            child: _DiagnosticEngineBadge(
-                              engine: _diagnosticEngine.label,
-                              switching: _switchingEngine,
-                              error: _diagnosticError,
-                            ),
+                          child: _DiagnosticEnginePanel(
+                            selected: _diagnosticEngine,
+                            switching: _switchingEngine,
+                            error: _diagnosticError,
+                            onSelected: _selectDiagnosticEngine,
                           ),
                         ),
                     ],
@@ -454,6 +433,77 @@ class _TwitchMediaKitVideoSurfaceState
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _DiagnosticEnginePanel extends StatelessWidget {
+  final _AndroidDiagnosticEngine selected;
+  final bool switching;
+  final String? error;
+  final ValueChanged<_AndroidDiagnosticEngine> onSelected;
+
+  const _DiagnosticEnginePanel({
+    required this.selected,
+    required this.switching,
+    required this.error,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final errorText = error?.trim();
+    return Material(
+      color: Colors.black.withValues(alpha: 0.76),
+      borderRadius: BorderRadius.circular(9),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              errorText != null && errorText.isNotEmpty
+                  ? 'TEST ERROR: $errorText'
+                  : switching
+                  ? 'TEST switching...'
+                  : 'TEST ${selected.label}',
+              style: TextStyle(
+                color: errorText != null && errorText.isNotEmpty
+                    ? Colors.redAccent
+                    : Colors.white,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Wrap(
+              spacing: 5,
+              runSpacing: 5,
+              children: [
+                for (final engine in _AndroidDiagnosticEngine.values)
+                  ChoiceChip(
+                    label: Text(
+                      switch (engine) {
+                        _AndroidDiagnosticEngine.mediaKit => 'media_kit',
+                        _AndroidDiagnosticEngine.videoPlayer => 'video_player',
+                        _AndroidDiagnosticEngine.libVlc => 'LibVLC',
+                      },
+                    ),
+                    selected: selected == engine,
+                    onSelected: switching ? null : (_) => onSelected(engine),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    labelStyle: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -487,47 +537,6 @@ class _DiagnosticWaitingSurface extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DiagnosticEngineBadge extends StatelessWidget {
-  final String engine;
-  final bool switching;
-  final String? error;
-
-  const _DiagnosticEngineBadge({
-    required this.engine,
-    required this.switching,
-    required this.error,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final errorText = error?.trim();
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white24),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        child: Text(
-          errorText != null && errorText.isNotEmpty
-              ? 'TEST $engine ERROR: $errorText'
-              : switching
-              ? 'TEST switching engine...'
-              : 'TEST $engine',
-          style: TextStyle(
-            color: errorText != null && errorText.isNotEmpty
-                ? Colors.redAccent
-                : Colors.white,
-            fontSize: 10.5,
-            fontWeight: FontWeight.w800,
-          ),
         ),
       ),
     );
