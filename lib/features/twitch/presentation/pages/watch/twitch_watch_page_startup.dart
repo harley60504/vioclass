@@ -90,7 +90,15 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         ),
       );
     } catch (error) {
-      if (mounted) showSnack('觀看頁暫時載入失敗，請稍後再試。');
+      if (!mounted) return;
+      if (watchMode == TwitchWatchMode.liveWatch) {
+        await showLiveWatchOfflineState(
+          channel: channel,
+          generation: generation,
+        );
+      } else {
+        showSnack('觀看頁暫時載入失敗，請稍後再試。');
+      }
     } finally {
       if (mounted && generation == watchLoadGeneration && loadingWatch) {
         setState(() => loadingWatch = false);
@@ -172,6 +180,36 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     );
   }
 
+  Future<void> showLiveWatchOfflineState({
+    required String channel,
+    required int generation,
+  }) async {
+    if (!isCurrentWatchTask(generation, channel)) return;
+
+    playbackController.setError(null);
+    offlineVodFallbackVideo = null;
+    activeGrowingVodVideo = null;
+    currentVodQualityVideo = null;
+    currentClipQualityClip = null;
+    vodQualityVariants = const [];
+    currentVodQualityVariant = null;
+    warmedLiveDvrVideoId = null;
+    warmedLiveDvrQualityKey = null;
+    warmedLiveDvrResolvedAt = null;
+    preferVodReplayChat = false;
+    watchPorts.player.runtime.setLiveDvrPlaylistOverride(null);
+    vodReplayController.stop();
+    clearOwnedPlayback();
+
+    try {
+      await playerSession.pauseCurrent();
+    } catch (_) {}
+    if (!isCurrentWatchTask(generation, channel)) return;
+
+    showOfflineChannelPlaceholder = true;
+    if (mounted) setState(() {});
+  }
+
   void primeInitialActiveDvrAvailability(String channel, int generation) {
     final video = widget.initialActiveDvrVideo;
     if (video == null) return;
@@ -230,19 +268,34 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     await yieldToUi();
     if (!isCurrentWatchTask(generation, channel)) return;
 
+    bool? liveAvailable;
     if (watchMode == TwitchWatchMode.liveWatch) {
-      await refreshLiveTimelineStartedAt(allowWithoutLivePlayback: true);
+      liveAvailable = await refreshLiveTimelineStartedAt(
+        allowWithoutLivePlayback: true,
+      );
       if (!isCurrentWatchTask(generation, channel)) return;
+      if (liveAvailable == false) {
+        await showLiveWatchOfflineState(
+          channel: channel,
+          generation: generation,
+        );
+        if (!isCurrentWatchTask(generation, channel)) return;
+      } else if (liveAvailable == true && showOfflineChannelPlaceholder) {
+        showOfflineChannelPlaceholder = false;
+        if (mounted) setState(() {});
+      }
     }
 
     var chatStartedEarly = false;
-    if (reuseCurrentLivePlayback) {
+    if (reuseCurrentLivePlayback && liveAvailable != false) {
       setState(() => chatBootstrapping = true);
       chatStartedEarly = true;
       unawaited(runDeferredChatStartup(channel, generation));
     }
 
-    if (enableWatchPlayer && !skipPlaybackStartup) {
+    if (enableWatchPlayer &&
+        !skipPlaybackStartup &&
+        !(watchMode == TwitchWatchMode.liveWatch && liveAvailable == false)) {
       try {
         final loadedInitialClip = await loadInitialClipPlayback(
           channel: channel,
@@ -288,6 +341,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           } else {
             await loadPlayer(channel, forceOpen: !reuseCurrentLivePlayback);
             if (!isCurrentWatchTask(generation, channel)) return;
+            showOfflineChannelPlaceholder = false;
             unawaited(
               prepareActiveGrowingVod(channel: channel, generation: generation),
             );
@@ -299,13 +353,11 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           showSnack('VOD 暫時載入失敗，請稍後再試。');
           return;
         }
-        final loadedVod = await loadOfflineVodFallback(
+        debugPrint('[LiveWatch] live player startup failed: $error');
+        await showLiveWatchOfflineState(
           channel: channel,
           generation: generation,
         );
-        if (!loadedVod) {
-          showSnack('播放器暫時載入失敗，請稍後再試。');
-        }
       }
     }
 
