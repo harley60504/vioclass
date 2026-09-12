@@ -158,9 +158,33 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     session.restorePlayback(owned);
 
     if (owned.kind == TwitchWatchPlaybackKind.live) {
+      var shouldForceProxyReconnect = forceProxyReconnect;
+      if (shouldForceProxyReconnect &&
+          currentUri != null &&
+          currentUri.isNotEmpty &&
+          currentUri == ownedUri &&
+          playerSession.playerOrNull != null) {
+        final liveStatus = await watchPorts.player.runtime.refreshProxyLiveStatus(
+          notify: false,
+        );
+        final existingConnectionIsHealthy =
+            liveStatus != null &&
+            liveStatus.running &&
+            liveStatus.hasWriter &&
+            liveStatus.activeClientCount > 0;
+        if (existingConnectionIsHealthy) {
+          shouldForceProxyReconnect = false;
+          debugPrint(
+            '[WatchPlaybackState] keep foreground live connection '
+            'clients=${liveStatus.activeClientCount} '
+            'sequence=${liveStatus.lastWrittenSequence}',
+          );
+        }
+      }
+
       final preparedUri = await watchPorts.player.runtime
           .prepareLowLatencyLiveFromWarmUpstream(
-            forceProxyReconnect: forceProxyReconnect,
+            forceProxyReconnect: shouldForceProxyReconnect,
           );
       if (preparedUri != null) {
         ownedUri = preparedUri.toString();
