@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from refactor_large_dart import mask_code, matching_brace
+from refactor_large_dart import class_member_spans, mask_code, matching_brace
 
 
 def add_change_notifier_bridges(class_file: Path, class_name: str, need_notify: bool, need_has: bool) -> None:
@@ -27,7 +27,29 @@ def add_change_notifier_bridges(class_file: Path, class_name: str, need_notify: 
         class_file.write_text(text, encoding='utf-8')
 
 
-def qualify_static_refs(text: str, class_name: str, names: list[str]) -> str:
+def discover_static_names(class_text: str, class_name: str) -> set[str]:
+    _, _, spans = class_member_spans(class_text, class_name)
+    names: set[str] = set()
+    for start, end in spans:
+        member = mask_code(class_text[start:end]).strip()
+        if not member.startswith('static '):
+            continue
+        header = member
+        for marker in ('=>', '=', ';', '{'):
+            pos = header.find(marker)
+            if pos >= 0:
+                header = header[:pos]
+        method_match = re.search(r'([A-Za-z_]\w*)\s*\(', header)
+        if method_match:
+            names.add(method_match.group(1))
+            continue
+        identifiers = re.findall(r'[A-Za-z_]\w*', header)
+        if identifiers:
+            names.add(identifiers[-1])
+    return names
+
+
+def qualify_static_refs(text: str, class_name: str, names: set[str]) -> str:
     masked = mask_code(text)
     replacements: list[tuple[int, int, str]] = []
     for name in sorted(names, key=len, reverse=True):
@@ -39,7 +61,20 @@ def qualify_static_refs(text: str, class_name: str, names: list[str]) -> str:
     return text
 
 
-def fix_extensions(part_dir: Path, class_name: str, static_names: list[str]) -> None:
+def fix_extensions(part_dir: Path, class_name: str) -> None:
+    class_file = next(
+        (
+            p
+            for p in part_dir.glob('*.dart')
+            if re.search(r'\bclass\s+' + re.escape(class_name) + r'\b', mask_code(p.read_text(encoding='utf-8')))
+        ),
+        None,
+    )
+    if class_file is None:
+        raise RuntimeError(f'class part for {class_name} not found in {part_dir}')
+    class_text = class_file.read_text(encoding='utf-8')
+    static_names = discover_static_names(class_text, class_name)
+
     extension_files = []
     need_notify = False
     need_has = False
@@ -61,48 +96,21 @@ def fix_extensions(part_dir: Path, class_name: str, static_names: list[str]) -> 
         text = qualify_static_refs(text, class_name, static_names)
         path.write_text(text, encoding='utf-8')
 
-    class_file = next(
-        (
-            p
-            for p in part_dir.glob('*.dart')
-            if re.search(r'\bclass\s+' + re.escape(class_name) + r'\b', mask_code(p.read_text(encoding='utf-8')))
-        ),
-        None,
-    )
-    if class_file is None:
-        raise RuntimeError(f'class part for {class_name} not found in {part_dir}')
     add_change_notifier_bridges(class_file, class_name, need_notify, need_has)
-    print(f'fixed {class_name}: extensions={len(extension_files)}, notify_bridge={need_notify}, has_bridge={need_has}')
+    print(
+        f'fixed {class_name}: extensions={len(extension_files)}, '
+        f'statics={sorted(static_names)}, notify_bridge={need_notify}, has_bridge={need_has}'
+    )
 
 
 def main() -> None:
     fix_extensions(
         Path('lib/features/twitch/services/playback/twitch_playlist_player_runtime_parts'),
         'TwitchPlaylistPlayerRuntime',
-        [
-            'defaultUpstreamHeaders',
-            '_qualityKey',
-            '_qualityChannelPrefix',
-            '_legacyQualityKey',
-            '_legacyQualityChannelPrefix',
-            '_firstRunMobileFallbackHeight',
-            '_firstRunMobileFallbackMaxFps',
-            '_dvrHealthyCheckInterval',
-            '_dvrUnavailableRetryInterval',
-            '_dvrFailuresBeforeRecovery',
-            '_sharedProxy',
-            '_sharedBridgeProxy',
-            '_sharedBridgeSeekRequestId',
-        ],
     )
     fix_extensions(
         Path('lib/features/twitch/services/chat/twitch_chat_runtime_parts'),
         'TwitchChatRuntime',
-        [
-            'initialUserStateWait',
-            'sendUserStateWait',
-            'pendingOutgoingTtl',
-        ],
     )
 
 
