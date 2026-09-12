@@ -53,11 +53,13 @@ def discover_static_names(class_text: str, class_name: str) -> set[str]:
 
 
 def qualify_static_refs(text: str, class_name: str, names: set[str]) -> str:
-    # Extensions cannot access a static member through `this`. The splitter may
-    # have inserted `this.` while making cross-extension private calls explicit,
-    # so normalize both instance-looking and bare static references here.
+    # Extensions cannot access static members through the extended instance.
+    # Normalize explicit `this.`, Dart spread expressions, and simple string
+    # interpolation before applying code-aware bare-reference qualification.
     for name in sorted(names, key=len, reverse=True):
         text = text.replace(f'this.{name}', f'{class_name}.{name}')
+        text = text.replace(f'...{name}', f'...{class_name}.{name}')
+        text = text.replace(f'${name}', f'${{{class_name}.{name}}}')
 
     masked = mask_code(text)
     replacements: list[tuple[int, int, str]] = []
