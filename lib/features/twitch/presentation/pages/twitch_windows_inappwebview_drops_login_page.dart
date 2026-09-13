@@ -186,6 +186,119 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
     }
   }
 
+  Future<void> _installAuthorizeDiagnostics(
+    InAppWebViewController controller,
+    WebUri? url,
+  ) async {
+    final uri = url == null ? null : Uri.tryParse(url.toString());
+    if (uri == null || uri.host.toLowerCase() != 'auth.twitch.tv') return;
+
+    const script = r'''
+(function() {
+  try {
+    if (window.__vioclassDropsDiagInstalled) {
+      return JSON.stringify({status: 'already-installed', href: location.href});
+    }
+    window.__vioclassDropsDiagInstalled = true;
+
+    const safeText = (el) => {
+      try { return String((el && (el.innerText || el.textContent)) || '').trim().slice(0, 120); }
+      catch (_) { return ''; }
+    };
+
+    const describe = (el) => {
+      if (!el) return null;
+      return {
+        tag: String(el.tagName || ''),
+        type: String(el.type || ''),
+        name: String(el.name || ''),
+        id: String(el.id || ''),
+        role: String(el.getAttribute && el.getAttribute('role') || ''),
+        text: safeText(el),
+        disabled: !!el.disabled
+      };
+    };
+
+    const log = (kind, value) => {
+      try { console.log('[VioClassDropsDiag][' + kind + '] ' + JSON.stringify(value)); }
+      catch (_) {}
+    };
+
+    document.addEventListener('click', function(e) {
+      const target = e.target && e.target.closest
+        ? e.target.closest('button,input,a,[role="button"]')
+        : e.target;
+      log('click', {
+        target: describe(target),
+        defaultPrevented: !!e.defaultPrevented,
+        trusted: !!e.isTrusted
+      });
+      setTimeout(function() {
+        log('after-click', {href: location.href, active: describe(document.activeElement)});
+      }, 0);
+      setTimeout(function() {
+        log('after-click-500ms', {href: location.href});
+      }, 500);
+    }, true);
+
+    document.addEventListener('submit', function(e) {
+      const form = e.target;
+      log('submit', {
+        action: String((form && form.action) || ''),
+        method: String((form && form.method) || ''),
+        defaultPrevented: !!e.defaultPrevented,
+        trusted: !!e.isTrusted
+      });
+    }, true);
+
+    window.addEventListener('error', function(e) {
+      log('window-error', {
+        message: String(e.message || ''),
+        filename: String(e.filename || ''),
+        line: e.lineno || 0,
+        column: e.colno || 0
+      });
+    });
+
+    window.addEventListener('unhandledrejection', function(e) {
+      log('unhandled-rejection', {reason: String(e.reason || '')});
+    });
+
+    const buttons = Array.from(document.querySelectorAll('button,input[type="submit"],input[type="button"],[role="button"]'))
+      .slice(0, 30)
+      .map(describe);
+    const forms = Array.from(document.forms).slice(0, 20).map(function(form) {
+      return {
+        action: String(form.action || ''),
+        method: String(form.method || ''),
+        id: String(form.id || ''),
+        name: String(form.name || '')
+      };
+    });
+
+    const snapshot = {
+      status: 'installed',
+      href: location.href,
+      readyState: document.readyState,
+      buttons: buttons,
+      forms: forms
+    };
+    log('snapshot', snapshot);
+    return JSON.stringify(snapshot);
+  } catch (e) {
+    return JSON.stringify({status: 'install-error', error: String(e && (e.stack || e.message || e))});
+  }
+})();
+''';
+
+    try {
+      final result = await controller.evaluateJavascript(source: script);
+      debugPrint('[TwitchDropsInAppWebView][diag] $result');
+    } catch (e) {
+      debugPrint('[TwitchDropsInAppWebView][diag] install failed: $e');
+    }
+  }
+
   Future<bool> _openPopup(CreateWindowAction action) async {
     final environment = _environment;
     if (environment == null || !mounted) return false;
@@ -213,8 +326,15 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
               onLoadStart: (_, url) {
                 debugPrint('[TwitchDropsInAppWebView][popup][start] $url');
               },
-              onLoadStop: (_, url) {
+              onLoadStop: (controller, url) {
                 debugPrint('[TwitchDropsInAppWebView][popup][stop] $url');
+                unawaited(_installAuthorizeDiagnostics(controller, url));
+              },
+              onConsoleMessage: (_, message) {
+                debugPrint(
+                  '[TwitchDropsInAppWebView][popup][console] '
+                  '${message.message}',
+                );
               },
               onCloseWindow: (_) {
                 if (Navigator.of(dialogContext).canPop()) {
@@ -327,14 +447,21 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
                                   '[TwitchDropsInAppWebView][start] $url',
                                 );
                               },
-                              onLoadStop: (_, url) {
+                              onLoadStop: (controller, url) {
                                 debugPrint(
                                   '[TwitchDropsInAppWebView][stop] $url',
                                 );
+                                unawaited(_installAuthorizeDiagnostics(controller, url));
                               },
                               onUpdateVisitedHistory: (_, url, __) {
                                 debugPrint(
                                   '[TwitchDropsInAppWebView][history] $url',
+                                );
+                              },
+                              onConsoleMessage: (_, message) {
+                                debugPrint(
+                                  '[TwitchDropsInAppWebView][console] '
+                                  '${message.message}',
                                 );
                               },
                             ),
