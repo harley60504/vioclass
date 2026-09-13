@@ -528,22 +528,87 @@ query ChannelPointsContext($channelLogin: String!) {
     const js = r'''
 (function() {
   try {
-    if (window.__vioclassPopupHookInstalled) return 'already-installed';
+    if (window.__vioclassPopupHookInstalled) {
+      const links = document.querySelectorAll('a[target="_blank"]');
+      links.forEach((a) => a.setAttribute('target', '_self'));
+      return 'already-installed; rewrote=' + links.length;
+    }
+
     window.__vioclassPopupHookInstalled = true;
     window.__vioclassPopupLog = [];
+
+    const rewriteBlankLinks = function(root) {
+      try {
+        const scope = root && root.querySelectorAll ? root : document;
+        const links = scope.querySelectorAll('a[target="_blank"]');
+        links.forEach(function(a) {
+          a.setAttribute('target', '_self');
+        });
+        return links.length;
+      } catch (e) {
+        return 0;
+      }
+    };
+
+    rewriteBlankLinks(document);
+
+    try {
+      const observer = new MutationObserver(function() {
+        rewriteBlankLinks(document);
+      });
+      observer.observe(document.documentElement || document.body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['target']
+      });
+      window.__vioclassBlankTargetObserver = observer;
+    } catch (e) {}
+
+    document.addEventListener('click', function(event) {
+      try {
+        const target = event.target;
+        const anchor = target && target.closest ? target.closest('a') : null;
+        if (!anchor) return;
+
+        const href = String(anchor.href || '');
+        const originalTarget = String(anchor.getAttribute('target') || '');
+        if (!href) return;
+
+        if (originalTarget.toLowerCase() === '_blank') {
+          window.__vioclassPopupLog.push({
+            kind: 'anchor-blank',
+            url: href,
+            target: originalTarget,
+            ts: Date.now()
+          });
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          window.location.assign(href);
+        }
+      } catch (e) {}
+    }, true);
+
     const originalOpen = window.open;
     window.open = function(url, target, features) {
       try {
+        const nextUrl = String(url || '');
         window.__vioclassPopupLog.push({
-          url: String(url || ''),
+          kind: 'window-open',
+          url: nextUrl,
           target: String(target || ''),
           features: String(features || ''),
           ts: Date.now()
         });
+        if (nextUrl && nextUrl !== 'about:blank') {
+          window.location.assign(nextUrl);
+          return window;
+        }
       } catch (e) {}
       return originalOpen.apply(this, arguments);
     };
-    return 'installed';
+
+    return 'installed-same-window';
   } catch (e) {
     return 'install-error:' + String(e && (e.message || e));
   }
@@ -551,9 +616,9 @@ query ChannelPointsContext($channelLogin: String!) {
 ''';
     try {
       final result = await window.evaluateJavaScript(js);
-      debugPrint('[TwitchAuth][popup-hook] $result');
+      debugPrint('[TwitchAuth][same-window] $result');
     } catch (error) {
-      debugPrint('[TwitchAuth][popup-hook] evaluate failed: $error');
+      debugPrint('[TwitchAuth][same-window] evaluate failed: $error');
     }
   }
 
