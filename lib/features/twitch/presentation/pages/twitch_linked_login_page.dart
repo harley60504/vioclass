@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
@@ -11,6 +12,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import 'twitch_drops_device_login_page.dart';
 import 'twitch_oauth_webview_login_page.dart';
+import 'twitch_windows_inappwebview_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
   final TwitchAuthService mainAuthService;
@@ -136,14 +138,21 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!status.mainReady || !status.webGqlReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => TwitchOAuthWebViewLoginPage(
-              mainAuthService: widget.mainAuthService,
-              authApi: widget.authApi,
-              webGqlAuthService: widget.webGqlAuthService,
-              apiClient: widget.apiClient,
-              captureWebGqlToken: true,
-              mirrorMainTokenToInteraction: false,
-            ),
+            builder: (_) => Platform.isWindows
+                ? TwitchWindowsInAppWebViewLoginPage(
+                    mainAuthService: widget.mainAuthService,
+                    authApi: widget.authApi,
+                    webGqlAuthService: widget.webGqlAuthService,
+                    apiClient: widget.apiClient,
+                  )
+                : TwitchOAuthWebViewLoginPage(
+                    mainAuthService: widget.mainAuthService,
+                    authApi: widget.authApi,
+                    webGqlAuthService: widget.webGqlAuthService,
+                    apiClient: widget.apiClient,
+                    captureWebGqlToken: true,
+                    mirrorMainTokenToInteraction: false,
+                  ),
           ),
         );
 
