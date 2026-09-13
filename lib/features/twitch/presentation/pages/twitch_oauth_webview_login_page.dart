@@ -82,7 +82,6 @@ class _TwitchOAuthWebViewLoginPageState
   bool _windowOpen = false;
   bool _isCompleting = false;
   bool _capturingGql = false;
-  int _providerCallbackResumeCount = 0;
   String? _errorText;
 
   bool get _isMain => widget.target == TwitchOAuthWebViewTokenTarget.main;
@@ -175,67 +174,6 @@ class _TwitchOAuthWebViewLoginPageState
     if (host != 'localhost' && host != '127.0.0.1') return false;
     return (uri.scheme == 'http' && uri.port == 3000) ||
         (uri.scheme == 'https' && (!uri.hasPort || uri.port == 443));
-  }
-
-  bool _isTwitchProviderCallback(Uri? uri) {
-    if (uri == null) return false;
-    final host = uri.host.toLowerCase();
-    final path = uri.path.toLowerCase();
-    if (host != 'www.twitch.tv' && host != 'twitch.tv') return false;
-    if (path != '/auth/callback') return false;
-    return (uri.queryParameters['authProvider'] ?? '').trim().isNotEmpty;
-  }
-
-  Future<void> _resumeOAuthAfterProviderCallback(
-    dynamic window,
-    Uri callbackUri,
-  ) async {
-    if (_providerCallbackResumeCount >= 2 || _isCompleting) return;
-    _providerCallbackResumeCount += 1;
-
-    final provider = callbackUri.queryParameters['authProvider'] ?? 'provider';
-    debugPrint(
-      '[TwitchAuth][provider-callback] $provider callback reached; '
-      'waiting for Twitch session',
-    );
-
-    await Future<void>.delayed(const Duration(milliseconds: 1800));
-    if (!_windowOpen || !identical(_webWindow, window) || _isCompleting) return;
-
-    try {
-      final rawHref = await window.evaluateJavaScript(
-        'String(window.location.href || "")',
-      );
-      final currentText = rawHref?.toString() ?? '';
-      if (!currentText.contains('/auth/callback')) {
-        debugPrint(
-          '[TwitchAuth][provider-callback] page already moved; skip resume',
-        );
-        return;
-      }
-    } catch (_) {}
-
-    try {
-      await window.evaluateJavaScript(r'''
-(function() {
-  try { window.name = ''; } catch (e) {}
-  try { window.__vioclassPopupTargetName = ''; } catch (e) {}
-  return true;
-})();
-''');
-    } catch (error) {
-      debugPrint('[TwitchAuth][provider-callback] cleanup failed: $error');
-    }
-
-    try {
-      final authUrl = _buildAuthorizationUri().toString();
-      debugPrint(
-        '[TwitchAuth][provider-callback] resuming original Twitch OAuth',
-      );
-      window.launch(authUrl);
-    } catch (error) {
-      debugPrint('[TwitchAuth][provider-callback] resume failed: $error');
-    }
   }
 
   Map<String, String> _parseOAuthResponse(Uri uri) {
@@ -590,87 +528,22 @@ query ChannelPointsContext($channelLogin: String!) {
     const js = r'''
 (function() {
   try {
-    if (window.__vioclassPopupHookInstalled) {
-      const links = document.querySelectorAll('a[target="_blank"]');
-      links.forEach((a) => a.setAttribute('target', '_self'));
-      return 'already-installed; rewrote=' + links.length;
-    }
-
+    if (window.__vioclassPopupHookInstalled) return 'already-installed';
     window.__vioclassPopupHookInstalled = true;
-    window.__vioclassPopupLog = window.__vioclassPopupLog || [];
-
-    const rewriteBlankLinks = function(root) {
-      try {
-        const scope = root && root.querySelectorAll ? root : document;
-        const links = scope.querySelectorAll('a[target="_blank"]');
-        links.forEach(function(a) {
-          a.setAttribute('target', '_self');
-        });
-        return links.length;
-      } catch (e) {
-        return 0;
-      }
-    };
-
-    rewriteBlankLinks(document);
-
-    try {
-      const observer = new MutationObserver(function() {
-        rewriteBlankLinks(document);
-      });
-      observer.observe(document.documentElement || document.body, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['target']
-      });
-      window.__vioclassBlankTargetObserver = observer;
-    } catch (e) {}
-
-    document.addEventListener('click', function(event) {
-      try {
-        const target = event.target;
-        const anchor = target && target.closest ? target.closest('a') : null;
-        if (!anchor) return;
-
-        const href = String(anchor.href || '');
-        const originalTarget = String(anchor.getAttribute('target') || '');
-        if (!href) return;
-
-        if (originalTarget.toLowerCase() === '_blank') {
-          window.__vioclassPopupLog.push({
-            kind: 'anchor-blank',
-            url: href,
-            target: originalTarget,
-            ts: Date.now()
-          });
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          window.location.assign(href);
-        }
-      } catch (e) {}
-    }, true);
-
+    window.__vioclassPopupLog = [];
     const originalOpen = window.open;
     window.open = function(url, target, features) {
       try {
-        const nextUrl = String(url || '');
         window.__vioclassPopupLog.push({
-          kind: 'window-open',
-          url: nextUrl,
+          url: String(url || ''),
           target: String(target || ''),
           features: String(features || ''),
           ts: Date.now()
         });
-        if (nextUrl && nextUrl !== 'about:blank') {
-          window.location.assign(nextUrl);
-          return window;
-        }
       } catch (e) {}
       return originalOpen.apply(this, arguments);
     };
-
-    return 'installed-same-window';
+    return 'installed';
   } catch (e) {
     return 'install-error:' + String(e && (e.message || e));
   }
@@ -678,9 +551,9 @@ query ChannelPointsContext($channelLogin: String!) {
 ''';
     try {
       final result = await window.evaluateJavaScript(js);
-      debugPrint('[TwitchAuth][same-window] $result');
+      debugPrint('[TwitchAuth][popup-hook] $result');
     } catch (error) {
-      debugPrint('[TwitchAuth][same-window] evaluate failed: $error');
+      debugPrint('[TwitchAuth][popup-hook] evaluate failed: $error');
     }
   }
 
@@ -694,9 +567,8 @@ query ChannelPointsContext($channelLogin: String!) {
       readyState: String(document.readyState || ''),
       visibility: String(document.visibilityState || ''),
       userAgent: String(navigator.userAgent || ''),
-      windowName: String(window.name || ''),
       popupLog: Array.isArray(window.__vioclassPopupLog)
-          ? window.__vioclassPopupLog.slice(-12)
+          ? window.__vioclassPopupLog.slice(-8)
           : []
     });
   } catch (e) {
@@ -756,7 +628,6 @@ query ChannelPointsContext($channelLogin: String!) {
 
       _webWindow = window;
       _windowOpen = true;
-      _providerCallbackResumeCount = 0;
       debugPrint('[TwitchAuth][open] desktop WebView created');
       debugPrint('[TwitchAuth][ua] using native WebView2 / Edge user agent');
 
@@ -765,113 +636,6 @@ query ChannelPointsContext($channelLogin: String!) {
       } catch (error) {
         debugPrint('[TwitchAuth][brightness] failed: $error');
       }
-
-      try {
-        window.addScriptToExecuteOnDocumentCreated(r'''
-(function() {
-  if (window.__vioclassEarlyPopupBridgeInstalled) return;
-  window.__vioclassEarlyPopupBridgeInstalled = true;
-  window.__vioclassPopupLog = window.__vioclassPopupLog || [];
-  window.__vioclassPopupTargetName = '';
-
-  const log = function(entry) {
-    try {
-      entry.ts = Date.now();
-      window.__vioclassPopupLog.push(entry);
-    } catch (e) {}
-  };
-
-  const matchesPopupTarget = function(target) {
-    const value = String(target || '');
-    return !!value && value === String(window.__vioclassPopupTargetName || '');
-  };
-
-  const forceFormIntoCurrentWindow = function(form) {
-    try {
-      if (!form) return false;
-      const target = String(form.getAttribute('target') || form.target || '');
-      if (!matchesPopupTarget(target)) return false;
-      log({
-        kind: 'early-form-submit',
-        target: target,
-        action: String(form.action || ''),
-        method: String(form.method || '')
-      });
-      form.setAttribute('target', '_self');
-      return true;
-    } catch (e) {
-      return false;
-    }
-  };
-
-  document.addEventListener('submit', function(event) {
-    forceFormIntoCurrentWindow(event.target);
-  }, true);
-
-  try {
-    const originalSubmit = HTMLFormElement.prototype.submit;
-    HTMLFormElement.prototype.submit = function() {
-      forceFormIntoCurrentWindow(this);
-      return originalSubmit.apply(this, arguments);
-    };
-  } catch (e) {}
-
-  try {
-    const originalRequestSubmit = HTMLFormElement.prototype.requestSubmit;
-    if (originalRequestSubmit) {
-      HTMLFormElement.prototype.requestSubmit = function() {
-        forceFormIntoCurrentWindow(this);
-        return originalRequestSubmit.apply(this, arguments);
-      };
-    }
-  } catch (e) {}
-
-  document.addEventListener('click', function(event) {
-    try {
-      const node = event.target;
-      const anchor = node && node.closest ? node.closest('a') : null;
-      if (!anchor) return;
-      const target = String(anchor.getAttribute('target') || anchor.target || '');
-      if (!matchesPopupTarget(target)) return;
-      const href = String(anchor.href || '');
-      log({kind: 'early-target-link', target: target, url: href});
-      anchor.setAttribute('target', '_self');
-    } catch (e) {}
-  }, true);
-
-  window.open = function(url, target, features) {
-    const nextUrl = String(url || '');
-    const targetName = String(target || '');
-    log({
-      kind: 'early-window-open',
-      url: nextUrl,
-      target: targetName,
-      features: String(features || '')
-    });
-
-    if (targetName && (!nextUrl || nextUrl === 'about:blank')) {
-      try {
-        window.__vioclassPopupTargetName = targetName;
-        window.name = targetName;
-        log({kind: 'early-window-name-bound', target: targetName});
-      } catch (e) {}
-      return window;
-    }
-
-    if (nextUrl && nextUrl !== 'about:blank') {
-      window.location.assign(nextUrl);
-      return window;
-    }
-
-    return window;
-  };
-})();
-''');
-        debugPrint('[TwitchAuth][early-popup] document-created bridge installed');
-      } catch (error) {
-        debugPrint('[TwitchAuth][early-popup] install failed: $error');
-      }
-
       try {
         window.addOnUrlRequestCallback((String nextUrl) {
           final parsed = Uri.tryParse(nextUrl);
@@ -879,9 +643,6 @@ query ChannelPointsContext($channelLogin: String!) {
             '[TwitchAuth][navigation] '
             '${parsed?.scheme ?? '?'}://${parsed?.host ?? '?'}${parsed?.path ?? ''}',
           );
-          if (_isTwitchProviderCallback(parsed)) {
-            unawaited(_resumeOAuthAfterProviderCallback(window, parsed!));
-          }
           unawaited(_tryHandleOAuthRedirect(parsed));
           unawaited(_probeDesktopAuthWindow(window));
         });
