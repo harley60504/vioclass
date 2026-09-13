@@ -167,17 +167,18 @@ class TwitchVodCommentsApiService {
 
     final rawMessage = _asMap(node['message']);
     final rawFragments = rawMessage['fragments'];
-    var hasEmoteFragment = false;
-    final fragmentSummary = <Map<String, dynamic>>[];
+    final emoteNames = <String>[];
+    final fragmentKeySets = <String>{};
+
     if (rawFragments is List) {
       for (final raw in rawFragments.whereType<Map<String, dynamic>>()) {
+        fragmentKeySets.add(raw.keys.join(','));
         final emote = _asMap(raw['emote']);
-        if (emote.isNotEmpty) hasEmoteFragment = true;
-        fragmentSummary.add(<String, dynamic>{
-          'keys': raw.keys.toList(),
-          'text': raw['text'],
-          'emote': emote,
-        });
+        if (emote.isNotEmpty) {
+          final name = raw['text']?.toString().trim() ?? '';
+          final id = emote['emoteID']?.toString().trim() ?? '';
+          emoteNames.add(name.isEmpty ? id : name);
+        }
       }
     }
 
@@ -187,18 +188,25 @@ class TwitchVodCommentsApiService {
         rawSearch.contains('powerup') ||
         rawSearch.contains('power-up') ||
         rawSearch.contains('notice');
-    if (!hasEmoteFragment && !hasPowerupHint) return;
+    if (emoteNames.isEmpty && !hasPowerupHint) return;
+
+    final commenter = _asMap(node['commenter']);
+    final user =
+        commenter['displayName']?.toString() ??
+        commenter['login']?.toString() ??
+        'unknown';
+    final text = runtimeMessage.source.message.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final compactText = text.length > 120 ? '${text.substring(0, 117)}...' : text;
 
     debugPrint(
-      '[TwitchVodChatVisualDebug] '
+      '[VodChatProbe] '
       'offset=${node['contentOffsetSeconds']} '
-      'nodeKeys=${node.keys.toList()} '
-      'messageKeys=${rawMessage.keys.toList()} '
-      'rawFragments=$fragmentSummary '
-      'tags=${runtimeMessage.source.tags} '
-      'message=${runtimeMessage.source.message} '
-      'fragments=${runtimeMessage.fragments.map((item) => item.toJson()).toList()} '
-      'segments=${runtimeMessage.segments.map((item) => item.toJson()).toList()}',
+      'user=$user '
+      'emotes=${emoteNames.isEmpty ? '-' : emoteNames.join(',')} '
+      'nodeKeys=${node.keys.join(',')} '
+      'messageKeys=${rawMessage.keys.join(',')} '
+      'fragmentKeys=${fragmentKeySets.join('|')} '
+      'text="$compactText"',
     );
   }
 
