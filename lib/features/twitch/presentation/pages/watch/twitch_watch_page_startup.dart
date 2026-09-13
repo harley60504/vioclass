@@ -208,6 +208,40 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
     showOfflineChannelPlaceholder = true;
     if (mounted) setState(() {});
+    unawaited(
+      loadOfflineLatestVodEntry(channel: channel, generation: generation),
+    );
+  }
+
+  Future<void> loadOfflineLatestVodEntry({
+    required String channel,
+    required int generation,
+  }) async {
+    final fallbackChannel = widget.resolvedInitialOfflineChannel;
+    final discoveryService = widget.initialDiscoveryService;
+    if (fallbackChannel == null || discoveryService == null) {
+      offlineLatestVodVideo = null;
+      if (mounted) setState(() {});
+      return;
+    }
+
+    try {
+      final page = await discoveryService.fetchChannelVideos(
+        userId: fallbackChannel.broadcasterId,
+        first: 1,
+      );
+      if (!isCurrentWatchTask(generation, channel) ||
+          !showOfflineChannelPlaceholder) {
+        return;
+      }
+      offlineLatestVodVideo = page.videos.isEmpty ? null : page.videos.first;
+      if (mounted) setState(() {});
+    } catch (error) {
+      if (!isCurrentWatchTask(generation, channel)) return;
+      debugPrint('[LiveWatch] latest offline VOD lookup failed: $error');
+      offlineLatestVodVideo = null;
+      if (mounted) setState(() {});
+    }
   }
 
   void primeInitialActiveDvrAvailability(String channel, int generation) {
@@ -281,6 +315,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         );
         if (!isCurrentWatchTask(generation, channel)) return;
       } else if (liveAvailable == true && showOfflineChannelPlaceholder) {
+        offlineLatestVodVideo = null;
         showOfflineChannelPlaceholder = false;
         if (mounted) setState(() {});
       }
@@ -458,6 +493,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     playbackController.resetError();
     relationshipController.reset();
     offlineVodFallbackVideo = null;
+    offlineLatestVodVideo = null;
     showOfflineChannelPlaceholder = false;
     activeGrowingVodVideo = null;
     currentVodQualityVideo = null;

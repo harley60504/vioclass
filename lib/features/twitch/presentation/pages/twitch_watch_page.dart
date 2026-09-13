@@ -50,11 +50,13 @@ import '../mini_player/twitch_mini_player_controller.dart';
 import '../watch/twitch_playback_session_controller.dart';
 import '../dialogs/twitch_clip_editor_dialog.dart';
 import '../widgets/channel/twitch_channel_about_section.dart';
+import '../widgets/watch/twitch_offline_latest_vod_card.dart';
 import '../widgets/watch/chat/twitch_vod_replay_chat_panel.dart';
 import '../widgets/shared/twitch_notice.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import 'twitch_channel_page.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'watch/twitch_watch_page_session.dart';
@@ -302,6 +304,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       engagementController.hypeTrainController;
   List<dynamic> get pinnedMessages => engagementController.pinnedMessages;
   TwitchChannelVideo? offlineVodFallbackVideo;
+  TwitchChannelVideo? offlineLatestVodVideo;
   bool showOfflineChannelPlaceholder = false;
   TwitchChannelVideo? activeGrowingVodVideo;
   TwitchChannelVideo? currentVodQualityVideo;
@@ -1261,7 +1264,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       clearStartedAt: usesLiveTimeline && liveTimelineStartedAt == null,
     );
 
-    final playerArea = TwitchWatchPlayerAreaPortAdapter(
+    final basePlayerArea = TwitchWatchPlayerAreaPortAdapter(
       metadata: metadata,
       loading: loadingPlayer,
       error: playerError,
@@ -1311,6 +1314,21 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         playbackController.setError(message);
         showSnack('播放器操作失敗，請稍後再試。');
       },
+    );
+    final playerArea = Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(child: basePlayerArea),
+        if (showOfflineChannelPlaceholder && offlineLatestVodVideo != null)
+          Positioned(
+            top: 76,
+            right: 16,
+            child: TwitchOfflineLatestVodCard(
+              video: offlineLatestVodVideo!,
+              onTap: () => unawaited(openOfflineLatestVod()),
+            ),
+          ),
+      ],
     );
     final belowPlayer = TwitchChannelAboutSection(
       metadata: metadata,

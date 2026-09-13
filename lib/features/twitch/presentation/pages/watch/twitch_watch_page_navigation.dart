@@ -33,6 +33,29 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
     await leaveWatchPageToHome(respectMiniPreference: true, popToRoot: false);
   }
 
+  Future<void> openOfflineLatestVod() async {
+    final video = offlineLatestVodVideo;
+    if (video == null || !mounted) return;
+
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TwitchWatchPage(
+          initialMetadata: widget.resolvedInitialMetadata.copyWith(
+            streamTitle: video.title,
+            language: video.language,
+            clearViewerCount: true,
+            clearStartedAt: true,
+          ),
+          initialOfflineChannel: widget.resolvedInitialOfflineChannel,
+          initialDiscoveryService: widget.initialDiscoveryService,
+          initialVodVideo: video,
+          initialVodPlaybackOnly: true,
+          initialKnownFollowing: effectiveIsFollowing,
+        ),
+      ),
+    );
+  }
+
   Future<void> returnToHome() async {
     if (leavingToMiniPlayer) return;
     leavingToMiniPlayer = true;

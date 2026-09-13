@@ -28,6 +28,9 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
         activeVideoId == videoId &&
         liveTimelineStreamId?.trim().isNotEmpty == true &&
         liveTimelineStartedAt != null;
+    if (watchMode == TwitchWatchMode.recordedWatch) {
+      return isBoundToCurrentLive;
+    }
     return isBoundToCurrentLive || video.isLikelyGrowingArchive;
   }
 
@@ -140,7 +143,9 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
             warmedLiveDvrQualityKey == preferredQualityKey) &&
         watchPorts.player.runtime.hasWarmLiveDvrBridge &&
         hasFreshWarmBridge) {
-      debugPrint('[LiveDvrBridge] reuse warmed active archive video=${video.id}');
+      debugPrint(
+        '[LiveDvrBridge] reuse warmed active archive video=${video.id}',
+      );
       return true;
     }
 
@@ -362,10 +367,11 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
         : safeTarget.inMilliseconds / 1000;
     final timelineOrigin = watchPorts.player.runtime.canonicalTimelineOrigin;
     final targetProgramDateTime = timelineOrigin?.add(safeTarget);
-    final seekResult = await watchPorts.player.runtime.seekLiveDvrBridgePosition(
-      safeTarget,
-      targetProgramDateTime: targetProgramDateTime,
-    );
+    final seekResult = await watchPorts.player.runtime
+        .seekLiveDvrBridgePosition(
+          safeTarget,
+          targetProgramDateTime: targetProgramDateTime,
+        );
     if (seekResult == null) return;
     await playerSession.useLiveDvrHlsCacheProfile();
     final playbackUrl = seekResult.playbackUrl;
