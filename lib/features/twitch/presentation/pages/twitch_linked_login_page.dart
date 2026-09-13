@@ -10,8 +10,8 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
-import 'twitch_cef_oauth_login_page.dart';
 import 'twitch_drops_device_login_page.dart';
+import 'twitch_oauth_package_login_page.dart';
 import 'twitch_oauth_webview_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
@@ -135,24 +135,39 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() => _applyStatus(status));
 
-      if (!status.mainReady || !status.webGqlReady) {
+      // Windows PoC: test flutter_web_auth_2 only for the official OAuth token.
+      // GQL deliberately stays separate so we can judge the OAuth package on
+      // its own, especially Twitch -> Google -> Twitch sign-in behavior.
+      if (Platform.isWindows && !status.mainReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => Platform.isWindows
-                ? TwitchCefOAuthLoginPage(
-                    mainAuthService: widget.mainAuthService,
-                    webGqlAuthService: widget.webGqlAuthService,
-                    authApi: widget.authApi,
-                    apiClient: widget.apiClient,
-                  )
-                : TwitchOAuthWebViewLoginPage(
-                    mainAuthService: widget.mainAuthService,
-                    authApi: widget.authApi,
-                    webGqlAuthService: widget.webGqlAuthService,
-                    apiClient: widget.apiClient,
-                    captureWebGqlToken: true,
-                    mirrorMainTokenToInteraction: false,
-                  ),
+            builder: (_) => TwitchOAuthPackageLoginPage(
+              mainAuthService: widget.mainAuthService,
+              authApi: widget.authApi,
+            ),
+          ),
+        );
+
+        status = await _readStatus();
+        if (!mounted) return;
+        setState(() {
+          _applyStatus(status);
+          _statusText = status.mainReady
+              ? 'OAuth 登入完成，GQL 尚未設定'
+              : 'OAuth 登入尚未完成';
+        });
+      } else if (!Platform.isWindows &&
+          (!status.mainReady || !status.webGqlReady)) {
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute<bool>(
+            builder: (_) => TwitchOAuthWebViewLoginPage(
+              mainAuthService: widget.mainAuthService,
+              authApi: widget.authApi,
+              webGqlAuthService: widget.webGqlAuthService,
+              apiClient: widget.apiClient,
+              captureWebGqlToken: true,
+              mirrorMainTokenToInteraction: false,
+            ),
           ),
         );
 
@@ -164,6 +179,18 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
               ? 'Twitch 登入完成，正在完成最後設定…'
               : '登入尚未完成';
         });
+      }
+
+      // During the Windows OAuth-package experiment, stop after OAuth if the
+      // separate GQL token is not ready. Do not reopen OAuth just because GQL
+      // is missing.
+      if (Platform.isWindows && status.mainReady && !status.webGqlReady) {
+        if (!mounted) return;
+        setState(() {
+          _statusText = 'OAuth 登入完成，GQL 尚未設定';
+          _errorText = null;
+        });
+        return;
       }
 
       if (status.mainReady && status.webGqlReady && !status.dropsReady) {
