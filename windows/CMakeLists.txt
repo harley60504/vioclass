@@ -55,6 +55,31 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+# desktop_webview_window intercepts WebView2 NewWindowRequested and redirects
+# every popup into the parent WebView. Twitch SSO requires a real named popup so
+# window.opener/postMessage can complete the provider login. Patch the generated
+# plugin source before CMake adds/builds the plugin. The PowerShell script is
+# idempotent and only changes the known single-window handler.
+set(DESKTOP_WEBVIEW_WINDOW_WEB_VIEW_CC
+  "${FLUTTER_MANAGED_DIR}/ephemeral/.plugin_symlinks/desktop_webview_window/windows/web_view.cc")
+set(DESKTOP_WEBVIEW_WINDOW_PATCH_SCRIPT
+  "${CMAKE_CURRENT_SOURCE_DIR}/patch_desktop_webview_window_popup.ps1")
+if(EXISTS "${DESKTOP_WEBVIEW_WINDOW_WEB_VIEW_CC}" AND
+   EXISTS "${DESKTOP_WEBVIEW_WINDOW_PATCH_SCRIPT}")
+  execute_process(
+    COMMAND powershell.exe -NoProfile -ExecutionPolicy Bypass
+      -File "${DESKTOP_WEBVIEW_WINDOW_PATCH_SCRIPT}"
+      "${DESKTOP_WEBVIEW_WINDOW_WEB_VIEW_CC}"
+    RESULT_VARIABLE DESKTOP_WEBVIEW_WINDOW_PATCH_RESULT
+    OUTPUT_VARIABLE DESKTOP_WEBVIEW_WINDOW_PATCH_STDOUT
+    ERROR_VARIABLE DESKTOP_WEBVIEW_WINDOW_PATCH_STDERR
+  )
+  message(STATUS "${DESKTOP_WEBVIEW_WINDOW_PATCH_STDOUT}")
+  if(NOT DESKTOP_WEBVIEW_WINDOW_PATCH_RESULT EQUAL 0)
+    message(FATAL_ERROR
+      "Failed to patch desktop_webview_window popup handling: ${DESKTOP_WEBVIEW_WINDOW_PATCH_STDERR}")
+  endif()
+endif()
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
@@ -106,6 +131,6 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}" COMPONENT Runtime)
 
 # Install the AOT library on non-Debug builds only.
-install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
+install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
