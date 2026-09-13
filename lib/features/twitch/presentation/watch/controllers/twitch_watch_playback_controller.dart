@@ -180,6 +180,13 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           forceOpen: forceOpen,
           startPosition: startPosition,
         );
+        // mpv can retain the paused state while reopening the local sequential
+        // DVR transport even when openOrResume(play: true) is requested. Force
+        // the new DVR generation into playing state so its media clock (and the
+        // canonical timeline UI) actually advances after a scrub/seek.
+        if (play && isSequentialDvr) {
+          await session.player.play();
+        }
       }
       openStopwatch.stop();
 
