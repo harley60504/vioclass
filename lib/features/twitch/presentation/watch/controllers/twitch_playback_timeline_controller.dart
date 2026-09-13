@@ -46,6 +46,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   bool _timelineEnabled = true;
   bool _advancing = false;
   bool _foregroundReanchorPending = false;
+  bool _initialSeekReanchorConsumed = false;
 
   // Live/DVR uses the player's media clock as the authoritative moving clock.
   // The canonical position supplied by the playback runtime is only an anchor.
@@ -344,6 +345,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       _canonicalAnchorPosition = explicitAnchor ?? canonicalPosition;
       _mediaAnchorObservedAt = now;
       _explicitSeekAnchorPosition = null;
+      if (initialSeekJumped) {
+        _initialSeekReanchorConsumed = true;
+      }
     }
 
     _lastObservedMediaPosition = mediaPosition;
@@ -372,6 +376,8 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     required Duration? mediaPosition,
     required Duration? canonicalPosition,
   }) {
+    if (_initialSeekReanchorConsumed) return false;
+
     final mediaAnchor = _mediaAnchorPosition;
     final canonicalAnchor = _canonicalAnchorPosition;
     final anchoredAt = _mediaAnchorObservedAt;
@@ -516,6 +522,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _canonicalAnchorPosition = null;
     _lastObservedMediaPosition = null;
     _mediaAnchorObservedAt = null;
+    _initialSeekReanchorConsumed = false;
     _clearPendingLocalMediaSeek();
   }
 
