@@ -102,10 +102,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
     _mode = mode;
     _timelineEnabled = timelineEnabled;
-    _advancing =
-        advancing ||
-        (mode == TwitchPlaybackTimelineMode.liveDvr &&
-            TwitchMediaKitPlayerHost.playerOrNull?.state.playing == true);
+    _advancing = advancing;
 
     if (mode == TwitchPlaybackTimelineMode.liveDvr) {
       _duration = duration ?? _duration;
@@ -421,6 +418,17 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
 
   Duration positionFor(Duration displayDuration) {
+    if (_mode == TwitchPlaybackTimelineMode.liveDvr && !_dragging) {
+      final mediaPosition = TwitchMediaKitPlayerHost.playerOrNull?.state.position;
+      final mediaAnchor = _mediaAnchorPosition;
+      final canonicalAnchor = _canonicalAnchorPosition;
+      if (mediaPosition != null && mediaAnchor != null && canonicalAnchor != null) {
+        return _clampPosition(
+          canonicalAnchor + (mediaPosition - mediaAnchor),
+          displayDuration,
+        );
+      }
+    }
     return _clampPosition(_position ?? Duration.zero, displayDuration);
   }
 
@@ -542,29 +550,14 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
     _lastPlaybackTickAt = DateTime.now();
     _playbackTimer = Timer.periodic(_playbackTickInterval, (_) {
-      final now = DateTime.now();
-      final previousTick = _lastPlaybackTickAt;
-      _lastPlaybackTickAt = now;
-
-      if (_advancing) {
-        final beforeSync = _position;
+      _lastPlaybackTickAt = DateTime.now();
+      final mediaPlaying =
+          TwitchMediaKitPlayerHost.playerOrNull?.state.playing == true;
+      if (_advancing || mediaPlaying) {
         _syncLiveDvrPosition(
           modeChanged: false,
           canonicalPosition: null,
         );
-        final afterSync = _position;
-        final mediaClockMoved =
-            beforeSync != null && afterSync != null && afterSync != beforeSync;
-
-        if (!mediaClockMoved &&
-            !_dragging &&
-            previousTick != null &&
-            _position != null) {
-          final elapsed = now.difference(previousTick);
-          if (!elapsed.isNegative && elapsed <= const Duration(seconds: 2)) {
-            _position = _clampPosition(_position! + elapsed, _duration);
-          }
-        }
       }
       notifyListeners();
     });
