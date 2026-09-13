@@ -96,6 +96,9 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
   void _schedulePoll() {
     if (_done) return;
     _pollTimer?.cancel();
+    debugPrint(
+      '[TwitchDropsInAppWebView][poll] next in ${_intervalSeconds}s',
+    );
     _pollTimer = Timer(
       Duration(seconds: _intervalSeconds),
       () => unawaited(_poll()),
@@ -105,6 +108,9 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
   Future<void> _poll() async {
     final auth = _authorization;
     if (auth == null || _polling || _done) return;
+
+    _pollTimer?.cancel();
+    _pollTimer = null;
     if (mounted) setState(() => _polling = true);
 
     try {
@@ -113,6 +119,11 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
         currentIntervalSeconds: _intervalSeconds,
       );
       if (!mounted) return;
+
+      debugPrint(
+        '[TwitchDropsInAppWebView][poll] result=${result.status.name} '
+        'interval=${_intervalSeconds}s',
+      );
 
       switch (result.status) {
         case TwitchDeviceTokenPollStatus.success:
@@ -137,14 +148,20 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
           return;
 
         case TwitchDeviceTokenPollStatus.pending:
-          setState(() => _polling = false);
+          setState(() {
+            _polling = false;
+            _status = '等待 Twitch 完成 Drops 授權…';
+          });
           _schedulePoll();
           return;
 
         case TwitchDeviceTokenPollStatus.slowDown:
           _intervalSeconds =
               result.nextIntervalSeconds ?? (_intervalSeconds + 5);
-          setState(() => _polling = false);
+          setState(() {
+            _polling = false;
+            _status = 'Twitch 要求降低檢查頻率，等待 ${_intervalSeconds} 秒…';
+          });
           _schedulePoll();
           return;
 
@@ -198,7 +215,6 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
               },
               onLoadStop: (_, url) {
                 debugPrint('[TwitchDropsInAppWebView][popup][stop] $url');
-                unawaited(_poll());
               },
               onCloseWindow: (_) {
                 if (Navigator.of(dialogContext).canPop()) {
@@ -315,10 +331,11 @@ class _TwitchWindowsInAppWebViewDropsLoginPageState
                                 debugPrint(
                                   '[TwitchDropsInAppWebView][stop] $url',
                                 );
-                                unawaited(_poll());
                               },
                               onUpdateVisitedHistory: (_, url, __) {
-                                unawaited(_poll());
+                                debugPrint(
+                                  '[TwitchDropsInAppWebView][history] $url',
+                                );
                               },
                             ),
                     ),
