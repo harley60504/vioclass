@@ -38,13 +38,10 @@ class TwitchChatMessageNormalizer {
       debugPrint(
         '[TwitchChatVisualDebug] '
         'source=${message.source.name} '
-        'command=${message.command} '
-        'msgId=$msgId '
-        'emotes=${message.tags['emotes'] ?? ''} '
-        'gifs=$gifsTag '
-        'message=${message.message} '
-        'fragments=${fragments.map((item) => item.toJson()).toList()} '
-        'segments=${segments.map((item) => item.toJson()).toList()}',
+        'msgId=${msgId.isEmpty ? '-' : msgId} '
+        'gifs=${gifsTag.isEmpty ? '-' : gifsTag} '
+        'emotes=${message.tags['emotes'] ?? '-'} '
+        'message=${message.message}',
       );
     }
 
