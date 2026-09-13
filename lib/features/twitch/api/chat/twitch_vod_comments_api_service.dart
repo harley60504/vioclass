@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../parsers/chat/twitch_chat_message_normalizer.dart';
@@ -77,12 +78,14 @@ class TwitchVodCommentsApiService {
           final offset = _readDouble(node['contentOffsetSeconds']);
           final rawLine = _buildIrcLine(node, cleanChannel);
           final message = _parser.parseLine(rawLine);
+          final runtimeMessage = normalizer.normalize(
+            message,
+            receivedAt: normalizer.readMessageTimeOrNow(message),
+          );
+          _debugVodVisualComment(node, runtimeMessage);
           return TwitchVodComment(
             contentOffsetSeconds: offset,
-            message: normalizer.normalize(
-              message,
-              receivedAt: normalizer.readMessageTimeOrNow(message),
-            ),
+            message: runtimeMessage,
           );
         })
         .toList(growable: false);
@@ -154,6 +157,49 @@ class TwitchVodCommentsApiService {
 
     return '@${tags.join(';')} :$login!$login@$login.tmi.twitch.tv '
         'PRIVMSG #$channelLogin :$buffer';
+  }
+
+  void _debugVodVisualComment(
+    Map<String, dynamic> node,
+    TwitchChatRuntimeMessage runtimeMessage,
+  ) {
+    if (!kDebugMode) return;
+
+    final rawMessage = _asMap(node['message']);
+    final rawFragments = rawMessage['fragments'];
+    var hasEmoteFragment = false;
+    final fragmentSummary = <Map<String, dynamic>>[];
+    if (rawFragments is List) {
+      for (final raw in rawFragments.whereType<Map<String, dynamic>>()) {
+        final emote = _asMap(raw['emote']);
+        if (emote.isNotEmpty) hasEmoteFragment = true;
+        fragmentSummary.add(<String, dynamic>{
+          'keys': raw.keys.toList(),
+          'text': raw['text'],
+          'emote': emote,
+        });
+      }
+    }
+
+    final rawSearch = '${node.keys} ${rawMessage.keys} $node'.toLowerCase();
+    final hasPowerupHint =
+        rawSearch.contains('gigant') ||
+        rawSearch.contains('powerup') ||
+        rawSearch.contains('power-up') ||
+        rawSearch.contains('notice');
+    if (!hasEmoteFragment && !hasPowerupHint) return;
+
+    debugPrint(
+      '[TwitchVodChatVisualDebug] '
+      'offset=${node['contentOffsetSeconds']} '
+      'nodeKeys=${node.keys.toList()} '
+      'messageKeys=${rawMessage.keys.toList()} '
+      'rawFragments=$fragmentSummary '
+      'tags=${runtimeMessage.source.tags} '
+      'message=${runtimeMessage.source.message} '
+      'fragments=${runtimeMessage.fragments.map((item) => item.toJson()).toList()} '
+      'segments=${runtimeMessage.segments.map((item) => item.toJson()).toList()}',
+    );
   }
 
   static Map<String, dynamic> _asMap(dynamic value) {
