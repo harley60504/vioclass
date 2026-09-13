@@ -12,6 +12,7 @@ import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import 'twitch_drops_device_login_page.dart';
 import 'twitch_oauth_webview_login_page.dart';
+import 'twitch_windows_inappwebview_drops_login_page.dart';
 import 'twitch_windows_inappwebview_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
@@ -169,9 +170,13 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (status.mainReady && status.webGqlReady && !status.dropsReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => TwitchDropsDeviceLoginPage(
-              dropsAuthService: widget.dropsAuthService,
-            ),
+            builder: (_) => Platform.isWindows
+                ? TwitchWindowsInAppWebViewDropsLoginPage(
+                    dropsAuthService: widget.dropsAuthService,
+                  )
+                : TwitchDropsDeviceLoginPage(
+                    dropsAuthService: widget.dropsAuthService,
+                  ),
           ),
         );
 
