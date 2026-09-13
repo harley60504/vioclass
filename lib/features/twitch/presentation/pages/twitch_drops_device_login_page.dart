@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import '../../api/auth/twitch_device_auth_api_service.dart';
 import '../../api/core/twitch_api_constants.dart';
+import '../../platform/twitch_windows_edge_auth_session.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_notice.dart';
@@ -15,7 +16,8 @@ import '../widgets/shared/twitch_notice.dart';
 /// Drops / Android token login using Twitch Device Flow.
 ///
 /// v30:
-/// - Desktop uses desktop_webview_window.
+/// - Windows uses the same real Edge profile as the Helix/Web GQL login.
+/// - Linux/macOS keep using desktop_webview_window.
 /// - Android / iOS uses an embedded InAppWebView in this route.
 /// - Device flow / polling logic is shared, only the auth container is split.
 class TwitchDropsDeviceLoginPage extends StatefulWidget {
@@ -31,6 +33,7 @@ class TwitchDropsDeviceLoginPage extends StatefulWidget {
 class _TwitchDropsDeviceLoginPageState
     extends State<TwitchDropsDeviceLoginPage> {
   dynamic _authWindow;
+  TwitchWindowsEdgeAuthSession? _windowsEdgeSession;
   InAppWebViewController? _embeddedController;
   Timer? _pollTimer;
 
@@ -47,6 +50,9 @@ class _TwitchDropsDeviceLoginPageState
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   bool get _useEmbeddedMobileWebView => !_isDesktopAuthWindowPlatform;
+
+  bool get _useWindowsEdgeAuth =>
+      Platform.isWindows && TwitchWindowsEdgeAuthSession.isExperimentEnabled;
 
   int _intervalSeconds = 5;
 
@@ -67,7 +73,7 @@ class _TwitchDropsDeviceLoginPageState
   void dispose() {
     _pollTimer?.cancel();
     _embeddedController = null;
-    unawaited(_closeAuthWindow());
+    unawaited(_closeAuthWindow(updateState: false));
     super.dispose();
   }
 
@@ -165,6 +171,23 @@ class _TwitchDropsDeviceLoginPageState
     await _closeAuthWindow();
 
     try {
+      if (_useWindowsEdgeAuth) {
+        final session = TwitchWindowsEdgeAuthSession();
+        await session.start(
+          authorizationUrl: url,
+          userDataFolder: TwitchWindowsEdgeAuthSession.sharedUserDataFolder(),
+        );
+        _windowsEdgeSession = session;
+        if (!mounted) return;
+        setState(() {
+          _openingWindow = false;
+          _authWindowOpen = true;
+          _statusText = '請在 Edge 完成 Drops / Android 授權。';
+        });
+        unawaited(_watchWindowsEdgeWindow(session));
+        return;
+      }
+
       final userDataFolder = sharedDesktopWebViewUserDataFolder();
 
       final window = await WebviewWindow.create(
@@ -228,14 +251,44 @@ class _TwitchDropsDeviceLoginPageState
     }
   }
 
-  Future<void> _closeAuthWindow() async {
+  Future<void> _watchWindowsEdgeWindow(
+    TwitchWindowsEdgeAuthSession session,
+  ) async {
+    while (mounted && identical(_windowsEdgeSession, session) && !_done) {
+      try {
+        final uris = await session.readPageUris();
+        if (uris.isNotEmpty && mounted) {
+          setState(() => _currentUrl = uris.first.toString());
+          unawaited(_poll());
+        }
+      } catch (_) {
+        if (!await session.isAlive()) {
+          if (mounted && identical(_windowsEdgeSession, session)) {
+            setState(() {
+              _authWindowOpen = false;
+              _statusText = 'Edge 授權視窗已關閉，仍會繼續輪詢一段時間。';
+            });
+          }
+          return;
+        }
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+    }
+  }
+
+  Future<void> _closeAuthWindow({bool updateState = true}) async {
+    final edgeSession = _windowsEdgeSession;
+    _windowsEdgeSession = null;
+    if (edgeSession != null) {
+      await edgeSession.close();
+    }
     final window = _authWindow;
     _authWindow = null;
     if (window == null) return;
     try {
       window.close();
     } catch (_) {}
-    if (!mounted) return;
+    if (!updateState || !mounted) return;
     setState(() {
       _authWindowOpen = false;
     });
@@ -704,6 +757,8 @@ class _TwitchDropsDeviceLoginPageState
               Text(
                 auth == null
                     ? '正在產生 Drops device code...'
+                    : _useWindowsEdgeAuth
+                    ? '請在彈出的 Edge 視窗完成 Android App 授權；它與主 OAuth、Web/GQL 共用同一個 Edge profile。'
                     : '請在彈出的 Twitch 視窗完成 Android App 授權。這個視窗與官方 Web/GQL、主 OAuth 共用同一個 desktop WebView cookie storage。',
                 textAlign: TextAlign.center,
                 style: const TextStyle(

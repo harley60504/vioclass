@@ -12,6 +12,7 @@ import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
+import '../../platform/twitch_windows_edge_auth_session.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -70,6 +71,7 @@ class _TwitchOAuthWebViewLoginPageState
   static const String _homeUrl = 'https://www.twitch.tv/';
 
   dynamic _webWindow;
+  TwitchWindowsEdgeAuthSession? _windowsEdgeSession;
   InAppWebViewController? _embeddedController;
 
   late String _clientId;
@@ -88,6 +90,9 @@ class _TwitchOAuthWebViewLoginPageState
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
 
   bool get _useEmbeddedMobileWebView => !_isDesktopAuthWindowPlatform;
+
+  bool get _useWindowsEdgeAuth =>
+      Platform.isWindows && TwitchWindowsEdgeAuthSession.isExperimentEnabled;
 
   List<String> get _scopes => widget.scopes.isEmpty
       ? TwitchOAuthWebViewLoginPage.legacyScopes
@@ -119,7 +124,7 @@ class _TwitchOAuthWebViewLoginPageState
   @override
   void dispose() {
     _embeddedController = null;
-    unawaited(_closeWindow());
+    unawaited(_closeWindow(updateState: false));
     super.dispose();
   }
 
@@ -161,8 +166,8 @@ class _TwitchOAuthWebViewLoginPageState
       final samePort = uri.hasPort
           ? uri.port == configured.port
           : configured.hasPort
-              ? false
-              : true;
+          ? false
+          : true;
       if (sameScheme && sameHost && samePort) return true;
     }
 
@@ -281,15 +286,21 @@ class _TwitchOAuthWebViewLoginPageState
     if (webGqlAuthService == null || apiClient == null) return;
 
     final window = _webWindow;
+    final edgeSession = _windowsEdgeSession;
     final embeddedController = _embeddedController;
-    if (_isDesktopAuthWindowPlatform && window == null) return;
+    if (_isDesktopAuthWindowPlatform && window == null && edgeSession == null) {
+      return;
+    }
     if (_useEmbeddedMobileWebView && embeddedController == null) return;
 
     _capturingGql = true;
     if (mounted) setState(() {});
 
     try {
-      if (_isDesktopAuthWindowPlatform) {
+      if (_useWindowsEdgeAuth) {
+        // The real Edge profile already owns the Twitch cookies. No navigation
+        // is needed because DevTools can read HttpOnly cookies for the profile.
+      } else if (_isDesktopAuthWindowPlatform) {
         window.launch(_homeUrl);
       } else {
         await embeddedController!.loadUrl(
@@ -302,7 +313,9 @@ class _TwitchOAuthWebViewLoginPageState
     for (var i = 0; i < 18; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 650));
       try {
-        webToken = _isDesktopAuthWindowPlatform
+        webToken = _useWindowsEdgeAuth
+            ? await edgeSession!.readTwitchAuthToken()
+            : _isDesktopAuthWindowPlatform
             ? await _readTwitchWebAuthTokenFromWindow(window)
             : await _readTwitchWebAuthTokenFromEmbeddedWebView(
                 embeddedController!,
@@ -529,6 +542,20 @@ query ChannelPointsContext($channelLogin: String!) {
     await _closeWindow();
 
     try {
+      if (_useWindowsEdgeAuth) {
+        final session = TwitchWindowsEdgeAuthSession();
+        await session.start(
+          authorizationUrl: _buildAuthorizationUri().toString(),
+          userDataFolder: TwitchWindowsEdgeAuthSession.sharedUserDataFolder(),
+        );
+        _windowsEdgeSession = session;
+        _windowOpen = true;
+        if (!mounted) return;
+        setState(() => _openingWindow = false);
+        unawaited(_watchWindowsEdgeSession(session));
+        return;
+      }
+
       final window = await WebviewWindow.create(
         configuration: CreateConfiguration(
           title: 'Twitch 登入',
@@ -572,15 +599,44 @@ query ChannelPointsContext($channelLogin: String!) {
     }
   }
 
-  Future<void> _closeWindow() async {
+  Future<void> _watchWindowsEdgeSession(
+    TwitchWindowsEdgeAuthSession session,
+  ) async {
+    var consecutiveFailures = 0;
+    while (mounted && identical(_windowsEdgeSession, session)) {
+      try {
+        final uris = await session.readPageUris();
+        consecutiveFailures = 0;
+        for (final uri in uris) {
+          if (await _tryHandleOAuthRedirect(uri)) return;
+        }
+      } catch (_) {
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= 3) {
+          if (mounted && identical(_windowsEdgeSession, session)) {
+            setState(() => _windowOpen = false);
+          }
+          return;
+        }
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+    }
+  }
+
+  Future<void> _closeWindow({bool updateState = true}) async {
     if (!_isDesktopAuthWindowPlatform) return;
+    final edgeSession = _windowsEdgeSession;
+    _windowsEdgeSession = null;
+    if (edgeSession != null) {
+      await edgeSession.close();
+    }
     final window = _webWindow;
     _webWindow = null;
     if (window == null) return;
     try {
       window.close();
     } catch (_) {}
-    if (mounted) setState(() => _windowOpen = false);
+    if (updateState && mounted) setState(() => _windowOpen = false);
   }
 
   void _showError(String message) {
@@ -707,8 +763,8 @@ query ChannelPointsContext($channelLogin: String!) {
                             _capturingGql
                                 ? '正在完成登入…'
                                 : _windowOpen
-                                    ? '請在 Twitch 視窗完成登入'
-                                    : 'Twitch 登入視窗已關閉',
+                                ? '請在 Twitch 視窗完成登入'
+                                : 'Twitch 登入視窗已關閉',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: Colors.white,
