@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../parsers/chat/twitch_chat_message_normalizer.dart';
@@ -82,7 +81,6 @@ class TwitchVodCommentsApiService {
             message,
             receivedAt: normalizer.readMessageTimeOrNow(message),
           );
-          _debugVodVisualComment(node, runtimeMessage);
           return TwitchVodComment(
             contentOffsetSeconds: offset,
             message: runtimeMessage,
@@ -157,57 +155,6 @@ class TwitchVodCommentsApiService {
 
     return '@${tags.join(';')} :$login!$login@$login.tmi.twitch.tv '
         'PRIVMSG #$channelLogin :$buffer';
-  }
-
-  void _debugVodVisualComment(
-    Map<String, dynamic> node,
-    TwitchChatRuntimeMessage runtimeMessage,
-  ) {
-    if (!kDebugMode) return;
-
-    final rawMessage = _asMap(node['message']);
-    final rawFragments = rawMessage['fragments'];
-    final emoteNames = <String>[];
-    final fragmentKeySets = <String>{};
-
-    if (rawFragments is List) {
-      for (final raw in rawFragments.whereType<Map<String, dynamic>>()) {
-        fragmentKeySets.add(raw.keys.join(','));
-        final emote = _asMap(raw['emote']);
-        if (emote.isNotEmpty) {
-          final name = raw['text']?.toString().trim() ?? '';
-          final id = emote['emoteID']?.toString().trim() ?? '';
-          emoteNames.add(name.isEmpty ? id : name);
-        }
-      }
-    }
-
-    final rawSearch = '${node.keys} ${rawMessage.keys} $node'.toLowerCase();
-    final hasPowerupHint =
-        rawSearch.contains('gigant') ||
-        rawSearch.contains('powerup') ||
-        rawSearch.contains('power-up') ||
-        rawSearch.contains('notice');
-    if (emoteNames.isEmpty && !hasPowerupHint) return;
-
-    final commenter = _asMap(node['commenter']);
-    final user =
-        commenter['displayName']?.toString() ??
-        commenter['login']?.toString() ??
-        'unknown';
-    final text = runtimeMessage.source.message.replaceAll(RegExp(r'\s+'), ' ').trim();
-    final compactText = text.length > 120 ? '${text.substring(0, 117)}...' : text;
-
-    debugPrint(
-      '[VodChatProbe] '
-      'offset=${node['contentOffsetSeconds']} '
-      'user=$user '
-      'emotes=${emoteNames.isEmpty ? '-' : emoteNames.join(',')} '
-      'nodeKeys=${node.keys.join(',')} '
-      'messageKeys=${rawMessage.keys.join(',')} '
-      'fragmentKeys=${fragmentKeySets.join('|')} '
-      'text="$compactText"',
-    );
   }
 
   static Map<String, dynamic> _asMap(dynamic value) {
