@@ -82,6 +82,7 @@ class _TwitchOAuthWebViewLoginPageState
   bool _windowOpen = false;
   bool _isCompleting = false;
   bool _capturingGql = false;
+  int _providerCallbackResumeCount = 0;
   String? _errorText;
 
   bool get _isMain => widget.target == TwitchOAuthWebViewTokenTarget.main;
@@ -174,6 +175,67 @@ class _TwitchOAuthWebViewLoginPageState
     if (host != 'localhost' && host != '127.0.0.1') return false;
     return (uri.scheme == 'http' && uri.port == 3000) ||
         (uri.scheme == 'https' && (!uri.hasPort || uri.port == 443));
+  }
+
+  bool _isTwitchProviderCallback(Uri? uri) {
+    if (uri == null) return false;
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    if (host != 'www.twitch.tv' && host != 'twitch.tv') return false;
+    if (path != '/auth/callback') return false;
+    return (uri.queryParameters['authProvider'] ?? '').trim().isNotEmpty;
+  }
+
+  Future<void> _resumeOAuthAfterProviderCallback(
+    dynamic window,
+    Uri callbackUri,
+  ) async {
+    if (_providerCallbackResumeCount >= 2 || _isCompleting) return;
+    _providerCallbackResumeCount += 1;
+
+    final provider = callbackUri.queryParameters['authProvider'] ?? 'provider';
+    debugPrint(
+      '[TwitchAuth][provider-callback] $provider callback reached; '
+      'waiting for Twitch session',
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    if (!_windowOpen || !identical(_webWindow, window) || _isCompleting) return;
+
+    try {
+      final rawHref = await window.evaluateJavaScript(
+        'String(window.location.href || "")',
+      );
+      final currentText = rawHref?.toString() ?? '';
+      if (!currentText.contains('/auth/callback')) {
+        debugPrint(
+          '[TwitchAuth][provider-callback] page already moved; skip resume',
+        );
+        return;
+      }
+    } catch (_) {}
+
+    try {
+      await window.evaluateJavaScript(r'''
+(function() {
+  try { window.name = ''; } catch (e) {}
+  try { window.__vioclassPopupTargetName = ''; } catch (e) {}
+  return true;
+})();
+''');
+    } catch (error) {
+      debugPrint('[TwitchAuth][provider-callback] cleanup failed: $error');
+    }
+
+    try {
+      final authUrl = _buildAuthorizationUri().toString();
+      debugPrint(
+        '[TwitchAuth][provider-callback] resuming original Twitch OAuth',
+      );
+      window.launch(authUrl);
+    } catch (error) {
+      debugPrint('[TwitchAuth][provider-callback] resume failed: $error');
+    }
   }
 
   Map<String, String> _parseOAuthResponse(Uri uri) {
@@ -694,6 +756,7 @@ query ChannelPointsContext($channelLogin: String!) {
 
       _webWindow = window;
       _windowOpen = true;
+      _providerCallbackResumeCount = 0;
       debugPrint('[TwitchAuth][open] desktop WebView created');
       debugPrint('[TwitchAuth][ua] using native WebView2 / Edge user agent');
 
@@ -816,6 +879,9 @@ query ChannelPointsContext($channelLogin: String!) {
             '[TwitchAuth][navigation] '
             '${parsed?.scheme ?? '?'}://${parsed?.host ?? '?'}${parsed?.path ?? ''}',
           );
+          if (_isTwitchProviderCallback(parsed)) {
+            unawaited(_resumeOAuthAfterProviderCallback(window, parsed!));
+          }
           unawaited(_tryHandleOAuthRedirect(parsed));
           unawaited(_probeDesktopAuthWindow(window));
         });
