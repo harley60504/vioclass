@@ -276,7 +276,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
               : '${_seconds(canonicalPosition)}s';
           debugPrint(
             '[CanonicalPlaybackClock][LOCAL-ANCHOR] '
-            'revision=$localReplayRevision '
+            'revision=$_localReplayAnchorRevision '
             'sequence=${localReplaySequence ?? -1} '
             'segmentStart=${_seconds(localReplayStart)}s '
             'intra=${_seconds(localReplayIntra)}s '
@@ -423,10 +423,25 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       final mediaAnchor = _mediaAnchorPosition;
       final canonicalAnchor = _canonicalAnchorPosition;
       if (mediaPosition != null && mediaAnchor != null && canonicalAnchor != null) {
-        return _clampPosition(
+        final mapped = _clampPosition(
           canonicalAnchor + (mediaPosition - mediaAnchor),
           displayDuration,
         );
+        if (_advancing && displayDuration > Duration.zero) {
+          final phaseUs =
+              displayDuration.inMicroseconds % Duration.microsecondsPerSecond;
+          if (phaseUs > 0) {
+            return _clampPosition(
+              Duration(
+                microseconds: (mapped.inMicroseconds - phaseUs)
+                    .clamp(0, displayDuration.inMicroseconds)
+                    .toInt(),
+              ),
+              displayDuration,
+            );
+          }
+        }
+        return mapped;
       }
     }
     return _clampPosition(_position ?? Duration.zero, displayDuration);
