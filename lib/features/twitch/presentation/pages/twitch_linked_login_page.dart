@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
@@ -9,6 +10,7 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import 'twitch_cef_oauth_login_page.dart';
 import 'twitch_drops_device_login_page.dart';
 import 'twitch_oauth_webview_login_page.dart';
 
@@ -133,20 +135,24 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() => _applyStatus(status));
 
-      // 第一階段：同一個 Twitch 登入視窗完成主 OAuth，並同步取得 Web/GQL。
-      // 不限制 Twitch 官方頁面提供的登入方式；若 Twitch 顯示 Google 等
-      // 第三方登入選項，使用者可以直接使用。
       if (!status.mainReady || !status.webGqlReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => TwitchOAuthWebViewLoginPage(
-              mainAuthService: widget.mainAuthService,
-              authApi: widget.authApi,
-              webGqlAuthService: widget.webGqlAuthService,
-              apiClient: widget.apiClient,
-              captureWebGqlToken: true,
-              mirrorMainTokenToInteraction: false,
-            ),
+            builder: (_) => Platform.isWindows
+                ? TwitchCefOAuthLoginPage(
+                    mainAuthService: widget.mainAuthService,
+                    webGqlAuthService: widget.webGqlAuthService,
+                    authApi: widget.authApi,
+                    apiClient: widget.apiClient,
+                  )
+                : TwitchOAuthWebViewLoginPage(
+                    mainAuthService: widget.mainAuthService,
+                    authApi: widget.authApi,
+                    webGqlAuthService: widget.webGqlAuthService,
+                    apiClient: widget.apiClient,
+                    captureWebGqlToken: true,
+                    mirrorMainTokenToInteraction: false,
+                  ),
           ),
         );
 
@@ -160,7 +166,6 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         });
       }
 
-      // 第二階段：Helix/GQL 都完成後，直接接 Android Drops 授權。
       if (status.mainReady && status.webGqlReady && !status.dropsReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
