@@ -10,7 +10,7 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import 'twitch_drops_device_login_page.dart';
-import 'twitch_main_device_login_page.dart';
+import 'twitch_oauth_webview_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
   final TwitchAuthService mainAuthService;
@@ -133,16 +133,16 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() => _applyStatus(status));
 
-      // 第一階段：使用 Twitch Device Code Flow。
-      // WebView 只負責官方 verification 頁；Main token 由背景 polling 取得。
-      // Device login 完成後，同一個 Twitch WebView session 再同步 Web/GQL。
       if (!status.mainReady || !status.webGqlReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => TwitchMainDeviceLoginPage(
+            builder: (_) => TwitchOAuthWebViewLoginPage(
               mainAuthService: widget.mainAuthService,
+              authApi: widget.authApi,
               webGqlAuthService: widget.webGqlAuthService,
               apiClient: widget.apiClient,
+              captureWebGqlToken: true,
+              mirrorMainTokenToInteraction: false,
             ),
           ),
         );
@@ -157,7 +157,6 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         });
       }
 
-      // 第二階段：Main/GQL 完成後，接原本的 Android Drops device flow。
       if (status.mainReady && status.webGqlReady && !status.dropsReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
