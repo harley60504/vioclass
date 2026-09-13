@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io' show Directory, Platform;
 
 import 'package:desktop_webview_window/desktop_webview_window.dart';
@@ -15,13 +14,6 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 
-/// StreamNook-style primary Twitch login:
-///
-/// 1. Start Twitch Device Code Flow.
-/// 2. Open Twitch's verification URI inside an in-app WebView.
-/// 3. Poll the OAuth token endpoint in the background.
-/// 4. Save the returned token as the main Helix/IRC token.
-/// 5. Reuse the same Twitch WebView session to capture the Web/GQL auth token.
 class TwitchMainDeviceLoginPage extends StatefulWidget {
   final TwitchAuthService mainAuthService;
   final TwitchWebGqlAuthService webGqlAuthService;
@@ -84,7 +76,7 @@ class _TwitchMainDeviceLoginPageState
     super.dispose();
   }
 
-  static String sharedDesktopWebViewUserDataFolder() {
+  static String _userDataFolder() {
     final path =
         '${Directory.systemTemp.path}${Platform.pathSeparator}'
         'new_twitch_app_shared_twitch_desktop_webview_v30';
@@ -120,18 +112,15 @@ class _TwitchMainDeviceLoginPageState
         _starting = false;
         _status = '請在 Twitch 頁面完成登入';
       });
-
-      if (_desktop) {
-        await _openDesktopWindow(auth.verificationUri);
-      }
+      if (_desktop) await _openDesktopWindow(auth.verificationUri);
       _schedulePoll();
     } catch (e) {
       debugPrint('[TwitchMainDeviceAuth][start] $e');
       if (!mounted) return;
       setState(() {
         _starting = false;
-        _error = '無法啟動 Twitch Device Code 登入：$e';
         _status = '登入尚未開始';
+        _error = '無法啟動 Twitch Device Code 登入：$e';
       });
     }
   }
@@ -142,7 +131,7 @@ class _TwitchMainDeviceLoginPageState
         title: 'Twitch 登入',
         windowWidth: 1120,
         windowHeight: 820,
-        userDataFolderWindows: sharedDesktopWebViewUserDataFolder(),
+        userDataFolderWindows: _userDataFolder(),
       ),
     );
     _desktopWindow = window;
@@ -158,8 +147,7 @@ class _TwitchMainDeviceLoginPageState
     } catch (_) {}
     try {
       window.onClose.whenComplete(() {
-        if (!mounted) return;
-        setState(() => _windowOpen = false);
+        if (mounted) setState(() => _windowOpen = false);
       });
     } catch (_) {}
     window.launch(url);
@@ -202,7 +190,6 @@ class _TwitchMainDeviceLoginPageState
         case TwitchDeviceTokenPollStatus.success:
           final token = result.token;
           if (token == null) throw StateError('Twitch did not return a token');
-
           final validation = await widget.mainAuthService.authApi
               .validateToken(token.accessToken);
           await widget.mainAuthService.saveSession(
@@ -211,17 +198,16 @@ class _TwitchMainDeviceLoginPageState
                 : TwitchMainDeviceLoginPage.clientId,
             token: token,
           );
-
-          setState(() {
-            _status = 'Twitch 已登入，正在同步網頁登入狀態…';
-          });
+          if (!mounted) return;
+          setState(() => _status = 'Twitch 已登入，正在同步網頁登入狀態…');
 
           final gqlOk = await _captureWebGqlFromSameSession();
+          if (!mounted) return;
           if (!gqlOk) {
             setState(() {
               _polling = false;
-              _error = '主登入已成功，但 Web/GQL 登入狀態尚未取得。';
               _status = 'Twitch 主登入完成';
+              _error = '主登入已成功，但 Web/GQL 登入狀態尚未取得。';
             });
             return;
           }
@@ -230,10 +216,6 @@ class _TwitchMainDeviceLoginPageState
           _pollTimer?.cancel();
           await _closeWindow();
           if (!mounted) return;
-          setState(() {
-            _polling = false;
-            _status = 'Twitch 登入完成';
-          });
           Navigator.of(context).pop(true);
           return;
 
@@ -253,8 +235,8 @@ class _TwitchMainDeviceLoginPageState
           _pollTimer?.cancel();
           setState(() {
             _polling = false;
-            _error = result.message ?? 'Twitch 登入失敗';
             _status = '登入失敗';
+            _error = result.message ?? 'Twitch 登入失敗';
           });
           return;
       }
@@ -289,18 +271,18 @@ class _TwitchMainDeviceLoginPageState
       }
       if (webToken == null || webToken.trim().isEmpty) return false;
 
-      final token = TwitchAuthToken(
-        accessToken: webToken.trim(),
-        refreshToken: '',
-        tokenType: 'bearer',
-        scopes: const <String>[],
-        expiresIn: const Duration(days: 30).inSeconds,
-        obtainedAt: DateTime.now(),
+      await widget.webGqlAuthService.saveSession(
+        TwitchAuthToken(
+          accessToken: webToken.trim(),
+          refreshToken: '',
+          tokenType: 'bearer',
+          scopes: const <String>[],
+          expiresIn: const Duration(days: 30).inSeconds,
+          obtainedAt: DateTime.now(),
+        ),
       );
-      await widget.webGqlAuthService.saveSession(token);
-      final valid = await widget.webGqlAuthService.validateToken();
-      if (!valid) return false;
-      return await _verifyGql(webToken);
+      if (!await widget.webGqlAuthService.validateToken()) return false;
+      return _verifyGql(webToken);
     } catch (e) {
       debugPrint('[TwitchMainDeviceAuth][gql] $e');
       return false;
@@ -311,17 +293,16 @@ class _TwitchMainDeviceLoginPageState
     const js = r'''
 (function() {
   try {
-    const pairs = [];
-    pairs.push(document.cookie || '');
+    const out = [document.cookie || ''];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k) pairs.push(k + '=' + (localStorage.getItem(k) || ''));
+      if (k) out.push(k + '=' + (localStorage.getItem(k) || ''));
     }
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i);
-      if (k) pairs.push(k + '=' + (sessionStorage.getItem(k) || ''));
+      if (k) out.push(k + '=' + (sessionStorage.getItem(k) || ''));
     }
-    return pairs.join('\n');
+    return out.join('\n');
   } catch (e) { return ''; }
 })();
 ''';
@@ -330,7 +311,7 @@ class _TwitchMainDeviceLoginPageState
         : await _mobileController?.evaluateJavascript(source: js);
     final text = raw?.toString() ?? '';
     final match = RegExp(
-      r'(?:auth-token|authToken)["\']?\s*[:=]\s*["\']?([^;,\s"\'}]+)',
+      r'''(?:auth-token|authToken)["']?\s*[:=]\s*["']?([^;,\s"'}]+)''',
       caseSensitive: false,
     ).firstMatch(text);
     final value = match?.group(1)?.trim();
@@ -391,7 +372,10 @@ query ChannelPointsContext($channelLogin: String!) {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               color: Colors.redAccent.withValues(alpha: 0.18),
-              child: Text(_error!, style: const TextStyle(color: Colors.orangeAccent)),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.orangeAccent),
+              ),
             ),
           Container(
             width: double.infinity,
@@ -406,12 +390,18 @@ query ChannelPointsContext($channelLogin: String!) {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 else
-                  const Icon(Icons.login_rounded, color: TwitchUiColors.primarySoft),
+                  const Icon(
+                    Icons.login_rounded,
+                    color: TwitchUiColors.primarySoft,
+                  ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     _status,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 if (auth != null)
@@ -428,17 +418,23 @@ query ChannelPointsContext($channelLogin: String!) {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.open_in_new_rounded,
-                            size: 54, color: TwitchUiColors.primarySoft),
+                        const Icon(
+                          Icons.open_in_new_rounded,
+                          size: 54,
+                          color: TwitchUiColors.primarySoft,
+                        ),
                         const SizedBox(height: 14),
                         Text(
-                          _windowOpen ? '請在 Twitch 視窗完成登入' : '登入視窗已關閉',
+                          _windowOpen
+                              ? '請在 Twitch 視窗完成登入'
+                              : '登入視窗已關閉',
                           style: const TextStyle(color: Colors.white70),
                         ),
                         if (auth != null && !_windowOpen) ...[
                           const SizedBox(height: 14),
                           ElevatedButton(
-                            onPressed: () => _openDesktopWindow(auth.verificationUri),
+                            onPressed: () =>
+                                _openDesktopWindow(auth.verificationUri),
                             child: const Text('重新開啟 Twitch'),
                           ),
                         ],
