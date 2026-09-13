@@ -10,7 +10,7 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import 'twitch_drops_device_login_page.dart';
-import 'twitch_oauth_webview_login_page.dart';
+import 'twitch_main_device_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
   final TwitchAuthService mainAuthService;
@@ -133,19 +133,16 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() => _applyStatus(status));
 
-      // 第一階段：同一個 Twitch 登入視窗完成主 OAuth，並同步取得 Web/GQL。
-      // 不限制 Twitch 官方頁面提供的登入方式；若 Twitch 顯示 Google 等
-      // 第三方登入選項，使用者可以直接使用。
+      // 第一階段：使用 Twitch Device Code Flow。
+      // WebView 只負責官方 verification 頁；Main token 由背景 polling 取得。
+      // Device login 完成後，同一個 Twitch WebView session 再同步 Web/GQL。
       if (!status.mainReady || !status.webGqlReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
-            builder: (_) => TwitchOAuthWebViewLoginPage(
+            builder: (_) => TwitchMainDeviceLoginPage(
               mainAuthService: widget.mainAuthService,
-              authApi: widget.authApi,
               webGqlAuthService: widget.webGqlAuthService,
               apiClient: widget.apiClient,
-              captureWebGqlToken: true,
-              mirrorMainTokenToInteraction: false,
             ),
           ),
         );
@@ -160,7 +157,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         });
       }
 
-      // 第二階段：Helix/GQL 都完成後，直接接 Android Drops 授權。
+      // 第二階段：Main/GQL 完成後，接原本的 Android Drops device flow。
       if (status.mainReady && status.webGqlReady && !status.dropsReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
