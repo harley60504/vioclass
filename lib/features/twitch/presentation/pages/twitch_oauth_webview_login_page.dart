@@ -629,13 +629,8 @@ query ChannelPointsContext($channelLogin: String!) {
       _webWindow = window;
       _windowOpen = true;
       debugPrint('[TwitchAuth][open] desktop WebView created');
+      debugPrint('[TwitchAuth][ua] using native WebView2 / Edge user agent');
 
-      try {
-        window.setApplicationNameForUserAgent('NewTwitchAppUnifiedAuth/1.0');
-        debugPrint('[TwitchAuth][ua] application name override installed');
-      } catch (error) {
-        debugPrint('[TwitchAuth][ua] override failed: $error');
-      }
       try {
         window.setBrightness(Brightness.dark);
       } catch (error) {
