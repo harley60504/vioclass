@@ -701,6 +701,85 @@ query ChannelPointsContext($channelLogin: String!) {
       } catch (error) {
         debugPrint('[TwitchAuth][brightness] failed: $error');
       }
+
+      try {
+        window.addScriptToExecuteOnDocumentCreated(r'''
+(function() {
+  if (window.__vioclassEarlyPopupBridgeInstalled) return;
+  window.__vioclassEarlyPopupBridgeInstalled = true;
+  window.__vioclassPopupLog = window.__vioclassPopupLog || [];
+
+  const navigateParent = function(value) {
+    try {
+      const nextUrl = String(value || '');
+      window.__vioclassPopupLog.push({
+        kind: 'early-popup-location',
+        url: nextUrl,
+        ts: Date.now()
+      });
+      if (nextUrl && nextUrl !== 'about:blank') {
+        window.location.assign(nextUrl);
+      }
+    } catch (e) {}
+  };
+
+  const makeFakePopup = function() {
+    let closed = false;
+    const fakeLocation = {};
+    Object.defineProperty(fakeLocation, 'href', {
+      configurable: true,
+      enumerable: true,
+      get: function() { return ''; },
+      set: function(value) { navigateParent(value); }
+    });
+    fakeLocation.assign = function(value) { navigateParent(value); };
+    fakeLocation.replace = function(value) { navigateParent(value); };
+
+    const fakePopup = {
+      focus: function() {},
+      close: function() { closed = true; },
+      postMessage: function() {},
+      opener: window
+    };
+    Object.defineProperty(fakePopup, 'closed', {
+      configurable: true,
+      enumerable: true,
+      get: function() { return closed; }
+    });
+    Object.defineProperty(fakePopup, 'location', {
+      configurable: true,
+      enumerable: true,
+      get: function() { return fakeLocation; },
+      set: function(value) { navigateParent(value); }
+    });
+    return fakePopup;
+  };
+
+  window.open = function(url, target, features) {
+    const nextUrl = String(url || '');
+    try {
+      window.__vioclassPopupLog.push({
+        kind: 'early-window-open',
+        url: nextUrl,
+        target: String(target || ''),
+        features: String(features || ''),
+        ts: Date.now()
+      });
+    } catch (e) {}
+
+    const popup = makeFakePopup();
+    if (nextUrl && nextUrl !== 'about:blank') {
+      navigateParent(nextUrl);
+    }
+    return popup;
+  };
+})();
+''');
+        debugPrint('[TwitchAuth][early-popup] document-created bridge installed');
+      } catch (error) {
+        debugPrint('[TwitchAuth][early-popup] install failed: $error');
+      }
+
       try {
         window.addOnUrlRequestCallback((String nextUrl) {
           final parsed = Uri.tryParse(nextUrl);
