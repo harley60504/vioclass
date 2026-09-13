@@ -59,6 +59,17 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
           animateEmotes: animateEmotes,
         );
         break;
+      case TwitchChatRenderSegmentType.twitchGif:
+        // GIFs are normally detached by TwitchChatMessageContent and rendered
+        // through the native image path. Keep this switch exhaustive and use
+        // a text fallback if a GIF segment reaches the inline renderer.
+        spans.add(
+          TextSpan(
+            text: segment.content.isEmpty ? '[GIF]' : segment.content,
+            style: _normalTextStyle(metrics),
+          ),
+        );
+        break;
       case TwitchChatRenderSegmentType.cheermote:
         spans.add(
           TextSpan(text: segment.content, style: _cheermoteTextStyle(metrics)),
@@ -731,6 +742,11 @@ class TwitchChatMessageSegmentView extends StatelessWidget {
               ),
             ],
           ),
+        );
+      case TwitchChatRenderSegmentType.twitchGif:
+        return Text(
+          segment.content.isEmpty ? '[GIF]' : segment.content,
+          style: _normalTextStyle(metrics),
         );
       case TwitchChatRenderSegmentType.cheermote:
         return _CheermoteSegment(segment: segment, metrics: metrics);
