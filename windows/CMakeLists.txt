@@ -68,14 +68,9 @@ include(flutter/generated_plugins.cmake)
 set(BUILD_BUNDLE_DIR "$<TARGET_FILE_DIR:${BINARY_NAME}>")
 # Make the "install" step default, as it's required to run.
 set(CMAKE_VS_INCLUDE_INSTALL_TO_DEFAULT_BUILD 1)
-
-# Recent CMake/Visual Studio combinations may not leave
-# CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT set when Flutter configures the
-# Windows runner. If that happens, CMake falls back to C:/Program Files/<app>,
-# which makes `flutter run` require administrator privileges. Flutter Windows
-# bundles are always installed next to the generated executable, so force the
-# bundle directory explicitly rather than relying on the default-prefix flag.
-set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "Flutter bundle directory" FORCE)
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
+endif()
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}")
