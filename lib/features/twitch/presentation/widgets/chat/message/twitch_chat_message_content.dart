@@ -135,10 +135,9 @@ class TwitchChatMessageContent extends StatelessWidget {
         .replaceFirst(RegExp(r'^\['), '')
         .replaceFirst(RegExp(r'\]$'), '')
         .trim();
-    final height = (80.0 * metrics.scale * metrics.compactFactor).clamp(
-      64.0,
-      116.0,
-    );
+    final height = (80.0 * metrics.scale * metrics.compactFactor)
+        .clamp(64.0, 116.0)
+        .toDouble();
 
     return Padding(
       padding: const EdgeInsets.only(top: 4, bottom: 2),
@@ -150,7 +149,7 @@ class TwitchChatMessageContent extends StatelessWidget {
               constraints: BoxConstraints(
                 maxWidth: constraints.maxWidth.isFinite
                     ? constraints.maxWidth
-                    : 320,
+                    : 320.0,
                 maxHeight: height,
               ),
               child: ClipRRect(
@@ -188,7 +187,7 @@ class TwitchChatMessageContent extends StatelessWidget {
     final emoteId = segment.emoteId?.trim() ?? '';
     if (emoteId.isEmpty) return const SizedBox.shrink();
 
-    final height = (metrics.emoteSize * 4).clamp(88.0, 152.0);
+    final height = (metrics.emoteSize * 4).clamp(88.0, 152.0).toDouble();
     final highResolutionUrl = TwitchChatFragment.twitchEmoteImageUrl(
       emoteId,
       scale: '4.0',
