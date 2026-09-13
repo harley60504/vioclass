@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 
@@ -11,7 +10,6 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import 'twitch_drops_device_login_page.dart';
-import 'twitch_oauth_package_login_page.dart';
 import 'twitch_oauth_webview_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
@@ -135,29 +133,10 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() => _applyStatus(status));
 
-      // Windows PoC: test flutter_web_auth_2 only for the official OAuth token.
-      // GQL deliberately stays separate so we can judge the OAuth package on
-      // its own, especially Twitch -> Google -> Twitch sign-in behavior.
-      if (Platform.isWindows && !status.mainReady) {
-        await Navigator.of(context).push<bool>(
-          MaterialPageRoute<bool>(
-            builder: (_) => TwitchOAuthPackageLoginPage(
-              mainAuthService: widget.mainAuthService,
-              authApi: widget.authApi,
-            ),
-          ),
-        );
-
-        status = await _readStatus();
-        if (!mounted) return;
-        setState(() {
-          _applyStatus(status);
-          _statusText = status.mainReady
-              ? 'OAuth 登入完成，GQL 尚未設定'
-              : 'OAuth 登入尚未完成';
-        });
-      } else if (!Platform.isWindows &&
-          (!status.mainReady || !status.webGqlReady)) {
+      // 第一階段：同一個 Twitch 登入視窗完成主 OAuth，並同步取得 Web/GQL。
+      // 不限制 Twitch 官方頁面提供的登入方式；若 Twitch 顯示 Google 等
+      // 第三方登入選項，使用者可以直接使用。
+      if (!status.mainReady || !status.webGqlReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
             builder: (_) => TwitchOAuthWebViewLoginPage(
@@ -181,18 +160,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         });
       }
 
-      // During the Windows OAuth-package experiment, stop after OAuth if the
-      // separate GQL token is not ready. Do not reopen OAuth just because GQL
-      // is missing.
-      if (Platform.isWindows && status.mainReady && !status.webGqlReady) {
-        if (!mounted) return;
-        setState(() {
-          _statusText = 'OAuth 登入完成，GQL 尚未設定';
-          _errorText = null;
-        });
-        return;
-      }
-
+      // 第二階段：Helix/GQL 都完成後，直接接 Android Drops 授權。
       if (status.mainReady && status.webGqlReady && !status.dropsReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
