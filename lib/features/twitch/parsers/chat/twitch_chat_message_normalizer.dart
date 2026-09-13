@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../models/chat/twitch_chat_fragment.dart';
 import '../../models/chat/twitch_chat_message.dart';
 import '../../models/chat/twitch_chat_message_metadata.dart';
@@ -29,6 +31,22 @@ class TwitchChatMessageNormalizer {
       message,
       fragments,
     );
+
+    final msgId = message.tags['msg-id']?.trim() ?? '';
+    final gifsTag = message.tags['gifs']?.trim() ?? '';
+    if (msgId == 'gigantified-emote-message' || gifsTag.isNotEmpty) {
+      debugPrint(
+        '[TwitchChatVisualDebug] '
+        'source=${message.source.name} '
+        'command=${message.command} '
+        'msgId=$msgId '
+        'emotes=${message.tags['emotes'] ?? ''} '
+        'gifs=$gifsTag '
+        'message=${message.message} '
+        'fragments=${fragments.map((item) => item.toJson()).toList()} '
+        'segments=${segments.map((item) => item.toJson()).toList()}',
+      );
+    }
 
     return TwitchChatRuntimeMessage(
       source: message,
