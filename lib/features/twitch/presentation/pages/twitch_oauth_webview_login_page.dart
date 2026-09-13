@@ -535,7 +535,7 @@ query ChannelPointsContext($channelLogin: String!) {
     }
 
     window.__vioclassPopupHookInstalled = true;
-    window.__vioclassPopupLog = [];
+    window.__vioclassPopupLog = window.__vioclassPopupLog || [];
 
     const rewriteBlankLinks = function(root) {
       try {
@@ -632,8 +632,9 @@ query ChannelPointsContext($channelLogin: String!) {
       readyState: String(document.readyState || ''),
       visibility: String(document.visibilityState || ''),
       userAgent: String(navigator.userAgent || ''),
+      windowName: String(window.name || ''),
       popupLog: Array.isArray(window.__vioclassPopupLog)
-          ? window.__vioclassPopupLog.slice(-8)
+          ? window.__vioclassPopupLog.slice(-12)
           : []
     });
   } catch (e) {
@@ -708,70 +709,98 @@ query ChannelPointsContext($channelLogin: String!) {
   if (window.__vioclassEarlyPopupBridgeInstalled) return;
   window.__vioclassEarlyPopupBridgeInstalled = true;
   window.__vioclassPopupLog = window.__vioclassPopupLog || [];
+  window.__vioclassPopupTargetName = '';
 
-  const navigateParent = function(value) {
+  const log = function(entry) {
     try {
-      const nextUrl = String(value || '');
-      window.__vioclassPopupLog.push({
-        kind: 'early-popup-location',
-        url: nextUrl,
-        ts: Date.now()
-      });
-      if (nextUrl && nextUrl !== 'about:blank') {
-        window.location.assign(nextUrl);
-      }
+      entry.ts = Date.now();
+      window.__vioclassPopupLog.push(entry);
     } catch (e) {}
   };
 
-  const makeFakePopup = function() {
-    let closed = false;
-    const fakeLocation = {};
-    Object.defineProperty(fakeLocation, 'href', {
-      configurable: true,
-      enumerable: true,
-      get: function() { return ''; },
-      set: function(value) { navigateParent(value); }
-    });
-    fakeLocation.assign = function(value) { navigateParent(value); };
-    fakeLocation.replace = function(value) { navigateParent(value); };
-
-    const fakePopup = {
-      focus: function() {},
-      close: function() { closed = true; },
-      postMessage: function() {},
-      opener: window
-    };
-    Object.defineProperty(fakePopup, 'closed', {
-      configurable: true,
-      enumerable: true,
-      get: function() { return closed; }
-    });
-    Object.defineProperty(fakePopup, 'location', {
-      configurable: true,
-      enumerable: true,
-      get: function() { return fakeLocation; },
-      set: function(value) { navigateParent(value); }
-    });
-    return fakePopup;
+  const matchesPopupTarget = function(target) {
+    const value = String(target || '');
+    return !!value && value === String(window.__vioclassPopupTargetName || '');
   };
+
+  const forceFormIntoCurrentWindow = function(form) {
+    try {
+      if (!form) return false;
+      const target = String(form.getAttribute('target') || form.target || '');
+      if (!matchesPopupTarget(target)) return false;
+      log({
+        kind: 'early-form-submit',
+        target: target,
+        action: String(form.action || ''),
+        method: String(form.method || '')
+      });
+      form.setAttribute('target', '_self');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  document.addEventListener('submit', function(event) {
+    forceFormIntoCurrentWindow(event.target);
+  }, true);
+
+  try {
+    const originalSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function() {
+      forceFormIntoCurrentWindow(this);
+      return originalSubmit.apply(this, arguments);
+    };
+  } catch (e) {}
+
+  try {
+    const originalRequestSubmit = HTMLFormElement.prototype.requestSubmit;
+    if (originalRequestSubmit) {
+      HTMLFormElement.prototype.requestSubmit = function() {
+        forceFormIntoCurrentWindow(this);
+        return originalRequestSubmit.apply(this, arguments);
+      };
+    }
+  } catch (e) {}
+
+  document.addEventListener('click', function(event) {
+    try {
+      const node = event.target;
+      const anchor = node && node.closest ? node.closest('a') : null;
+      if (!anchor) return;
+      const target = String(anchor.getAttribute('target') || anchor.target || '');
+      if (!matchesPopupTarget(target)) return;
+      const href = String(anchor.href || '');
+      log({kind: 'early-target-link', target: target, url: href});
+      anchor.setAttribute('target', '_self');
+    } catch (e) {}
+  }, true);
 
   window.open = function(url, target, features) {
     const nextUrl = String(url || '');
-    try {
-      window.__vioclassPopupLog.push({
-        kind: 'early-window-open',
-        url: nextUrl,
-        target: String(target || ''),
-        features: String(features || ''),
-        ts: Date.now()
-      });
-    } catch (e) {}
+    const targetName = String(target || '');
+    log({
+      kind: 'early-window-open',
+      url: nextUrl,
+      target: targetName,
+      features: String(features || '')
+    });
 
-    const popup = makeFakePopup();
-    if (nextUrl && nextUrl !== 'about:blank') {
-      navigateParent(nextUrl);
+    if (targetName && (!nextUrl || nextUrl === 'about:blank')) {
+      try {
+        window.__vioclassPopupTargetName = targetName;
+        window.name = targetName;
+        log({kind: 'early-window-name-bound', target: targetName});
+      } catch (e) {}
+      return window;
     }
-    return popup;
+
+    if (nextUrl && nextUrl !== 'about:blank') {
+      window.location.assign(nextUrl);
+      return window;
+    }
+
+    return window;
   };
 })();
 ''');
