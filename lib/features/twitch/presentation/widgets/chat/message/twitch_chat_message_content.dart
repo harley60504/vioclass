@@ -155,8 +155,6 @@ class TwitchChatMessageContent extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: TwitchEmoteImage(
-                  // Keep GIFs out of the normal emote-id fallback path. The
-                  // Twitch-supplied URL is the source of truth for this asset.
                   id: '',
                   name: label.isEmpty ? 'GIF' : label,
                   imageUrl: url,
@@ -190,7 +188,7 @@ class TwitchChatMessageContent extends StatelessWidget {
     final height = (metrics.emoteSize * 4).clamp(88.0, 152.0).toDouble();
     final highResolutionUrl = TwitchChatFragment.twitchEmoteImageUrl(
       emoteId,
-      scale: '4.0',
+      scale: '3.0',
     );
 
     return Padding(
@@ -203,8 +201,6 @@ class TwitchChatMessageContent extends StatelessWidget {
             maxWidth: height * 3,
           ),
           child: TwitchEmoteImage(
-            // Use the same native animated-image decoder as normal VioClass
-            // emotes, but request Twitch's larger source for the giant layout.
             id: '',
             name: segment.content,
             imageUrl: highResolutionUrl,
@@ -315,21 +311,6 @@ class TwitchChatMessageContent extends StatelessWidget {
             padding: const EdgeInsets.only(left: 4),
             child: TwitchChatBitsChip(
               bits: message.metadata.bitsAmount!,
-              metrics: metrics,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (message.metadata.isRewardRedemption) {
-      spans.add(
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          child: Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: TwitchChatSmallChip(
-              label: context.vio.t('獎勵'),
               metrics: metrics,
             ),
           ),
