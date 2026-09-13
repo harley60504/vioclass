@@ -1,0 +1,47 @@
+name: Offline latest VOD card
+
+on:
+  push:
+    branches:
+      - ai/offline-latest-vod-card
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: ${{ !contains(github.event.head_commit.message, '[offline-vod-output]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Apply UI changes
+        run: python3 tool/apply_offline_latest_vod_card.py
+      - name: Format changed Dart files
+        run: |
+          dart format \
+            lib/features/twitch/presentation/pages/twitch_watch_page.dart \
+            lib/features/twitch/presentation/pages/watch/twitch_watch_page_startup.dart \
+            lib/features/twitch/presentation/pages/watch/twitch_watch_page_navigation.dart \
+            lib/features/twitch/presentation/pages/watch/twitch_live_watch_playback.dart \
+            lib/features/twitch/presentation/widgets/watch/twitch_offline_latest_vod_card.dart
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+      - name: Remove one-off tooling
+        run: |
+          rm tool/apply_offline_latest_vod_card.py
+          rm .github/workflows/offline-latest-vod-card.yml
+      - name: Commit validated output
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat(watch): add latest VOD card to offline view [offline-vod-output]"
+          git push
