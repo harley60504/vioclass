@@ -71,6 +71,8 @@ class _TwitchOAuthWebViewLoginPageState
 
   dynamic _webWindow;
   InAppWebViewController? _embeddedController;
+  Timer? _desktopDebugTimer;
+  String? _lastDesktopDebugSnapshot;
 
   late String _clientId;
   late String _redirectUri;
@@ -118,6 +120,8 @@ class _TwitchOAuthWebViewLoginPageState
 
   @override
   void dispose() {
+    _desktopDebugTimer?.cancel();
+    _desktopDebugTimer = null;
     _embeddedController = null;
     unawaited(_closeWindow());
     super.dispose();
@@ -193,6 +197,7 @@ class _TwitchOAuthWebViewLoginPageState
 
   Future<bool> _tryHandleOAuthRedirect(Uri? uri) async {
     if (uri == null || !_isRedirectUri(uri)) return false;
+    debugPrint('[TwitchAuth][oauth-callback] ${uri.scheme}://${uri.host}:${uri.port}${uri.path}');
     await _handleOAuthRedirect(uri);
     return true;
   }
@@ -269,7 +274,8 @@ class _TwitchOAuthWebViewLoginPageState
       await _closeWindow();
       if (!mounted) return;
       Navigator.of(context).pop(true);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[TwitchAuth][save] failed: $error');
       _isCompleting = false;
       _showError('登入沒有完成，請重新登入。');
     }
@@ -518,6 +524,82 @@ query ChannelPointsContext($channelLogin: String!) {
     }
   }
 
+  Future<void> _installDesktopPopupDebug(dynamic window) async {
+    const js = r'''
+(function() {
+  try {
+    if (window.__vioclassPopupHookInstalled) return 'already-installed';
+    window.__vioclassPopupHookInstalled = true;
+    window.__vioclassPopupLog = [];
+    const originalOpen = window.open;
+    window.open = function(url, target, features) {
+      try {
+        window.__vioclassPopupLog.push({
+          url: String(url || ''),
+          target: String(target || ''),
+          features: String(features || ''),
+          ts: Date.now()
+        });
+      } catch (e) {}
+      return originalOpen.apply(this, arguments);
+    };
+    return 'installed';
+  } catch (e) {
+    return 'install-error:' + String(e && (e.message || e));
+  }
+})();
+''';
+    try {
+      final result = await window.evaluateJavaScript(js);
+      debugPrint('[TwitchAuth][popup-hook] $result');
+    } catch (error) {
+      debugPrint('[TwitchAuth][popup-hook] evaluate failed: $error');
+    }
+  }
+
+  Future<void> _probeDesktopAuthWindow(dynamic window) async {
+    const js = r'''
+(function() {
+  try {
+    return JSON.stringify({
+      href: String(window.location.href || ''),
+      title: String(document.title || ''),
+      readyState: String(document.readyState || ''),
+      visibility: String(document.visibilityState || ''),
+      userAgent: String(navigator.userAgent || ''),
+      popupLog: Array.isArray(window.__vioclassPopupLog)
+          ? window.__vioclassPopupLog.slice(-8)
+          : []
+    });
+  } catch (e) {
+    return JSON.stringify({probeError: String(e && (e.message || e))});
+  }
+})();
+''';
+    try {
+      await _installDesktopPopupDebug(window);
+      final raw = await window.evaluateJavaScript(js);
+      final snapshot = raw?.toString() ?? '';
+      if (snapshot.isNotEmpty && snapshot != _lastDesktopDebugSnapshot) {
+        _lastDesktopDebugSnapshot = snapshot;
+        debugPrint('[TwitchAuth][probe] $snapshot');
+      }
+    } catch (error) {
+      debugPrint('[TwitchAuth][probe] evaluate failed: $error');
+    }
+  }
+
+  void _startDesktopDebugProbe(dynamic window) {
+    _desktopDebugTimer?.cancel();
+    _lastDesktopDebugSnapshot = null;
+    debugPrint('[TwitchAuth][debug] desktop auth probe started');
+    unawaited(_probeDesktopAuthWindow(window));
+    _desktopDebugTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_windowOpen || !identical(_webWindow, window)) return;
+      unawaited(_probeDesktopAuthWindow(window));
+    });
+  }
+
   Future<void> _openDesktopWindow() async {
     if (!_isDesktopAuthWindowPlatform || _openingWindow) return;
 
@@ -529,40 +611,70 @@ query ChannelPointsContext($channelLogin: String!) {
     await _closeWindow();
 
     try {
+      final userDataFolder = sharedDesktopWebViewUserDataFolder();
+      final authUrl = _buildAuthorizationUri().toString();
+      debugPrint('[TwitchAuth][open] creating desktop WebView');
+      debugPrint('[TwitchAuth][open] userDataFolder=$userDataFolder');
+      debugPrint('[TwitchAuth][open] authorization host=id.twitch.tv');
+
       final window = await WebviewWindow.create(
         configuration: CreateConfiguration(
           title: 'Twitch 登入',
           windowWidth: 1120,
           windowHeight: 820,
-          userDataFolderWindows: sharedDesktopWebViewUserDataFolder(),
+          userDataFolderWindows: userDataFolder,
         ),
       );
 
       _webWindow = window;
       _windowOpen = true;
+      debugPrint('[TwitchAuth][open] desktop WebView created');
 
       try {
         window.setApplicationNameForUserAgent('NewTwitchAppUnifiedAuth/1.0');
-      } catch (_) {}
+        debugPrint('[TwitchAuth][ua] application name override installed');
+      } catch (error) {
+        debugPrint('[TwitchAuth][ua] override failed: $error');
+      }
       try {
         window.setBrightness(Brightness.dark);
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('[TwitchAuth][brightness] failed: $error');
+      }
       try {
         window.addOnUrlRequestCallback((String nextUrl) {
-          unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
+          final parsed = Uri.tryParse(nextUrl);
+          debugPrint(
+            '[TwitchAuth][navigation] '
+            '${parsed?.scheme ?? '?'}://${parsed?.host ?? '?'}${parsed?.path ?? ''}',
+          );
+          unawaited(_tryHandleOAuthRedirect(parsed));
+          unawaited(_probeDesktopAuthWindow(window));
         });
-      } catch (_) {}
+        debugPrint('[TwitchAuth][navigation] callback installed');
+      } catch (error) {
+        debugPrint('[TwitchAuth][navigation] callback install failed: $error');
+      }
       try {
         window.onClose.whenComplete(() {
+          debugPrint('[TwitchAuth][close] desktop WebView closed');
+          _desktopDebugTimer?.cancel();
+          _desktopDebugTimer = null;
           if (!mounted) return;
           setState(() => _windowOpen = false);
         });
-      } catch (_) {}
+      } catch (error) {
+        debugPrint('[TwitchAuth][close] listener failed: $error');
+      }
 
-      window.launch(_buildAuthorizationUri().toString());
+      window.launch(authUrl);
+      debugPrint('[TwitchAuth][launch] Twitch OAuth page launched');
+      _startDesktopDebugProbe(window);
       if (!mounted) return;
       setState(() => _openingWindow = false);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('[TwitchAuth][open] failed: $error');
+      debugPrint('[TwitchAuth][open] stack: $stackTrace');
       if (!mounted) return;
       setState(() {
         _openingWindow = false;
@@ -574,12 +686,16 @@ query ChannelPointsContext($channelLogin: String!) {
 
   Future<void> _closeWindow() async {
     if (!_isDesktopAuthWindowPlatform) return;
+    _desktopDebugTimer?.cancel();
+    _desktopDebugTimer = null;
     final window = _webWindow;
     _webWindow = null;
     if (window == null) return;
     try {
       window.close();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('[TwitchAuth][close] close() failed: $error');
+    }
     if (mounted) setState(() => _windowOpen = false);
   }
 
@@ -612,8 +728,6 @@ query ChannelPointsContext($channelLogin: String!) {
         )) {
           return NavigationActionPolicy.CANCEL;
         }
-        // Twitch 官方頁面的所有登入方式都保持可用，包括它提供的
-        // Google 等第三方登入流程，不額外限制網域或登入方式。
         return NavigationActionPolicy.ALLOW;
       },
       onLoadStart: (controller, webUri) {
