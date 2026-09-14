@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/material.dart';
 
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_notice.dart';
+import '../shared/twitch_text_field.dart';
 import 'twitch_chat_input_emote_state.dart';
 import 'twitch_chat_text_style.dart';
 
@@ -145,92 +147,95 @@ class _SelfDrawnInputField extends StatelessWidget {
         fontWeight: TwitchUiFontWeight.regular,
       ),
     );
-    final transparentInputStyle = textStyle.copyWith(
-      color: Colors.transparent,
-      decorationColor: Colors.transparent,
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+      borderSide: BorderSide(
+        color: enabled ? TwitchUiColors.border : TwitchUiColors.borderSubtle,
+      ),
     );
 
-    return Container(
+    return TwitchTextField(
       height: height,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: TwitchUiColors.surfaceInteractive,
-        borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-        border: Border.all(
-          color: enabled ? TwitchUiColors.border : TwitchUiColors.borderSubtle,
+      controller: controller,
+      enabled: enabled,
+      maxLines: 1,
+      textInputAction: TextInputAction.send,
+      onSubmitted: (_) => onSubmit(),
+      style: textStyle,
+      strutStyle: StrutStyle(
+        fontSize: fontSize,
+        height: lineHeight,
+        forceStrutHeight: true,
+      ),
+      specialTextSpanBuilder: _ChatInputSpanBuilder(
+        controller: controller,
+        emoteSize: fontSize * 1.45,
+      ),
+      selectionControls: materialTextSelectionControls,
+      decoration: InputDecoration(
+        hintText: hintText?.trim().isNotEmpty == true
+            ? hintText
+            : l10n.t('輸入聊天室訊息...'),
+        hintStyle: textStyle.copyWith(
+          color: hintColor ?? TwitchUiColors.textMuted,
+        ),
+        filled: true,
+        fillColor: TwitchUiColors.surfaceInteractive,
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: const BorderSide(color: TwitchUiColors.primarySoft),
+        ),
+        disabledBorder: border.copyWith(
+          borderSide: const BorderSide(color: TwitchUiColors.borderSubtle),
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: TwitchUiSpacing.space12,
+          vertical: verticalPadding,
         ),
       ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          IgnorePointer(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: TwitchUiSpacing.space12,
-                vertical: verticalPadding,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: AnimatedBuilder(
-                  animation: controller,
-                  builder: (context, _) {
-                    return RichText(
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      softWrap: false,
-                      strutStyle: StrutStyle(
-                        fontSize: fontSize,
-                        height: lineHeight,
-                        forceStrutHeight: true,
-                      ),
-                      text: TwitchChatInputEmoteState.buildTextSpan(
-                        controller,
-                        textStyle,
-                        emoteSize: fontSize * 1.45,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            maxLines: 1,
-            textInputAction: TextInputAction.send,
-            onSubmitted: (_) => onSubmit(),
-            textAlignVertical: TextAlignVertical.center,
-            style: transparentInputStyle,
-            strutStyle: StrutStyle(
-              fontSize: fontSize,
-              height: lineHeight,
-              forceStrutHeight: true,
-            ),
-            cursorColor: TwitchUiColors.primarySoft,
-            selectionControls: materialTextSelectionControls,
-            decoration: InputDecoration(
-              isCollapsed: true,
-              filled: false,
-              hintText: hintText?.trim().isNotEmpty == true
-                  ? hintText
-                  : l10n.t('輸入聊天室訊息...'),
-              hintStyle: textStyle.copyWith(
-                color: hintColor ?? TwitchUiColors.textMuted,
-              ),
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              disabledBorder: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: TwitchUiSpacing.space12,
-                vertical: verticalPadding,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
+  }
+}
+
+class _ChatInputSpanBuilder extends SpecialTextSpanBuilder {
+  final TextEditingController controller;
+  final double emoteSize;
+
+  _ChatInputSpanBuilder({required this.controller, required this.emoteSize});
+
+  @override
+  TextSpan build(
+    String data, {
+    TextStyle? textStyle,
+    SpecialTextGestureTapCallback? onTap,
+  }) {
+    final value = controller.value;
+    var sourceStart = 0;
+    if (data != value.text && value.composing.isValid) {
+      final before = value.composing.textBefore(value.text);
+      final after = value.composing.textAfter(value.text);
+      if (data == after && data != before) {
+        sourceStart = value.composing.end;
+      }
+    }
+    return TwitchChatInputEmoteState.buildTextSpanForSource(
+      controller,
+      data,
+      textStyle ?? const TextStyle(),
+      sourceStart: sourceStart,
+      emoteSize: emoteSize,
+    );
+  }
+
+  @override
+  SpecialText? createSpecialText(
+    String flag, {
+    TextStyle? textStyle,
+    SpecialTextGestureTapCallback? onTap,
+    required int index,
+  }) {
+    return null;
   }
 }
 

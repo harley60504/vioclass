@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../../../watch/twitch_watch_playback_kind.dart';
+import '../../shared/twitch_text_field.dart';
 import 'twitch_time_jump_sheet.dart';
 
 class TwitchVodPlaybackStrip extends StatefulWidget {
@@ -616,7 +617,8 @@ class _InlineTimeValue extends StatelessWidget {
         child: SizedBox(
           width: 66,
           height: 28,
-          child: TextField(
+          child: TwitchTextField(
+            height: 28,
             controller: controller,
             focusNode: focusNode,
             textAlign: TextAlign.center,
@@ -628,6 +630,7 @@ class _InlineTimeValue extends StatelessWidget {
             style: style,
             decoration: const InputDecoration(
               isDense: true,
+              filled: false,
               border: InputBorder.none,
               contentPadding: EdgeInsets.symmetric(horizontal: 2, vertical: 6),
             ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../shared/twitch_glass.dart';
+import '../../shared/twitch_text_field.dart';
 
 Future<Duration?> showTwitchTimeJumpSheet({
   required BuildContext context,
@@ -155,7 +156,7 @@ class _TwitchTimeJumpSheetState extends State<_TwitchTimeJumpSheet> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    TextField(
+                    TwitchTextField(
                       controller: _controller,
                       autofocus: true,
                       keyboardType: TextInputType.text,

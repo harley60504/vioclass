@@ -11,6 +11,7 @@ import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_notice.dart';
+import '../widgets/shared/twitch_text_field.dart';
 
 /// Drops / Android token login through an embedded WebView OAuth page.
 ///
@@ -508,7 +509,7 @@ class _TwitchDropsWebViewLoginPageState
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: TwitchTextField(
                   controller: _clientIdController,
                   enabled: !_isCompleting,
                   decoration: const InputDecoration(
@@ -520,7 +521,7 @@ class _TwitchDropsWebViewLoginPageState
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: TextField(
+                child: TwitchTextField(
                   controller: _redirectUriController,
                   enabled: !_isCompleting,
                   decoration: const InputDecoration(
@@ -541,7 +542,7 @@ class _TwitchDropsWebViewLoginPageState
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: TwitchTextField(
                   controller: _manualTextController,
                   enabled: !_isCompleting,
                   minLines: 1,

@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/material.dart';
 
 import '../shared/twitch_emote_image.dart';
@@ -143,22 +144,48 @@ class TwitchChatInputEmoteState {
     TextStyle style, {
     double emoteSize = 20,
   }) {
+    return buildTextSpanForSource(
+      controller,
+      controller.text,
+      style,
+      emoteSize: emoteSize,
+    );
+  }
+
+  static TextSpan buildTextSpanForSource(
+    TextEditingController controller,
+    String source,
+    TextStyle style, {
+    int sourceStart = 0,
+    double emoteSize = 20,
+  }) {
     final state = _state(controller);
     _reconcile(controller, state);
-    final text = controller.text;
-    if (state.markers.isEmpty) return TextSpan(text: text, style: style);
+    if (state.markers.isEmpty) return TextSpan(text: source, style: style);
 
     final children = <InlineSpan>[];
-    var cursor = 0;
+    final sourceEnd = sourceStart + source.length;
+    var cursor = sourceStart;
     for (final marker in state.markers) {
-      if (marker.offset < cursor || marker.offset >= text.length) continue;
-      if (text[marker.offset] != placeholder) continue;
+      if (marker.offset < sourceStart || marker.offset >= sourceEnd) continue;
+      if (marker.offset < cursor) continue;
+      final relativeOffset = marker.offset - sourceStart;
+      if (source[relativeOffset] != placeholder) continue;
       if (marker.offset > cursor) {
-        children.add(TextSpan(text: text.substring(cursor, marker.offset)));
+        children.add(
+          TextSpan(
+            text: source.substring(
+              cursor - sourceStart,
+              marker.offset - sourceStart,
+            ),
+          ),
+        );
       }
       final emote = marker.emote;
       children.add(
-        WidgetSpan(
+        ExtendedWidgetSpan(
+          actualText: placeholder,
+          start: marker.offset,
           alignment: PlaceholderAlignment.middle,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
@@ -191,8 +218,8 @@ class TwitchChatInputEmoteState {
       );
       cursor = marker.offset + placeholder.length;
     }
-    if (cursor < text.length) {
-      children.add(TextSpan(text: text.substring(cursor)));
+    if (cursor < sourceEnd) {
+      children.add(TextSpan(text: source.substring(cursor - sourceStart)));
     }
     return TextSpan(style: style, children: children);
   }

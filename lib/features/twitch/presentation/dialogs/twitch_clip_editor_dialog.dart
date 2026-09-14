@@ -10,6 +10,7 @@ import '../../models/playback/twitch_m3u8_variant.dart';
 import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import '../widgets/shared/twitch_text_field.dart';
 
 const double _minClipLength = 5;
 const double _maxClipLength = 60;
@@ -471,7 +472,7 @@ class _TwitchClipEditorDialogBodyState
                     Row(
                       children: [
                         Expanded(
-                          child: TextField(
+                          child: TwitchTextField(
                             controller: _titleController,
                             enabled: !_creating,
                             maxLength: 100,

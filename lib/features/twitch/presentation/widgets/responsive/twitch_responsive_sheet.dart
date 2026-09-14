@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../shared/twitch_text_field.dart';
 
 enum TwitchUnifiedSheetSize { compact, medium, large, wide }
 
@@ -111,7 +112,10 @@ Future<T?> showTwitchResponsiveSheet<T>({
           left: false,
           right: false,
           child: Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 4,
+            ),
             backgroundColor: Colors.transparent,
             child: Center(
               child: ConstrainedBox(
@@ -537,10 +541,13 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
               flex: 5,
               child: SizedBox(
                 height: compact ? 34 : 38,
-                child: TextField(
+                child: TwitchTextField(
+                  height: compact ? 34 : 38,
                   controller: searchController,
                   onChanged: onSearchChanged,
-                  style: const TextStyle(fontSize: TwitchUiFontSize.bodyCompact),
+                  style: const TextStyle(
+                    fontSize: TwitchUiFontSize.bodyCompact,
+                  ),
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: l10n.t(searchHint),

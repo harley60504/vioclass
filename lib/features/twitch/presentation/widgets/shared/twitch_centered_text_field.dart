@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'twitch_text_field.dart';
+
 class TwitchCenteredTextField extends StatelessWidget {
   final TextEditingController controller;
   final String hintText;
@@ -42,7 +44,6 @@ class TwitchCenteredTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final verticalPadding = (height - fontSize * _lineHeight) / 2;
     final style = TextStyle(
       color: textColor,
       fontSize: fontSize,
@@ -50,48 +51,29 @@ class TwitchCenteredTextField extends StatelessWidget {
       fontWeight: fontWeight,
     );
 
-    return Container(
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(radius),
+      borderSide: BorderSide(color: borderColor),
+    );
+
+    return TwitchTextField(
       height: height,
-      decoration: BoxDecoration(
-        color: fillColor,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: 1,
-        textAlignVertical: TextAlignVertical.center,
-        textInputAction: textInputAction,
-        onChanged: onChanged,
-        onSubmitted: onSubmitted,
-        style: style,
-        strutStyle: StrutStyle(
-          fontSize: fontSize,
-          height: _lineHeight,
-          forceStrutHeight: true,
-        ),
-        decoration: InputDecoration(
-          isCollapsed: true,
-          hintText: hintText,
-          hintStyle: style.copyWith(color: hintColor),
-          prefixIcon: Icon(prefixIcon, color: iconColor, size: height * 0.42),
-          prefixIconConstraints: BoxConstraints(
-            minWidth: height,
-            minHeight: height,
-          ),
-          suffixIcon: suffixIcon,
-          suffixIconConstraints: BoxConstraints(
-            minWidth: height,
-            minHeight: height,
-          ),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: verticalPadding,
-          ),
-        ),
+      controller: controller,
+      maxLines: 1,
+      textInputAction: textInputAction,
+      onChanged: onChanged,
+      onSubmitted: onSubmitted,
+      style: style,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: style.copyWith(color: hintColor),
+        prefixIcon: Icon(prefixIcon, color: iconColor, size: height * 0.42),
+        suffixIcon: suffixIcon,
+        filled: true,
+        fillColor: fillColor,
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border,
       ),
     );
   }
