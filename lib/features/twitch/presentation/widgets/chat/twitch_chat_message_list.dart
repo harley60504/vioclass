@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../models/chat/twitch_chat_message.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
@@ -436,7 +435,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
       color: Colors.transparent,
       child: Stack(
         children: [
-          SuperListView.builder(
+          ListView.builder(
             controller: _scrollController,
             reverse: true,
             physics: const AlwaysScrollableScrollPhysics(),
