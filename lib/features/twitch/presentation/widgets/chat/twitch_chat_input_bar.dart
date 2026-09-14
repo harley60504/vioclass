@@ -16,6 +16,7 @@ class TwitchChatInputBar extends StatelessWidget {
   final bool sending;
   final String? hintText;
   final Color? hintColor;
+  final Widget? leadingActions;
   final FutureOr<void> Function() onSend;
 
   const TwitchChatInputBar({
@@ -25,11 +26,11 @@ class TwitchChatInputBar extends StatelessWidget {
     required this.sending,
     this.hintText,
     this.hintColor,
+    this.leadingActions,
     required this.onSend,
   });
 
-  static const double _inputRowHeight = 48;
-  static const double _sendButtonSize = 36;
+  static const double _inputRowHeight = 36;
   static const double _inputFontSize = 13;
   static const double _inputLineHeight = 1.20;
 
@@ -80,33 +81,33 @@ class TwitchChatInputBar extends StatelessWidget {
         TwitchUiSpacing.space12,
         TwitchUiSpacing.space8,
       ),
-      child: SizedBox(
-        height: rowHeight,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: _SelfDrawnInputField(
-                height: rowHeight,
-                controller: controller,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SelfDrawnInputField(
+            height: rowHeight,
+            controller: controller,
+            enabled: enabled && !sending,
+            fontSize: fontSize,
+            lineHeight: _inputLineHeight,
+            verticalPadding: _inputVerticalPadding,
+            hintText: hintText,
+            hintColor: hintColor,
+            onSubmit: () => unawaited(_submitIfPossible(context)),
+          ),
+          const SizedBox(height: TwitchUiSpacing.space8),
+          Row(
+            children: [
+              Expanded(child: leadingActions ?? const SizedBox.shrink()),
+              const SizedBox(width: TwitchUiSpacing.space8),
+              _SelfDrawnSendButton(
                 enabled: enabled && !sending,
-                fontSize: fontSize,
-                lineHeight: _inputLineHeight,
-                verticalPadding: _inputVerticalPadding,
-                hintText: hintText,
-                hintColor: hintColor,
-                onSubmit: () => unawaited(_submitIfPossible(context)),
+                sending: sending,
+                onTap: () => unawaited(_submitIfPossible(context)),
               ),
-            ),
-            const SizedBox(width: TwitchUiSpacing.space8),
-            _SelfDrawnSendButton(
-              size: _sendButtonSize,
-              enabled: enabled && !sending,
-              sending: sending,
-              onTap: () => unawaited(_submitIfPossible(context)),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -242,13 +243,11 @@ class _ChatInputSpanBuilder extends SpecialTextSpanBuilder {
 }
 
 class _SelfDrawnSendButton extends StatelessWidget {
-  final double size;
   final bool enabled;
   final bool sending;
   final VoidCallback onTap;
 
   const _SelfDrawnSendButton({
-    required this.size,
     required this.enabled,
     required this.sending,
     required this.onTap,
@@ -259,38 +258,36 @@ class _SelfDrawnSendButton extends StatelessWidget {
     final foreground = enabled
         ? TwitchUiColors.textOnAccent
         : TwitchUiColors.disabledForeground;
-    return Align(
-      alignment: Alignment.center,
-      child: ConstrainedBox(
-        constraints: BoxConstraints.tightFor(width: size, height: size),
-        child: Material(
-          color: enabled
-              ? TwitchUiColors.primary
-              : TwitchUiColors.surfaceInteractive,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-            side: BorderSide(
-              color: enabled
-                  ? TwitchUiColors.primarySoft.withValues(alpha: 0.34)
-                  : TwitchUiColors.borderSubtle,
-            ),
+    return IconButton(
+      onPressed: enabled ? onTap : null,
+      style: IconButton.styleFrom(
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        padding: const EdgeInsets.all(10),
+        backgroundColor: enabled
+            ? TwitchUiColors.primary
+            : TwitchUiColors.surfaceInteractive,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+          side: BorderSide(
+            color: enabled
+                ? TwitchUiColors.primarySoft.withValues(alpha: 0.34)
+                : TwitchUiColors.borderSubtle,
           ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: enabled ? onTap : null,
-            child: Center(
-              child: sending
-                  ? SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: foreground,
-                      ),
-                    )
-                  : Icon(Icons.send_rounded, size: 16, color: foreground),
-            ),
-          ),
+        ),
+      ),
+      icon: SizedBox.square(
+        dimension: 16,
+        child: Center(
+          child: sending
+              ? SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: foreground,
+                  ),
+                )
+              : Icon(Icons.send_rounded, size: 16, color: foreground),
         ),
       ),
     );

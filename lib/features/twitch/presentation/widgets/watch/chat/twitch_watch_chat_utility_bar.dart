@@ -13,6 +13,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
   final VoidCallback? onOpenSpecialActions;
+  final EdgeInsetsGeometry padding;
 
   const TwitchWatchChatUtilityBar({
     super.key,
@@ -21,6 +22,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
     this.onOpenSpecialActions,
+    this.padding = const EdgeInsets.fromLTRB(10, 7, 10, 4),
   });
 
   @override
@@ -31,7 +33,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
     final hasClaim = (channelPoints?.availableClaimId ?? '').isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 4),
+      padding: padding,
       child: Row(
         children: [
           _ChannelPointsCompactButton(

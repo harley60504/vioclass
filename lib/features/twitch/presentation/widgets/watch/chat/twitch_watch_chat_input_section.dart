@@ -103,13 +103,6 @@ class TwitchWatchChatInputSection extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TwitchWatchChatUtilityBar(
-            channelPoints: channelPoints,
-            loadingEmotes: loadingEmotes,
-            onOpenChannelPoints: onOpenChannelPoints,
-            onOpenEmotes: onOpenEmotes,
-            onOpenSpecialActions: onOpenSpecialActions,
-          ),
           TwitchChatInputBar(
             controller: messageController,
             enabled: enabled,
@@ -118,6 +111,14 @@ class TwitchWatchChatInputSection extends StatelessWidget {
             hintColor: roomModeHint == null
                 ? null
                 : Colors.amber.shade200.withValues(alpha: 0.88),
+            leadingActions: TwitchWatchChatUtilityBar(
+              channelPoints: channelPoints,
+              loadingEmotes: loadingEmotes,
+              onOpenChannelPoints: onOpenChannelPoints,
+              onOpenEmotes: onOpenEmotes,
+              onOpenSpecialActions: onOpenSpecialActions,
+              padding: EdgeInsets.zero,
+            ),
             onSend: onSend,
           ),
         ],
