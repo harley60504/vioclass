@@ -59,24 +59,23 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // Keep the large app background opaque and purple-black. Interactive surfaces
-  // above it are neutral translucent black so the UI does not become uniformly
-  // purple.
+  // Opaque purple-black page foundation. Depth comes from neutral gray-black
+  // surfaces above it rather than from making every component purple.
   static const Color appBackground = Color(0xFF0B0812);
   static const Color fallbackAppBackground = appBackground;
   static const Color windowBackground = appBackground;
 
-  // Neutral translucent surface ladder. Cards, buttons, search fields and chat
-  // inputs intentionally share the same 40% black fill for visual consistency.
-  static const Color surfaceBase = Color(0x24000000);
-  static const Color surfacePanel = Color(0x52000000);
-  static const Color surfaceCard = Color(0x66000000);
-  static const Color surfaceRaised = Color(0x70000000);
-  static const Color surfaceInteractive = Color(0x66000000);
-  static const Color surfaceHover = Color(0x80000000);
-  static const Color surfaceSelected = Color(0x668D7BFF);
-  static const Color surfacePlayer = Color(0xB0000000);
-  static const Color surfaceGlass = Color(0x66000000);
+  // Solid neutral surface ladder. Cards, buttons, search fields and chat inputs
+  // sit one or more luminance steps above the purple-black page to create depth.
+  static const Color surfaceBase = Color(0xFF111114);
+  static const Color surfacePanel = Color(0xFF141417);
+  static const Color surfaceCard = Color(0xFF1A1A1E);
+  static const Color surfaceRaised = Color(0xFF202026);
+  static const Color surfaceInteractive = Color(0xFF242429);
+  static const Color surfaceHover = Color(0xFF2C2C31);
+  static const Color surfaceSelected = Color(0xFF352957);
+  static const Color surfacePlayer = Color(0xFF09070D);
+  static const Color surfaceGlass = Color(0xFF1A1A1E);
 
   // Backward-compatible aliases. New code should prefer semantic names above.
   static const Color surface = surfacePanel;
@@ -96,17 +95,17 @@ class TwitchUiColors {
   static const Color textFaint = Color(0xFF555D6B);
   static const Color textOnAccent = Color(0xFFFFFFFF);
 
-  // Neutral borders / separators. Purple is reserved for focus and selected
-  // states instead of every surface edge.
-  static const Color borderSubtle = Color(0x1AFFFFFF);
-  static const Color border = Color(0x2AFFFFFF);
-  static const Color borderStrong = Color(0x3DFFFFFF);
-  static const Color borderInteractive = Color(0x558D7BFF);
-  static const Color divider = Color(0x18FFFFFF);
+  // Neutral borders / separators. Purple remains reserved for interactive
+  // focus and selected states.
+  static const Color borderSubtle = Color(0x18FFFFFF);
+  static const Color border = Color(0x26FFFFFF);
+  static const Color borderStrong = Color(0x38FFFFFF);
+  static const Color borderInteractive = Color(0x668D7BFF);
+  static const Color divider = Color(0x16FFFFFF);
 
   // States.
-  static const Color hoverOverlay = Color(0x12FFFFFF);
-  static const Color pressedOverlay = Color(0x1CFFFFFF);
+  static const Color hoverOverlay = Color(0x10FFFFFF);
+  static const Color pressedOverlay = Color(0x18FFFFFF);
   static const Color selectedOverlay = Color(0x268D7BFF);
   static const Color disabledForeground = Color(0x59FFFFFF);
   static const Color focusRing = Color(0x998D7BFF);
@@ -130,9 +129,8 @@ class TwitchUiColors {
         foregroundMuted: Color(0xCCB8B2D8),
       );
 
-  // Sheets stay fully opaque so the page underneath never bleeds through.
-  // Controls and cards inside the sheet still use the neutral translucent
-  // surface tokens above.
+  // Sheets stay fully opaque and purple-black so the page underneath never
+  // bleeds through. Their inner cards use the same solid neutral ladder above.
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
     background: Color(0xFF120D1D),
     scrim: Color(0x99000000),
@@ -278,17 +276,17 @@ class TwitchUiShadows {
   static const List<BoxShadow> soft = <BoxShadow>[
     BoxShadow(
       color: Color(0x66000000),
-      blurRadius: 20,
-      offset: Offset(0, 8),
+      blurRadius: 16,
+      offset: Offset(0, 5),
     ),
   ];
 
   static const List<BoxShadow> floating = <BoxShadow>[
     BoxShadow(
       color: Color(0x80000000),
-      blurRadius: 30,
-      spreadRadius: -6,
-      offset: Offset(0, 14),
+      blurRadius: 24,
+      spreadRadius: -4,
+      offset: Offset(0, 10),
     ),
   ];
 }
