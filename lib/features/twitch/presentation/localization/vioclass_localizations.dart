@@ -511,8 +511,6 @@ const Map<String, String> _englishText = <String, String>{
   '目前在直播最新位置': 'Already at live edge',
   '跳到直播最新位置': 'Jump to live edge',
   '僅可回看 20 秒': '20-second replay only',
-  '目前沒有 DVR，僅能回看最近 20 秒':
-      'DVR is unavailable. You can replay only the latest 20 seconds.',
   '目前未開台': 'Currently offline',
   '播放器已停用': 'Player is disabled',
   '連結': 'Link',
