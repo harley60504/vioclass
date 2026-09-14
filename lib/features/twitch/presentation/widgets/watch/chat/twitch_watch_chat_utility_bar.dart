@@ -171,13 +171,13 @@ class _UtilityButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: IconButton(
+      child: TextButton(
         onPressed: onTap,
         style: twitchChatComposerButtonStyle(
           enabled: onTap != null,
           active: active,
         ),
-        icon: Icon(icon, size: 16),
+        child: Icon(icon, size: 16),
       ),
     );
   }

@@ -256,10 +256,10 @@ class _SelfDrawnSendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
+    return TextButton(
       onPressed: enabled ? onTap : null,
       style: twitchChatComposerButtonStyle(enabled: enabled, emphasized: true),
-      icon: SizedBox.square(
+      child: SizedBox.square(
         dimension: 16,
         child: Center(
           child: sending

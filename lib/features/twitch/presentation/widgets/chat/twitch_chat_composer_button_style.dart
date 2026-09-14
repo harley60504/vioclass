@@ -23,8 +23,9 @@ ButtonStyle twitchChatComposerButtonStyle({
             : TwitchUiColors.borderSubtle)
       : (active ? palette.borderActive : palette.border);
 
-  return IconButton.styleFrom(
+  return TextButton.styleFrom(
     minimumSize: const Size(36, 36),
+    maximumSize: const Size(double.infinity, 36),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: padding,
     backgroundColor: background,
