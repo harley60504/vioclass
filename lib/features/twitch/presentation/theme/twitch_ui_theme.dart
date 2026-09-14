@@ -169,7 +169,7 @@ class TwitchUiTheme {
           side: const BorderSide(color: TwitchUiColors.border),
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
+      bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: TwitchUiColors.surfacePanel,
         modalBackgroundColor: TwitchUiColors.surfacePanel,
         modalBarrierColor: TwitchUiColors.sheet.scrim,
