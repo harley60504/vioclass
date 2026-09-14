@@ -10,7 +10,6 @@ import '../../shared/twitch_default_channel_points_icon.dart';
 class TwitchWatchChatUtilityBar extends StatelessWidget {
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
   final bool loadingEmotes;
-  final bool compact;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
   final VoidCallback? onOpenSpecialActions;
@@ -19,7 +18,6 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
     super.key,
     required this.channelPoints,
     required this.loadingEmotes,
-    required this.compact,
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
     this.onOpenSpecialActions,
@@ -33,22 +31,20 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
     final hasClaim = (channelPoints?.availableClaimId ?? '').isNotEmpty;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, compact ? 7 : 9, 10, compact ? 4 : 5),
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 4),
       child: Row(
         children: [
           _ChannelPointsCompactButton(
             balance: balance,
             iconUrl: pointsIconUrl,
             hasClaim: hasClaim,
-            compact: compact,
             onTap: onOpenChannelPoints,
           ),
-          if (!compact) const Spacer() else const SizedBox(width: 6),
+          const SizedBox(width: 6),
           _UtilityButton(
             tooltip: l10n.t('特殊訊息'),
             icon: Icons.auto_awesome_rounded,
             active: false,
-            compact: compact,
             onTap: onOpenSpecialActions,
           ),
           const SizedBox(width: 6),
@@ -56,7 +52,6 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
             tooltip: l10n.t(loadingEmotes ? '貼圖載入中' : '貼圖'),
             icon: loadingEmotes ? Icons.sync_rounded : Icons.tag_faces_rounded,
             active: loadingEmotes,
-            compact: compact,
             onTap: onOpenEmotes,
           ),
         ],
@@ -69,14 +64,12 @@ class _ChannelPointsCompactButton extends StatelessWidget {
   final int? balance;
   final String? iconUrl;
   final bool hasClaim;
-  final bool compact;
   final VoidCallback onTap;
 
   const _ChannelPointsCompactButton({
     required this.balance,
     required this.iconUrl,
     required this.hasClaim,
-    required this.compact,
     required this.onTap,
   });
 
@@ -98,13 +91,8 @@ class _ChannelPointsCompactButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
         onTap: onTap,
         child: Container(
-          height: compact ? 30 : 34,
-          padding: EdgeInsets.fromLTRB(
-            compact ? 8 : 10,
-            0,
-            compact ? 9 : 12,
-            0,
-          ),
+          height: 30,
+          padding: const EdgeInsets.fromLTRB(8, 0, 9, 0),
           decoration: BoxDecoration(
             color: hasClaim ? palette.fillActive : palette.fill,
             borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
@@ -117,14 +105,14 @@ class _ChannelPointsCompactButton extends StatelessWidget {
             children: [
               _ChannelPointsIcon(iconUrl: iconUrl, hasClaim: hasClaim),
               if (balance != null) ...[
-                SizedBox(width: compact ? 5 : 7),
+                const SizedBox(width: 5),
                 Text(
                   label,
                   style: TextStyle(
                     color: hasClaim
                         ? palette.foreground
                         : palette.foregroundMuted,
-                    fontSize: compact ? 11 : 12.5,
+                    fontSize: 11,
                     fontWeight: TwitchUiFontWeight.heavy,
                   ),
                 ),
@@ -178,14 +166,12 @@ class _UtilityButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
   final bool active;
-  final bool compact;
   final VoidCallback? onTap;
 
   const _UtilityButton({
     required this.tooltip,
     required this.icon,
     this.active = false,
-    this.compact = false,
     required this.onTap,
   });
 
@@ -200,7 +186,7 @@ class _UtilityButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           width: 34,
-          height: compact ? 30 : 34,
+          height: 30,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: active ? palette.fillActive : palette.fill,
@@ -211,7 +197,7 @@ class _UtilityButton extends StatelessWidget {
           ),
           child: Icon(
             icon,
-            size: compact ? 15 : 17,
+            size: 15,
             color: active ? palette.foreground : palette.foregroundMuted,
           ),
         ),

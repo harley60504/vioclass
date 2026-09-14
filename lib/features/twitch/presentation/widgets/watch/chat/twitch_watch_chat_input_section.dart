@@ -96,7 +96,6 @@ class TwitchWatchChatInputSection extends StatelessWidget {
                 TwitchWatchChatUtilityBar(
                   channelPoints: channelPoints,
                   loadingEmotes: loadingEmotes,
-                  compact: compact,
                   onOpenChannelPoints: onOpenChannelPoints,
                   onOpenEmotes: onOpenEmotes,
                   onOpenSpecialActions: onOpenSpecialActions,

@@ -48,7 +48,7 @@ class TwitchWatchChatLayoutMetrics {
         : (constraints.maxHeight * 0.42).clamp(160.0, 320.0).toDouble();
 
     final headerHeight = verticalCompact ? 42.0 : 54.0;
-    final utilityBarHeight = (compactWidth || verticalCompact) ? 41.0 : 48.0;
+    const utilityBarHeight = 41.0;
     const inputBarHeight = 48.0;
     final fixedChromeHeight = headerHeight + utilityBarHeight + inputBarHeight;
     final minMessageListHeight = keyboardVisible ? 84.0 : 56.0;
