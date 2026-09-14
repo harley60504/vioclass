@@ -33,15 +33,21 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
 
 class _TwitchMediaKitVideoSurfaceState
     extends State<TwitchMediaKitVideoSurface> {
+  static const Duration _androidSourceRectSettleDelay = Duration(
+    milliseconds: 140,
+  );
+
   final GlobalKey _videoSurfaceKey = GlobalKey();
   late Widget _stableVideo;
+  Timer? _sourceRectSettleTimer;
+  Rect? _lastReportedSourceRect;
 
   @override
   void initState() {
     super.initState();
     _stableVideo = _buildVideo();
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _reportSourceRectHint(),
+      (_) => _scheduleSourceRectHint(),
     );
   }
 
@@ -54,8 +60,14 @@ class _TwitchMediaKitVideoSurfaceState
       _stableVideo = _buildVideo();
     }
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _reportSourceRectHint(),
+      (_) => _scheduleSourceRectHint(),
     );
+  }
+
+  @override
+  void dispose() {
+    _sourceRectSettleTimer?.cancel();
+    super.dispose();
   }
 
   Widget _buildVideo() {
@@ -64,6 +76,18 @@ class _TwitchMediaKitVideoSurfaceState
       fit: widget.fit,
       controls: widget.controls,
     );
+  }
+
+  void _scheduleSourceRectHint() {
+    if (!mounted || !Platform.isAndroid || !widget.reportAndroidPipSourceRect) {
+      return;
+    }
+
+    _sourceRectSettleTimer?.cancel();
+    _sourceRectSettleTimer = Timer(_androidSourceRectSettleDelay, () {
+      if (!mounted) return;
+      _reportSourceRectHint();
+    });
   }
 
   void _reportSourceRectHint() {
@@ -80,7 +104,18 @@ class _TwitchMediaKitVideoSurfaceState
     }
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final rect = topLeft & renderObject.size;
+    final lastRect = _lastReportedSourceRect;
+    if (lastRect != null && _rectNearlyEqual(lastRect, rect)) return;
+    _lastReportedSourceRect = rect;
     unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
+  }
+
+  bool _rectNearlyEqual(Rect a, Rect b) {
+    const tolerance = 1.0;
+    return (a.left - b.left).abs() <= tolerance &&
+        (a.top - b.top).abs() <= tolerance &&
+        (a.right - b.right).abs() <= tolerance &&
+        (a.bottom - b.bottom).abs() <= tolerance;
   }
 
   @override
@@ -109,8 +144,13 @@ class _TwitchMediaKitVideoSurfaceState
             height = height.clamp(1.0, maxHeight).toDouble();
           }
 
+          // Android PiP source-rect updates are intentionally coalesced.
+          // During an interactive resize this builder can run every pointer
+          // frame; pushing PictureInPictureParams for each intermediate size
+          // causes unnecessary native window/surface work and visible flashes
+          // on some devices. Wait until the geometry settles instead.
           WidgetsBinding.instance.addPostFrameCallback(
-            (_) => _reportSourceRectHint(),
+            (_) => _scheduleSourceRectHint(),
           );
 
           final transitionMask = TwitchDvrTransitionMaskController.instance;
