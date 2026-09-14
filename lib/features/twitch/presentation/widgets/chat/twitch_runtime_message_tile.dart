@@ -40,9 +40,8 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     final metrics = TwitchChatMessageVisualMetrics(fontScale, compact: compact);
     final style = TwitchChatSpecialMessageStyle.fromMetadata(message.metadata);
 
-    final Widget card;
     if (style != null) {
-      card = TwitchChatSpecialMessageCard(
+      return TwitchChatSpecialMessageCard(
         message: message,
         thirdPartyEmotes: thirdPartyEmotes,
         officialEmotes: officialEmotes,
@@ -54,27 +53,18 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
         animateEmotes: animateEmotes,
         onOpenContext: onOpenContext,
       );
-    } else {
-      card = TwitchChatNormalMessageCard(
-        message: message,
-        thirdPartyEmotes: thirdPartyEmotes,
-        officialEmotes: officialEmotes,
-        displayColor: displayColor,
-        displayNameText: displayNameText,
-        showTimestamp: showTimestamp,
-        metrics: metrics,
-        animateEmotes: animateEmotes,
-        onOpenContext: onOpenContext,
-      );
     }
 
-    // Every message owns a strict paint box. Rich descendants such as link
-    // previews, highlighted messages, GIFs and media thumbnails may be taller
-    // than plain text, but they are never allowed to paint outside the size the
-    // sliver measured for this item.
-    return ClipRect(
-      clipBehavior: Clip.hardEdge,
-      child: SizedBox(width: double.infinity, child: card),
+    return TwitchChatNormalMessageCard(
+      message: message,
+      thirdPartyEmotes: thirdPartyEmotes,
+      officialEmotes: officialEmotes,
+      displayColor: displayColor,
+      displayNameText: displayNameText,
+      showTimestamp: showTimestamp,
+      metrics: metrics,
+      animateEmotes: animateEmotes,
+      onOpenContext: onOpenContext,
     );
   }
 }
