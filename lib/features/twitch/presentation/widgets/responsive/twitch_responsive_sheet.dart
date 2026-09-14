@@ -72,7 +72,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
   double? maxWidth,
   double? portraitHeightFactor,
   double? landscapeHeightFactor,
-  Color backgroundColor = TwitchUiColors.surface,
+  Color backgroundColor = TwitchUiColors.surfacePanel,
   bool enableDrag = false,
 }) {
   final resolvedSize = _resolveUnifiedSheetSize(
@@ -111,10 +111,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
           left: false,
           right: false,
           child: Dialog(
-            insetPadding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             backgroundColor: Colors.transparent,
             child: Center(
               child: ConstrainedBox(
@@ -126,7 +123,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
                   ),
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(TwitchUiRadius.xl),
                   child: Material(
                     color: backgroundColor,
                     child: builder(dialogContext),
@@ -146,6 +143,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
     isScrollControlled: true,
     useSafeArea: false,
     enableDrag: enableDrag,
+    barrierColor: TwitchUiColors.sheet.scrim,
     builder: (sheetContext) {
       final insetBottom = MediaQuery.of(sheetContext).viewInsets.bottom;
       return SafeArea(
@@ -165,7 +163,7 @@ Future<T?> showTwitchResponsiveSheet<T>({
               ),
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
+                  top: Radius.circular(TwitchUiRadius.xl),
                 ),
                 child: Material(
                   color: backgroundColor,
@@ -197,11 +195,10 @@ Future<T?> showTwitchUnifiedSheet<T>({
   double? maxWidth,
   double? portraitHeightFactor,
   double? landscapeHeightFactor,
-  Color backgroundColor = TwitchUiColors.surface,
+  Color backgroundColor = TwitchUiColors.surfacePanel,
   bool enableDrag = false,
 }) {
   final refreshHandler = onRefresh;
-
   return showTwitchResponsiveSheet<T>(
     context: context,
     size: size,
@@ -219,9 +216,7 @@ Future<T?> showTwitchUnifiedSheet<T>({
         loading: loading,
         onRefresh: refreshHandler == null
             ? null
-            : () {
-                unawaited(refreshHandler());
-              },
+            : () => unawaited(refreshHandler()),
         onClose: onClose ?? () => Navigator.of(sheetContext).maybePop(),
         showRefresh: showRefresh,
         showClose: showClose,
@@ -262,26 +257,11 @@ class TwitchUnifiedSheetScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final refreshHandler = onRefresh;
-
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            TwitchUiColors.sheet.shellGradientStart,
-            TwitchUiColors.sheet.shellGradientEnd,
-          ],
-        ),
-        border: Border.all(color: TwitchUiColors.sheet.border),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: TwitchUiColors.sheet.shadow,
-            blurRadius: 24,
-            offset: const Offset(0, -8),
-          ),
-        ],
+        color: TwitchUiColors.surfacePanel,
+        border: Border.all(color: TwitchUiColors.border),
+        boxShadow: TwitchUiShadows.floating,
       ),
       child: SizedBox.expand(
         child: Column(
@@ -292,11 +272,7 @@ class TwitchUnifiedSheetScaffold extends StatelessWidget {
               icon: icon,
               iconImageUrl: iconImageUrl,
               loading: loading,
-              onRefresh: refreshHandler == null
-                  ? null
-                  : () {
-                      refreshHandler();
-                    },
+              onRefresh: onRefresh,
               onClose: onClose,
               showRefresh: showRefresh,
               showClose: showClose,
@@ -341,24 +317,16 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
     final l10n = context.vio;
     final subtitleText = subtitle?.trim();
     final iconUrl = iconImageUrl?.trim() ?? '';
-
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            TwitchUiColors.sheet.headerGradientStart,
-            TwitchUiColors.sheet.headerGradientEnd,
-          ],
-        ),
-        border: Border(bottom: BorderSide(color: TwitchUiColors.sheet.border)),
+      padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.surfaceRaised,
+        border: Border(bottom: BorderSide(color: TwitchUiColors.divider)),
       ),
       child: Row(
         children: [
           _UnifiedSheetHeaderIcon(icon: icon, imageUrl: iconUrl),
-          const SizedBox(width: 10),
+          const SizedBox(width: TwitchUiSpacing.space12),
           Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -369,32 +337,35 @@ class TwitchUnifiedSheetHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    height: 1.1,
-                    fontWeight: FontWeight.w900,
+                    color: TwitchUiColors.textPrimary,
+                    fontSize: TwitchUiFontSize.heading,
+                    height: 1.15,
+                    fontWeight: TwitchUiFontWeight.strong,
                   ),
                 ),
                 if (subtitleText != null && subtitleText.isNotEmpty) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: TwitchUiSpacing.space2),
                   Text(
                     subtitleText,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 11,
-                      height: 1.1,
-                      fontWeight: FontWeight.w700,
+                      color: TwitchUiColors.textMuted,
+                      fontSize: TwitchUiFontSize.meta,
+                      height: 1.2,
+                      fontWeight: TwitchUiFontWeight.medium,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          if (trailing.isNotEmpty) ...[const SizedBox(width: 8), ...trailing],
+          if (trailing.isNotEmpty) ...[
+            const SizedBox(width: TwitchUiSpacing.space8),
+            ...trailing,
+          ],
           if (showRefresh) ...[
-            const SizedBox(width: 4),
+            const SizedBox(width: TwitchUiSpacing.space4),
             _SheetHeaderIconButton(
               tooltip: l10n.t('重新整理'),
               loading: loading,
@@ -431,34 +402,27 @@ class _SheetHeaderIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: onPressed,
-        child: Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: TwitchUiColors.sheet.cardFill,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-          ),
-          child: loading
+      child: SizedBox(
+        width: TwitchUiControlSize.hitCompact,
+        height: TwitchUiControlSize.hitCompact,
+        child: IconButton(
+          onPressed: onPressed,
+          icon: loading
               ? const SizedBox(
                   width: 16,
                   height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: TwitchUiColors.primarySoft,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Icon(
-                  icon,
-                  color: onPressed == null
-                      ? Colors.white24
-                      : TwitchUiColors.sheet.backplate.foreground,
-                  size: 19,
-                ),
+              : Icon(icon, size: 19),
+          style: IconButton.styleFrom(
+            backgroundColor: TwitchUiColors.surfaceInteractive,
+            foregroundColor: TwitchUiColors.textSecondary,
+            disabledForegroundColor: TwitchUiColors.disabledForeground,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
+              side: const BorderSide(color: TwitchUiColors.borderSubtle),
+            ),
+          ),
         ),
       ),
     );
@@ -475,22 +439,22 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     if (imageUrl.isNotEmpty) {
       return Container(
-        width: 28,
-        height: 28,
+        width: 32,
+        height: 32,
         padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: TwitchUiColors.sheet.backplate.fillActive,
-          shape: BoxShape.circle,
-          border: Border.all(color: TwitchUiColors.sheet.backplate.border),
+          color: TwitchUiColors.surfaceSelected,
+          borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
+          border: Border.all(color: TwitchUiColors.borderInteractive),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(TwitchUiRadius.xs),
           child: Image.network(
             imageUrl,
-            width: 24,
-            height: 24,
-            cacheWidth: 48,
-            cacheHeight: 48,
+            width: 28,
+            height: 28,
+            cacheWidth: 56,
+            cacheHeight: 56,
             filterQuality: FilterQuality.low,
             fit: BoxFit.cover,
             errorBuilder: (_, _, _) => _fallbackIcon(),
@@ -498,25 +462,20 @@ class _UnifiedSheetHeaderIcon extends StatelessWidget {
         ),
       );
     }
-
     return _fallbackIcon();
   }
 
   Widget _fallbackIcon() {
     return Container(
-      width: 28,
-      height: 28,
+      width: 32,
+      height: 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: TwitchUiColors.sheet.backplate.fillActive,
-        shape: BoxShape.circle,
-        border: Border.all(color: TwitchUiColors.sheet.backplate.borderActive),
+        color: TwitchUiColors.surfaceSelected,
+        borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
+        border: Border.all(color: TwitchUiColors.borderInteractive),
       ),
-      child: Icon(
-        icon,
-        color: TwitchUiColors.sheet.backplate.foreground,
-        size: 17,
-      ),
+      child: Icon(icon, color: TwitchUiColors.primarySoft, size: 18),
     );
   }
 }
@@ -549,9 +508,12 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.vio;
     final verticalPadding = compact ? 6.0 : 8.0;
-
-    return Padding(
+    return Container(
       padding: EdgeInsets.fromLTRB(10, verticalPadding, 8, verticalPadding),
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.surfaceRaised,
+        border: Border(bottom: BorderSide(color: TwitchUiColors.divider)),
+      ),
       child: Row(
         children: [
           if (showTitle && title != null && title!.isNotEmpty) ...[
@@ -562,12 +524,13 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+                  color: TwitchUiColors.textPrimary,
+                  fontSize: TwitchUiFontSize.body,
+                  fontWeight: TwitchUiFontWeight.strong,
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: TwitchUiSpacing.space8),
           ],
           if (searchController != null)
             Expanded(
@@ -577,14 +540,13 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                 child: TextField(
                   controller: searchController,
                   onChanged: onSearchChanged,
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(fontSize: TwitchUiFontSize.bodyCompact),
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: l10n.t(searchHint),
                     prefixIcon: const Icon(Icons.search, size: 18),
-                    border: const OutlineInputBorder(),
                     contentPadding: EdgeInsets.symmetric(
-                      horizontal: 8,
+                      horizontal: TwitchUiSpacing.space8,
                       vertical: compact ? 7 : 9,
                     ),
                   ),
@@ -593,7 +555,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
             )
           else
             const Spacer(),
-          const SizedBox(width: 6),
+          const SizedBox(width: TwitchUiSpacing.space4),
           IconButton(
             tooltip: l10n.t('重新整理'),
             visualDensity: VisualDensity.compact,
@@ -602,10 +564,7 @@ class TwitchResponsiveSheetHeader extends StatelessWidget {
                 ? SizedBox(
                     width: compact ? 16 : 18,
                     height: compact ? 16 : 18,
-                    child: const CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: TwitchUiColors.primarySoft,
-                    ),
+                    child: const CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Icon(Icons.refresh_rounded, size: compact ? 19 : 21),
           ),

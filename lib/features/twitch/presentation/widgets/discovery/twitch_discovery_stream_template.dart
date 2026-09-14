@@ -9,8 +9,8 @@ import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
 import '../../localization/vioclass_localizations.dart';
-import '../../theme/twitch_ui_tokens.dart';
 import '../../pages/twitch_watch_route_guard.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../../twitch_follow_status_resolver.dart';
 import 'twitch_stream_card.dart';
 
@@ -50,86 +50,54 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final mainAxisExtent = twitchStreamCardGridMainAxisExtent(width);
-
-        return DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(-0.72, -0.92),
-              radius: 1.35,
-              colors: <Color>[
-                Color(0xFF24133A),
-                Color(0xFF14121E),
-                Color(0xFF0A0A0F),
-              ],
-              stops: <double>[0.0, 0.46, 1.0],
-            ),
-          ),
-          child: Stack(
-            children: <Widget>[
-              const Positioned(
-                left: -140,
-                top: -180,
-                width: 520,
-                height: 520,
-                child: _DiscoveryGlowOrb(color: Color(0x559146FF)),
-              ),
-              const Positioned(
-                right: -220,
-                bottom: -240,
-                width: 620,
-                height: 620,
-                child: _DiscoveryGlowOrb(color: Color(0x335B2D91)),
-              ),
-              CustomScrollView(
-                key: PageStorageKey<String>(
-                  'twitch_discovery_grid_$sectionTitle',
+        final mainAxisExtent = twitchStreamCardGridMainAxisExtent(
+          constraints.maxWidth,
+        );
+        return ColoredBox(
+          color: TwitchUiColors.appBackground,
+          child: CustomScrollView(
+            key: PageStorageKey<String>('twitch_discovery_grid_$sectionTitle'),
+            controller: controller,
+            scrollCacheExtent: const ScrollCacheExtent.pixels(840),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: <Widget>[
+              SliverToBoxAdapter(
+                child: TwitchDiscoverySectionHeader(
+                  icon: sectionIcon,
+                  title: sectionTitle,
+                  count: streamCount,
+                  showCount: showSectionCount,
                 ),
-                controller: controller,
-                scrollCacheExtent: const ScrollCacheExtent.pixels(840),
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: <Widget>[
-                  SliverToBoxAdapter(
-                    child: TwitchDiscoverySectionHeader(
-                      icon: sectionIcon,
-                      title: sectionTitle,
-                      count: streamCount,
-                      showCount: showSectionCount,
-                    ),
-                  ),
-                  ...extraSliversAfterHeader,
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
-                    sliver: SliverGrid(
-                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent:
-                            twitchStreamCardGridMaxCrossAxisExtent,
-                        mainAxisExtent: mainAxisExtent,
-                        crossAxisSpacing: twitchStreamCardGridSpacing,
-                        mainAxisSpacing: twitchStreamCardGridSpacing,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final stream = streams[index];
-                          return RepaintBoundary(
-                            child: TwitchStreamCard(
-                              stream: stream,
-                              onTap: () => _openStreamTarget(context, stream),
-                            ),
-                          );
-                        },
-                        childCount: streams.length,
-                        addAutomaticKeepAlives: false,
-                        addRepaintBoundaries: true,
-                        addSemanticIndexes: false,
-                      ),
-                    ),
-                  ),
-                  ...extraSliversBeforeFooter,
-                  SliverToBoxAdapter(child: footer),
-                ],
               ),
+              ...extraSliversAfterHeader,
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
+                    mainAxisExtent: mainAxisExtent,
+                    crossAxisSpacing: twitchStreamCardGridSpacing,
+                    mainAxisSpacing: twitchStreamCardGridSpacing,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final stream = streams[index];
+                      return RepaintBoundary(
+                        child: TwitchStreamCard(
+                          stream: stream,
+                          onTap: () => _openStreamTarget(context, stream),
+                        ),
+                      );
+                    },
+                    childCount: streams.length,
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    addSemanticIndexes: false,
+                  ),
+                ),
+              ),
+              ...extraSliversBeforeFooter,
+              SliverToBoxAdapter(child: footer),
             ],
           ),
         );
@@ -142,9 +110,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
         .push(
           MaterialPageRoute<void>(
             builder: (_) => TwitchWatchRouteGuard(
-              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
-                stream,
-              ),
+              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
               initialOfflineChannel: TwitchFollowedChannel(
                 broadcasterId: stream.userId,
                 broadcasterLogin: stream.userLogin,
@@ -196,7 +162,6 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (streams.isEmpty) return const SliverToBoxAdapter(child: SizedBox());
-
     return SliverMainAxisGroup(
       slivers: <Widget>[
         SliverToBoxAdapter(
@@ -207,13 +172,12 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
           ),
         ),
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           sliver: SliverLayoutBuilder(
             builder: (context, constraints) {
               final mainAxisExtent = twitchStreamCardGridMainAxisExtent(
                 constraints.crossAxisExtent,
               );
-
               return SliverGrid(
                 gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
@@ -249,9 +213,7 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
         .push(
           MaterialPageRoute<void>(
             builder: (_) => TwitchWatchRouteGuard(
-              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
-                stream,
-              ),
+              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
               initialOfflineChannel: TwitchFollowedChannel(
                 broadcasterId: stream.userId,
                 broadcasterLogin: stream.userLogin,
@@ -280,26 +242,6 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
   }
 }
 
-class _DiscoveryGlowOrb extends StatelessWidget {
-  final Color color;
-
-  const _DiscoveryGlowOrb({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: <Color>[color, color.withValues(alpha: 0.0)],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class TwitchDiscoverySectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -317,40 +259,31 @@ class TwitchDiscoverySectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(26, 24, 26, 14),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
       child: Row(
-        children: <Widget>[
+        children: [
           Container(
             width: 34,
             height: 34,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: TwitchUiColors.primary.withValues(alpha: 0.18),
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: TwitchUiColors.primarySoft.withValues(alpha: 0.28),
-              ),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: TwitchUiColors.primary.withValues(alpha: 0.26),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              color: TwitchUiColors.surfaceSelected,
+              borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+              border: Border.all(color: TwitchUiColors.borderInteractive),
             ),
-            child: Icon(icon, color: TwitchUiColors.primarySoft, size: 19),
+            child: Icon(icon, color: TwitchUiColors.primarySoft, size: 18),
           ),
-          const SizedBox(width: 11),
+          const SizedBox(width: TwitchUiSpacing.space12),
           Expanded(
             child: Text(
               showCount && count > 0 ? '$title · $count' : title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 19,
-                height: 1.1,
-                fontWeight: FontWeight.w900,
+                color: TwitchUiColors.textPrimary,
+                fontSize: TwitchUiFontSize.title,
+                height: 1.15,
+                fontWeight: TwitchUiFontWeight.strong,
               ),
             ),
           ),
@@ -380,58 +313,42 @@ class TwitchDiscoveryFooter extends StatelessWidget {
     if (loadingMore) {
       return const Padding(
         padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
-        child: Center(
-          child: CircularProgressIndicator(color: TwitchUiColors.primary),
-        ),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
-
     if (errorText != null && errorText!.trim().isNotEmpty) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         child: Center(
           child: OutlinedButton.icon(
-            onPressed: () {
-              unawaited(onLoadMore());
-            },
+            onPressed: () => unawaited(onLoadMore()),
             icon: const Icon(Icons.refresh_rounded),
             label: Text(l10n.t('載入更多失敗，重試')),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: TwitchUiColors.primarySoft,
-              side: const BorderSide(color: TwitchUiColors.primary),
-            ),
           ),
         ),
       );
     }
-
     if (hasMore) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         child: Center(
           child: TextButton.icon(
-            onPressed: () {
-              unawaited(onLoadMore());
-            },
+            onPressed: () => unawaited(onLoadMore()),
             icon: const Icon(Icons.keyboard_arrow_down_rounded),
             label: Text(l10n.t('載入更多')),
-            style: TextButton.styleFrom(
-              foregroundColor: TwitchUiColors.primarySoft,
-            ),
           ),
         ),
       );
     }
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 26),
       child: Center(
         child: Text(
           l10n.t('已經到底了'),
           style: const TextStyle(
-            color: Colors.white38,
-            fontSize: 12.5,
-            fontWeight: FontWeight.w800,
+            color: TwitchUiColors.textFaint,
+            fontSize: TwitchUiFontSize.bodyCompact,
+            fontWeight: TwitchUiFontWeight.medium,
           ),
         ),
       ),
@@ -464,7 +381,6 @@ TwitchDiscoveryLowerContentState twitchDiscoveryLowerContentState({
       footer: SizedBox.shrink(),
     );
   }
-
   if (!hasAnyLoadedContent) {
     return TwitchDiscoveryLowerContentState(
       slivers: <Widget>[
@@ -473,7 +389,6 @@ TwitchDiscoveryLowerContentState twitchDiscoveryLowerContentState({
       footer: const SizedBox.shrink(),
     );
   }
-
   if (filteredEmpty) {
     return TwitchDiscoveryLowerContentState(
       slivers: <Widget>[
@@ -482,7 +397,6 @@ TwitchDiscoveryLowerContentState twitchDiscoveryLowerContentState({
       footer: const SizedBox.shrink(),
     );
   }
-
   return TwitchDiscoveryLowerContentState(
     slivers: contentSlivers,
     footer: footer,
@@ -496,9 +410,7 @@ class TwitchDiscoveryLoadingSliver extends StatelessWidget {
   Widget build(BuildContext context) {
     return const SliverFillRemaining(
       hasScrollBody: false,
-      child: Center(
-        child: CircularProgressIndicator(color: TwitchUiColors.primary),
-      ),
+      child: Center(child: CircularProgressIndicator()),
     );
   }
 }
@@ -521,43 +433,56 @@ class TwitchDiscoveryEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.vio;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(28),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 440),
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: TwitchUiColors.surfaceCard,
+          borderRadius: BorderRadius.circular(TwitchUiRadius.xl),
+          border: Border.all(color: TwitchUiColors.borderSubtle),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Icon(icon, color: TwitchUiColors.primary, size: 46),
-            const SizedBox(height: 14),
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: TwitchUiColors.surfaceSelected,
+                borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
+                border: Border.all(color: TwitchUiColors.borderInteractive),
+              ),
+              child: Icon(icon, color: TwitchUiColors.primarySoft, size: 28),
+            ),
+            const SizedBox(height: TwitchUiSpacing.space16),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
+                color: TwitchUiColors.textPrimary,
+                fontSize: TwitchUiFontSize.title,
+                fontWeight: TwitchUiFontWeight.strong,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: TwitchUiSpacing.space8),
             Text(
               message,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 13,
-                height: 1.35,
-                fontWeight: FontWeight.w700,
+                color: TwitchUiColors.textSecondary,
+                fontSize: TwitchUiFontSize.body,
+                height: 1.45,
+                fontWeight: TwitchUiFontWeight.regular,
               ),
             ),
-            if (onRetry != null) ...<Widget>[
-              const SizedBox(height: 18),
+            if (onRetry != null) ...[
+              const SizedBox(height: TwitchUiSpacing.space20),
               OutlinedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text(l10n.t('重新整理')),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: TwitchUiColors.primarySoft,
-                  side: const BorderSide(color: TwitchUiColors.primary),
-                ),
               ),
             ],
           ],
