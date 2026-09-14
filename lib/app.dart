@@ -53,6 +53,7 @@ class _VioClassAppState extends State<VioClassApp> {
     return MaterialApp(
       title: 'VioClass',
       debugShowCheckedModeBanner: false,
+      color: TwitchUiColors.windowBackground,
       locale: twitchAppLanguageController.locale,
       supportedLocales: const [Locale('zh', 'TW'), Locale('en')],
       localizationsDelegates: const [
@@ -109,7 +110,7 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
     }
 
     return Scaffold(
-      backgroundColor: TwitchUiColors.appBackground,
+      backgroundColor: TwitchUiColors.windowBackground,
       body: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxHeight < 150) {
