@@ -59,17 +59,19 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // Midnight Glass neutral ladder.
+  // StreamNook-inspired frosted neutral ladder. The root stays dark so white
+  // text keeps reliable contrast, while surfaces become translucent white
+  // glass instead of opaque charcoal panels.
   static const Color appBackground = Color(0xFF08090D);
-  static const Color surfaceBase = Color(0xFF0D0F14);
-  static const Color surfacePanel = Color(0xFF101218);
-  static const Color surfaceCard = Color(0xFF141720);
-  static const Color surfaceRaised = Color(0xFF171A22);
-  static const Color surfaceInteractive = Color(0xFF1C202A);
-  static const Color surfaceHover = Color(0xFF222733);
-  static const Color surfaceSelected = Color(0xFF25233A);
-  static const Color surfacePlayer = Color(0xA60A0B10);
-  static const Color surfaceGlass = Color(0xB312141B);
+  static const Color surfaceBase = Color(0x0AFFFFFF);
+  static const Color surfacePanel = Color(0x10FFFFFF);
+  static const Color surfaceCard = Color(0x14FFFFFF);
+  static const Color surfaceRaised = Color(0x1AFFFFFF);
+  static const Color surfaceInteractive = Color(0x20FFFFFF);
+  static const Color surfaceHover = Color(0x2AFFFFFF);
+  static const Color surfaceSelected = Color(0x298D7BFF);
+  static const Color surfacePlayer = Color(0x8A0A0B10);
+  static const Color surfaceGlass = Color(0x18FFFFFF);
 
   // Backward-compatible aliases. New code should prefer semantic names above.
   static const Color surface = surfacePanel;
@@ -90,16 +92,16 @@ class TwitchUiColors {
   static const Color textOnAccent = Color(0xFFFFFFFF);
 
   // Borders / separators.
-  static const Color borderSubtle = Color(0x14FFFFFF);
-  static const Color border = Color(0x1FFFFFFF);
-  static const Color borderStrong = Color(0x2BFFFFFF);
-  static const Color borderInteractive = Color(0x3D8D7BFF);
-  static const Color divider = Color(0x12FFFFFF);
+  static const Color borderSubtle = Color(0x1AFFFFFF);
+  static const Color border = Color(0x2AFFFFFF);
+  static const Color borderStrong = Color(0x3DFFFFFF);
+  static const Color borderInteractive = Color(0x558D7BFF);
+  static const Color divider = Color(0x18FFFFFF);
 
   // States.
-  static const Color hoverOverlay = Color(0x0DFFFFFF);
-  static const Color pressedOverlay = Color(0x14FFFFFF);
-  static const Color selectedOverlay = Color(0x1F8D7BFF);
+  static const Color hoverOverlay = Color(0x12FFFFFF);
+  static const Color pressedOverlay = Color(0x1CFFFFFF);
+  static const Color selectedOverlay = Color(0x268D7BFF);
   static const Color disabledForeground = Color(0x59FFFFFF);
   static const Color focusRing = Color(0x998D7BFF);
 
@@ -114,24 +116,24 @@ class TwitchUiColors {
 
   static const TwitchUiBackplatePalette purpleBackplate =
       TwitchUiBackplatePalette(
-        fill: Color(0xFF211E35),
-        fillActive: Color(0xFF2A2644),
-        border: Color(0x558D7BFF),
-        borderActive: Color(0x88C3BAFF),
+        fill: Color(0x1F8D7BFF),
+        fillActive: Color(0x318D7BFF),
+        border: Color(0x668D7BFF),
+        borderActive: Color(0x99C3BAFF),
         foreground: primarySoft,
         foregroundMuted: Color(0xCCB8B2D8),
       );
 
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
-    background: surfacePanel,
-    scrim: Color(0xB3000000),
-    shellGradientStart: Color(0xF2171922),
-    shellGradientEnd: Color(0xFC0C0E13),
-    headerGradientStart: Color(0xF5201D31),
-    headerGradientEnd: Color(0xF515171F),
+    background: Color(0xEE111319),
+    scrim: Color(0x99000000),
+    shellGradientStart: Color(0x2EFFFFFF),
+    shellGradientEnd: Color(0x1410161E),
+    headerGradientStart: Color(0x36FFFFFF),
+    headerGradientEnd: Color(0x1811161E),
     border: border,
-    shadow: Color(0x52000000),
-    handle: Color(0x38FFFFFF),
+    shadow: Color(0x42000000),
+    handle: Color(0x5AFFFFFF),
     cardFill: surfaceCard,
     cardFillActive: surfaceSelected,
     cardBorder: borderSubtle,
@@ -240,9 +242,9 @@ class TwitchUiControlSize {
 class TwitchUiGlass {
   const TwitchUiGlass._();
 
-  static const double blurSoft = 8;
-  static const double blurMedium = 12;
-  static const double blurStrong = 18;
+  static const double blurSoft = 12;
+  static const double blurMedium = 18;
+  static const double blurStrong = 24;
   static const Color playerBackground = TwitchUiColors.surfacePlayer;
   static const Color floatingBackground = TwitchUiColors.surfaceGlass;
   static const Color border = TwitchUiColors.border;
@@ -266,16 +268,16 @@ class TwitchUiShadows {
 
   static const List<BoxShadow> soft = <BoxShadow>[
     BoxShadow(
-      color: Color(0x52000000),
-      blurRadius: 18,
+      color: Color(0x42000000),
+      blurRadius: 20,
       offset: Offset(0, 8),
     ),
   ];
 
   static const List<BoxShadow> floating = <BoxShadow>[
     BoxShadow(
-      color: Color(0x66000000),
-      blurRadius: 28,
+      color: Color(0x52000000),
+      blurRadius: 30,
       spreadRadius: -6,
       offset: Offset(0, 14),
     ),
