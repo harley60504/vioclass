@@ -38,18 +38,7 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
   }
 
   Widget _buildDesktopShell(TwitchResponsiveLayout layout) {
-    return Row(
-      children: <Widget>[
-        TwitchStreamHomeSidebar(
-          selectedSection: selectedSection,
-          viewerLabel: viewerLabel,
-          loginStatus: loginStatus,
-          loadingLoginState: loadingLoginState,
-          onSelectSection: selectSection,
-        ),
-        Expanded(child: this._buildContentColumn(layout)),
-      ],
-    );
+    return this._buildContentColumn(layout);
   }
 
   Widget _buildMobileShell(TwitchResponsiveLayout layout) {
@@ -65,31 +54,45 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
   }
 
   Widget _buildContentColumn(TwitchResponsiveLayout layout) {
-    return Column(
+    final twoRows = layout.shouldUseTwoRowHomeToolbar;
+    final topInset = twoRows ? 118.0 : 72.0;
+
+    return Stack(
       children: <Widget>[
-        TwitchStreamHomeToolbar(
-          selectedSection: selectedSection,
-          searchController: searchController,
-          forceTwoRows: layout.shouldUseTwoRowHomeToolbar,
-          onSearchChanged: updateSearchText,
-          onClearSearch: () {
-            searchController.clear();
-            updateSearchText('');
-          },
-          onShowGameMenu: showCurrentGameMenu,
-          onShowLanguageMenu: showCurrentLanguageMenu,
-          onRefresh: refreshCurrentPage,
-          onOpenDropsConnector: openDropsConnectorPage,
-          onOpenSettings: openSettings,
+        Positioned.fill(
+          child: Padding(
+            padding: EdgeInsets.only(top: topInset),
+            child: this._buildHomeContent(),
+          ),
         ),
-        Expanded(child: this._buildHomeContent()),
+        Positioned(
+          left: twoRows ? 10 : 16,
+          right: twoRows ? 10 : 16,
+          top: 8,
+          child: TwitchStreamHomeToolbar(
+            selectedSection: selectedSection,
+            onSelectSection: selectSection,
+            searchController: searchController,
+            forceTwoRows: twoRows,
+            onSearchChanged: updateSearchText,
+            onClearSearch: () {
+              searchController.clear();
+              updateSearchText('');
+            },
+            onShowGameMenu: showCurrentGameMenu,
+            onShowLanguageMenu: showCurrentLanguageMenu,
+            onRefresh: refreshCurrentPage,
+            onOpenDropsConnector: openDropsConnectorPage,
+            onOpenSettings: openSettings,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildHomeContent() {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 160),
+      duration: TwitchUiMotion.standard,
       child: searchText.isNotEmpty
           ? _TwitchChannelSearchPage(
               key: const ValueKey<String>('twitch-channel-search-page'),

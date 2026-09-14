@@ -77,7 +77,7 @@ class WatchStreamHeaderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = _WatchStreamHeaderData.fromMetadata(metadata);
-    final avatarSize = compact ? 32.0 : 36.0;
+    final avatarSize = math.min(compact ? 30.0 : 34.0, height - 12.0);
 
     return TwitchGlassSurface(
       borderRadius: BorderRadius.circular(TwitchUiRadius.md),
@@ -115,7 +115,7 @@ class WatchStreamHeaderCard extends StatelessWidget {
               ),
               const SizedBox(width: TwitchUiSpacing.space8),
               Expanded(
-                child: _WatchStreamHeaderTextBlock(
+                child: _WatchStreamHeaderSingleRow(
                   data: data,
                   compact: compact,
                 ),
@@ -154,7 +154,6 @@ class _WatchStreamHeaderData {
   ) {
     final channelLogin = metadata.channelLogin.trim();
     final language = metadata.language.trim();
-
     return _WatchStreamHeaderData(
       channelLogin: channelLogin,
       channelLabel: channelLogin.isEmpty ? 'Twitch Stream' : channelLogin,
@@ -168,79 +167,87 @@ class _WatchStreamHeaderData {
   }
 }
 
-class _WatchStreamHeaderTextBlock extends StatelessWidget {
+class _WatchStreamHeaderSingleRow extends StatelessWidget {
   final _WatchStreamHeaderData data;
   final bool compact;
 
-  const _WatchStreamHeaderTextBlock({
+  const _WatchStreamHeaderSingleRow({
     required this.data,
     required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _WatchStreamHeaderMainRow(data: data, compact: compact),
-        if (data.streamTitle.isNotEmpty) ...[
-          const SizedBox(height: TwitchUiSpacing.space2),
-          _WatchStreamTitleText(title: data.streamTitle, compact: compact),
-        ],
-      ],
-    );
-  }
-}
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final showViewer = width >= 310 &&
+            data.viewerCount != null &&
+            data.viewerCount! > 0;
+        final showGame = width >= 500 && data.gameName.isNotEmpty;
+        final showLanguage = width >= 650 && data.languageLabel.isNotEmpty;
 
-class _WatchStreamHeaderMainRow extends StatelessWidget {
-  final _WatchStreamHeaderData data;
-  final bool compact;
-
-  const _WatchStreamHeaderMainRow({required this.data, required this.compact});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Flexible(
-          child: _WatchChannelNameText(
-            label: data.channelLabel,
-            compact: compact,
-          ),
-        ),
-        if (data.viewerCount != null && data.viewerCount! > 0) ...[
-          const SizedBox(width: TwitchUiSpacing.space8),
-          _WatchInfoPill(
-            icon: Icons.visibility_rounded,
-            label: _formatViewerCount(context, data.viewerCount!),
-            compact: compact,
-          ),
-        ],
-        if (data.gameName.isNotEmpty) ...[
-          const SizedBox(width: TwitchUiSpacing.space8),
-          Flexible(
-            child: _WatchInfoPill(
-              icon: Icons.sports_esports_rounded,
-              label: data.gameName,
-              copyText: data.gameName,
-              compact: compact,
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: width * 0.28),
+              child: _WatchChannelNameText(
+                label: data.channelLabel,
+                compact: compact,
+              ),
             ),
-          ),
-        ],
-        if (data.languageLabel.isNotEmpty) ...[
-          const SizedBox(width: TwitchUiSpacing.space8),
-          Flexible(
-            child: _WatchInfoPill(
-              icon: Icons.translate_rounded,
-              label: data.languageLabel,
-              copyText: data.language,
-              compact: compact,
-              maxWidth: compact ? 62 : 72,
-            ),
-          ),
-        ],
-      ],
+            if (data.streamTitle.isNotEmpty) ...[
+              const SizedBox(width: TwitchUiSpacing.space8),
+              Text(
+                '•',
+                style: TextStyle(
+                  color: TwitchUiColors.textFaint,
+                  fontSize: TwitchUiFontSize.meta,
+                  fontWeight: TwitchUiFontWeight.strong,
+                ),
+              ),
+              const SizedBox(width: TwitchUiSpacing.space8),
+              Expanded(
+                child: _WatchStreamTitleText(
+                  title: data.streamTitle,
+                  compact: compact,
+                ),
+              ),
+            ] else
+              const Spacer(),
+            if (showViewer) ...[
+              const SizedBox(width: TwitchUiSpacing.space8),
+              _WatchInfoPill(
+                icon: Icons.visibility_rounded,
+                label: _formatViewerCount(context, data.viewerCount!),
+                compact: true,
+                maxWidth: 110,
+              ),
+            ],
+            if (showGame) ...[
+              const SizedBox(width: TwitchUiSpacing.space4),
+              _WatchInfoPill(
+                icon: Icons.sports_esports_rounded,
+                label: data.gameName,
+                copyText: data.gameName,
+                compact: true,
+                maxWidth: 150,
+              ),
+            ],
+            if (showLanguage) ...[
+              const SizedBox(width: TwitchUiSpacing.space4),
+              _WatchInfoPill(
+                icon: Icons.translate_rounded,
+                label: data.languageLabel,
+                copyText: data.language,
+                compact: true,
+                maxWidth: 64,
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -258,6 +265,7 @@ class _WatchChannelNameText extends StatelessWidget {
       child: Text(
         label,
         maxLines: 1,
+        softWrap: false,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: TwitchUiColors.textPrimary,
@@ -265,7 +273,7 @@ class _WatchChannelNameText extends StatelessWidget {
               ? TwitchUiFontSize.body
               : TwitchUiFontSize.heading,
           fontWeight: TwitchUiFontWeight.strong,
-          height: 1.05,
+          height: 1.0,
         ),
       ),
     );
@@ -285,6 +293,7 @@ class _WatchStreamTitleText extends StatelessWidget {
       child: Text(
         title,
         maxLines: 1,
+        softWrap: false,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: TwitchUiColors.textSecondary,
@@ -292,7 +301,7 @@ class _WatchStreamTitleText extends StatelessWidget {
               ? TwitchUiFontSize.meta
               : TwitchUiFontSize.bodyCompact,
           fontWeight: TwitchUiFontWeight.medium,
-          height: 1.05,
+          height: 1.0,
         ),
       ),
     );
@@ -426,7 +435,6 @@ String _formatViewerCount(BuildContext context, int value) {
     }
     return '$value viewers';
   }
-
   if (value >= 10000) {
     final text = (value / 10000).toStringAsFixed(value >= 100000 ? 0 : 1);
     return '${text.replaceFirst(RegExp(r'\.0$'), '')}萬人';
@@ -456,7 +464,6 @@ class _WatchInfoPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canCopy = copyText != null && copyText!.trim().isNotEmpty;
-
     return Tooltip(
       message: canCopy ? '${context.vio.t('點擊複製：')}$label' : label,
       child: Material(
@@ -466,9 +473,7 @@ class _WatchInfoPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
           onTap: canCopy
               ? () async {
-                  await Clipboard.setData(
-                    ClipboardData(text: copyText!.trim()),
-                  );
+                  await Clipboard.setData(ClipboardData(text: copyText!.trim()));
                   if (!context.mounted) return;
                   showTwitchNotice(
                     context,
@@ -479,12 +484,9 @@ class _WatchInfoPill extends StatelessWidget {
               : null,
           child: Container(
             height: compact ? 22 : 26,
-            constraints: BoxConstraints(
-              maxWidth: maxWidth ?? (compact ? 120 : 190),
-            ),
-            padding: EdgeInsets.symmetric(
-              horizontal:
-                  compact ? TwitchUiSpacing.space4 : TwitchUiSpacing.space8,
+            constraints: BoxConstraints(maxWidth: maxWidth ?? 150),
+            padding: const EdgeInsets.symmetric(
+              horizontal: TwitchUiSpacing.space4,
             ),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
@@ -503,6 +505,7 @@ class _WatchInfoPill extends StatelessWidget {
                   child: Text(
                     label,
                     maxLines: 1,
+                    softWrap: false,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       color: TwitchUiColors.textSecondary,
@@ -510,6 +513,7 @@ class _WatchInfoPill extends StatelessWidget {
                           ? TwitchUiFontSize.micro
                           : TwitchUiFontSize.meta,
                       fontWeight: TwitchUiFontWeight.medium,
+                      height: 1.0,
                     ),
                   ),
                 ),

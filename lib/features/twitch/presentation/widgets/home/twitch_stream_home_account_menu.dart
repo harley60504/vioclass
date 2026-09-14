@@ -2,34 +2,43 @@ import 'package:flutter/material.dart';
 
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../shared/twitch_glass.dart';
 
 class TwitchStreamHomeAccountMenu extends StatelessWidget {
   final Future<void> Function() onOpenSettings;
+  final bool compact;
 
-  const TwitchStreamHomeAccountMenu({super.key, required this.onOpenSettings});
+  const TwitchStreamHomeAccountMenu({
+    super.key,
+    required this.onOpenSettings,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final size = compact ? 42.0 : 46.0;
     return Tooltip(
       message: context.vio.t('設定'),
-      child: Material(
-        color: const Color(0xB8221B32),
-        borderRadius: BorderRadius.circular(999),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => onOpenSettings(),
-          child: Container(
-            width: 48,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            child: const Icon(
-              Icons.settings_rounded,
-              color: TwitchUiColors.primarySoft,
-              size: 22,
+      child: TwitchGlassSurface(
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+        backgroundColor: TwitchUiColors.surfaceGlass,
+        borderColor: TwitchUiColors.border,
+        blurSigma: TwitchUiGlass.blurSoft,
+        boxShadow: TwitchUiShadows.soft,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onOpenSettings(),
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: Icon(
+                Icons.settings_rounded,
+                color: TwitchUiColors.textSecondary,
+                size: compact ? 19 : 21,
+              ),
             ),
           ),
         ),
