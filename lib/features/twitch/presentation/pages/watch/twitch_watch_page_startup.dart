@@ -142,6 +142,31 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
         state.kind == TwitchWatchPlaybackKind.vod ||
         state.kind == TwitchWatchPlaybackKind.clip;
 
+    final restoredDvrVideo = state.activeDvrVideo;
+    final restoringLiveDvrCapability =
+        restoredDvrVideo != null &&
+        (state.kind == TwitchWatchPlaybackKind.live ||
+            state.kind == TwitchWatchPlaybackKind.liveDvr);
+    if (restoringLiveDvrCapability) {
+      currentVodQualityVideo ??= restoredDvrVideo;
+      if (watchPorts.player.runtime.hasWarmLiveDvrBridge) {
+        warmedLiveDvrVideoId = restoredDvrVideo.id;
+        warmedLiveDvrResolvedAt = DateTime.now();
+        debugPrint(
+          '[LiveDvrBridge] restored warm DVR capability after mini handoff '
+          'video=${restoredDvrVideo.id}',
+        );
+      } else {
+        unawaited(
+          warmLiveDvrBridgeSource(
+            video: restoredDvrVideo,
+            channel: channel,
+            generation: generation,
+          ),
+        );
+      }
+    }
+
     if (state.kind == TwitchWatchPlaybackKind.vod ||
         state.kind == TwitchWatchPlaybackKind.clip) {
       watchPorts.player.runtime.markExternalVodPlayback(channelLogin: channel);
