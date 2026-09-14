@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Midnight Glass design tokens for VioClass.
@@ -59,10 +60,16 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // StreamNook-inspired frosted neutral ladder. The root stays dark so white
-  // text keeps reliable contrast, while surfaces become translucent white
-  // glass instead of opaque charcoal panels.
+  // Opaque fallback used on non-Windows targets. Windows uses the native
+  // acrylic compositor as the actual app backdrop, so root surfaces must stay
+  // transparent and let the desktop material show through.
   static const Color appBackground = Color(0xFF08090D);
+  static Color get windowBackground =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+      ? Colors.transparent
+      : appBackground;
+
+  // StreamNook-inspired frosted neutral ladder.
   static const Color surfaceBase = Color(0x0AFFFFFF);
   static const Color surfacePanel = Color(0x10FFFFFF);
   static const Color surfaceCard = Color(0x14FFFFFF);
