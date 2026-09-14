@@ -76,52 +76,46 @@ class TwitchChatInputBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final rowHeight = _inputRowHeight;
     final fontSize = _inputFontSize;
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: TwitchUiColors.surfacePanel,
-        border: Border(top: BorderSide(color: TwitchUiColors.divider)),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        TwitchUiSpacing.space12,
+        compact ? TwitchUiSpacing.space4 : TwitchUiSpacing.space8,
+        TwitchUiSpacing.space12,
+        compact ? TwitchUiSpacing.space8 : TwitchUiSpacing.space12,
       ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          TwitchUiSpacing.space12,
-          compact ? TwitchUiSpacing.space8 : TwitchUiSpacing.space12,
-          TwitchUiSpacing.space12,
-          compact ? TwitchUiSpacing.space8 : TwitchUiSpacing.space12,
-        ),
-        child: SizedBox(
-          height: rowHeight,
-          child: Row(
-            children: [
-              _InputActionButton(
+      child: SizedBox(
+        height: rowHeight,
+        child: Row(
+          children: [
+            _InputActionButton(
+              height: rowHeight,
+              tooltip: context.vio.t('表情符號'),
+              icon: Icons.emoji_emotions_outlined,
+              enabled: enabled && !sending,
+              onTap: onOpenEmotes,
+            ),
+            const SizedBox(width: TwitchUiSpacing.space8),
+            Expanded(
+              child: _SelfDrawnInputField(
                 height: rowHeight,
-                tooltip: context.vio.t('表情符號'),
-                icon: Icons.emoji_emotions_outlined,
+                controller: controller,
                 enabled: enabled && !sending,
-                onTap: onOpenEmotes,
+                fontSize: fontSize,
+                lineHeight: _inputLineHeight,
+                verticalPadding: _inputVerticalPadding,
+                onSubmit: () => unawaited(_submitIfPossible(context)),
               ),
-              const SizedBox(width: TwitchUiSpacing.space8),
-              Expanded(
-                child: _SelfDrawnInputField(
-                  height: rowHeight,
-                  controller: controller,
-                  enabled: enabled && !sending,
-                  fontSize: fontSize,
-                  lineHeight: _inputLineHeight,
-                  verticalPadding: _inputVerticalPadding,
-                  onSubmit: () => unawaited(_submitIfPossible(context)),
-                ),
-              ),
-              const SizedBox(width: TwitchUiSpacing.space8),
-              _SelfDrawnSendButton(
-                height: rowHeight,
-                minWidth: compact ? rowHeight : 86,
-                compact: compact,
-                enabled: enabled && !sending,
-                sending: sending,
-                onTap: () => unawaited(_submitIfPossible(context)),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(width: TwitchUiSpacing.space8),
+            _SelfDrawnSendButton(
+              height: rowHeight,
+              minWidth: compact ? rowHeight : 86,
+              compact: compact,
+              enabled: enabled && !sending,
+              sending: sending,
+              onTap: () => unawaited(_submitIfPossible(context)),
+            ),
+          ],
         ),
       ),
     );
