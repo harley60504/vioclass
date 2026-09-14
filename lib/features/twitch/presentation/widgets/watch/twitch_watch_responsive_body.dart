@@ -14,7 +14,7 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 class TwitchWatchResponsiveBody extends StatelessWidget {
   static const double _chatMinWidthVisualBoost = 18.0;
   static const double _playerAspectRatio = 16 / 9;
-  static const Color _watchBackgroundColor = Color(0xFF171222);
+  static const Color _watchBackgroundColor = Color(0x28000000);
 
   final bool chatVisible;
   final bool fullscreenMode;
