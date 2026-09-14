@@ -452,9 +452,9 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.34),
+        color: Colors.white.withValues(alpha: 0.055),
         border: Border(
-          left: BorderSide(color: Colors.white.withValues(alpha: 0.055)),
+          left: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
         ),
       ),
       child: LayoutBuilder(
