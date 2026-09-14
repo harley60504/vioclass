@@ -24,7 +24,7 @@ class TwitchUiTheme {
       brightness: Brightness.dark,
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: TwitchUiColors.appBackground,
+      scaffoldBackgroundColor: TwitchUiColors.windowBackground,
       canvasColor: TwitchUiColors.surfaceBase,
       cardColor: TwitchUiColors.surfaceCard,
       dividerColor: TwitchUiColors.divider,
