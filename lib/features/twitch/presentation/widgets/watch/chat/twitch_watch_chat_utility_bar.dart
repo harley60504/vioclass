@@ -4,6 +4,7 @@ import '../../../../services/engagement/twitch_channel_points_runtime_service.da
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../channel_points/twitch_channel_points_sheet_utils.dart';
+import '../../chat/twitch_chat_composer_button_style.dart';
 import '../../shared/twitch_cached_image_layer.dart';
 import '../../shared/twitch_default_channel_points_icon.dart';
 
@@ -83,44 +84,33 @@ class _ChannelPointsCompactButton extends StatelessWidget {
     final fullLabel = balance == null
         ? '--'
         : formatChannelPointFullNumber(balance!);
-    final palette = TwitchUiColors.sheet.backplate;
-
     return Tooltip(
       message: hasClaim
           ? '${context.vio.t('忠誠點數')} $fullLabel · ${context.vio.t('有可領獎勵')}'
           : '${context.vio.t('忠誠點數')} $fullLabel',
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        onTap: onTap,
-        child: Container(
-          height: 30,
-          padding: const EdgeInsets.fromLTRB(8, 0, 9, 0),
-          decoration: BoxDecoration(
-            color: hasClaim ? palette.fillActive : palette.fill,
-            borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(
-              color: hasClaim ? palette.borderActive : palette.border,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _ChannelPointsIcon(iconUrl: iconUrl, hasClaim: hasClaim),
-              if (balance != null) ...[
-                const SizedBox(width: 5),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: hasClaim
-                        ? palette.foreground
-                        : palette.foregroundMuted,
-                    fontSize: 11,
-                    fontWeight: TwitchUiFontWeight.heavy,
-                  ),
+      child: TextButton(
+        onPressed: onTap,
+        style: twitchChatComposerButtonStyle(
+          enabled: true,
+          active: hasClaim,
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _ChannelPointsIcon(iconUrl: iconUrl, hasClaim: hasClaim),
+            if (balance != null) ...[
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1,
+                  fontWeight: TwitchUiFontWeight.heavy,
                 ),
-              ],
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -179,30 +169,15 @@ class _UtilityButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = TwitchUiColors.sheet.backplate;
-
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        onTap: onTap,
-        child: Container(
-          width: 34,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active ? palette.fillActive : palette.fill,
-            borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(
-              color: active ? palette.borderActive : palette.border,
-            ),
-          ),
-          child: Icon(
-            icon,
-            size: 15,
-            color: active ? palette.foreground : palette.foregroundMuted,
-          ),
+      child: IconButton(
+        onPressed: onTap,
+        style: twitchChatComposerButtonStyle(
+          enabled: onTap != null,
+          active: active,
         ),
+        icon: Icon(icon, size: 16),
       ),
     );
   }

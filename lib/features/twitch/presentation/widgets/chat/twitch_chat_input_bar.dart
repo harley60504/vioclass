@@ -7,6 +7,7 @@ import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_notice.dart';
 import '../shared/twitch_text_field.dart';
+import 'twitch_chat_composer_button_style.dart';
 import 'twitch_chat_input_emote_state.dart';
 import 'twitch_chat_text_style.dart';
 
@@ -30,7 +31,7 @@ class TwitchChatInputBar extends StatelessWidget {
     required this.onSend,
   });
 
-  static const double _inputRowHeight = 36;
+  static const double _inputRowHeight = 48;
   static const double _inputFontSize = 13;
   static const double _inputLineHeight = 1.20;
 
@@ -255,27 +256,9 @@ class _SelfDrawnSendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final foreground = enabled
-        ? TwitchUiColors.textOnAccent
-        : TwitchUiColors.disabledForeground;
     return IconButton(
       onPressed: enabled ? onTap : null,
-      style: IconButton.styleFrom(
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: const EdgeInsets.all(10),
-        backgroundColor: enabled
-            ? TwitchUiColors.primary
-            : TwitchUiColors.surfaceInteractive,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-          side: BorderSide(
-            color: enabled
-                ? TwitchUiColors.primarySoft.withValues(alpha: 0.34)
-                : TwitchUiColors.borderSubtle,
-          ),
-        ),
-      ),
+      style: twitchChatComposerButtonStyle(enabled: enabled, emphasized: true),
       icon: SizedBox.square(
         dimension: 16,
         child: Center(
@@ -284,10 +267,12 @@ class _SelfDrawnSendButton extends StatelessWidget {
                   dimension: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: foreground,
+                    color: enabled
+                        ? TwitchUiColors.textOnAccent
+                        : TwitchUiColors.disabledForeground,
                   ),
                 )
-              : Icon(Icons.send_rounded, size: 16, color: foreground),
+              : const Icon(Icons.send_rounded, size: 16),
         ),
       ),
     );
