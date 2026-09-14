@@ -60,14 +60,15 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // Opaque fallback used on non-Windows targets. Windows uses the native
-  // acrylic compositor as the actual app backdrop, so root surfaces must stay
-  // transparent and let the desktop material show through.
-  static const Color appBackground = Color(0xFF08090D);
+  // Shared page tint. On Windows this sits directly on top of the native
+  // acrylic compositor; on other platforms an opaque fallback remains behind
+  // it so the existing dark appearance is preserved.
+  static const Color appBackground = Color(0x5208090D);
+  static const Color fallbackAppBackground = Color(0xFF08090D);
   static Color get windowBackground =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
       ? Colors.transparent
-      : appBackground;
+      : fallbackAppBackground;
 
   // StreamNook-inspired frosted neutral ladder.
   static const Color surfaceBase = Color(0x0AFFFFFF);
