@@ -57,36 +57,39 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
     final twoRows = layout.shouldUseTwoRowHomeToolbar;
     final topInset = twoRows ? 118.0 : 72.0;
 
-    return Stack(
-      children: <Widget>[
-        Positioned.fill(
-          child: Padding(
-            padding: EdgeInsets.only(top: topInset),
-            child: this._buildHomeContent(),
+    return ColoredBox(
+      color: TwitchUiColors.appBackground,
+      child: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: Padding(
+              padding: EdgeInsets.only(top: topInset),
+              child: this._buildHomeContent(),
+            ),
           ),
-        ),
-        Positioned(
-          left: twoRows ? 10 : 16,
-          right: twoRows ? 10 : 16,
-          top: 8,
-          child: TwitchStreamHomeToolbar(
-            selectedSection: selectedSection,
-            onSelectSection: selectSection,
-            searchController: searchController,
-            forceTwoRows: twoRows,
-            onSearchChanged: updateSearchText,
-            onClearSearch: () {
-              searchController.clear();
-              updateSearchText('');
-            },
-            onShowGameMenu: showCurrentGameMenu,
-            onShowLanguageMenu: showCurrentLanguageMenu,
-            onRefresh: refreshCurrentPage,
-            onOpenDropsConnector: openDropsConnectorPage,
-            onOpenSettings: openSettings,
+          Positioned(
+            left: twoRows ? 10 : 16,
+            right: twoRows ? 10 : 16,
+            top: 8,
+            child: TwitchStreamHomeToolbar(
+              selectedSection: selectedSection,
+              onSelectSection: selectSection,
+              searchController: searchController,
+              forceTwoRows: twoRows,
+              onSearchChanged: updateSearchText,
+              onClearSearch: () {
+                searchController.clear();
+                updateSearchText('');
+              },
+              onShowGameMenu: showCurrentGameMenu,
+              onShowLanguageMenu: showCurrentLanguageMenu,
+              onRefresh: refreshCurrentPage,
+              onOpenDropsConnector: openDropsConnectorPage,
+              onOpenSettings: openSettings,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
