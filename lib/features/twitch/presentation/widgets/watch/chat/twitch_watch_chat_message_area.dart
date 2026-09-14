@@ -32,35 +32,26 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentRuntime = runtime;
+    if (currentRuntime == null) return const TwitchChatEmptyView();
 
-    // This widget owns the exact rectangular viewport between the fixed chat
-    // chrome above and below it. Nothing rendered by the message feed may paint
-    // outside these bounds.
-    return SizedBox.expand(
-      child: ClipRect(
-        clipBehavior: Clip.hardEdge,
-        child: currentRuntime == null
-            ? const TwitchChatEmptyView()
-            : AnimatedBuilder(
-                animation: Listenable.merge([
-                  currentRuntime,
-                  thirdPartyEmoteCache,
-                  officialEmoteCache,
-                  appearanceListenable,
-                ]),
-                builder: (context, _) {
-                  return TwitchChatMessageList(
-                    runtime: currentRuntime,
-                    thirdPartyEmoteCache: thirdPartyEmoteCache,
-                    officialEmoteCache: officialEmoteCache,
-                    showTimestamp: showTimestamp,
-                    fontScale: fontScale,
-                    compact: compact,
-                    onOpenMessageContext: onOpenMessageContext,
-                  );
-                },
-              ),
-      ),
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        currentRuntime,
+        thirdPartyEmoteCache,
+        officialEmoteCache,
+        appearanceListenable,
+      ]),
+      builder: (context, _) {
+        return TwitchChatMessageList(
+          runtime: currentRuntime,
+          thirdPartyEmoteCache: thirdPartyEmoteCache,
+          officialEmoteCache: officialEmoteCache,
+          showTimestamp: showTimestamp,
+          fontScale: fontScale,
+          compact: compact,
+          onOpenMessageContext: onOpenMessageContext,
+        );
+      },
     );
   }
 }
