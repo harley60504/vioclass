@@ -130,13 +130,16 @@ class TwitchUiColors {
         foregroundMuted: Color(0xCCB8B2D8),
       );
 
+  // Sheets stay fully opaque so the page underneath never bleeds through.
+  // Controls and cards inside the sheet still use the neutral translucent
+  // surface tokens above.
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
-    background: surfacePanel,
+    background: Color(0xFF120D1D),
     scrim: Color(0x99000000),
-    shellGradientStart: Color(0x52000000),
-    shellGradientEnd: Color(0x66000000),
-    headerGradientStart: Color(0x5A000000),
-    headerGradientEnd: Color(0x42000000),
+    shellGradientStart: Color(0xFF1B1428),
+    shellGradientEnd: Color(0xFF120D1D),
+    headerGradientStart: Color(0xFF211832),
+    headerGradientEnd: Color(0xFF151020),
     border: border,
     shadow: Color(0xB3000000),
     handle: Color(0x5AFFFFFF),
