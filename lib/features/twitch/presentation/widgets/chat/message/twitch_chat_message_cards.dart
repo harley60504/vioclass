@@ -43,12 +43,12 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
         horizontal: TwitchUiSpacing.space8,
         vertical: TwitchUiSpacing.space2,
       ),
-      child: _ChatHoverSurface(
-        onOpenContext: onOpenContext,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TwitchChatMessageContent(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ChatHoverSurface(
+            onOpenContext: onOpenContext,
+            child: TwitchChatMessageContent(
               message: message,
               thirdPartyEmotes: thirdPartyEmotes,
               officialEmotes: officialEmotes,
@@ -59,12 +59,12 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
               metrics: metrics,
               animateEmotes: animateEmotes,
             ),
-            TwitchChatLinkPreviewColumn(
-              items: previewItems,
-              fontScale: metrics.scale,
-            ),
-          ],
-        ),
+          ),
+          TwitchChatLinkPreviewColumn(
+            items: previewItems,
+            fontScale: metrics.scale,
+          ),
+        ],
       ),
     );
   }
