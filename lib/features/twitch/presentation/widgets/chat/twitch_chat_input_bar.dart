@@ -82,6 +82,7 @@ class TwitchChatInputBar extends StatelessWidget {
       child: SizedBox(
         height: rowHeight,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
               child: _SelfDrawnInputField(
@@ -173,6 +174,7 @@ class _SelfDrawnInputField extends StatelessWidget {
       ),
       selectionControls: materialTextSelectionControls,
       decoration: InputDecoration(
+        constraints: BoxConstraints.tightFor(height: height),
         hintText: hintText?.trim().isNotEmpty == true
             ? hintText
             : l10n.t('輸入聊天室訊息...'),
@@ -259,39 +261,36 @@ class _SelfDrawnSendButton extends StatelessWidget {
     final foreground = enabled
         ? TwitchUiColors.textOnAccent
         : TwitchUiColors.disabledForeground;
-    return Material(
-      color: enabled
-          ? TwitchUiColors.primary
-          : TwitchUiColors.surfaceInteractive,
-      borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        child: Container(
-          height: height,
-          constraints: BoxConstraints(minWidth: minWidth),
-          padding: const EdgeInsets.symmetric(
-            horizontal: TwitchUiSpacing.space8,
+    return SizedBox(
+      width: minWidth,
+      height: height,
+      child: Material(
+        color: enabled
+            ? TwitchUiColors.primary
+            : TwitchUiColors.surfaceInteractive,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+          side: BorderSide(
+            color: enabled
+                ? TwitchUiColors.primarySoft.withValues(alpha: 0.34)
+                : TwitchUiColors.borderSubtle,
           ),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-            border: Border.all(
-              color: enabled
-                  ? TwitchUiColors.primarySoft.withValues(alpha: 0.34)
-                  : TwitchUiColors.borderSubtle,
-            ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          child: Center(
+            child: sending
+                ? SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: foreground,
+                    ),
+                  )
+                : Icon(Icons.send_rounded, size: 16, color: foreground),
           ),
-          child: sending
-              ? SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: foreground,
-                  ),
-                )
-              : Icon(Icons.send_rounded, size: 16, color: foreground),
         ),
       ),
     );
