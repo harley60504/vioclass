@@ -27,13 +27,20 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
         : _localizedPendingText(l10n, pending.costLabel!);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, compact ? 7 : 9, 10, 0),
+      padding: EdgeInsets.fromLTRB(10, compact ? 7 : 9, 10, 5),
       child: Container(
         padding: EdgeInsets.fromLTRB(10, compact ? 8 : 10, 7, compact ? 8 : 10),
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.12),
+          color: TwitchUiColors.surfaceRaised,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: accent.withValues(alpha: 0.34)),
+          border: Border.all(color: accent.withValues(alpha: 0.42)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x66000000),
+              blurRadius: 18,
+              offset: Offset(0, 6),
+            ),
+          ],
         ),
         child: Row(
           children: <Widget>[
@@ -42,7 +49,7 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
               height: compact ? 30 : 34,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.20),
+                color: accent.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
                 border: Border.all(color: accent.withValues(alpha: 0.42)),
               ),
