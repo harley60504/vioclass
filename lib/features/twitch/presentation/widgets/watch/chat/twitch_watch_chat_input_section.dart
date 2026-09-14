@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../../services/chat/twitch_chat_runtime.dart';
 import '../../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 import '../../chat/twitch_chat_input_bar.dart';
 import 'twitch_chat_room_mode_banner.dart';
 import 'twitch_pending_chat_action_banner.dart';
@@ -56,19 +57,6 @@ class TwitchWatchChatInputSection extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: Colors.white.withValues(alpha: 0.055),
-          ),
-          TwitchWatchChatUtilityBar(
-            channelPoints: channelPoints,
-            loadingEmotes: loadingEmotes,
-            compact: compact,
-            onOpenChannelPoints: onOpenChannelPoints,
-            onOpenEmotes: onOpenEmotes,
-            onOpenSpecialActions: onOpenSpecialActions,
-          ),
           if (pending != null)
             TwitchPendingChatActionBanner(
               pending: pending,
@@ -88,13 +76,34 @@ class TwitchWatchChatInputSection extends StatelessWidget {
                 viewerIsSubscriber: activeRuntime.viewerIsSubscriber,
               ),
             ),
-          TwitchChatInputBar(
-            controller: messageController,
-            enabled: enabled,
-            sending: sending,
-            compact: compact,
-            onSend: onSend,
-            onOpenEmotes: onOpenEmotes,
+          DecoratedBox(
+            decoration: const BoxDecoration(
+              color: TwitchUiColors.surfacePanel,
+              border: Border(
+                top: BorderSide(color: TwitchUiColors.divider),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TwitchWatchChatUtilityBar(
+                  channelPoints: channelPoints,
+                  loadingEmotes: loadingEmotes,
+                  compact: compact,
+                  onOpenChannelPoints: onOpenChannelPoints,
+                  onOpenEmotes: onOpenEmotes,
+                  onOpenSpecialActions: onOpenSpecialActions,
+                ),
+                TwitchChatInputBar(
+                  controller: messageController,
+                  enabled: enabled,
+                  sending: sending,
+                  compact: compact,
+                  onSend: onSend,
+                  onOpenEmotes: onOpenEmotes,
+                ),
+              ],
+            ),
           ),
         ],
       ),
