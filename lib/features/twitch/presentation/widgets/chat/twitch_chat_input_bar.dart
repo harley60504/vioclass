@@ -12,30 +12,20 @@ class TwitchChatInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
   final bool sending;
-  final bool compact;
   final FutureOr<void> Function() onSend;
-  final VoidCallback onOpenEmotes;
 
   const TwitchChatInputBar({
     super.key,
     required this.controller,
     required this.enabled,
     required this.sending,
-    required this.compact,
     required this.onSend,
-    required this.onOpenEmotes,
   });
 
-  static const double _normalInputRowHeight = 40;
-  static const double _compactInputRowHeight = 36;
-  static const double _normalInputFontSize = 14;
-  static const double _compactInputFontSize = 13;
+  static const double _inputRowHeight = 36;
+  static const double _inputFontSize = 13;
   static const double _inputLineHeight = 1.20;
 
-  double get _inputRowHeight =>
-      compact ? _compactInputRowHeight : _normalInputRowHeight;
-  double get _inputFontSize =>
-      compact ? _compactInputFontSize : _normalInputFontSize;
   double get _inputVerticalPadding =>
       (_inputRowHeight - _inputFontSize * _inputLineHeight) / 2;
 
@@ -77,24 +67,16 @@ class TwitchChatInputBar extends StatelessWidget {
     final rowHeight = _inputRowHeight;
     final fontSize = _inputFontSize;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
+      padding: const EdgeInsets.fromLTRB(
         TwitchUiSpacing.space12,
-        compact ? TwitchUiSpacing.space4 : TwitchUiSpacing.space8,
+        TwitchUiSpacing.space4,
         TwitchUiSpacing.space12,
-        compact ? TwitchUiSpacing.space8 : TwitchUiSpacing.space12,
+        TwitchUiSpacing.space8,
       ),
       child: SizedBox(
         height: rowHeight,
         child: Row(
           children: [
-            _InputActionButton(
-              height: rowHeight,
-              tooltip: context.vio.t('表情符號'),
-              icon: Icons.emoji_emotions_outlined,
-              enabled: enabled && !sending,
-              onTap: onOpenEmotes,
-            ),
-            const SizedBox(width: TwitchUiSpacing.space8),
             Expanded(
               child: _SelfDrawnInputField(
                 height: rowHeight,
@@ -109,53 +91,12 @@ class TwitchChatInputBar extends StatelessWidget {
             const SizedBox(width: TwitchUiSpacing.space8),
             _SelfDrawnSendButton(
               height: rowHeight,
-              minWidth: compact ? rowHeight : 86,
-              compact: compact,
+              minWidth: rowHeight,
               enabled: enabled && !sending,
               sending: sending,
               onTap: () => unawaited(_submitIfPossible(context)),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InputActionButton extends StatelessWidget {
-  final double height;
-  final String tooltip;
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  const _InputActionButton({
-    required this.height,
-    required this.tooltip,
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: SizedBox(
-        width: height,
-        height: height,
-        child: IconButton(
-          onPressed: enabled ? onTap : null,
-          icon: Icon(icon, size: 19),
-          style: IconButton.styleFrom(
-            backgroundColor: TwitchUiColors.surfaceInteractive,
-            foregroundColor: TwitchUiColors.textSecondary,
-            disabledForegroundColor: TwitchUiColors.disabledForeground,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-              side: const BorderSide(color: TwitchUiColors.borderSubtle),
-            ),
-          ),
         ),
       ),
     );
@@ -282,7 +223,6 @@ class _SelfDrawnInputField extends StatelessWidget {
 class _SelfDrawnSendButton extends StatelessWidget {
   final double height;
   final double minWidth;
-  final bool compact;
   final bool enabled;
   final bool sending;
   final VoidCallback onTap;
@@ -290,7 +230,6 @@ class _SelfDrawnSendButton extends StatelessWidget {
   const _SelfDrawnSendButton({
     required this.height,
     required this.minWidth,
-    required this.compact,
     required this.enabled,
     required this.sending,
     required this.onTap,
@@ -302,7 +241,9 @@ class _SelfDrawnSendButton extends StatelessWidget {
         ? TwitchUiColors.textOnAccent
         : TwitchUiColors.disabledForeground;
     return Material(
-      color: enabled ? TwitchUiColors.primary : TwitchUiColors.surfaceInteractive,
+      color: enabled
+          ? TwitchUiColors.primary
+          : TwitchUiColors.surfaceInteractive,
       borderRadius: BorderRadius.circular(TwitchUiRadius.md),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -310,8 +251,8 @@ class _SelfDrawnSendButton extends StatelessWidget {
         child: Container(
           height: height,
           constraints: BoxConstraints(minWidth: minWidth),
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? TwitchUiSpacing.space8 : TwitchUiSpacing.space12,
+          padding: const EdgeInsets.symmetric(
+            horizontal: TwitchUiSpacing.space8,
           ),
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -331,25 +272,7 @@ class _SelfDrawnSendButton extends StatelessWidget {
                     color: foreground,
                   ),
                 )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.send_rounded, size: compact ? 16 : 17, color: foreground),
-                    if (!compact) ...[
-                      const SizedBox(width: TwitchUiSpacing.space8),
-                      Text(
-                        context.vio.t('送出'),
-                        style: twitchChatTextStyle(
-                          TextStyle(
-                            color: foreground,
-                            fontSize: TwitchUiFontSize.bodyCompact,
-                            fontWeight: TwitchUiFontWeight.strong,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              : Icon(Icons.send_rounded, size: 16, color: foreground),
         ),
       ),
     );
