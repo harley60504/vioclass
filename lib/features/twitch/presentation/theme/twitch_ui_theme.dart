@@ -162,7 +162,7 @@ class TwitchUiTheme {
         ),
       ),
       dialogTheme: DialogThemeData(
-        backgroundColor: TwitchUiColors.surfaceRaised,
+        backgroundColor: TwitchUiColors.appBackground,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(TwitchUiRadius.xl),
@@ -170,9 +170,9 @@ class TwitchUiTheme {
         ),
       ),
       bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: TwitchUiColors.surfacePanel,
-        modalBackgroundColor: TwitchUiColors.surfacePanel,
-        modalBarrierColor: Color(0xB3000000),
+        backgroundColor: Colors.transparent,
+        modalBackgroundColor: Colors.transparent,
+        modalBarrierColor: TwitchUiColors.sheet.scrim,
         showDragHandle: false,
       ),
     );
