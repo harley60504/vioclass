@@ -63,23 +63,24 @@ class TwitchUiColors {
   // Shared page tint. On Windows this sits directly on top of the native
   // acrylic compositor; on other platforms an opaque fallback remains behind
   // it so the existing dark appearance is preserved.
-  static const Color appBackground = Color(0x5208090D);
+  static const Color appBackground = Color(0x36000000);
   static const Color fallbackAppBackground = Color(0xFF08090D);
   static Color get windowBackground =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
       ? Colors.transparent
       : fallbackAppBackground;
 
-  // StreamNook-inspired frosted neutral ladder.
-  static const Color surfaceBase = Color(0x0AFFFFFF);
-  static const Color surfacePanel = Color(0x10FFFFFF);
-  static const Color surfaceCard = Color(0x14FFFFFF);
-  static const Color surfaceRaised = Color(0x1AFFFFFF);
-  static const Color surfaceInteractive = Color(0x20FFFFFF);
-  static const Color surfaceHover = Color(0x2AFFFFFF);
-  static const Color surfaceSelected = Color(0x298D7BFF);
-  static const Color surfacePlayer = Color(0x8A0A0B10);
-  static const Color surfaceGlass = Color(0x18FFFFFF);
+  // Translucent-black glass ladder. The desktop acrylic remains visible below
+  // these surfaces while controls keep reliable contrast over bright wallpaper.
+  static const Color surfaceBase = Color(0x12000000);
+  static const Color surfacePanel = Color(0x22000000);
+  static const Color surfaceCard = Color(0x2C000000);
+  static const Color surfaceRaised = Color(0x38000000);
+  static const Color surfaceInteractive = Color(0x46000000);
+  static const Color surfaceHover = Color(0x5A000000);
+  static const Color surfaceSelected = Color(0x668D7BFF);
+  static const Color surfacePlayer = Color(0x8A000000);
+  static const Color surfaceGlass = Color(0x40000000);
 
   // Backward-compatible aliases. New code should prefer semantic names above.
   static const Color surface = surfacePanel;
@@ -133,12 +134,12 @@ class TwitchUiColors {
       );
 
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
-    background: Color(0xEE111319),
+    background: Color(0xB8000000),
     scrim: Color(0x99000000),
-    shellGradientStart: Color(0x2EFFFFFF),
-    shellGradientEnd: Color(0x1410161E),
-    headerGradientStart: Color(0x36FFFFFF),
-    headerGradientEnd: Color(0x1811161E),
+    shellGradientStart: Color(0x66000000),
+    shellGradientEnd: Color(0x8A000000),
+    headerGradientStart: Color(0x52000000),
+    headerGradientEnd: Color(0x76000000),
     border: border,
     shadow: Color(0x42000000),
     handle: Color(0x5AFFFFFF),
