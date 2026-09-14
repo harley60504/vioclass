@@ -13,6 +13,7 @@ import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../settings/twitch_chat_appearance_controller.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../chat/twitch_chat_text_style.dart';
 import 'chat/twitch_watch_chat_engagement_area.dart';
 import 'chat/twitch_watch_chat_header_bar.dart';
@@ -451,11 +452,12 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
     final prediction = _visiblePrediction ?? widget.prediction;
 
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: const Color(0x2A000000),
-        border: Border(
-          left: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
-        ),
+      decoration: const BoxDecoration(
+        // Chat owns its canvas instead of compositing through the watch
+        // route. Header, messages and composer therefore share one stable
+        // Android render target even while the window surface is recreated.
+        color: TwitchUiColors.surfacePanel,
+        border: Border(left: BorderSide(color: TwitchUiColors.borderSubtle)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {

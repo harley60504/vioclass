@@ -47,6 +47,7 @@ import '../watch/twitch_watch_port_scope.dart';
 import '../watch/twitch_watch_playback_kind.dart';
 import '../watch/twitch_watch_scope.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../watch/twitch_playback_session_controller.dart';
 import '../dialogs/twitch_clip_editor_dialog.dart';
 import '../widgets/channel/twitch_channel_about_section.dart';
@@ -1391,7 +1392,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         unawaited(leaveToMiniPlayer());
       },
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        // The watch route owns an opaque canvas. Android devices can briefly
+        // lose the route below this one while recreating the window surface;
+        // a transparent scaffold would then expose the platform's white
+        // fallback behind every translucent watch control.
+        backgroundColor: TwitchUiColors.appBackground,
         body: Stack(
           children: [
             Positioned.fill(

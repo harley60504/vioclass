@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../localization/vioclass_localizations.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../responsive/twitch_responsive_layout.dart';
 import 'player/twitch_player_only_surface.dart';
 import 'twitch_watch_chat_resize_handle.dart';
@@ -14,7 +15,6 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 class TwitchWatchResponsiveBody extends StatelessWidget {
   static const double _chatMinWidthVisualBoost = 18.0;
   static const double _playerAspectRatio = 16 / 9;
-  static const Color _watchBackgroundColor = Color(0x0DFFFFFF);
 
   final bool chatVisible;
   final bool fullscreenMode;
@@ -65,7 +65,10 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
 
         return DecoratedBox(
           decoration: const BoxDecoration(
-            color: _watchBackgroundColor,
+            // Always paint a complete opaque frame before adding the visual
+            // gradient. This keeps the Flutter UI layer independent from the
+            // native video surface and the route underneath it.
+            color: TwitchUiColors.appBackground,
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -398,9 +401,11 @@ class _WatchSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.045),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.surfacePanel,
+        border: Border.fromBorderSide(
+          BorderSide(color: TwitchUiColors.borderSubtle),
+        ),
       ),
       child: child,
     );
