@@ -31,16 +31,9 @@ class TwitchPendingChatActionBanner extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.fromLTRB(10, compact ? 8 : 10, 7, compact ? 8 : 10),
         decoration: BoxDecoration(
-          color: TwitchUiColors.surfaceRaised,
+          color: TwitchUiColors.surfaceCard,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: accent.withValues(alpha: 0.42)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x66000000),
-              blurRadius: 18,
-              offset: Offset(0, 6),
-            ),
-          ],
+          border: Border.all(color: accent.withValues(alpha: 0.34)),
         ),
         child: Row(
           children: <Widget>[
