@@ -36,7 +36,7 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
       final video = page.videos.first;
       if (video.isLikelyGrowingArchive) return false;
       showOfflineChannelPlaceholder = false;
-      return openVodPlayback(
+      return await openVodPlayback(
         channel: channel,
         generation: generation,
         video: video,
@@ -72,7 +72,7 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
         if (mounted) setState(() {});
         return true;
       }
-      return openVodPlayback(
+      return await openVodPlayback(
         channel: channel,
         generation: generation,
         video: video,
@@ -174,7 +174,9 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
   }) async {
     if (usesLiveDvrArchive(video)) {
       activeGrowingVodVideo = video;
-      debugPrint('[WatchVodOnly] growing archive redirected to live DVR bridge');
+      debugPrint(
+        '[WatchVodOnly] growing archive redirected to live DVR bridge',
+      );
       await switchToLiveDvrReplay(
         video: video,
         position:
@@ -241,7 +243,8 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
         } else if (initialRatio != null) {
           final target = Duration(
             milliseconds:
-                (duration.inMilliseconds * initialRatio.clamp(0.0, 0.98)).round(),
+                (duration.inMilliseconds * initialRatio.clamp(0.0, 0.98))
+                    .round(),
           );
           await playerSession.player.seek(target);
         }

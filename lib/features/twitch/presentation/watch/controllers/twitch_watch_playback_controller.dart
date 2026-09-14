@@ -142,8 +142,8 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       }
 
       if (isSequentialDvr) {
-        dvrTransitionGeneration =
-            TwitchDvrTransitionMaskController.instance.begin();
+        dvrTransitionGeneration = TwitchDvrTransitionMaskController.instance
+            .begin();
       }
 
       if (startPosition != null) {
@@ -157,14 +157,14 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       if (isSequentialDvr) {
         debugPrint(
           '[TwitchPlayer] sequential DVR start '
-          'target=${_seconds(startPosition!)}s '
+          'target=${_seconds(startPosition)}s '
           'strategy=media-start-single-stream',
         );
       }
 
       final openStopwatch = Stopwatch()..start();
       if (shouldDeferInitialSeek) {
-        final seekTarget = startPosition!;
+        final seekTarget = startPosition;
         await session.openOrResume(
           uri: nextUri,
           play: false,
@@ -194,7 +194,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         debugPrint(
           '[PlaybackLatency] '
           'dvrSequentialStartup=${openStopwatch.elapsedMilliseconds}ms '
-          'target=${_seconds(startPosition!)}s',
+          'target=${_seconds(startPosition)}s',
         );
 
         final transitionGeneration = dvrTransitionGeneration;
@@ -203,7 +203,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
             unawaited(
               TwitchDvrTransitionMaskController.instance.revealWhenReady(
                 player: session.player,
-                target: startPosition!,
+                target: startPosition,
                 generation: transitionGeneration,
               ),
             );
@@ -269,5 +269,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
   }
 
   String _seconds(Duration value) =>
-      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(
+        3,
+      );
 }

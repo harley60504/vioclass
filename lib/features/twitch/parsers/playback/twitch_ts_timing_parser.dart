@@ -60,9 +60,10 @@ class TwitchTsTimingInfo {
   Duration? keyframeOffsetAtOrBefore(Duration targetOffset) {
     final first = firstPts90k;
     if (first == null || keyframePts90k.isEmpty) return null;
-    final targetTicks = ((targetOffset.inMicroseconds * ptsClockHz) /
-            Duration.microsecondsPerSecond)
-        .round();
+    final targetTicks =
+        ((targetOffset.inMicroseconds * ptsClockHz) /
+                Duration.microsecondsPerSecond)
+            .round();
     int? bestTicks;
     for (final pts in keyframePts90k) {
       final delta = _forwardPtsDelta(first, pts);
@@ -81,8 +82,8 @@ class TwitchTsTimingInfo {
 
   static Duration _ticksToDuration(int ticks, int clockHz) {
     return Duration(
-      microseconds:
-          ((ticks * Duration.microsecondsPerSecond) / clockHz).round(),
+      microseconds: ((ticks * Duration.microsecondsPerSecond) / clockHz)
+          .round(),
     );
   }
 }
@@ -123,9 +124,11 @@ class TwitchTsTimingParser {
     var packetCount = 0;
     var nalCarry = <int>[];
 
-    for (var packetStart = syncOffset;
-        packetStart + _packetSize <= bytes.length;
-        packetStart += _packetSize) {
+    for (
+      var packetStart = syncOffset;
+      packetStart + _packetSize <= bytes.length;
+      packetStart += _packetSize
+    ) {
       if (bytes[packetStart] != 0x47) continue;
       packetCount++;
 
@@ -200,7 +203,7 @@ class TwitchTsTimingParser {
       final scan = <int>[...nalCarry, ...payload];
       if (_containsRandomAccessNal(scan, videoStreamType)) {
         if (keyframes.isEmpty || keyframes.last != currentVideoPesPts) {
-          keyframes.add(currentVideoPesPts!);
+          keyframes.add(currentVideoPesPts);
         }
       }
       nalCarry = scan.length <= 4
@@ -329,7 +332,8 @@ class TwitchTsTimingParser {
   }
 
   static int _readPcr27m(Uint8List b, int o) {
-    final base = (b[o] << 25) |
+    final base =
+        (b[o] << 25) |
         (b[o + 1] << 17) |
         (b[o + 2] << 9) |
         (b[o + 3] << 1) |

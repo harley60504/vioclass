@@ -26,7 +26,6 @@ import '../watch/twitch_playback_session_controller.dart';
 import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/home/twitch_stream_home_bottom_nav.dart';
-import '../widgets/home/twitch_stream_home_sidebar.dart';
 import '../widgets/home/twitch_stream_home_toolbar.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import '../widgets/shared/twitch_cached_image_layer.dart';

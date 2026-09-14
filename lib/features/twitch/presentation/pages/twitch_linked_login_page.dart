@@ -67,7 +67,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     if (webGqlReady) {
       webGqlReady = await widget.webGqlAuthService.validateToken();
       if (webGqlReady) {
-        webGqlReady = await _verifyWebGqlToken(webToken!);
+        webGqlReady = await _verifyWebGqlToken(webToken);
       }
     }
 
@@ -297,8 +297,12 @@ query ChannelPointsContext($channelLogin: String!) {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _complete ? Icons.check_circle_rounded : Icons.live_tv_rounded,
-                    color: _complete ? Colors.greenAccent : TwitchUiColors.primary,
+                    _complete
+                        ? Icons.check_circle_rounded
+                        : Icons.live_tv_rounded,
+                    color: _complete
+                        ? Colors.greenAccent
+                        : TwitchUiColors.primary,
                     size: 62,
                   ),
                   const SizedBox(height: 18),
@@ -315,10 +319,7 @@ query ChannelPointsContext($channelLogin: String!) {
                   Text(
                     _statusText,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white54,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.white54, fontSize: 14),
                   ),
                   if (_errorText != null) ...[
                     const SizedBox(height: 14),

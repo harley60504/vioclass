@@ -198,7 +198,9 @@ class TwitchChatInputEmoteState {
   }
 
   static _InputControllerState _state(TextEditingController controller) {
-    return _states[controller] ??= _InputControllerState(lastText: controller.text);
+    return _states[controller] ??= _InputControllerState(
+      lastText: controller.text,
+    );
   }
 
   static void _reconcile(
@@ -218,8 +220,7 @@ class TwitchChatInputEmoteState {
     }
 
     var suffix = 0;
-    while (
-        suffix < oldText.length - prefix &&
+    while (suffix < oldText.length - prefix &&
         suffix < newText.length - prefix &&
         oldText[oldText.length - 1 - suffix] ==
             newText[newText.length - 1 - suffix]) {
@@ -247,12 +248,9 @@ class TwitchChatInputEmoteState {
 
 class _InputControllerState {
   String lastText;
-  List<_InputEmoteMarker> markers;
+  List<_InputEmoteMarker> markers = const <_InputEmoteMarker>[];
 
-  _InputControllerState({
-    required this.lastText,
-    this.markers = const <_InputEmoteMarker>[],
-  });
+  _InputControllerState({required this.lastText});
 }
 
 class _InputEmoteMarker {
