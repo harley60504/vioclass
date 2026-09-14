@@ -170,8 +170,8 @@ class TwitchUiTheme {
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: TwitchUiColors.surfacePanel,
-        modalBackgroundColor: TwitchUiColors.surfacePanel,
+        backgroundColor: TwitchUiColors.sheet.background,
+        modalBackgroundColor: TwitchUiColors.sheet.background,
         modalBarrierColor: TwitchUiColors.sheet.scrim,
         showDragHandle: false,
       ),
