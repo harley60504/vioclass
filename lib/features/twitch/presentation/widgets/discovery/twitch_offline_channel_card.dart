@@ -3,11 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_channel_page.dart';
 import '../../pages/twitch_watch_page.dart';
-import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
-import '../chat/twitch_chat_text_style.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
 class TwitchOfflineChannelCard extends StatelessWidget {
@@ -25,103 +24,96 @@ class TwitchOfflineChannelCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.vio;
-    const radius = BorderRadius.all(Radius.circular(18));
-    final avatarUrl = channel.profileImageUrl.trim();
     final description = channel.description.trim();
-
     return Material(
-      color: Colors.transparent,
-      borderRadius: radius,
+      color: TwitchUiColors.surfaceCard,
+      borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _openMediaWatchPage(context),
-        child: Ink(
+        child: Container(
+          padding: const EdgeInsets.all(TwitchUiSpacing.space16),
           decoration: BoxDecoration(
-            borderRadius: radius,
-            color: Colors.white.withValues(alpha: 0.055),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+            borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
+            border: Border.all(color: TwitchUiColors.borderSubtle),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _OfflineAvatar(imageUrl: avatarUrl),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _OfflineAvatar(imageUrl: channel.profileImageUrl.trim()),
+                  const SizedBox(width: TwitchUiSpacing.space12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          channel.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: TwitchUiColors.textPrimary,
+                            fontSize: TwitchUiFontSize.heading,
+                            fontWeight: TwitchUiFontWeight.strong,
+                          ),
+                        ),
+                        if (channel.channelLogin.isNotEmpty) ...[
+                          const SizedBox(height: TwitchUiSpacing.space4),
                           Text(
-                            channel.displayName,
+                            channel.channelLogin,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              height: 1.08,
-                              fontWeight: FontWeight.w900,
+                              color: TwitchUiColors.textMuted,
+                              fontSize: TwitchUiFontSize.meta,
+                              fontWeight: TwitchUiFontWeight.medium,
                             ),
                           ),
-                          if (channel.channelLogin.isNotEmpty) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              channel.channelLogin,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white54,
-                                fontSize: 11.5,
-                                height: 1,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
                         ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: Text(
-                    description.isEmpty
-                        ? l10n.t('目前未開台，點擊後會先播放最新 VOD；沒有 VOD 則顯示關台圖。')
-                        : description,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                      height: 1.28,
-                      fontWeight: FontWeight.w700,
+                      ],
                     ),
                   ),
+                  const _OfflineStatusChip(),
+                ],
+              ),
+              const SizedBox(height: TwitchUiSpacing.space12),
+              Expanded(
+                child: Text(
+                  description.isEmpty
+                      ? l10n.t('目前未開台，點擊後會先播放最新 VOD；沒有 VOD 則顯示關台圖。')
+                      : description,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: TwitchUiColors.textSecondary,
+                    fontSize: TwitchUiFontSize.bodyCompact,
+                    height: 1.4,
+                    fontWeight: TwitchUiFontWeight.regular,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _OfflineActionButton(
-                        icon: Icons.play_arrow_rounded,
-                        label: l10n.t('觀看'),
-                        onPressed: () => _openMediaWatchPage(context),
-                      ),
+              ),
+              const SizedBox(height: TwitchUiSpacing.space12),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _openMediaWatchPage(context),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 17),
+                      label: Text(l10n.t('觀看')),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _OfflineActionButton(
-                        icon: Icons.video_library_rounded,
-                        label: l10n.t('媒體庫'),
-                        onPressed: () => _openChannelPage(context, 2),
-                      ),
+                  ),
+                  const SizedBox(width: TwitchUiSpacing.space8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openChannelPage(context, 2),
+                      icon: const Icon(Icons.video_library_rounded, size: 16),
+                      label: Text(l10n.t('媒體庫')),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -156,6 +148,34 @@ class TwitchOfflineChannelCard extends StatelessWidget {
   }
 }
 
+class _OfflineStatusChip extends StatelessWidget {
+  const _OfflineStatusChip();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: TwitchUiSpacing.space8,
+        vertical: TwitchUiSpacing.space4,
+      ),
+      decoration: BoxDecoration(
+        color: TwitchUiColors.surfaceInteractive,
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+        border: Border.all(color: TwitchUiColors.borderSubtle),
+      ),
+      child: const Text(
+        'OFFLINE',
+        style: TextStyle(
+          color: TwitchUiColors.textMuted,
+          fontSize: TwitchUiFontSize.micro,
+          fontWeight: TwitchUiFontWeight.strong,
+          letterSpacing: 0.4,
+        ),
+      ),
+    );
+  }
+}
+
 class _OfflineAvatar extends StatelessWidget {
   final String imageUrl;
 
@@ -164,68 +184,23 @@ class _OfflineAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const size = 44.0;
-
     return Container(
       width: size,
       height: size,
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.07),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        color: TwitchUiColors.surfaceRaised,
+        border: Border.all(color: TwitchUiColors.border),
       ),
       child: TwitchCachedImageLayer.avatar(
         imageUrl: imageUrl,
         size: size,
         cacheWidth: 88,
         cacheHeight: 88,
-        fallbackColor: Colors.white.withValues(alpha: 0.07),
-        fallbackIconColor: Colors.white38,
+        fallbackColor: TwitchUiColors.surfaceRaised,
+        fallbackIconColor: TwitchUiColors.textFaint,
         fallbackIconSize: 24,
-      ),
-    );
-  }
-}
-
-class _OfflineActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onPressed;
-
-  const _OfflineActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 34,
-      child: OutlinedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 15),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: twitchChatTextStyle(
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: TwitchUiColors.primarySoft,
-          side: BorderSide(
-            color: TwitchUiColors.primary.withValues(alpha: 0.55),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          textStyle: twitchChatTextStyle(
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
       ),
     );
   }

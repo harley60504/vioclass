@@ -6,6 +6,7 @@ import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
+import '../shared/twitch_ui_primitives.dart';
 
 class TwitchChannelAboutSection extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
@@ -31,37 +32,38 @@ class TwitchChannelAboutSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final cleanDescription = description.trim();
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 24),
-      color: const Color(0xFF0E0E10),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      color: TwitchUiColors.appBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
+        children: [
           Row(
-            children: <Widget>[
+            children: [
               _Avatar(imageUrl: metadata.profileImageUrl),
-              const SizedBox(width: 12),
+              const SizedBox(width: TwitchUiSpacing.space12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
+                  children: [
                     Text(
                       metadata.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
+                        color: TwitchUiColors.textPrimary,
+                        fontSize: TwitchUiFontSize.title,
+                        fontWeight: TwitchUiFontWeight.strong,
                       ),
                     ),
+                    const SizedBox(height: TwitchUiSpacing.space4),
                     Text(
                       metadata.channelLogin,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
+                        color: TwitchUiColors.textMuted,
+                        fontSize: TwitchUiFontSize.bodyCompact,
+                        fontWeight: TwitchUiFontWeight.medium,
                       ),
                     ),
                   ],
@@ -69,19 +71,19 @@ class TwitchChannelAboutSection extends StatelessWidget {
               ),
             ],
           ),
-          if (cleanDescription.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 14),
+          if (cleanDescription.isNotEmpty) ...[
+            const SizedBox(height: TwitchUiSpacing.space16),
             Text(
               cleanDescription,
               style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 14,
-                height: 1.45,
-                fontWeight: FontWeight.w700,
+                color: TwitchUiColors.textSecondary,
+                fontSize: TwitchUiFontSize.body,
+                height: 1.5,
+                fontWeight: TwitchUiFontWeight.regular,
               ),
             ),
           ],
-          const SizedBox(height: 20),
+          const SizedBox(height: TwitchUiSpacing.space24),
           _PanelSection(
             panels: panels,
             socialLinks: socialLinks,
@@ -102,15 +104,21 @@ class _Avatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipOval(
-      child: TwitchCachedImageLayer(
+    return Container(
+      width: 56,
+      height: 56,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: TwitchUiColors.border),
+      ),
+      child: TwitchCachedImageLayer.avatar(
         imageUrl: imageUrl,
-        width: 54,
-        height: 54,
-        fit: BoxFit.cover,
-        fallbackColor: Colors.white.withValues(alpha: 0.08),
-        fallbackIcon: Icons.person_rounded,
-        fallbackIconColor: Colors.white38,
+        size: 56,
+        cacheWidth: 112,
+        cacheHeight: 112,
+        fallbackColor: TwitchUiColors.surfaceRaised,
+        fallbackIconColor: TwitchUiColors.textFaint,
         fallbackIconSize: 26,
       ),
     );
@@ -136,74 +144,57 @@ class _PanelSection extends StatelessWidget {
   Widget build(BuildContext context) {
     if (loading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 18),
-        child: Center(
-          child: CircularProgressIndicator(color: TwitchUiColors.primary),
-        ),
+        padding: EdgeInsets.symmetric(vertical: TwitchUiSpacing.space24),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
-
     final error = errorText?.trim();
     if (panels.isEmpty && error != null && error.isNotEmpty) {
       return OutlinedButton.icon(
         onPressed: onRetry,
-        icon: const Icon(Icons.image_not_supported_outlined, size: 16),
+        icon: const Icon(Icons.refresh_rounded, size: 16),
         label: Text(context.vio.t('關於圖片讀取失敗')),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: TwitchUiColors.primarySoft,
-          side: BorderSide(
-            color: TwitchUiColors.primary.withValues(alpha: 0.45),
-          ),
-        ),
       );
     }
-
     if (panels.isEmpty && socialLinks.isEmpty) {
       return Text(
         context.vio.t('這個頻道目前沒有關於面板。'),
         style: const TextStyle(
-          color: Colors.white38,
-          fontSize: 12.5,
-          fontWeight: FontWeight.w800,
+          color: TwitchUiColors.textMuted,
+          fontSize: TwitchUiFontSize.bodyCompact,
+          fontWeight: TwitchUiFontWeight.medium,
         ),
       );
     }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        if (socialLinks.isNotEmpty) ...<Widget>[
-          _SocialLinkSection(links: socialLinks),
-          const SizedBox(height: 20),
-        ],
-        if (panels.isNotEmpty) ...<Widget>[
-          Row(
-            children: <Widget>[
-              const Icon(
-                Icons.dashboard_customize_rounded,
-                color: TwitchUiColors.primarySoft,
-                size: 18,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                context.vio.t('關於面板'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+      children: [
+        if (socialLinks.isNotEmpty) ...[
+          _SectionTitle(icon: Icons.hub_outlined, label: context.vio.t('社群連結')),
+          const SizedBox(height: TwitchUiSpacing.space12),
+          Wrap(
+            spacing: TwitchUiSpacing.space8,
+            runSpacing: TwitchUiSpacing.space8,
+            children: socialLinks
+                .map((link) => _SocialLinkCard(link: link))
+                .toList(growable: false),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: TwitchUiSpacing.space24),
+        ],
+        if (panels.isNotEmpty) ...[
+          _SectionTitle(
+            icon: Icons.dashboard_customize_rounded,
+            label: context.vio.t('關於面板'),
+          ),
+          const SizedBox(height: TwitchUiSpacing.space12),
           LayoutBuilder(
             builder: (context, constraints) {
               final columns = (constraints.maxWidth / 330).floor().clamp(1, 3);
               final cardWidth =
-                  (constraints.maxWidth - (columns - 1) * 14) / columns;
+                  (constraints.maxWidth - (columns - 1) * 12) / columns;
               return Wrap(
-                spacing: 14,
-                runSpacing: 14,
+                spacing: TwitchUiSpacing.space12,
+                runSpacing: TwitchUiSpacing.space12,
                 children: panels
                     .map(
                       (panel) => SizedBox(
@@ -221,39 +212,25 @@ class _PanelSection extends StatelessWidget {
   }
 }
 
-class _SocialLinkSection extends StatelessWidget {
-  final List<TwitchChannelSocialLink> links;
+class _SectionTitle extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  const _SocialLinkSection({required this.links});
+  const _SectionTitle({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            const Icon(
-              Icons.hub_outlined,
-              color: TwitchUiColors.primarySoft,
-              size: 18,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              context.vio.t('社群連結'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: links.map((link) => _SocialLinkCard(link: link)).toList(),
+    return Row(
+      children: [
+        Icon(icon, color: TwitchUiColors.primarySoft, size: 18),
+        const SizedBox(width: TwitchUiSpacing.space8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: TwitchUiColors.textPrimary,
+            fontSize: TwitchUiFontSize.heading,
+            fontWeight: TwitchUiFontWeight.strong,
+          ),
         ),
       ],
     );
@@ -268,44 +245,33 @@ class _SocialLinkCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visual = _socialVisualFor(link.name);
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _openExternalUrl(link.url),
-        child: Ink(
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.030),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: visual.color.withValues(alpha: 0.18)),
+    return TwitchUiInteractiveSurface(
+      onTap: () => _openExternalUrl(link.url),
+      radius: TwitchUiRadius.md,
+      padding: const EdgeInsets.symmetric(
+        horizontal: TwitchUiSpacing.space12,
+        vertical: TwitchUiSpacing.space8,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(visual.icon, color: visual.color, size: 17),
+          const SizedBox(width: TwitchUiSpacing.space8),
+          Text(
+            link.title.isEmpty ? link.name : link.title,
+            style: const TextStyle(
+              color: TwitchUiColors.textPrimary,
+              fontSize: TwitchUiFontSize.bodyCompact,
+              fontWeight: TwitchUiFontWeight.strong,
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(visual.icon, color: visual.color, size: 17),
-              const SizedBox(width: 8),
-              Text(
-                link.title.isEmpty ? link.name : link.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.open_in_new_rounded,
-                color: Colors.white.withValues(alpha: 0.45),
-                size: 14,
-              ),
-            ],
+          const SizedBox(width: TwitchUiSpacing.space8),
+          const Icon(
+            Icons.open_in_new_rounded,
+            color: TwitchUiColors.textMuted,
+            size: 14,
           ),
-        ),
+        ],
       ),
     );
   }
@@ -320,75 +286,57 @@ class _PanelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = panel.imageUrl.trim();
     final linkUrl = panel.linkUrl.trim();
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: linkUrl.isEmpty ? null : () => _openExternalUrl(linkUrl),
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                Colors.white.withValues(alpha: 0.045),
-                Colors.white.withValues(alpha: 0.014),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.070)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: LayoutBuilder(
-                  builder: (context, constraints) => TwitchCachedImageLayer(
-                    imageUrl: imageUrl,
-                    width: constraints.maxWidth,
-                    height: constraints.maxHeight,
-                    fit: BoxFit.contain,
-                    fallbackColor: Colors.white.withValues(alpha: 0.045),
-                    fallbackIcon: Icons.article_outlined,
-                    fallbackIconColor: Colors.white38,
-                    fallbackIconSize: 34,
-                  ),
-                ),
+    return TwitchUiInteractiveSurface(
+      onTap: linkUrl.isEmpty ? null : () => _openExternalUrl(linkUrl),
+      radius: TwitchUiRadius.lg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 16 / 9,
+            child: LayoutBuilder(
+              builder: (context, constraints) => TwitchCachedImageLayer(
+                imageUrl: imageUrl,
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                fit: BoxFit.contain,
+                fallbackColor: TwitchUiColors.surfaceRaised,
+                fallbackIcon: Icons.article_outlined,
+                fallbackIconColor: TwitchUiColors.textFaint,
+                fallbackIconSize: 34,
               ),
-              if (panel.title.isNotEmpty ||
-                  panel.description.isNotEmpty ||
-                  linkUrl.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 9, 12, 11),
-                  child: Row(
-                    children: <Widget>[
-                      Expanded(
-                        child: Text(
-                          _panelLabel(context, panel),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            height: 1.2,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      if (linkUrl.isNotEmpty) ...<Widget>[
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.open_in_new_rounded,
-                          color: TwitchUiColors.primarySoft,
-                          size: 16,
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
+          if (panel.title.isNotEmpty ||
+              panel.description.isNotEmpty ||
+              linkUrl.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _panelLabel(context, panel),
+                      style: const TextStyle(
+                        color: TwitchUiColors.textSecondary,
+                        fontSize: TwitchUiFontSize.bodyCompact,
+                        height: 1.3,
+                        fontWeight: TwitchUiFontWeight.medium,
+                      ),
+                    ),
+                  ),
+                  if (linkUrl.isNotEmpty) ...[
+                    const SizedBox(width: TwitchUiSpacing.space8),
+                    const Icon(
+                      Icons.open_in_new_rounded,
+                      color: TwitchUiColors.primarySoft,
+                      size: 16,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -412,42 +360,42 @@ _SocialVisual _socialVisualFor(String name) {
   if (key.contains('youtube')) {
     return const _SocialVisual(
       icon: Icons.smart_display_rounded,
-      color: Color(0xFFFF5A5F),
+      color: Color(0xFFFF5D73),
     );
   }
   if (key.contains('discord')) {
     return const _SocialVisual(
       icon: Icons.forum_rounded,
-      color: Color(0xFF7B86FF),
+      color: Color(0xFF8D7BFF),
     );
   }
   if (key.contains('facebook')) {
     return const _SocialVisual(
       icon: Icons.facebook_rounded,
-      color: Color(0xFF5EA2FF),
+      color: Color(0xFF68A7FF),
     );
   }
   if (key.contains('instagram')) {
     return const _SocialVisual(
       icon: Icons.camera_alt_rounded,
-      color: Color(0xFFFF7AC8),
+      color: Color(0xFFE887C5),
     );
   }
   if (key.contains('twitter') || key == 'x') {
     return const _SocialVisual(
       icon: Icons.alternate_email_rounded,
-      color: Color(0xFF9FB4C7),
+      color: Color(0xFFAFB5C1),
     );
   }
   if (key.contains('tiktok')) {
     return const _SocialVisual(
       icon: Icons.music_note_rounded,
-      color: Color(0xFF5FFFE0),
+      color: Color(0xFF5CC8FF),
     );
   }
   return const _SocialVisual(
     icon: Icons.language_rounded,
-    color: Color(0xFF9FB4C7),
+    color: Color(0xFFAFB5C1),
   );
 }
 

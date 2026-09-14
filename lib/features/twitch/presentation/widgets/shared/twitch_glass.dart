@@ -44,18 +44,30 @@ class TwitchGlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // BackdropFilter over a moving video surface is expensive on mobile.
-    // Midnight Glass keeps the same translucent visual hierarchy there but
-    // removes blur and shadow work.
     final lowCostMobile = _useLowCostMobileGlass;
-    final effectiveBlurSigma = lowCostMobile ? 0.0 : blurSigma;
-    final effectiveBoxShadow = lowCostMobile ? TwitchUiShadows.none : boxShadow;
+    final legacyPlayerDock =
+        blurSigma == 0 &&
+        boxShadow.isEmpty &&
+        backgroundColor == const Color(0x8F000000);
+
+    final requestedBlur = legacyPlayerDock ? TwitchUiGlass.blurSoft : blurSigma;
+    final requestedShadow = legacyPlayerDock
+        ? TwitchUiShadows.soft
+        : boxShadow;
+    final requestedBackground = legacyPlayerDock
+        ? TwitchUiGlass.playerBackground
+        : backgroundColor;
+
+    final effectiveBlurSigma = lowCostMobile ? 0.0 : requestedBlur;
+    final effectiveBoxShadow = lowCostMobile
+        ? TwitchUiShadows.none
+        : requestedShadow;
     final effectiveBackgroundColor = lowCostMobile
         ? Color.alphaBlend(
             Colors.black.withValues(alpha: 0.12),
-            backgroundColor,
+            requestedBackground,
           )
-        : backgroundColor;
+        : requestedBackground;
 
     final decorated = DecoratedBox(
       decoration: BoxDecoration(

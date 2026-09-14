@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
+import '../../../theme/twitch_ui_tokens.dart';
 import '../links/twitch_chat_link_preview.dart';
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_content.dart';
@@ -37,46 +38,76 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final previewItems = extractTwitchChatPreviewUrls(message.message);
-
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TwitchUiSpacing.space8,
+        vertical: TwitchUiSpacing.space2,
+      ),
+      child: _ChatHoverSurface(
+        onOpenContext: onOpenContext,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TwitchChatMessageContent(
+              message: message,
+              thirdPartyEmotes: thirdPartyEmotes,
+              officialEmotes: officialEmotes,
+              displayColor: displayColor,
+              displayNameText: displayNameText,
+              showSystemMessage: true,
+              showTimestamp: showTimestamp,
+              metrics: metrics,
+              animateEmotes: animateEmotes,
+            ),
+            TwitchChatLinkPreviewColumn(
+              items: previewItems,
+              fontScale: metrics.scale,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatHoverSurface extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onOpenContext;
+
+  const _ChatHoverSurface({required this.child, required this.onOpenContext});
+
+  @override
+  State<_ChatHoverSurface> createState() => _ChatHoverSurfaceState();
+}
+
+class _ChatHoverSurfaceState extends State<_ChatHoverSurface> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onOpenContext,
-        onLongPress: onOpenContext,
-        onSecondaryTap: onOpenContext,
-        child: SizedBox(
+        onTap: widget.onOpenContext,
+        onLongPress: widget.onOpenContext,
+        onSecondaryTap: widget.onOpenContext,
+        child: AnimatedContainer(
+          duration: TwitchUiMotion.fast,
+          curve: TwitchUiMotion.standardCurve,
           width: double.infinity,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1B1B23),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.075)),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(9, 6, 9, 7),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TwitchChatMessageContent(
-                    message: message,
-                    thirdPartyEmotes: thirdPartyEmotes,
-                    officialEmotes: officialEmotes,
-                    displayColor: displayColor,
-                    displayNameText: displayNameText,
-                    showSystemMessage: true,
-                    showTimestamp: showTimestamp,
-                    metrics: metrics,
-                    animateEmotes: animateEmotes,
-                  ),
-                  TwitchChatLinkPreviewColumn(
-                    items: previewItems,
-                    fontScale: metrics.scale,
-                  ),
-                ],
-              ),
+          padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
+          decoration: BoxDecoration(
+            color: _hovered ? TwitchUiColors.hoverOverlay : Colors.transparent,
+            borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
+            border: Border.all(
+              color: _hovered
+                  ? TwitchUiColors.borderSubtle
+                  : Colors.transparent,
             ),
           ),
+          child: widget.child,
         ),
       ),
     );
@@ -118,110 +149,108 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
     final previewItems = extractTwitchChatPreviewUrls(message.message);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: TwitchUiSpacing.space8,
+        vertical: TwitchUiSpacing.space4,
+      ),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onOpenContext,
         onLongPress: onOpenContext,
         onSecondaryTap: onOpenContext,
-        child: SizedBox(
-          width: double.infinity,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: style.backgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: style.borderColor),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(
+              style.accentColor.withValues(alpha: 0.06),
+              TwitchUiColors.surfaceCard,
             ),
-            child: Stack(
-              children: [
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 4,
-                    decoration: BoxDecoration(
-                      color: style.accentColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        bottomLeft: Radius.circular(12),
-                      ),
-                    ),
+            borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+            border: Border.all(color: style.borderColor),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                left: 0,
+                top: TwitchUiSpacing.space8,
+                bottom: TwitchUiSpacing.space8,
+                child: Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: style.accentColor,
+                    borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 9, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(style.icon, size: 15, color: style.accentColor),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              metadata.specialLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: twitchChatTextStyle(
-                                TextStyle(
-                                  color: style.accentColor,
-                                  fontSize: 11 * metrics.scale,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0,
-                                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 10, 9),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(style.icon, size: 14, color: style.accentColor),
+                        const SizedBox(width: TwitchUiSpacing.space8),
+                        Flexible(
+                          child: Text(
+                            metadata.specialLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: twitchChatTextStyle(
+                              TextStyle(
+                                color: style.accentColor,
+                                fontSize: TwitchUiFontSize.meta * metrics.scale,
+                                fontWeight: TwitchUiFontWeight.strong,
                               ),
                             ),
                           ),
-                          if (showTimestamp) ...[
-                            const SizedBox(width: 7),
-                            TwitchChatTimestampChip(
-                              time: message.receivedAt,
-                              metrics: metrics,
-                            ),
-                          ],
+                        ),
+                        if (showTimestamp) ...[
+                          const SizedBox(width: TwitchUiSpacing.space8),
+                          TwitchChatTimestampChip(
+                            time: message.receivedAt,
+                            metrics: metrics,
+                          ),
                         ],
-                      ),
-                      if (bannerText != null && bannerText.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          bannerText,
-                          textAlign: TextAlign.left,
-                          style: twitchChatTextStyle(
-                            TextStyle(
-                              color: Colors.white,
-                              fontSize: metrics.compactMessageFontSize,
-                              height: metrics.lineHeight,
-                              fontWeight: FontWeight.w800,
-                            ),
+                      ],
+                    ),
+                    if (bannerText != null && bannerText.isNotEmpty) ...[
+                      const SizedBox(height: TwitchUiSpacing.space8),
+                      Text(
+                        bannerText,
+                        style: twitchChatTextStyle(
+                          TextStyle(
+                            color: TwitchUiColors.textPrimary,
+                            fontSize: metrics.compactMessageFontSize,
+                            height: metrics.lineHeight,
+                            fontWeight: TwitchUiFontWeight.medium,
                           ),
                         ),
-                      ],
-                      if (hasVisibleChatText) ...[
-                        if (bannerText != null && bannerText.isNotEmpty)
-                          const SizedBox(height: 6),
-                        TwitchChatMessageContent(
-                          message: message,
-                          thirdPartyEmotes: thirdPartyEmotes,
-                          officialEmotes: officialEmotes,
-                          displayColor: displayColor,
-                          displayNameText: displayNameText,
-                          showSystemMessage: false,
-                          showTimestamp: false,
-                          compact: true,
-                          metrics: metrics,
-                          animateEmotes: animateEmotes,
-                        ),
-                        TwitchChatLinkPreviewColumn(
-                          items: previewItems,
-                          fontScale: metrics.scale,
-                        ),
-                      ],
+                      ),
                     ],
-                  ),
+                    if (hasVisibleChatText) ...[
+                      if (bannerText != null && bannerText.isNotEmpty)
+                        const SizedBox(height: TwitchUiSpacing.space8),
+                      TwitchChatMessageContent(
+                        message: message,
+                        thirdPartyEmotes: thirdPartyEmotes,
+                        officialEmotes: officialEmotes,
+                        displayColor: displayColor,
+                        displayNameText: displayNameText,
+                        showSystemMessage: false,
+                        showTimestamp: false,
+                        compact: true,
+                        metrics: metrics,
+                        animateEmotes: animateEmotes,
+                      ),
+                      TwitchChatLinkPreviewColumn(
+                        items: previewItems,
+                        fontScale: metrics.scale,
+                      ),
+                    ],
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
