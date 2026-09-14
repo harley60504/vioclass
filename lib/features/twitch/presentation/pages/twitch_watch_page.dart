@@ -1391,7 +1391,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         unawaited(leaveToMiniPlayer());
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0E0E10),
+        backgroundColor: Colors.transparent,
         body: Stack(
           children: [
             Positioned.fill(
