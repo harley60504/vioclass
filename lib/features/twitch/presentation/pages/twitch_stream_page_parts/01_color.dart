@@ -1,6 +1,6 @@
 part of '../twitch_stream_page.dart';
 
-const Color _kBackground = Color(0xFF0A0A0F);
+const Color _kBackground = Colors.transparent;
 
 class TwitchStreamPage extends StatefulWidget {
   const TwitchStreamPage({super.key});
@@ -484,18 +484,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
           builder: (context, _) {
             return Stack(
               children: <Widget>[
-                DecoratedBox(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: <Color>[
-                        Color(0xFF25113C),
-                        Color(0xFF11111A),
-                        Color(0xFF07070B),
-                      ],
-                    ),
-                  ),
+                ColoredBox(
+                  color: TwitchUiColors.appBackground,
                   child: SafeArea(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
