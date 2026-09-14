@@ -78,10 +78,17 @@ class TwitchWatchChatInputSection extends StatelessWidget {
             ),
           DecoratedBox(
             decoration: const BoxDecoration(
-              color: TwitchUiColors.surfacePanel,
+              color: TwitchUiColors.surfaceRaised,
               border: Border(
-                top: BorderSide(color: TwitchUiColors.divider),
+                top: BorderSide(color: TwitchUiColors.borderSubtle),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x52000000),
+                  blurRadius: 12,
+                  offset: Offset(0, -3),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
