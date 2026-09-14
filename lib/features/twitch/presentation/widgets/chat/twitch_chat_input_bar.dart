@@ -78,7 +78,7 @@ class TwitchChatInputBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         TwitchUiSpacing.space12,
-        TwitchUiSpacing.space4,
+        TwitchUiSpacing.space8,
         TwitchUiSpacing.space12,
         TwitchUiSpacing.space8,
       ),

@@ -24,7 +24,7 @@ ButtonStyle twitchChatComposerButtonStyle({
       : (active ? palette.borderActive : palette.border);
 
   return IconButton.styleFrom(
-    minimumSize: Size.zero,
+    minimumSize: const Size(36, 36),
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: padding,
     backgroundColor: background,
