@@ -471,7 +471,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
               showPrediction &&
               !metrics.hideOptionalEngagement &&
               predictionHasData;
-          final showFloatingEngagement =
+          final showEngagement =
               effectiveShowPinned ||
               effectiveShowPrediction ||
               (widget.engagementError != null &&
@@ -497,59 +497,44 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                     onTogglePrediction: _togglePredictionVisibility,
                   ),
                 TwitchHypeTrainBanner(controller: widget.hypeTrainController),
+                if (showEngagement)
+                  TwitchWatchChatEngagementArea(
+                    maxHeight: metrics.maxUsableEngagementHeight,
+                    channelPoints: widget.channelPoints,
+                    pinnedMessages: pinned,
+                    prediction: effectiveShowPrediction ? prediction : null,
+                    loading: widget.loadingEngagement,
+                    error: widget.engagementError,
+                    showPinned: effectiveShowPinned,
+                    showPrediction: effectiveShowPrediction,
+                    fontScale: chatFontScale,
+                    fallbackProfileImageUrl: widget.fallbackProfileImageUrl,
+                    fallbackDisplayName: widget.fallbackDisplayName,
+                    fallbackUserId: widget.fallbackUserId,
+                    fallbackLogin: widget.fallbackLogin,
+                    onRefresh: widget.onRefreshEngagement,
+                    onOpenChannelPoints: widget.onOpenChannelPoints,
+                    onOpenPrediction: widget.onOpenPrediction,
+                  ),
                 Expanded(
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Positioned.fill(
-                        child: TwitchWatchChatMessageArea(
-                          runtime: currentRuntime,
-                          thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
-                          officialEmoteCache: widget.officialEmoteCache,
-                          appearanceListenable: _appearanceController,
+                  child: TwitchWatchChatMessageArea(
+                    runtime: currentRuntime,
+                    thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
+                    officialEmoteCache: widget.officialEmoteCache,
+                    appearanceListenable: _appearanceController,
+                    fontScale: chatFontScale,
+                    showTimestamp:
+                        _appearanceController.messageTimestampsEnabled,
+                    compact: metrics.verticalCompact,
+                    onOpenMessageContext: (message) =>
+                        showTwitchChatMessageContextSheet(
+                          context: context,
+                          selectedMessage: message,
+                          messages: currentRuntime?.messages ?? const [],
+                          thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                          officialEmotes: widget.officialEmoteCache,
                           fontScale: chatFontScale,
-                          showTimestamp:
-                              _appearanceController.messageTimestampsEnabled,
-                          compact: metrics.verticalCompact,
-                          onOpenMessageContext: (message) =>
-                              showTwitchChatMessageContextSheet(
-                                context: context,
-                                selectedMessage: message,
-                                messages: currentRuntime?.messages ?? const [],
-                                thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                                officialEmotes: widget.officialEmoteCache,
-                                fontScale: chatFontScale,
-                              ),
                         ),
-                      ),
-                      if (showFloatingEngagement)
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          top: 0,
-                          child: TwitchWatchChatEngagementArea(
-                            maxHeight: metrics.maxUsableEngagementHeight,
-                            channelPoints: widget.channelPoints,
-                            pinnedMessages: pinned,
-                            prediction: effectiveShowPrediction
-                                ? prediction
-                                : null,
-                            loading: widget.loadingEngagement,
-                            error: widget.engagementError,
-                            showPinned: effectiveShowPinned,
-                            showPrediction: effectiveShowPrediction,
-                            fontScale: chatFontScale,
-                            fallbackProfileImageUrl:
-                                widget.fallbackProfileImageUrl,
-                            fallbackDisplayName: widget.fallbackDisplayName,
-                            fallbackUserId: widget.fallbackUserId,
-                            fallbackLogin: widget.fallbackLogin,
-                            onRefresh: widget.onRefreshEngagement,
-                            onOpenChannelPoints: widget.onOpenChannelPoints,
-                            onOpenPrediction: widget.onOpenPrediction,
-                          ),
-                        ),
-                    ],
                   ),
                 ),
                 TwitchWatchChatInputSection(
