@@ -65,9 +65,6 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
 
         return DecoratedBox(
           decoration: const BoxDecoration(
-            // Always paint a complete opaque frame before adding the visual
-            // gradient. This keeps the Flutter UI layer independent from the
-            // native video surface and the route underneath it.
             color: TwitchUiColors.appBackground,
             gradient: LinearGradient(
               begin: Alignment.topLeft,
@@ -219,7 +216,7 @@ class _BottomChatLayout extends StatelessWidget {
             SizedBox(
               height: playerHeight,
               width: double.infinity,
-              child: _WatchSurface(child: player),
+              child: _PlayerSurface(child: player),
             )
           else
             Expanded(
@@ -351,7 +348,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
   @override
   Widget build(BuildContext context) {
     final content = widget.belowPlayer;
-    if (content == null) return _WatchSurface(child: widget.player);
+    if (content == null) return _PlayerSurface(child: widget.player);
 
     return PageView(
       controller: _pageController,
@@ -364,7 +361,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
               _showPage(1);
             }
           },
-          child: _WatchSurface(child: widget.player),
+          child: _PlayerSurface(child: widget.player),
         ),
         _WatchSurface(
           child: Listener(
@@ -389,6 +386,24 @@ class _PlayerColumnState extends State<_PlayerColumn> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PlayerSurface extends StatelessWidget {
+  final Widget child;
+
+  const _PlayerSurface({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border.fromBorderSide(
+          BorderSide(color: TwitchUiColors.borderSubtle),
+        ),
+      ),
+      child: child,
     );
   }
 }
