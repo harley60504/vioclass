@@ -41,7 +41,6 @@ class WatchTopActionBar extends StatelessWidget {
           constraints.maxWidth,
         );
         final actions = _WatchTopActionButtons(
-          metadata: metadata,
           isFollowing: isFollowing,
           followBusy: followBusy,
           metrics: metrics,
@@ -98,20 +97,24 @@ class _WatchTopActionBarMetrics {
   factory _WatchTopActionBarMetrics.fromWidth(double width) {
     final compact = width < 680;
     final tiny = width < 430;
+    final controlHeight = tiny
+        ? TwitchUiControlSize.hitCompact
+        : compact
+            ? TwitchUiControlSize.hit
+            : TwitchUiControlSize.hitLarge;
 
     return _WatchTopActionBarMetrics(
       compact: compact,
       tiny: tiny,
-      actionGap: tiny ? 6.0 : 9.0,
-      slotHeight: compact ? 62.0 : 78.0,
-      controlHeight: compact ? 52.0 : 72.0,
-      designWidth: compact ? (tiny ? 470.0 : 570.0) : 1040.0,
+      actionGap: tiny ? TwitchUiSpacing.space4 : TwitchUiSpacing.space8,
+      slotHeight: controlHeight + TwitchUiSpacing.space12,
+      controlHeight: controlHeight,
+      designWidth: compact ? (tiny ? 430.0 : 560.0) : 940.0,
     );
   }
 }
 
 class _WatchTopActionButtons {
-  final TwitchStreamHeaderMetadata metadata;
   final bool isFollowing;
   final bool followBusy;
   final _WatchTopActionBarMetrics metrics;
@@ -124,7 +127,6 @@ class _WatchTopActionButtons {
   final bool creatingClip;
 
   const _WatchTopActionButtons({
-    required this.metadata,
     required this.isFollowing,
     required this.followBusy,
     required this.metrics,
@@ -140,11 +142,7 @@ class _WatchTopActionButtons {
   Widget buildBackButton(BuildContext context) {
     return RoundIconButton(
       tooltip: context.vio.t('返回'),
-      icon: Icons.arrow_back,
-      iconColor: const Color(0xFF93C5FD),
-      backgroundColor: const Color(0xFF1E3A8A).withValues(alpha: 0.20),
-      borderColor: const Color(0xFF93C5FD).withValues(alpha: 0.22),
-      glowOpacity: 0.18,
+      icon: Icons.arrow_back_rounded,
       compact: metrics.compact,
       tiny: metrics.tiny,
       height: metrics.controlHeight,
@@ -156,10 +154,6 @@ class _WatchTopActionButtons {
     return RoundIconButton(
       tooltip: context.vio.t('回主畫面'),
       icon: Icons.home_rounded,
-      iconColor: const Color(0xFFE9D5FF),
-      backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.22),
-      borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.22),
-      glowOpacity: 0.14,
       compact: metrics.compact,
       tiny: metrics.tiny,
       height: metrics.controlHeight,
@@ -258,9 +252,9 @@ class _WideWatchTopActionContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         actions.buildBackButton(context),
-        const SizedBox(width: 10),
+        const SizedBox(width: TwitchUiSpacing.space8),
         actions.buildHomeButton(context),
-        const SizedBox(width: 10),
+        const SizedBox(width: TwitchUiSpacing.space8),
         Expanded(
           child: WatchStreamHeaderCard(
             metadata: metadata,
@@ -269,7 +263,7 @@ class _WideWatchTopActionContent extends StatelessWidget {
             onOpenChannel: onOpenChannel,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: TwitchUiSpacing.space12),
         ...actions.buildRightActions(),
       ],
     );

@@ -20,6 +20,9 @@ class PlayerChromeButton extends StatefulWidget {
   final double? height;
   final double? iconSize;
   final Color? accentColor;
+  final Color? foregroundColor;
+  final Color? backgroundColor;
+  final Color? borderColor;
 
   const PlayerChromeButton({
     super.key,
@@ -35,6 +38,9 @@ class PlayerChromeButton extends StatefulWidget {
     this.height,
     this.iconSize,
     this.accentColor,
+    this.foregroundColor,
+    this.backgroundColor,
+    this.borderColor,
   });
 
   @override
@@ -63,27 +69,30 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
     final radius = widget.tiny ? TwitchUiRadius.sm : TwitchUiRadius.md;
     final accent = widget.accentColor ?? TwitchUiColors.primarySoft;
 
-    final background = widget.primary
-        ? (_hovered && _enabled
-            ? TwitchUiColors.primaryHover
-            : TwitchUiColors.primary)
-        : widget.selected
-            ? TwitchUiColors.surfaceSelected
-            : _hovered && _enabled
-                ? TwitchUiColors.surfaceHover
-                : TwitchUiColors.surfacePlayer;
-    final border = widget.primary
-        ? TwitchUiColors.primarySoft.withValues(alpha: 0.42)
-        : widget.selected
-            ? accent.withValues(alpha: 0.48)
-            : _hovered && _enabled
-                ? TwitchUiColors.borderStrong
-                : TwitchUiColors.border;
-    final foreground = widget.primary
-        ? TwitchUiColors.textOnAccent
-        : widget.selected
-            ? accent
-            : TwitchUiColors.textPrimary;
+    final background = widget.backgroundColor ??
+        (widget.primary
+            ? (_hovered && _enabled
+                ? TwitchUiColors.primaryHover
+                : TwitchUiColors.primary)
+            : widget.selected
+                ? TwitchUiColors.surfaceSelected
+                : _hovered && _enabled
+                    ? TwitchUiColors.surfaceHover
+                    : TwitchUiColors.surfacePlayer);
+    final border = widget.borderColor ??
+        (widget.primary
+            ? TwitchUiColors.primarySoft.withValues(alpha: 0.42)
+            : widget.selected
+                ? accent.withValues(alpha: 0.48)
+                : _hovered && _enabled
+                    ? TwitchUiColors.borderStrong
+                    : TwitchUiColors.border);
+    final foreground = widget.foregroundColor ??
+        (widget.primary
+            ? TwitchUiColors.textOnAccent
+            : widget.selected
+                ? accent
+                : TwitchUiColors.textPrimary);
 
     final label = widget.label?.trim();
     final hasLabel = label != null && label.isNotEmpty;
@@ -103,60 +112,57 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: _enabled ? widget.onPressed : null,
-              child: AnimatedContainer(
-                duration: TwitchUiMotion.fast,
-                curve: TwitchUiMotion.standardCurve,
-                child: TwitchGlassSurface(
-                  borderRadius: BorderRadius.circular(radius),
-                  backgroundColor: background,
-                  borderColor: border,
-                  blurSigma: 0,
-                  boxShadow: TwitchUiShadows.none,
-                  child: SizedBox(
-                    height: controlHeight,
-                    width: hasLabel ? null : controlHeight,
-                    child: Padding(
-                      padding: hasLabel
-                          ? EdgeInsets.symmetric(
-                              horizontal: widget.compact
-                                  ? TwitchUiSpacing.space8
-                                  : TwitchUiSpacing.space12,
+              child: TwitchGlassSurface(
+                borderRadius: BorderRadius.circular(radius),
+                backgroundColor: background,
+                borderColor: border,
+                blurSigma: 0,
+                boxShadow: TwitchUiShadows.none,
+                child: AnimatedContainer(
+                  duration: TwitchUiMotion.fast,
+                  curve: TwitchUiMotion.standardCurve,
+                  height: controlHeight,
+                  padding: hasLabel
+                      ? EdgeInsets.symmetric(
+                          horizontal: widget.compact
+                              ? TwitchUiSpacing.space8
+                              : TwitchUiSpacing.space12,
+                        )
+                      : EdgeInsets.zero,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: controlHeight),
+                    child: Center(
+                      child: widget.busy
+                          ? SizedBox(
+                              width: iconSize * 0.78,
+                              height: iconSize * 0.78,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: foreground,
+                              ),
                             )
-                          : EdgeInsets.zero,
-                      child: Center(
-                        child: widget.busy
-                            ? SizedBox(
-                                width: iconSize * 0.78,
-                                height: iconSize * 0.78,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: foreground,
-                                ),
-                              )
-                            : hasLabel
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(widget.icon,
-                                          color: foreground, size: iconSize),
-                                      const SizedBox(
-                                          width: TwitchUiSpacing.space8),
-                                      Text(
-                                        label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: foreground,
-                                          fontSize: TwitchUiFontSize.bodyCompact,
-                                          fontWeight:
-                                              TwitchUiFontWeight.strong,
-                                        ),
+                          : hasLabel
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(widget.icon,
+                                        color: foreground, size: iconSize),
+                                    const SizedBox(
+                                        width: TwitchUiSpacing.space8),
+                                    Text(
+                                      label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: foreground,
+                                        fontSize: TwitchUiFontSize.bodyCompact,
+                                        fontWeight: TwitchUiFontWeight.strong,
                                       ),
-                                    ],
-                                  )
-                                : Icon(widget.icon,
-                                    color: foreground, size: iconSize),
-                      ),
+                                    ),
+                                  ],
+                                )
+                              : Icon(widget.icon,
+                                  color: foreground, size: iconSize),
                     ),
                   ),
                 ),

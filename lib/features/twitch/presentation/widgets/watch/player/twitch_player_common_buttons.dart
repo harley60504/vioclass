@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/twitch_ui_tokens.dart';
-import '../../shared/twitch_glass.dart';
+import 'twitch_player_chrome_button.dart';
 
+/// Compatibility wrapper for existing player call sites.
 class RoundIconButton extends StatelessWidget {
   final String tooltip;
   final IconData icon;
@@ -19,7 +20,7 @@ class RoundIconButton extends StatelessWidget {
     super.key,
     required this.tooltip,
     required this.icon,
-    this.iconColor = Colors.white,
+    this.iconColor = TwitchUiColors.textPrimary,
     this.backgroundColor,
     this.borderColor,
     this.glowOpacity = 0.18,
@@ -31,53 +32,16 @@ class RoundIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size =
-        height ??
-        (tiny
-            ? 36.0
-            : compact
-            ? 42.0
-            : 64.0);
-    final radius = tiny
-        ? 14.0
-        : compact
-        ? 16.0
-        : 20.0;
-    final effectiveBackgroundColor =
-        backgroundColor ?? Colors.black.withValues(alpha: 0.42);
-    final effectiveBorderColor =
-        borderColor ?? Colors.white.withValues(alpha: 0.10);
-
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(radius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: TwitchGlassSurface(
-            borderRadius: BorderRadius.circular(radius),
-            backgroundColor: effectiveBackgroundColor,
-            borderColor: effectiveBorderColor,
-            blurSigma: 0,
-            boxShadow: const <BoxShadow>[],
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: tiny
-                    ? 20
-                    : compact
-                    ? 23
-                    : 30,
-              ),
-            ),
-          ),
-        ),
-      ),
+    return PlayerChromeButton(
+      tooltip: tooltip,
+      icon: icon,
+      onPressed: onPressed,
+      foregroundColor: iconColor,
+      backgroundColor: backgroundColor,
+      borderColor: borderColor,
+      compact: compact,
+      tiny: tiny,
+      height: height,
     );
   }
 }
@@ -95,40 +59,49 @@ class PlainIconButton extends StatelessWidget {
     required this.tooltip,
     required this.icon,
     required this.onPressed,
-    this.size = 25,
+    this.size = TwitchUiControlSize.icon,
     this.active = false,
     this.dense = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!dense) {
-      return IconButton(
-        tooltip: tooltip,
-        splashRadius: 22,
-        onPressed: onPressed,
-        icon: Icon(
-          icon,
-          color: active ? TwitchUiColors.primarySoft : Colors.white,
-          size: size,
-        ),
-      );
-    }
-
-    final hitSize = (size + 16).clamp(34.0, 48.0).toDouble();
+    final hitSize = dense
+        ? (size + 16).clamp(
+            TwitchUiControlSize.hitCompact,
+            TwitchUiControlSize.hitLarge,
+          ).toDouble()
+        : TwitchUiControlSize.hitLarge;
 
     return IconButton(
       tooltip: tooltip,
-      splashRadius: hitSize / 2,
-      visualDensity: VisualDensity.compact,
+      visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
       padding: EdgeInsets.zero,
       constraints: BoxConstraints.tightFor(width: hitSize, height: hitSize),
       onPressed: onPressed,
-      icon: Icon(
-        icon,
-        color: active ? TwitchUiColors.primarySoft : Colors.white,
-        size: size,
+      style: ButtonStyle(
+        backgroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.hovered)) {
+            return TwitchUiColors.hoverOverlay;
+          }
+          if (active) return TwitchUiColors.selectedOverlay;
+          return Colors.transparent;
+        }),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return TwitchUiColors.disabledForeground;
+          }
+          return active
+              ? TwitchUiColors.primarySoft
+              : TwitchUiColors.textPrimary;
+        }),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
+          ),
+        ),
       ),
+      icon: Icon(icon, size: size),
     );
   }
 }

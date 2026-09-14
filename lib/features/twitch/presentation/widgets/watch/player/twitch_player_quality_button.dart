@@ -22,8 +22,18 @@ class QualityButton extends StatelessWidget {
     return PopupMenuButton<TwitchM3u8Variant>(
       tooltip:
           '${l10n.t('畫質：')}${currentVariant?.displayName ?? currentVariant?.name ?? l10n.t('自動')}',
-      color: const Color(0xFF18181B),
-      icon: const Icon(Icons.settings, color: Colors.white, size: 24),
+      color: TwitchUiColors.surfaceRaised,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+        side: const BorderSide(color: TwitchUiColors.border),
+      ),
+      icon: const Icon(
+        Icons.tune_rounded,
+        color: TwitchUiColors.textPrimary,
+        size: TwitchUiControlSize.icon,
+      ),
       onSelected: onChanged,
       itemBuilder: (context) {
         if (variants.isEmpty) {
@@ -32,7 +42,10 @@ class QualityButton extends StatelessWidget {
               enabled: false,
               child: Text(
                 l10n.t('尚未取得畫質'),
-                style: const TextStyle(color: Colors.white54),
+                style: const TextStyle(
+                  color: TwitchUiColors.textMuted,
+                  fontSize: TwitchUiFontSize.bodyCompact,
+                ),
               ),
             ),
           ];
@@ -47,25 +60,30 @@ class QualityButton extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 24,
+                  width: TwitchUiSpacing.space24,
                   child: selected
                       ? const Icon(
-                          Icons.check,
-                          color: TwitchUiColors.primary,
-                          size: 18,
+                          Icons.check_rounded,
+                          color: TwitchUiColors.primarySoft,
+                          size: TwitchUiControlSize.iconCompact,
                         )
                       : null,
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: TwitchUiSpacing.space8),
                 Expanded(
                   child: Text(
                     variant.displayName.isNotEmpty
                         ? variant.displayName
                         : variant.name,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      color: selected
+                          ? TwitchUiColors.primarySoft
+                          : TwitchUiColors.textPrimary,
+                      fontSize: TwitchUiFontSize.body,
+                      fontWeight: selected
+                          ? TwitchUiFontWeight.strong
+                          : TwitchUiFontWeight.medium,
                     ),
                   ),
                 ),
