@@ -70,20 +70,20 @@ extension _TwitchPlaylistPlayerRuntimeQualityOps
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = false;
-    this._clearLiveBufferReplay();
+    _clearLiveBufferReplay();
     _proxyUrl = _routerStreamTsPlaybackUrl(router);
     _proxyMpvUrl = _proxyUrl;
     _proxyLiveStatus = null;
     if (dvrWarmed) {
       _adAwareStatus = '${_adAwareStatus.trim()} dvr=warm'.trim();
-      this._beginDvrHealthMonitoring(
+      _beginDvrHealthMonitoring(
         archiveUri: warmedDvrUri,
         initiallyHealthy: true,
       );
     } else if (_dvrProbeEnabled && !variant.isAudioOnly) {
-      this._beginDvrHealthMonitoring(initiallyHealthy: false);
+      _beginDvrHealthMonitoring(initiallyHealthy: false);
     } else {
-      this._stopDvrHealthMonitoring();
+      _stopDvrHealthMonitoring();
     }
     debugPrint(
       '[DvrSequential] live player=$_proxyUrl '
@@ -114,7 +114,7 @@ extension _TwitchPlaylistPlayerRuntimeQualityOps
 
   Future<TwitchM3u8Variant> _probeDvrVariant(TwitchM3u8Variant variant) async {
     if (!_dvrProbeEnabled || variant.isAudioOnly) return variant;
-    final dvrUri = await this._resolveDvrPlaylistUri(variant);
+    final dvrUri = await _resolveDvrPlaylistUri(variant);
     if (dvrUri == null) {
       _debugDvr(
         'skip ${variant.name}: cannot derive DVR URL from ${variant.url}',
@@ -166,7 +166,7 @@ extension _TwitchPlaylistPlayerRuntimeQualityOps
 
   List<TwitchM3u8Variant> _sortVariants(List<TwitchM3u8Variant> variants) {
     final list = variants.toList();
-    list.sort((a, b) => this._sortScore(b).compareTo(this._sortScore(a)));
+    list.sort((a, b) => _sortScore(b).compareTo(_sortScore(a)));
     return list;
   }
 
@@ -185,25 +185,25 @@ extension _TwitchPlaylistPlayerRuntimeQualityOps
     final exactMatches = variants
         .where((v) => v.name == target || v.displayName == target)
         .toList();
-    if (exactMatches.isNotEmpty) return this._sortVariants(exactMatches).first;
+    if (exactMatches.isNotEmpty) return _sortVariants(exactMatches).first;
 
-    final normalizedTarget = this._normalizeQualityPreference(target);
+    final normalizedTarget = _normalizeQualityPreference(target);
     if (normalizedTarget.isEmpty) return null;
 
     if (normalizedTarget == 'source' || normalizedTarget == 'chunked') {
-      final source = variants.where(this._isSourceLikeVariant).toList();
-      if (source.isNotEmpty) return this._sortVariants(source).first;
+      final source = variants.where(_isSourceLikeVariant).toList();
+      if (source.isNotEmpty) return _sortVariants(source).first;
     }
 
     final keyMatches = variants.where((v) {
-      return this._normalizeQualityPreference(v.adAwareQualityKey) ==
+      return _normalizeQualityPreference(v.adAwareQualityKey) ==
               normalizedTarget ||
-          this._normalizeQualityPreference(v.name) == normalizedTarget ||
-          this._normalizeQualityPreference(v.displayName) == normalizedTarget ||
-          this._normalizeQualityPreference(v.videoGroupId ?? '') ==
+          _normalizeQualityPreference(v.name) == normalizedTarget ||
+          _normalizeQualityPreference(v.displayName) == normalizedTarget ||
+          _normalizeQualityPreference(v.videoGroupId ?? '') ==
               normalizedTarget;
     }).toList();
-    return keyMatches.isEmpty ? null : this._sortVariants(keyMatches).first;
+    return keyMatches.isEmpty ? null : _sortVariants(keyMatches).first;
   }
 
   String _normalizeQualityPreference(String value) {
@@ -225,6 +225,6 @@ extension _TwitchPlaylistPlayerRuntimeQualityOps
     final matches = variants
         .where((v) => v.adAwareQualityKey == preferred.adAwareQualityKey)
         .toList();
-    return matches.isEmpty ? null : this._sortVariants(matches).first;
+    return matches.isEmpty ? null : _sortVariants(matches).first;
   }
 }

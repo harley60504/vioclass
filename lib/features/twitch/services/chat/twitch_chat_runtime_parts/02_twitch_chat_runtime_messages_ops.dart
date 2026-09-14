@@ -6,31 +6,31 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
       case 'GLOBALUSERSTATE':
       case 'USERSTATE':
         _ownUserStateTags.addAll(message.tags);
-        this._markOldestPendingAcknowledged();
+        _markOldestPendingAcknowledged();
         return;
 
       case 'NOTICE':
-        this._handleNotice(message);
+        _handleNotice(message);
         return;
 
       case 'CLEARMSG':
-        this._handleClearMessage(message);
+        _handleClearMessage(message);
         return;
 
       case 'CLEARCHAT':
-        this._handleClearChat(message);
+        _handleClearChat(message);
         return;
 
       case 'ROOMSTATE':
-        this._handleRoomState(message);
+        _handleRoomState(message);
         return;
 
       case 'PRIVMSG':
-        this._handleVisiblePrivMsg(message);
+        _handleVisiblePrivMsg(message);
         return;
 
       case 'USERNOTICE':
-        this._appendRuntimeMessage(
+        _appendRuntimeMessage(
           normalizer.normalize(message, receivedAt: DateTime.now()),
         );
         return;
@@ -42,15 +42,15 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
       case 'GLOBALUSERSTATE':
       case 'USERSTATE':
         _ownUserStateTags.addAll(message.tags);
-        this._markOldestPendingAcknowledged();
+        _markOldestPendingAcknowledged();
         return;
 
       case 'NOTICE':
-        this._handleNotice(message);
+        _handleNotice(message);
         return;
 
       case 'PRIVMSG':
-        this._handleVisiblePrivMsg(message);
+        _handleVisiblePrivMsg(message);
         return;
     }
   }
@@ -67,26 +67,26 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
   }
 
   void _handleVisiblePrivMsg(TwitchChatMessage message) {
-    final pending = this._findMatchingPending(message);
+    final pending = _findMatchingPending(message);
     if (pending != null) {
-      this._removePending(pending);
+      _removePending(pending);
       _serverEchoMatchCount += 1;
     }
 
-    this._appendRuntimeMessage(
+    _appendRuntimeMessage(
       normalizer.normalize(message, receivedAt: DateTime.now()),
     );
   }
 
   void _handleNotice(TwitchChatMessage message) {
-    if (this._isSendRejectionNotice(message)) {
-      this._rejectNewestPending(message);
+    if (_isSendRejectionNotice(message)) {
+      _rejectNewestPending(message);
       return;
     }
 
     final text = message.message.trim();
     if (text.isNotEmpty) {
-      this._appendSystemMessage(text);
+      _appendSystemMessage(text);
     }
   }
 
@@ -99,7 +99,7 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
     if (targetId == null || targetId.isEmpty) return;
 
     _deletedMessageIds.add(targetId);
-    this._trimHistory(_deletedMessageIds);
+    _trimHistory(_deletedMessageIds);
     _messages.removeWhere((item) => item.id == targetId);
     _notifyPartListeners();
   }
@@ -110,7 +110,7 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
 
     if (targetUserId == null || targetUserId.trim().isEmpty) {
       _messages.clear();
-      this._appendSystemMessage('Chat was cleared.');
+      _appendSystemMessage('Chat was cleared.');
       _notifyPartListeners();
       return;
     }
@@ -127,9 +127,9 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
     final duration =
         message.tags['ban-duration'] ?? message.tags['ban_duration'];
     if (duration != null && duration.isNotEmpty) {
-      this._appendSystemMessage('$targetUser was timed out for ${duration}s.');
+      _appendSystemMessage('$targetUser was timed out for ${duration}s.');
     } else {
-      this._appendSystemMessage('$targetUser was banned or removed from chat.');
+      _appendSystemMessage('$targetUser was banned or removed from chat.');
     }
 
     _notifyPartListeners();
@@ -151,7 +151,7 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
     TwitchChatRuntimeMessage message, {
     bool notify = true,
   }) {
-    if (this._isDeletedMessage(message.id)) return;
+    if (_isDeletedMessage(message.id)) return;
 
     final id = message.id;
     if (id.isNotEmpty) {
@@ -165,14 +165,14 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
       }
     }
 
-    final fingerprint = this._messageFingerprint(message);
+    final fingerprint = _messageFingerprint(message);
     if (fingerprint.isNotEmpty &&
         _seenMessageFingerprints.contains(fingerprint)) {
       return;
     }
 
-    this._insertRuntimeMessageInTimeOrder(message);
-    this._markSeen(message);
+    _insertRuntimeMessageInTimeOrder(message);
+    _markSeen(message);
 
     if (_messages.length > maxMessages) {
       _messages.removeRange(0, _messages.length - maxMessages);
@@ -250,7 +250,7 @@ extension _TwitchChatRuntimeMessagesOps on TwitchChatRuntime {
       },
     );
 
-    this._appendRuntimeMessage(normalizer.normalize(source, receivedAt: now));
+    _appendRuntimeMessage(normalizer.normalize(source, receivedAt: now));
   }
 }
 
@@ -266,7 +266,7 @@ extension _TwitchChatRuntimeOutgoingOps on TwitchChatRuntime {
   }
 
   _PendingOutgoingChatMessage? _findMatchingPending(TwitchChatMessage message) {
-    if (!this._isOwnVisibleMessage(message)) return null;
+    if (!_isOwnVisibleMessage(message)) return null;
 
     final text = message.message.trim();
     if (text.isEmpty) return null;
@@ -304,10 +304,10 @@ extension _TwitchChatRuntimeOutgoingOps on TwitchChatRuntime {
     }
 
     if (pending != null) {
-      this._removePending(pending);
+      _removePending(pending);
     }
 
-    this._appendSystemMessage(reason);
+    _appendSystemMessage(reason);
     _notifyPartListeners();
   }
 
@@ -340,7 +340,7 @@ extension _TwitchChatRuntimeOutgoingOps on TwitchChatRuntime {
   void _schedulePendingCleanup(_PendingOutgoingChatMessage pending) {
     pending.cleanupTimer = Timer(TwitchChatRuntime.pendingOutgoingTtl, () {
       if (!_pendingOutgoingMessages.contains(pending)) return;
-      this._removePending(pending);
+      _removePending(pending);
       _notifyPartListeners();
     });
   }
@@ -363,12 +363,12 @@ extension _TwitchChatRuntimeConnectionOps on TwitchChatRuntime {
     final id = message.id;
     if (id.isNotEmpty) {
       _seenMessageIds.add(id);
-      this._trimHistory(_seenMessageIds);
+      _trimHistory(_seenMessageIds);
     }
-    final fingerprint = this._messageFingerprint(message);
+    final fingerprint = _messageFingerprint(message);
     if (fingerprint.isNotEmpty) {
       _seenMessageFingerprints.add(fingerprint);
-      this._trimHistory(_seenMessageFingerprints);
+      _trimHistory(_seenMessageFingerprints);
     }
   }
 }

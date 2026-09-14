@@ -165,7 +165,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       _seenMessageFingerprints.clear();
       _deletedMessageIds.clear();
     }
-    this._clearPendingOutgoingMessages();
+    _clearPendingOutgoingMessages();
     _ownUserStateTags.clear();
     _roomStateTags.clear();
 
@@ -177,7 +177,7 @@ class TwitchChatRuntime extends ChangeNotifier {
         : Future<TwitchRecentMessagesResult?>.value();
 
     _messageSubscription = ircApi.messages.listen(
-      this._handleReadConnectionMessage,
+      _handleReadConnectionMessage,
       onError: (Object error, StackTrace stackTrace) {
         _error = error;
         _connected = false;
@@ -187,7 +187,7 @@ class TwitchChatRuntime extends ChangeNotifier {
 
     if (writeIrcApi != null) {
       _writeMessageSubscription = writeIrcApi!.messages.listen(
-        this._handleWriteConnectionMessage,
+        _handleWriteConnectionMessage,
         onError: (Object error, StackTrace stackTrace) {
           _error = error;
           _connected = false;
@@ -352,7 +352,7 @@ class TwitchChatRuntime extends ChangeNotifier {
         receivedAt: normalize.readMessageTimeOrNow(message),
       );
 
-      this._appendRuntimeMessage(runtimeMessage, notify: false);
+      _appendRuntimeMessage(runtimeMessage, notify: false);
     }
 
     _recentMessageCount +=
@@ -412,7 +412,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     );
 
     _pendingOutgoingMessages.add(pending);
-    this._schedulePendingCleanup(pending);
+    _schedulePendingCleanup(pending);
 
     try {
       await _sendIrcApi.sendChatMessage(
@@ -421,7 +421,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       );
       notifyListeners();
     } catch (e) {
-      this._removePending(pending);
+      _removePending(pending);
       _error = e;
       notifyListeners();
       rethrow;
@@ -470,7 +470,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       },
     );
 
-    this._appendRuntimeMessage(normalizer.normalize(source, receivedAt: now));
+    _appendRuntimeMessage(normalizer.normalize(source, receivedAt: now));
   }
 
   Future<void> disconnect() async {
@@ -483,7 +483,7 @@ class TwitchChatRuntime extends ChangeNotifier {
     _writeMessageSubscription = null;
     _rawSubscription = null;
 
-    this._clearPendingOutgoingMessages();
+    _clearPendingOutgoingMessages();
 
     await ircApi.disconnect();
     await writeIrcApi?.disconnect();

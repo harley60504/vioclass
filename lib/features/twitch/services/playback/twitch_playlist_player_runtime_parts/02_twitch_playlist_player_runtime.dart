@@ -162,7 +162,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       }
       await bridge.open(dvrPlaylistUri: dvrPlaylistUri);
       _bridgeProxy = bridge;
-      this._recordDvrHealthy(
+      _recordDvrHealthy(
         dvrPlaylistUri,
         duration: bridge.latestDuration,
         scheduleNextCheck: _currentVariant != null,
@@ -174,7 +174,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       _sharedBridgeProxy = null;
       if (identical(_bridgeProxy, bridge)) _bridgeProxy = null;
       await bridge?.close();
-      this._recordDvrUnavailable(scheduleRetry: _currentVariant != null);
+      _recordDvrUnavailable(scheduleRetry: _currentVariant != null);
       debugPrint('[DvrSequential] warm failed: $error');
       return false;
     }
@@ -188,7 +188,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = false;
-    this._clearLiveBufferReplay();
+    _clearLiveBufferReplay();
     _bridgeProxy = null;
 
     final router = _proxy ?? _sharedProxy;
@@ -235,7 +235,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       );
     }
 
-    this._stopDvrHealthMonitoring();
+    _stopDvrHealthMonitoring();
     _channelLogin = login;
     _loading = true;
     _switchingQuality = false;
@@ -248,8 +248,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = false;
-    this._clearLiveBufferReplay();
-    this._clearCanonicalLiveTiming();
+    _clearLiveBufferReplay();
+    _clearCanonicalLiveTiming();
     notifyListeners();
 
     try {
@@ -315,12 +315,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
           'clean=${merged.where((v) => !v.hasAds).length}';
 
       final selected = preferredVariant == null
-          ? this._findVariantBySavedPreference(merged, wantedQuality) ??
+          ? _findVariantBySavedPreference(merged, wantedQuality) ??
                 selectDefaultVariant(
                   merged,
                   allowMobileStartupSafeQuality: wantedQuality == null,
                 )
-          : this._findMatchingMergedVariant(merged, preferredVariant) ??
+          : _findMatchingMergedVariant(merged, preferredVariant) ??
                 preferredVariant;
 
       if (selected == null) {
@@ -332,7 +332,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       final variantToOpen = selected;
       _currentVariant = variantToOpen;
       _upstreamPlaylistUri = Uri.tryParse(variantToOpen.url) ?? base.masterUri;
-      _playlistUri = await this._startProxyForVariant(
+      _playlistUri = await _startProxyForVariant(
         variantToOpen,
         probeDvr: probeDvr,
       );
@@ -347,7 +347,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   Future<Uri?> startProxyForVariant(TwitchM3u8Variant variant) async {
-    this._stopDvrHealthMonitoring();
+    _stopDvrHealthMonitoring();
     _switchingQuality = true;
     _error = null;
     notifyListeners();
@@ -355,7 +355,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     try {
       _currentVariant = variant;
       _upstreamPlaylistUri = Uri.tryParse(variant.url);
-      _playlistUri = await this._startProxyForVariant(variant, probeDvr: false);
+      _playlistUri = await _startProxyForVariant(variant, probeDvr: false);
       await _savePreferredQualityName(_channelLogin, variant);
       return _playlistUri;
     } catch (e) {
@@ -368,7 +368,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   void markExternalVodPlayback({required String channelLogin}) {
-    this._stopDvrHealthMonitoring();
+    _stopDvrHealthMonitoring();
     _channelLogin = channelLogin.trim().toLowerCase();
     _loading = false;
     _switchingQuality = false;
@@ -383,7 +383,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingDvrPlaylist = false;
     _usingExternalVodPlayback = true;
     _usingLiveDvrReplay = false;
-    this._clearLiveBufferReplay();
+    _clearLiveBufferReplay();
     _liveDvrPlaylistOverride = null;
     notifyListeners();
   }
@@ -496,10 +496,10 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _usingDvrPlaylist = true;
     _usingExternalVodPlayback = false;
     _usingLiveDvrReplay = true;
-    this._clearLiveBufferReplay();
+    _clearLiveBufferReplay();
     _liveDvrPlaylistOverride = null;
     debugPrint('[DvrSequential] direct TS seek player=$playbackUrl');
-    this._notifyListenersAfterFrame();
+    _notifyListenersAfterFrame();
     return (playbackUrl: playbackUrl, startPosition: startPosition);
   }
 
@@ -558,7 +558,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       '[LiveBufferReplay] route target=${_formatSeconds(safeTarget)}s '
       'fromLive=${_formatSeconds(safeFromLive)}s player=$playbackUrl',
     );
-    this._notifyListenersAfterFrame();
+    _notifyListenersAfterFrame();
     return playbackUrl;
   }
 
@@ -577,12 +577,12 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
             v.height <= _firstRunMobileFallbackHeight &&
             (fps == 0 || fps <= _firstRunMobileFallbackMaxFps);
       }).toList();
-      if (safe.isNotEmpty) return this._sortVariants(safe).first;
+      if (safe.isNotEmpty) return _sortVariants(safe).first;
     }
 
-    final source = pool.where(this._isSourceLikeVariant).firstOrNull;
+    final source = pool.where(_isSourceLikeVariant).firstOrNull;
     if (source != null) return source;
-    return this._sortVariants(pool).first;
+    return _sortVariants(pool).first;
   }
 
   bool get _prefersMobileStartupSafeQuality {
@@ -599,7 +599,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   }
 
   void clear() {
-    unawaited(this._stopProxy(notify: false, closeShared: true));
+    unawaited(_stopProxy(notify: false, closeShared: true));
     _channelLogin = '';
     _masterPlaylistUri = null;
     _playlistUri = null;
@@ -614,8 +614,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
     _variants = const <TwitchM3u8Variant>[];
     _currentVariant = null;
     _adAwareStatus = '';
-    this._clearLiveBufferReplay();
-    this._clearCanonicalLiveTiming();
+    _clearLiveBufferReplay();
+    _clearCanonicalLiveTiming();
     notifyListeners();
   }
 
@@ -623,7 +623,7 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _dio.close(force: true);
-    unawaited(this._stopProxy(notify: false, closeShared: false));
+    unawaited(_stopProxy(notify: false, closeShared: false));
     super.dispose();
   }
 
@@ -656,8 +656,8 @@ class TwitchPlaylistPlayerRuntime extends ChangeNotifier {
       'proxyRunning': router?.isRunning ?? false,
       'proxyStablePort': router?.port,
       'proxyStableUpstream': router?.upstreamPlaylistUrl,
-      'canonicalElapsedSeconds': this._formatSeconds(_canonicalLiveElapsed),
-      'canonicalTotalSeconds': this._formatSeconds(_canonicalLiveTotal),
+      'canonicalElapsedSeconds': _formatSeconds(_canonicalLiveElapsed),
+      'canonicalTotalSeconds': _formatSeconds(_canonicalLiveTotal),
       'canonicalTimelineOrigin': _canonicalTimelineOrigin?.toIso8601String(),
       'canonicalTimingObservedAt': _canonicalTimingObservedAt
           ?.toIso8601String(),

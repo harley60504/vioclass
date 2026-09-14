@@ -38,13 +38,13 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
   }
 
   Widget _buildDesktopShell(TwitchResponsiveLayout layout) {
-    return this._buildContentColumn(layout);
+    return _buildContentColumn(layout);
   }
 
   Widget _buildMobileShell(TwitchResponsiveLayout layout) {
     return Column(
       children: <Widget>[
-        Expanded(child: this._buildContentColumn(layout)),
+        Expanded(child: _buildContentColumn(layout)),
         TwitchStreamHomeBottomNavigation(
           selectedSection: selectedSection,
           onSelectSection: selectSection,
@@ -72,7 +72,7 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
       ),
       child: Stack(
         children: <Widget>[
-          Positioned.fill(child: this._buildHomeContent()),
+          Positioned.fill(child: _buildHomeContent()),
           Positioned(
             left: twoRows ? 10 : 16,
             right: twoRows ? 10 : 16,
@@ -171,7 +171,7 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
     final cleanKeyword = keyword.trim().toLowerCase();
     if (cleanKeyword.isEmpty) return const _TwitchSearchMediaBundle.empty();
 
-    final candidates = this._searchMediaCandidateChannels(
+    final candidates = _searchMediaCandidateChannels(
       liveStreams: liveStreams,
       offlineChannels: offlineChannels,
     );
@@ -190,7 +190,7 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
           videoResults.addAll(
             page.videos
                 .where(
-                  (video) => this._matchesSearchMediaVideo(video, cleanKeyword),
+                  (video) => _matchesSearchMediaVideo(video, cleanKeyword),
                 )
                 .take(4)
                 .map(
@@ -210,7 +210,7 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
           clipResults.addAll(
             page.clips
                 .where(
-                  (clip) => this._matchesSearchMediaClip(clip, cleanKeyword),
+                  (clip) => _matchesSearchMediaClip(clip, cleanKeyword),
                 )
                 .take(4)
                 .map(

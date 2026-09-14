@@ -106,7 +106,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       unawaited(_loadLoginState());
       unawaited(chatAppearanceController.load());
       unawaited(playerSettingsController.load());
-      unawaited(this._loadUpdateSettingsAndCheck());
+      unawaited(_loadUpdateSettingsAndCheck());
     });
   }
 
@@ -138,15 +138,15 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      this._syncRootAutoPip();
+      _syncRootAutoPip();
     }
   }
 
   void _handleRootPlaybackPolicyChanged() {
     if (TwitchAndroidPipController.instance.stoppedOutsidePictureInPicture) {
-      unawaited(this._suspendPlaybackOutsidePictureInPicture());
+      unawaited(_suspendPlaybackOutsidePictureInPicture());
     }
-    this._syncRootAutoPip();
+    _syncRootAutoPip();
     if (mounted) setState(() {});
   }
 
@@ -392,7 +392,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   Future<void> searchChannels(String keyword, int generation) async {
     try {
       final result = await discoveryService.searchChannels(query: keyword);
-      final media = await this._searchChannelMedia(
+      final media = await _searchChannelMedia(
         keyword: keyword,
         liveStreams: result.liveStreams,
         offlineChannels: result.offlineChannels,
@@ -448,8 +448,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       ...liveStreams.map((stream) => stream.channelLogin),
       ...offlineChannels.map((channel) => channel.channelLogin),
     }.where((login) => login.isNotEmpty).toSet();
-    if (this._setEquals(followedUserIds, ids) &&
-        this._setEquals(followedLogins, logins)) {
+    if (_setEquals(followedUserIds, ids) &&
+        _setEquals(followedLogins, logins)) {
       return;
     }
     setState(() {
@@ -475,7 +475,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       canPop: !_shouldBackEnterPictureInPicture,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        unawaited(this._enterPictureInPictureFromRootBack());
+        unawaited(_enterPictureInPictureFromRootBack());
       },
       child: Scaffold(
         backgroundColor: _kBackground,
@@ -493,8 +493,8 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
                           constraints,
                         );
                         return layout.shouldUseBottomHomeNavigation
-                            ? this._buildMobileShell(layout)
-                            : this._buildDesktopShell(layout);
+                            ? _buildMobileShell(layout)
+                            : _buildDesktopShell(layout);
                       },
                     ),
                   ),

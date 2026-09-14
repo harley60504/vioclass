@@ -21,13 +21,13 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
       _latestDvrDuration = null;
       _dvrHealthState = TwitchDvrHealthState.unavailable;
     }
-    this._scheduleDvrHealthCheck(
+    _scheduleDvrHealthCheck(
       initiallyHealthy
           ? TwitchPlaylistPlayerRuntime._dvrHealthyCheckInterval
           : TwitchPlaylistPlayerRuntime._dvrUnavailableRetryInterval,
       _dvrHealthGeneration,
     );
-    this._notifyListenersAfterFrame();
+    _notifyListenersAfterFrame();
   }
 
   void _scheduleDvrHealthCheck(Duration delay, int generation) {
@@ -39,7 +39,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
     }
     _dvrHealthTimer = Timer(
       delay,
-      () => unawaited(this._runDvrHealthCheck(generation)),
+      () => unawaited(_runDvrHealthCheck(generation)),
     );
   }
 
@@ -60,7 +60,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
     try {
       final bridge = TwitchPlaylistPlayerRuntime._sharedBridgeProxy;
       if (bridge == null || !bridge.isRunning || _dvrArchiveUri == null) {
-        await this._recoverDvrArchive(variant, generation);
+        await _recoverDvrArchive(variant, generation);
       } else {
         final health = await bridge.probeArchiveHealth();
         if (generation != _dvrHealthGeneration || _disposed) return;
@@ -76,7 +76,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
             'duration=${health.indexedDuration.inSeconds}s',
           );
         } else {
-          await this._recordDvrHealthFailure(
+          await _recordDvrHealthFailure(
             variant,
             generation,
             reason: 'archive did not advance',
@@ -85,7 +85,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
       }
     } catch (error) {
       if (generation == _dvrHealthGeneration && !_disposed) {
-        await this._recordDvrHealthFailure(
+        await _recordDvrHealthFailure(
           variant,
           generation,
           reason: error.toString(),
@@ -97,9 +97,9 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
         if (_dvrHealthState == TwitchDvrHealthState.unavailable) {
           nextDelay = TwitchPlaylistPlayerRuntime._dvrUnavailableRetryInterval;
         }
-        this._scheduleDvrHealthCheck(nextDelay, generation);
+        _scheduleDvrHealthCheck(nextDelay, generation);
         if (_dvrHealthState != stateBeforeCheck) {
-          this._notifyListenersAfterFrame();
+          _notifyListenersAfterFrame();
         }
       }
     }
@@ -114,13 +114,14 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
     _dvrHealthState = TwitchDvrHealthState.stale;
     _debugDvr('health stale failures=$_dvrConsecutiveFailures reason=$reason');
     if (_dvrConsecutiveFailures <
-        TwitchPlaylistPlayerRuntime._dvrFailuresBeforeRecovery)
+        TwitchPlaylistPlayerRuntime._dvrFailuresBeforeRecovery) {
       return;
+    }
     if (_usingLiveDvrReplay) {
       _debugDvr('health recovery deferred while DVR replay is active');
       return;
     }
-    await this._recoverDvrArchive(variant, generation);
+    await _recoverDvrArchive(variant, generation);
   }
 
   Future<void> _recoverDvrArchive(
@@ -133,10 +134,10 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
         : TwitchDvrHealthState.recovering;
     _debugDvr('health ${_dvrHealthState.name} variant=${variant.name}');
 
-    final resolvedUri = await this._resolveDvrPlaylistUri(variant);
+    final resolvedUri = await _resolveDvrPlaylistUri(variant);
     if (generation != _dvrHealthGeneration || _disposed) return;
     if (resolvedUri == null) {
-      this._recordDvrUnavailable(scheduleRetry: false);
+      _recordDvrUnavailable(scheduleRetry: false);
       return;
     }
 
@@ -154,7 +155,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
           (_bridgeProxy == null || identical(_bridgeProxy, previous))) {
         _bridgeProxy = replacement;
       }
-      this._recordDvrHealthy(
+      _recordDvrHealthy(
         resolvedUri,
         duration: replacement.latestDuration,
         scheduleNextCheck: false,
@@ -165,7 +166,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
       );
     } catch (error) {
       await replacement.close();
-      this._recordDvrUnavailable(scheduleRetry: false);
+      _recordDvrUnavailable(scheduleRetry: false);
       _debugDvr('health recovery failed: $error');
       return;
     }
@@ -190,11 +191,11 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
     _lastDvrHealthyAt = DateTime.now().toUtc();
     if (scheduleNextCheck) {
       _dvrHealthGeneration++;
-      this._scheduleDvrHealthCheck(
+      _scheduleDvrHealthCheck(
         TwitchPlaylistPlayerRuntime._dvrHealthyCheckInterval,
         _dvrHealthGeneration,
       );
-      this._notifyListenersAfterFrame();
+      _notifyListenersAfterFrame();
     }
   }
 
@@ -206,11 +207,11 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
     _dvrHealthState = TwitchDvrHealthState.unavailable;
     if (scheduleRetry) {
       _dvrHealthGeneration++;
-      this._scheduleDvrHealthCheck(
+      _scheduleDvrHealthCheck(
         TwitchPlaylistPlayerRuntime._dvrUnavailableRetryInterval,
         _dvrHealthGeneration,
       );
-      this._notifyListenersAfterFrame();
+      _notifyListenersAfterFrame();
     }
   }
 
@@ -229,7 +230,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
   }
 
   Future<Uri?> _resolveDvrPlaylistUri(TwitchM3u8Variant variant) async {
-    final direct = this._buildDvrPlaylistUri(variant.url);
+    final direct = _buildDvrPlaylistUri(variant.url);
     if (direct != null) return direct;
 
     try {
@@ -249,12 +250,12 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
       );
       if (statusCode >= 400 || !text.contains('#EXTM3U')) return null;
 
-      final fromRealUri = this._buildDvrPlaylistUri(
+      final fromRealUri = _buildDvrPlaylistUri(
         response.realUri.toString(),
       );
       if (fromRealUri != null) return fromRealUri;
 
-      return await this._buildDvrPlaylistUriFromMediaPlaylist(
+      return await _buildDvrPlaylistUriFromMediaPlaylist(
         playlistUri: response.realUri,
         playlistText: text,
       );
@@ -273,7 +274,7 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
       if (line.isEmpty || line.startsWith('#')) continue;
       final segmentUri = playlistUri.resolve(line);
       _debugDvr('first segment candidate: $segmentUri');
-      final fromFinalSegment = await this._buildDvrPlaylistUriFromFinalSegment(
+      final fromFinalSegment = await _buildDvrPlaylistUriFromFinalSegment(
         segmentUri,
       );
       if (fromFinalSegment != null) return fromFinalSegment;
@@ -285,22 +286,22 @@ extension _TwitchPlaylistPlayerRuntimeDvrOps on TwitchPlaylistPlayerRuntime {
   }
 
   Future<Uri?> _buildDvrPlaylistUriFromFinalSegment(Uri segmentUri) async {
-    final headResult = await this._resolveSegmentFinalUri(
+    final headResult = await _resolveSegmentFinalUri(
       segmentUri,
       method: 'HEAD',
     );
     final fromHead =
-        headResult == null || this._isTwitchHlsSegmentProxy(headResult)
+        headResult == null || _isTwitchHlsSegmentProxy(headResult)
         ? null
         : _buildDvrPlaylistUriFromSegment(headResult);
     if (fromHead != null) return fromHead;
 
-    final rangeResult = await this._resolveSegmentFinalUri(
+    final rangeResult = await _resolveSegmentFinalUri(
       segmentUri,
       method: 'GET',
       rangeProbe: true,
     );
-    return rangeResult == null || this._isTwitchHlsSegmentProxy(rangeResult)
+    return rangeResult == null || _isTwitchHlsSegmentProxy(rangeResult)
         ? null
         : _buildDvrPlaylistUriFromSegment(rangeResult);
   }
@@ -331,7 +332,7 @@ extension _TwitchPlaylistPlayerRuntimeProxyOps on TwitchPlaylistPlayerRuntime {
   }
 
   Future<void> _stopProxy({bool notify = true, bool closeShared = true}) async {
-    this._stopDvrHealthMonitoring();
+    _stopDvrHealthMonitoring();
     final router = _proxy ?? TwitchPlaylistPlayerRuntime._sharedProxy;
     final bridge =
         _bridgeProxy ?? TwitchPlaylistPlayerRuntime._sharedBridgeProxy;
@@ -341,16 +342,18 @@ extension _TwitchPlaylistPlayerRuntimeProxyOps on TwitchPlaylistPlayerRuntime {
     _proxyMpvUrl = null;
     _proxyLiveStatus = null;
     _usingLiveDvrReplay = false;
-    this._clearLiveBufferReplay();
+    _clearLiveBufferReplay();
 
     if (closeShared && router != null) {
-      if (identical(TwitchPlaylistPlayerRuntime._sharedProxy, router))
+      if (identical(TwitchPlaylistPlayerRuntime._sharedProxy, router)) {
         TwitchPlaylistPlayerRuntime._sharedProxy = null;
+      }
       await router.close();
     }
     if (closeShared && bridge != null) {
-      if (identical(TwitchPlaylistPlayerRuntime._sharedBridgeProxy, bridge))
+      if (identical(TwitchPlaylistPlayerRuntime._sharedBridgeProxy, bridge)) {
         TwitchPlaylistPlayerRuntime._sharedBridgeProxy = null;
+      }
       await bridge.close();
     }
 
@@ -456,7 +459,7 @@ extension _TwitchPlaylistPlayerRuntimeProxyOps on TwitchPlaylistPlayerRuntime {
     for (final c in cleanCandidates) {
       for (final v in c.variants) {
         final old = cleanByKey[v.adAwareQualityKey];
-        if (old == null || this._sortScore(v) > this._sortScore(old)) {
+        if (old == null || _sortScore(v) > _sortScore(old)) {
           cleanByKey[v.adAwareQualityKey] = v;
         }
       }
@@ -489,7 +492,7 @@ extension _TwitchPlaylistPlayerRuntimeProxyOps on TwitchPlaylistPlayerRuntime {
         merged.add(clean.copyWith(hasAds: false));
       }
     }
-    return this._sortVariants(merged);
+    return _sortVariants(merged);
   }
 
   void _clearLiveBufferReplay() {
