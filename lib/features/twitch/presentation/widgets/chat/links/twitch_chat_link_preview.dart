@@ -332,137 +332,131 @@ class _LinkPreviewShell extends StatelessWidget {
         image.isNotEmpty &&
         (kind == 'youtube' || kind == 'clip' || kind == 'vod');
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(10),
-      onTap: () {
-        final clip = _parseTwitchClipLink(item.url);
-        if (item.trusted && clip != null && !loading) {
-          _openTwitchClipInside(
-            context,
-            clip: clip,
-            url: item.url,
-            title: preview?.title ?? title,
-            thumbnailUrl: image,
-          );
-          return;
-        }
-        showTwitchChatLinkPreviewSheet(context, item.url);
-      },
-      onLongPress: () => copyTwitchChatLink(context, item.url),
-      child: Ink(
-        decoration: BoxDecoration(
-          color: const Color(0xFF20202A),
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: const Color(0xFF20202A),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
+          side: BorderSide(
             color: iconColor.withValues(alpha: item.trusted ? 0.30 : 0.22),
           ),
         ),
-        child: showsHeroImage
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        TwitchCachedImageLayer(
-                          imageUrl: image,
-                          width: double.infinity,
-                          height: double.infinity,
-                          fit: BoxFit.cover,
-                          cacheWidth: 480,
-                          cacheHeight: 270,
-                        ),
-                        Center(
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.58),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 30,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            final clip = _parseTwitchClipLink(item.url);
+            if (item.trusted && clip != null && !loading) {
+              _openTwitchClipInside(
+                context,
+                clip: clip,
+                url: item.url,
+                title: preview?.title ?? title,
+                thumbnailUrl: image,
+              );
+              return;
+            }
+            showTwitchChatLinkPreviewSheet(context, item.url);
+          },
+          onLongPress: () => copyTwitchChatLink(context, item.url),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showsHeroImage)
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: TwitchCachedImageLayer(
+                    imageUrl: image,
+                    width: double.infinity,
+                    height: double.infinity,
+                    fit: BoxFit.cover,
+                    cacheWidth: 480,
+                    cacheHeight: 270,
+                  ),
+                ),
+              Padding(
+                padding: showsHeroImage
+                    ? EdgeInsets.fromLTRB(10, 8 * scale, 10, 9 * scale)
+                    : EdgeInsets.fromLTRB(9, 7 * scale, 9, 7 * scale),
+                child: showsHeroImage
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.play_arrow_rounded,
+                            color: iconColor,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 7),
+                          Expanded(
+                            child: _LinkPreviewTextBlock(
+                              title: title,
+                              subtitle: subtitle,
+                              siteName: siteName,
+                              author: preview?.author,
+                              scale: scale,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(10, 8 * scale, 10, 9 * scale),
-                    child: _LinkPreviewTextBlock(
-                      title: title,
-                      subtitle: subtitle,
-                      siteName: siteName,
-                      author: preview?.author,
-                      scale: scale,
-                    ),
-                  ),
-                ],
-              )
-            : Padding(
-                padding: EdgeInsets.fromLTRB(9, 7 * scale, 9, 7 * scale),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 30,
-                      height: 30,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: iconColor.withValues(alpha: 0.13),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(icon, color: iconColor, size: 17),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: _LinkPreviewTextBlock(
-                        title: title,
-                        subtitle: subtitle,
-                        siteName: siteName,
-                        author: preview?.author,
-                        scale: scale,
-                        compact: image.isEmpty,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    if (loading)
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: iconColor.withValues(alpha: 0.9),
-                        ),
+                        ],
                       )
-                    else if (image.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(7),
-                        child: TwitchCachedImageLayer(
-                          imageUrl: image,
-                          width: 58,
-                          height: 38,
-                          fit: BoxFit.cover,
-                          cacheWidth: 160,
-                          cacheHeight: 96,
-                        ),
-                      )
-                    else
-                      Icon(
-                        _parseTwitchClipLink(item.url) == null
-                            ? Icons.open_in_new_rounded
-                            : Icons.play_arrow_rounded,
-                        color: Colors.white38,
-                        size: 17,
+                    : Row(
+                        children: [
+                          SizedBox(
+                            width: 30,
+                            height: 30,
+                            child: Icon(icon, color: iconColor, size: 17),
+                          ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: _LinkPreviewTextBlock(
+                              title: title,
+                              subtitle: subtitle,
+                              siteName: siteName,
+                              author: preview?.author,
+                              scale: scale,
+                              compact: image.isEmpty,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (loading)
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: iconColor.withValues(alpha: 0.9),
+                              ),
+                            )
+                          else if (image.isNotEmpty)
+                            SizedBox(
+                              width: 58,
+                              child: AspectRatio(
+                                aspectRatio: 29 / 19,
+                                child: TwitchCachedImageLayer(
+                                  imageUrl: image,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: 160,
+                                  cacheHeight: 96,
+                                ),
+                              ),
+                            )
+                          else
+                            Icon(
+                              _parseTwitchClipLink(item.url) == null
+                                  ? Icons.open_in_new_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white38,
+                              size: 17,
+                            ),
+                        ],
                       ),
-                  ],
-                ),
               ),
+            ],
+          ),
+        ),
       ),
     );
   }

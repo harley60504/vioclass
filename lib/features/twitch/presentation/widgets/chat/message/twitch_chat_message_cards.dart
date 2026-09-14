@@ -158,99 +158,114 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
         onTap: onOpenContext,
         onLongPress: onOpenContext,
         onSecondaryTap: onOpenContext,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: Color.alphaBlend(
-              style.accentColor.withValues(alpha: 0.06),
-              TwitchUiColors.surfaceCard,
-            ),
-            borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-            border: Border.all(color: style.borderColor),
+        child: Material(
+          color: Color.alphaBlend(
+            style.accentColor.withValues(alpha: 0.06),
+            TwitchUiColors.surfaceCard,
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                left: 0,
-                top: TwitchUiSpacing.space8,
-                bottom: TwitchUiSpacing.space8,
-                child: Container(
-                  width: 3,
-                  decoration: BoxDecoration(
-                    color: style.accentColor,
-                    borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+            side: BorderSide(color: style.borderColor),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 8, 10, 9),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Container(
+                        width: 3,
+                        decoration: BoxDecoration(
+                          color: style.accentColor,
+                          borderRadius: BorderRadius.circular(
+                            TwitchUiRadius.pill,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: TwitchUiSpacing.space8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  style.icon,
+                                  size: 14,
+                                  color: style.accentColor,
+                                ),
+                                const SizedBox(width: TwitchUiSpacing.space8),
+                                Flexible(
+                                  child: Text(
+                                    metadata.specialLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: twitchChatTextStyle(
+                                      TextStyle(
+                                        color: style.accentColor,
+                                        fontSize:
+                                            TwitchUiFontSize.meta *
+                                            metrics.scale,
+                                        fontWeight: TwitchUiFontWeight.strong,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (showTimestamp) ...[
+                                  const SizedBox(width: TwitchUiSpacing.space8),
+                                  TwitchChatTimestampChip(
+                                    time: message.receivedAt,
+                                    metrics: metrics,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (bannerText != null &&
+                                bannerText.isNotEmpty) ...[
+                              const SizedBox(height: TwitchUiSpacing.space8),
+                              Text(
+                                bannerText,
+                                style: twitchChatTextStyle(
+                                  TextStyle(
+                                    color: TwitchUiColors.textPrimary,
+                                    fontSize: metrics.compactMessageFontSize,
+                                    height: metrics.lineHeight,
+                                    fontWeight: TwitchUiFontWeight.medium,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (hasVisibleChatText) ...[
+                              if (bannerText != null && bannerText.isNotEmpty)
+                                const SizedBox(height: TwitchUiSpacing.space8),
+                              TwitchChatMessageContent(
+                                message: message,
+                                thirdPartyEmotes: thirdPartyEmotes,
+                                officialEmotes: officialEmotes,
+                                displayColor: displayColor,
+                                displayNameText: displayNameText,
+                                showSystemMessage: false,
+                                showTimestamp: false,
+                                compact: true,
+                                metrics: metrics,
+                                animateEmotes: animateEmotes,
+                              ),
+                              TwitchChatLinkPreviewColumn(
+                                items: previewItems,
+                                fontScale: metrics.scale,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 10, 9),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(style.icon, size: 14, color: style.accentColor),
-                        const SizedBox(width: TwitchUiSpacing.space8),
-                        Flexible(
-                          child: Text(
-                            metadata.specialLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: twitchChatTextStyle(
-                              TextStyle(
-                                color: style.accentColor,
-                                fontSize: TwitchUiFontSize.meta * metrics.scale,
-                                fontWeight: TwitchUiFontWeight.strong,
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (showTimestamp) ...[
-                          const SizedBox(width: TwitchUiSpacing.space8),
-                          TwitchChatTimestampChip(
-                            time: message.receivedAt,
-                            metrics: metrics,
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (bannerText != null && bannerText.isNotEmpty) ...[
-                      const SizedBox(height: TwitchUiSpacing.space8),
-                      Text(
-                        bannerText,
-                        style: twitchChatTextStyle(
-                          TextStyle(
-                            color: TwitchUiColors.textPrimary,
-                            fontSize: metrics.compactMessageFontSize,
-                            height: metrics.lineHeight,
-                            fontWeight: TwitchUiFontWeight.medium,
-                          ),
-                        ),
-                      ),
-                    ],
-                    if (hasVisibleChatText) ...[
-                      if (bannerText != null && bannerText.isNotEmpty)
-                        const SizedBox(height: TwitchUiSpacing.space8),
-                      TwitchChatMessageContent(
-                        message: message,
-                        thirdPartyEmotes: thirdPartyEmotes,
-                        officialEmotes: officialEmotes,
-                        displayColor: displayColor,
-                        displayNameText: displayNameText,
-                        showSystemMessage: false,
-                        showTimestamp: false,
-                        compact: true,
-                        metrics: metrics,
-                        animateEmotes: animateEmotes,
-                      ),
-                      TwitchChatLinkPreviewColumn(
-                        items: previewItems,
-                        fontScale: metrics.scale,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
