@@ -56,8 +56,20 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
   Widget _buildContentColumn(TwitchResponsiveLayout layout) {
     final twoRows = layout.shouldUseTwoRowHomeToolbar;
 
-    return ColoredBox(
-      color: TwitchUiColors.appBackground,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.appBackground,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            Color(0x18FFFFFF),
+            Color(0x0AFFFFFF),
+            Color(0x00000000),
+          ],
+          stops: <double>[0.0, 0.42, 1.0],
+        ),
+      ),
       child: Stack(
         children: <Widget>[
           Positioned.fill(child: this._buildHomeContent()),
