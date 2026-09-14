@@ -59,23 +59,24 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // Opaque Midnight Purple foundation. Large app surfaces never reveal the
-  // desktop or content behind them; depth comes from progressively lighter
-  // purple-black surfaces instead of transparency.
+  // Keep the large app background opaque and purple-black. Interactive surfaces
+  // above it are neutral translucent black so the UI does not become uniformly
+  // purple.
   static const Color appBackground = Color(0xFF0B0812);
   static const Color fallbackAppBackground = appBackground;
   static const Color windowBackground = appBackground;
 
-  // Opaque purple-black surface ladder.
-  static const Color surfaceBase = Color(0xFF0E0A17);
-  static const Color surfacePanel = Color(0xFF120D1D);
-  static const Color surfaceCard = Color(0xFF171122);
-  static const Color surfaceRaised = Color(0xFF1C152A);
-  static const Color surfaceInteractive = Color(0xFF211930);
-  static const Color surfaceHover = Color(0xFF2A203C);
-  static const Color surfaceSelected = Color(0xFF31264C);
-  static const Color surfacePlayer = Color(0xFF09070D);
-  static const Color surfaceGlass = Color(0xFF171122);
+  // Neutral translucent surface ladder. Cards, buttons, search fields and chat
+  // inputs intentionally share the same 40% black fill for visual consistency.
+  static const Color surfaceBase = Color(0x24000000);
+  static const Color surfacePanel = Color(0x52000000);
+  static const Color surfaceCard = Color(0x66000000);
+  static const Color surfaceRaised = Color(0x70000000);
+  static const Color surfaceInteractive = Color(0x66000000);
+  static const Color surfaceHover = Color(0x80000000);
+  static const Color surfaceSelected = Color(0x668D7BFF);
+  static const Color surfacePlayer = Color(0xB0000000);
+  static const Color surfaceGlass = Color(0x66000000);
 
   // Backward-compatible aliases. New code should prefer semantic names above.
   static const Color surface = surfacePanel;
@@ -95,19 +96,20 @@ class TwitchUiColors {
   static const Color textFaint = Color(0xFF555D6B);
   static const Color textOnAccent = Color(0xFFFFFFFF);
 
-  // Borders / separators.
-  static const Color borderSubtle = Color(0xFF262033);
-  static const Color border = Color(0xFF342A45);
-  static const Color borderStrong = Color(0xFF49395F);
-  static const Color borderInteractive = Color(0xFF6756A0);
-  static const Color divider = Color(0xFF241D30);
+  // Neutral borders / separators. Purple is reserved for focus and selected
+  // states instead of every surface edge.
+  static const Color borderSubtle = Color(0x1AFFFFFF);
+  static const Color border = Color(0x2AFFFFFF);
+  static const Color borderStrong = Color(0x3DFFFFFF);
+  static const Color borderInteractive = Color(0x558D7BFF);
+  static const Color divider = Color(0x18FFFFFF);
 
   // States.
-  static const Color hoverOverlay = Color(0xFF251D35);
-  static const Color pressedOverlay = Color(0xFF302442);
-  static const Color selectedOverlay = Color(0xFF352957);
-  static const Color disabledForeground = Color(0xFF77727F);
-  static const Color focusRing = Color(0xFF8D7BFF);
+  static const Color hoverOverlay = Color(0x12FFFFFF);
+  static const Color pressedOverlay = Color(0x1CFFFFFF);
+  static const Color selectedOverlay = Color(0x268D7BFF);
+  static const Color disabledForeground = Color(0x59FFFFFF);
+  static const Color focusRing = Color(0x998D7BFF);
 
   // Semantic accents.
   static const Color blue = Color(0xFF68A7FF);
@@ -120,24 +122,24 @@ class TwitchUiColors {
 
   static const TwitchUiBackplatePalette purpleBackplate =
       TwitchUiBackplatePalette(
-        fill: Color(0xFF241C39),
-        fillActive: Color(0xFF33264F),
-        border: Color(0xFF66569A),
-        borderActive: Color(0xFF9B8DDA),
+        fill: Color(0x1F8D7BFF),
+        fillActive: Color(0x318D7BFF),
+        border: Color(0x668D7BFF),
+        borderActive: Color(0x99C3BAFF),
         foreground: primarySoft,
-        foregroundMuted: Color(0xFFB8B2D8),
+        foregroundMuted: Color(0xCCB8B2D8),
       );
 
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
     background: surfacePanel,
     scrim: Color(0x99000000),
-    shellGradientStart: Color(0xFF1B1428),
-    shellGradientEnd: Color(0xFF120D1D),
-    headerGradientStart: Color(0xFF211832),
-    headerGradientEnd: Color(0xFF151020),
+    shellGradientStart: Color(0x52000000),
+    shellGradientEnd: Color(0x66000000),
+    headerGradientStart: Color(0x5A000000),
+    headerGradientEnd: Color(0x42000000),
     border: border,
     shadow: Color(0xB3000000),
-    handle: Color(0xFF6D657A),
+    handle: Color(0x5AFFFFFF),
     cardFill: surfaceCard,
     cardFillActive: surfaceSelected,
     cardBorder: borderSubtle,
