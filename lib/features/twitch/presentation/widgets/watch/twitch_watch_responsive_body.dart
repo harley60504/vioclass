@@ -14,7 +14,7 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 class TwitchWatchResponsiveBody extends StatelessWidget {
   static const double _chatMinWidthVisualBoost = 18.0;
   static const double _playerAspectRatio = 16 / 9;
-  static const Color _watchBackgroundColor = Color(0x28000000);
+  static const Color _watchBackgroundColor = Color(0x0DFFFFFF);
 
   final bool chatVisible;
   final bool fullscreenMode;
@@ -63,8 +63,20 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
           return TwitchPlayerOnlySurface(player: player);
         }
 
-        return ColoredBox(
-          color: _watchBackgroundColor,
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            color: _watchBackgroundColor,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                Color(0x14FFFFFF),
+                Color(0x08FFFFFF),
+                Color(0x00000000),
+              ],
+              stops: <double>[0.0, 0.48, 1.0],
+            ),
+          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final layout = TwitchResponsiveLayout.fromConstraints(
@@ -387,8 +399,8 @@ class _WatchSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.045)),
+        color: Colors.white.withValues(alpha: 0.045),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
       ),
       child: child,
     );
