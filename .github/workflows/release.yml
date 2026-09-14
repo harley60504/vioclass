@@ -121,11 +121,39 @@ jobs:
           path.write_text(updated, encoding='utf-8')
           PY
 
+      - name: Configure Android release signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${ANDROID_KEYSTORE_BASE64:?Missing ANDROID_KEYSTORE_BASE64 secret}"
+          : "${ANDROID_KEYSTORE_PASSWORD:?Missing ANDROID_KEYSTORE_PASSWORD secret}"
+          : "${ANDROID_KEY_PASSWORD:?Missing ANDROID_KEY_PASSWORD secret}"
+
+          printf '%s' "${ANDROID_KEYSTORE_BASE64}" | base64 --decode > android/app/vioclass-release.p12
+          {
+            printf 'storePassword=%s\n' "${ANDROID_KEYSTORE_PASSWORD}"
+            printf 'keyPassword=%s\n' "${ANDROID_KEY_PASSWORD}"
+            printf 'keyAlias=vioclass-release\n'
+            printf 'storeFile=vioclass-release.p12\n'
+          } > android/key.properties
+
       - name: Resolve dependencies
         run: flutter pub get
 
       - name: Build release APK
         run: flutter build apk --release
+
+      - name: Verify Android release signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          apksigner_path="$(find "${ANDROID_SDK_ROOT}/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "${apksigner_path}"
+          "${apksigner_path}" verify --verbose --print-certs build/app/outputs/flutter-apk/app-release.apk
 
       - name: Prepare APK artifact
         shell: bash
