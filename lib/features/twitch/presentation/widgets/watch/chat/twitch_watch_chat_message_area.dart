@@ -32,26 +32,34 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentRuntime = runtime;
-    if (currentRuntime == null) return const TwitchChatEmptyView();
 
-    return AnimatedBuilder(
-      animation: Listenable.merge([
-        currentRuntime,
-        thirdPartyEmoteCache,
-        officialEmoteCache,
-        appearanceListenable,
-      ]),
-      builder: (context, _) {
-        return TwitchChatMessageList(
-          runtime: currentRuntime,
-          thirdPartyEmoteCache: thirdPartyEmoteCache,
-          officialEmoteCache: officialEmoteCache,
-          showTimestamp: showTimestamp,
-          fontScale: fontScale,
-          compact: compact,
-          onOpenMessageContext: onOpenMessageContext,
-        );
-      },
+    // The chat feed is a strict viewport between the header and composer.
+    // Rich cards (link previews, special messages, media thumbnails) must never
+    // paint outside this rectangle even while sliver items are entering/leaving
+    // the visible region.
+    return ClipRect(
+      clipBehavior: Clip.hardEdge,
+      child: currentRuntime == null
+          ? const TwitchChatEmptyView()
+          : AnimatedBuilder(
+              animation: Listenable.merge([
+                currentRuntime,
+                thirdPartyEmoteCache,
+                officialEmoteCache,
+                appearanceListenable,
+              ]),
+              builder: (context, _) {
+                return TwitchChatMessageList(
+                  runtime: currentRuntime,
+                  thirdPartyEmoteCache: thirdPartyEmoteCache,
+                  officialEmoteCache: officialEmoteCache,
+                  showTimestamp: showTimestamp,
+                  fontScale: fontScale,
+                  compact: compact,
+                  onOpenMessageContext: onOpenMessageContext,
+                );
+              },
+            ),
     );
   }
 }
