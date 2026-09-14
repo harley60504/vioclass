@@ -3,6 +3,7 @@ import 'twitch_live_stream.dart';
 class TwitchStreamHeaderMetadata {
   final String streamId;
   final String channelLogin;
+  final String broadcasterDisplayName;
   final String streamTitle;
   final String gameName;
   final String language;
@@ -15,6 +16,7 @@ class TwitchStreamHeaderMetadata {
   const TwitchStreamHeaderMetadata({
     this.streamId = '',
     required this.channelLogin,
+    this.broadcasterDisplayName = '',
     this.streamTitle = '',
     this.gameName = '',
     this.language = '',
@@ -29,13 +31,13 @@ class TwitchStreamHeaderMetadata {
     String fallbackChannelLogin = 'roger9527',
   }) : this(channelLogin: fallbackChannelLogin);
 
-  /// Compatibility display name used by UI components that only need a
-  /// human-readable channel label.
-  ///
-  /// Twitch stream metadata currently carries [channelLogin] but not a separate
-  /// broadcaster display name. Keep this getter so UI components can avoid
-  /// depending on a specific discovery model shape.
-  String get displayName => channelLogin;
+  /// Human-readable broadcaster name. Prefer Twitch's display name (which may
+  /// contain localized/CJK characters) and fall back to the stable login.
+  String get displayName {
+    final display = broadcasterDisplayName.trim();
+    if (display.isNotEmpty) return display;
+    return channelLogin.trim();
+  }
 
   /// Compatibility channel id used by UI fallback APIs.
   ///
@@ -48,6 +50,7 @@ class TwitchStreamHeaderMetadata {
     return TwitchStreamHeaderMetadata(
       streamId: stream.id,
       channelLogin: stream.channelLogin,
+      broadcasterDisplayName: stream.displayName,
       streamTitle: stream.title,
       gameName: stream.gameName,
       language: stream.language,
@@ -62,6 +65,7 @@ class TwitchStreamHeaderMetadata {
   TwitchStreamHeaderMetadata copyWith({
     String? streamId,
     String? channelLogin,
+    String? broadcasterDisplayName,
     String? streamTitle,
     String? gameName,
     String? language,
@@ -76,6 +80,8 @@ class TwitchStreamHeaderMetadata {
     return TwitchStreamHeaderMetadata(
       streamId: streamId ?? this.streamId,
       channelLogin: channelLogin ?? this.channelLogin,
+      broadcasterDisplayName:
+          broadcasterDisplayName ?? this.broadcasterDisplayName,
       streamTitle: streamTitle ?? this.streamTitle,
       gameName: gameName ?? this.gameName,
       language: language ?? this.language,
