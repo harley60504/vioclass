@@ -55,18 +55,12 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
 
   Widget _buildContentColumn(TwitchResponsiveLayout layout) {
     final twoRows = layout.shouldUseTwoRowHomeToolbar;
-    final topInset = twoRows ? 118.0 : 72.0;
 
     return ColoredBox(
       color: TwitchUiColors.appBackground,
       child: Stack(
         children: <Widget>[
-          Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.only(top: topInset),
-              child: this._buildHomeContent(),
-            ),
-          ),
+          Positioned.fill(child: this._buildHomeContent()),
           Positioned(
             left: twoRows ? 10 : 16,
             right: twoRows ? 10 : 16,
