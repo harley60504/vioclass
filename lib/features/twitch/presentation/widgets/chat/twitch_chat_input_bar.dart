@@ -12,6 +12,8 @@ class TwitchChatInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
   final bool sending;
+  final String? hintText;
+  final Color? hintColor;
   final FutureOr<void> Function() onSend;
 
   const TwitchChatInputBar({
@@ -19,6 +21,8 @@ class TwitchChatInputBar extends StatelessWidget {
     required this.controller,
     required this.enabled,
     required this.sending,
+    this.hintText,
+    this.hintColor,
     required this.onSend,
   });
 
@@ -85,6 +89,8 @@ class TwitchChatInputBar extends StatelessWidget {
                 fontSize: fontSize,
                 lineHeight: _inputLineHeight,
                 verticalPadding: _inputVerticalPadding,
+                hintText: hintText,
+                hintColor: hintColor,
                 onSubmit: () => unawaited(_submitIfPossible(context)),
               ),
             ),
@@ -110,6 +116,8 @@ class _SelfDrawnInputField extends StatelessWidget {
   final double fontSize;
   final double lineHeight;
   final double verticalPadding;
+  final String? hintText;
+  final Color? hintColor;
   final VoidCallback onSubmit;
 
   const _SelfDrawnInputField({
@@ -119,6 +127,8 @@ class _SelfDrawnInputField extends StatelessWidget {
     required this.fontSize,
     required this.lineHeight,
     required this.verticalPadding,
+    required this.hintText,
+    required this.hintColor,
     required this.onSubmit,
   });
 
@@ -202,8 +212,12 @@ class _SelfDrawnInputField extends StatelessWidget {
             decoration: InputDecoration(
               isCollapsed: true,
               filled: false,
-              hintText: l10n.t('輸入聊天室訊息...'),
-              hintStyle: textStyle.copyWith(color: TwitchUiColors.textMuted),
+              hintText: hintText?.trim().isNotEmpty == true
+                  ? hintText
+                  : l10n.t('輸入聊天室訊息...'),
+              hintStyle: textStyle.copyWith(
+                color: hintColor ?? TwitchUiColors.textMuted,
+              ),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,

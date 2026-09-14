@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../../services/chat/twitch_chat_runtime.dart';
 import '../../../../services/engagement/twitch_channel_points_runtime_service.dart';
+import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../chat/twitch_chat_input_bar.dart';
 import 'twitch_chat_room_mode_banner.dart';
@@ -48,6 +49,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pending = pendingSpecialMessage;
+    final activeRuntime = runtime;
 
     return SafeArea(
       left: false,
@@ -63,51 +65,60 @@ class TwitchWatchChatInputSection extends StatelessWidget {
               compact: compact,
               onCancel: onCancelPendingSpecialMessage ?? () {},
             ),
-          if (runtime case final activeRuntime?)
+          if (activeRuntime == null)
+            _buildComposer()
+          else
             AnimatedBuilder(
               animation: activeRuntime,
-              builder: (context, _) => TwitchChatRoomModeBanner(
-                roomState: activeRuntime.roomState,
-                compact: compact,
-                viewerIsFollowing: viewerIsFollowing,
-                viewerFollowedAt: viewerFollowedAt,
-                viewerIsModerator: activeRuntime.viewerIsModerator,
-                viewerIsVip: activeRuntime.viewerIsVip,
-                viewerIsSubscriber: activeRuntime.viewerIsSubscriber,
+              builder: (context, _) => _buildComposer(
+                roomModeHint: twitchChatRoomModeHint(
+                  l10n: context.vio,
+                  roomState: activeRuntime.roomState,
+                  viewerIsFollowing: viewerIsFollowing,
+                  viewerFollowedAt: viewerFollowedAt,
+                  viewerIsModerator: activeRuntime.viewerIsModerator,
+                  viewerIsVip: activeRuntime.viewerIsVip,
+                  viewerIsSubscriber: activeRuntime.viewerIsSubscriber,
+                ),
               ),
             ),
-          DecoratedBox(
-            decoration: const BoxDecoration(
-              color: TwitchUiColors.surfaceRaised,
-              border: Border(
-                top: BorderSide(color: TwitchUiColors.borderSubtle),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x52000000),
-                  blurRadius: 12,
-                  offset: Offset(0, -3),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TwitchWatchChatUtilityBar(
-                  channelPoints: channelPoints,
-                  loadingEmotes: loadingEmotes,
-                  onOpenChannelPoints: onOpenChannelPoints,
-                  onOpenEmotes: onOpenEmotes,
-                  onOpenSpecialActions: onOpenSpecialActions,
-                ),
-                TwitchChatInputBar(
-                  controller: messageController,
-                  enabled: enabled,
-                  sending: sending,
-                  onSend: onSend,
-                ),
-              ],
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComposer({String? roomModeHint}) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.surfaceRaised,
+        border: Border(top: BorderSide(color: TwitchUiColors.borderSubtle)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x52000000),
+            blurRadius: 12,
+            offset: Offset(0, -3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TwitchWatchChatUtilityBar(
+            channelPoints: channelPoints,
+            loadingEmotes: loadingEmotes,
+            onOpenChannelPoints: onOpenChannelPoints,
+            onOpenEmotes: onOpenEmotes,
+            onOpenSpecialActions: onOpenSpecialActions,
+          ),
+          TwitchChatInputBar(
+            controller: messageController,
+            enabled: enabled,
+            sending: sending,
+            hintText: roomModeHint,
+            hintColor: roomModeHint == null
+                ? null
+                : Colors.amber.shade200.withValues(alpha: 0.88),
+            onSend: onSend,
           ),
         ],
       ),

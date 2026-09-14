@@ -12,6 +12,7 @@ import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_watch_route_guard.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../twitch_follow_status_resolver.dart';
+import '../responsive/twitch_responsive_layout.dart';
 import 'twitch_stream_card.dart';
 
 class TwitchDiscoveryStreamGrid extends StatelessWidget {
@@ -50,6 +51,10 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
+        final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+        final homeToolbarInset = layout.shouldUseTwoRowHomeToolbar
+            ? 118.0
+            : 70.0;
         final mainAxisExtent = twitchStreamCardGridMainAxisExtent(
           constraints.maxWidth,
         );
@@ -61,6 +66,7 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
             scrollCacheExtent: const ScrollCacheExtent.pixels(840),
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: <Widget>[
+              SliverToBoxAdapter(child: SizedBox(height: homeToolbarInset)),
               SliverToBoxAdapter(
                 child: TwitchDiscoverySectionHeader(
                   icon: sectionIcon,
@@ -110,7 +116,9 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
         .push(
           MaterialPageRoute<void>(
             builder: (_) => TwitchWatchRouteGuard(
-              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
+              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
+                stream,
+              ),
               initialOfflineChannel: TwitchFollowedChannel(
                 broadcasterId: stream.userId,
                 broadcasterLogin: stream.userLogin,
@@ -213,7 +221,9 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
         .push(
           MaterialPageRoute<void>(
             builder: (_) => TwitchWatchRouteGuard(
-              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
+              initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
+                stream,
+              ),
               initialOfflineChannel: TwitchFollowedChannel(
                 broadcasterId: stream.userId,
                 broadcasterLogin: stream.userLogin,
