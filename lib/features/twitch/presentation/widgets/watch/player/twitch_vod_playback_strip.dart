@@ -615,7 +615,7 @@ class _InlineTimeValue extends StatelessWidget {
       return TapRegion(
         onTapOutside: (_) => onTapOutside(),
         child: SizedBox(
-          width: 66,
+          width: 92,
           height: 28,
           child: TwitchTextField(
             height: 28,
