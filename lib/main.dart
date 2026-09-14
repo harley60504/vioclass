@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
 
 import 'app.dart';
 import 'features/twitch/platform/twitch_desktop_webview_entry.dart';
@@ -15,11 +14,10 @@ const bool _filterAxTreeDebugLogs = bool.fromEnvironment(
   defaultValue: true,
 );
 
-Future<void> main(List<String> args) async {
+void main(List<String> args) {
   if (tryRunTwitchDesktopWebViewEntry(args)) return;
 
   WidgetsFlutterBinding.ensureInitialized();
-  await _initializeDesktopBackdrop();
   _installDebugLogFilter();
 
   final app = kDebugMode && _disableDebugSemantics
@@ -27,22 +25,6 @@ Future<void> main(List<String> args) async {
       : const VioClassApp();
 
   runApp(app);
-}
-
-Future<void> _initializeDesktopBackdrop() async {
-  if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) return;
-
-  try {
-    await flutter_acrylic.Window.initialize();
-    await flutter_acrylic.Window.setEffect(
-      effect: flutter_acrylic.WindowEffect.acrylic,
-      color: const Color(0x4410151D),
-      dark: true,
-    );
-  } catch (error, stackTrace) {
-    debugPrint('Windows acrylic backdrop unavailable: $error');
-    debugPrint('$stackTrace');
-  }
 }
 
 void _installDebugLogFilter() {
