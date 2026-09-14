@@ -29,6 +29,7 @@ class TwitchChatInputBar extends StatelessWidget {
   });
 
   static const double _inputRowHeight = 48;
+  static const double _sendButtonSize = 36;
   static const double _inputFontSize = 13;
   static const double _inputLineHeight = 1.20;
 
@@ -82,7 +83,7 @@ class TwitchChatInputBar extends StatelessWidget {
       child: SizedBox(
         height: rowHeight,
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: _SelfDrawnInputField(
@@ -99,8 +100,8 @@ class TwitchChatInputBar extends StatelessWidget {
             ),
             const SizedBox(width: TwitchUiSpacing.space8),
             _SelfDrawnSendButton(
-              height: rowHeight,
-              minWidth: rowHeight,
+              height: _sendButtonSize,
+              minWidth: _sendButtonSize,
               enabled: enabled && !sending,
               sending: sending,
               onTap: () => unawaited(_submitIfPossible(context)),
