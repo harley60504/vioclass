@@ -574,11 +574,10 @@ class _InlineTimelineTimeControlsState
           Text(_formatTimeline(widget.duration), style: textStyle),
           if (widget.liveText != null) ...[
             const SizedBox(width: 8),
-            _InlineLiveButton(
+            _LiveStatusButton(
               text: widget.liveText!,
               active: widget.liveActive,
               enabled: widget.canReturnToLive,
-              style: textStyle,
               onPressed: widget.onReturnToLive,
             ),
           ],
@@ -651,37 +650,50 @@ class _InlineTimeValue extends StatelessWidget {
   }
 }
 
-class _InlineLiveButton extends StatelessWidget {
+class _LiveStatusButton extends StatelessWidget {
   final String text;
   final bool active;
   final bool enabled;
-  final TextStyle style;
   final VoidCallback onPressed;
 
-  const _InlineLiveButton({
+  const _LiveStatusButton({
     required this.text,
     required this.active,
     required this.enabled,
-    required this.style,
     required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? Colors.redAccent : Colors.white60;
+    final color = active ? Colors.redAccent : Colors.white54;
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: enabled ? onPressed : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: active ? const Color(0x2EEF4444) : const Color(0x18FFFFFF),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: active ? const Color(0x99EF4444) : Colors.white24,
+            ),
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.circle, size: 7, color: color),
-              const SizedBox(width: 4),
-              Text(text, style: style.copyWith(color: color)),
+              Icon(Icons.circle, size: 6, color: color),
+              const SizedBox(width: 3),
+              Text(
+                text,
+                maxLines: 1,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ],
           ),
         ),
@@ -814,37 +826,12 @@ class _LiveTimelineTimeControls extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 7),
-          MouseRegion(
-            cursor: canReturnToLive
-                ? SystemMouseCursors.click
-                : MouseCursor.defer,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: canReturnToLive ? onReturnToLive : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 5),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.circle,
-                      size: compact ? 6 : 7,
-                      color: liveActive ? Colors.redAccent : Colors.white38,
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      liveText,
-                      style: baseStyle.copyWith(
-                        color: liveActive ? Colors.redAccent : Colors.white60,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _LiveStatusButton(
+            text: liveText,
+            active: liveActive,
+            enabled: canReturnToLive,
+            onPressed: onReturnToLive,
           ),
-          const SizedBox(width: 7),
-          Text(durationText, style: baseStyle),
         ],
       ),
     );
