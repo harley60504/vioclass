@@ -78,8 +78,19 @@ class TwitchPipBridge(
 
     private fun setSourceRectHint(left: Int, top: Int, right: Int, bottom: Int) {
         if (right <= left || bottom <= top) return
-        sourceRectHint = Rect(left, top, right, bottom)
-        updatePictureInPictureParams(16, 9)
+
+        val next = Rect(left, top, right, bottom)
+        if (sourceRectHint == next) return
+        sourceRectHint = next
+
+        // Keep the latest rect ready for manual PiP, but do not continuously
+        // call setPictureInPictureParams during ordinary playback. Flutter can
+        // report layout changes many times per second while resizing; pushing
+        // each one through Android's window manager is unnecessary and can
+        // disturb the video surface on some devices.
+        if (autoPipEnabled || isCurrentlyInPip()) {
+            updatePictureInPictureParams(16, 9)
+        }
     }
 
     private fun isPipAvailable(): Boolean {
