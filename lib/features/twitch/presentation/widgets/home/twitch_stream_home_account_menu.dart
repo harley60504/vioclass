@@ -21,9 +21,9 @@ class TwitchStreamHomeAccountMenu extends StatelessWidget {
       message: context.vio.t('設定'),
       child: TwitchGlassSurface(
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        backgroundColor: TwitchUiColors.surfaceGlass,
-        borderColor: TwitchUiColors.border,
-        blurSigma: TwitchUiGlass.blurSoft,
+        backgroundColor: TwitchUiColors.surfacePanel.withValues(alpha: 0.30),
+        borderColor: Colors.white.withValues(alpha: 0.09),
+        blurSigma: TwitchUiGlass.blurStrong,
         boxShadow: TwitchUiShadows.soft,
         child: Material(
           color: Colors.transparent,
