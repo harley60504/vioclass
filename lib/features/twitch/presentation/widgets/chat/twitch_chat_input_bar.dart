@@ -28,7 +28,7 @@ class TwitchChatInputBar extends StatelessWidget {
     required this.onSend,
   });
 
-  static const double _inputRowHeight = 36;
+  static const double _inputRowHeight = 48;
   static const double _inputFontSize = 13;
   static const double _inputLineHeight = 1.20;
 
