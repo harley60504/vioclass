@@ -92,9 +92,14 @@ extension TwitchLiveWatchStateMethods on TwitchWatchPageState {
 
   bool get hasUsableLiveDvrArchive {
     final video = activeGrowingVodVideo;
-    return video != null &&
-        warmedLiveDvrVideoId == video.id &&
-        watchPorts.player.runtime.hasWarmLiveDvrBridge;
+    if (video == null) return false;
+
+    final runtime = watchPorts.player.runtime;
+    final runtimeChannel = runtime.channelLogin.trim().toLowerCase();
+    final activeChannel = channelLogin.trim().toLowerCase();
+    return runtimeChannel.isNotEmpty &&
+        runtimeChannel == activeChannel &&
+        runtime.hasWarmLiveDvrBridge;
   }
 
   bool get hasDvrReplayPlayback {
