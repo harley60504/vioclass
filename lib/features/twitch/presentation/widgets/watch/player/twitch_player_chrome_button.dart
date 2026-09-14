@@ -96,6 +96,7 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
 
     final label = widget.label?.trim();
     final hasLabel = label != null && label.isNotEmpty;
+    final displayLabel = label ?? '';
 
     return Tooltip(
       message: widget.tooltip,
@@ -150,7 +151,7 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
                                     const SizedBox(
                                         width: TwitchUiSpacing.space8),
                                     Text(
-                                      label,
+                                      displayLabel,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
