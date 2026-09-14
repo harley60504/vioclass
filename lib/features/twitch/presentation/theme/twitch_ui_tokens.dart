@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Midnight Glass design tokens for VioClass.
@@ -60,26 +59,23 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // Shared page tint. Keep page roots almost clear so Windows acrylic remains
-  // visible instead of being covered by a dark Flutter layer.
-  static const Color appBackground = Color(0x0DFFFFFF);
-  static const Color fallbackAppBackground = Color(0xFF08090D);
-  static Color get windowBackground =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
-      ? Colors.transparent
-      : fallbackAppBackground;
+  // Opaque Midnight Purple foundation. Large app surfaces never reveal the
+  // desktop or content behind them; depth comes from progressively lighter
+  // purple-black surfaces instead of transparency.
+  static const Color appBackground = Color(0xFF0B0812);
+  static const Color fallbackAppBackground = appBackground;
+  static const Color windowBackground = appBackground;
 
-  // Translucent-black glass ladder. These are for local controls/cards only;
-  // large page and sheet roots use appBackground instead.
-  static const Color surfaceBase = Color(0x12000000);
-  static const Color surfacePanel = Color(0x22000000);
-  static const Color surfaceCard = Color(0x2C000000);
-  static const Color surfaceRaised = Color(0x38000000);
-  static const Color surfaceInteractive = Color(0x46000000);
-  static const Color surfaceHover = Color(0x5A000000);
-  static const Color surfaceSelected = Color(0x668D7BFF);
-  static const Color surfacePlayer = Color(0x8A000000);
-  static const Color surfaceGlass = Color(0x40000000);
+  // Opaque purple-black surface ladder.
+  static const Color surfaceBase = Color(0xFF0E0A17);
+  static const Color surfacePanel = Color(0xFF120D1D);
+  static const Color surfaceCard = Color(0xFF171122);
+  static const Color surfaceRaised = Color(0xFF1C152A);
+  static const Color surfaceInteractive = Color(0xFF211930);
+  static const Color surfaceHover = Color(0xFF2A203C);
+  static const Color surfaceSelected = Color(0xFF31264C);
+  static const Color surfacePlayer = Color(0xFF09070D);
+  static const Color surfaceGlass = Color(0xFF171122);
 
   // Backward-compatible aliases. New code should prefer semantic names above.
   static const Color surface = surfacePanel;
@@ -100,18 +96,18 @@ class TwitchUiColors {
   static const Color textOnAccent = Color(0xFFFFFFFF);
 
   // Borders / separators.
-  static const Color borderSubtle = Color(0x1AFFFFFF);
-  static const Color border = Color(0x2AFFFFFF);
-  static const Color borderStrong = Color(0x3DFFFFFF);
-  static const Color borderInteractive = Color(0x558D7BFF);
-  static const Color divider = Color(0x18FFFFFF);
+  static const Color borderSubtle = Color(0xFF262033);
+  static const Color border = Color(0xFF342A45);
+  static const Color borderStrong = Color(0xFF49395F);
+  static const Color borderInteractive = Color(0xFF6756A0);
+  static const Color divider = Color(0xFF241D30);
 
   // States.
-  static const Color hoverOverlay = Color(0x12FFFFFF);
-  static const Color pressedOverlay = Color(0x1CFFFFFF);
-  static const Color selectedOverlay = Color(0x268D7BFF);
-  static const Color disabledForeground = Color(0x59FFFFFF);
-  static const Color focusRing = Color(0x998D7BFF);
+  static const Color hoverOverlay = Color(0xFF251D35);
+  static const Color pressedOverlay = Color(0xFF302442);
+  static const Color selectedOverlay = Color(0xFF352957);
+  static const Color disabledForeground = Color(0xFF77727F);
+  static const Color focusRing = Color(0xFF8D7BFF);
 
   // Semantic accents.
   static const Color blue = Color(0xFF68A7FF);
@@ -124,26 +120,24 @@ class TwitchUiColors {
 
   static const TwitchUiBackplatePalette purpleBackplate =
       TwitchUiBackplatePalette(
-        fill: Color(0x1F8D7BFF),
-        fillActive: Color(0x318D7BFF),
-        border: Color(0x668D7BFF),
-        borderActive: Color(0x99C3BAFF),
+        fill: Color(0xFF241C39),
+        fillActive: Color(0xFF33264F),
+        border: Color(0xFF66569A),
+        borderActive: Color(0xFF9B8DDA),
         foreground: primarySoft,
-        foregroundMuted: Color(0xCCB8B2D8),
+        foregroundMuted: Color(0xFFB8B2D8),
       );
 
-  // Sheets use the same low-opacity page tint as watch/home. The modal scrim is
-  // intentionally light so opening a sheet does not turn the whole app black.
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
-    background: appBackground,
-    scrim: Color(0x33000000),
-    shellGradientStart: Color(0x14FFFFFF),
-    shellGradientEnd: Color(0x00000000),
-    headerGradientStart: Color(0x18FFFFFF),
-    headerGradientEnd: Color(0x06000000),
+    background: surfacePanel,
+    scrim: Color(0x99000000),
+    shellGradientStart: Color(0xFF1B1428),
+    shellGradientEnd: Color(0xFF120D1D),
+    headerGradientStart: Color(0xFF211832),
+    headerGradientEnd: Color(0xFF151020),
     border: border,
-    shadow: Color(0x26000000),
-    handle: Color(0x5AFFFFFF),
+    shadow: Color(0xB3000000),
+    handle: Color(0xFF6D657A),
     cardFill: surfaceCard,
     cardFillActive: surfaceSelected,
     cardBorder: borderSubtle,
@@ -278,7 +272,7 @@ class TwitchUiShadows {
 
   static const List<BoxShadow> soft = <BoxShadow>[
     BoxShadow(
-      color: Color(0x42000000),
+      color: Color(0x66000000),
       blurRadius: 20,
       offset: Offset(0, 8),
     ),
@@ -286,7 +280,7 @@ class TwitchUiShadows {
 
   static const List<BoxShadow> floating = <BoxShadow>[
     BoxShadow(
-      color: Color(0x52000000),
+      color: Color(0x80000000),
       blurRadius: 30,
       spreadRadius: -6,
       offset: Offset(0, 14),
