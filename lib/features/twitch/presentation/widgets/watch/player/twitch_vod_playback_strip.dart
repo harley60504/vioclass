@@ -6,6 +6,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../../../watch/twitch_watch_playback_kind.dart';
+import '../../shared/twitch_notice.dart';
 import 'twitch_time_jump_sheet.dart';
 
 class TwitchVodPlaybackStrip extends StatefulWidget {
@@ -48,9 +49,30 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
   bool _dragging = false;
   double? _dragValue;
   double? _scrubbedTimelineValue;
+  bool _limitedReplayNoticeShown = false;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
+
+  @override
+  void didUpdateWidget(covariant TwitchVodPlaybackStrip oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.liveSeekWindowDuration != widget.liveSeekWindowDuration) {
+      _limitedReplayNoticeShown = false;
+    }
+  }
+
+  void _showLimitedReplayNoticeOnce() {
+    if (_limitedReplayNoticeShown || widget.liveSeekWindowDuration == null) {
+      return;
+    }
+    _limitedReplayNoticeShown = true;
+    showTwitchNotice(
+      context,
+      '目前沒有 DVR，僅能回看最近 20 秒',
+      tone: TwitchNoticeTone.warning,
+    );
+  }
 
   Duration? _effectiveLiveTimelineDuration() {
     final base = widget.liveTimelineDuration;
@@ -94,6 +116,8 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                 final hasDuration = displayDuration.inMilliseconds > 500;
                 final canScrubTimeline = widget.timelineEnabled && hasDuration;
                 final requestedSeekWindow = widget.liveSeekWindowDuration;
+                final limitedLiveReplay =
+                    isLiveTimeline && requestedSeekWindow != null;
                 final seekWindowMs = !hasDuration
                     ? displayDuration.inMilliseconds
                     : requestedSeekWindow == null
@@ -176,6 +200,9 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     !compact &&
                     (media.size.width >= 760 || physicalShortestSide >= 1400);
                 void jumpToTarget(Duration target) {
+                  if (limitedLiveReplay) {
+                    _showLimitedReplayNoticeOnce();
+                  }
                   final ratio = sliderValueForPosition(target);
                   final safeTarget = positionForSliderValue(ratio);
                   final exactLiveEdge =
@@ -237,6 +264,9 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                           max: 1,
                           onChangeStart: canScrubTimeline
                               ? (next) {
+                                  if (limitedLiveReplay) {
+                                    _showLimitedReplayNoticeOnce();
+                                  }
                                   setState(() {
                                     _dragging = true;
                                     _dragValue = next;
@@ -294,6 +324,10 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                         ),
                       ),
                     ),
+                    if (limitedLiveReplay) ...[
+                      SizedBox(width: compact ? 5 : 7),
+                      const _LimitedReplayBadge(),
+                    ],
                     SizedBox(width: compact ? 6 : 8),
                     ConstrainedBox(
                       constraints: BoxConstraints(
@@ -384,6 +418,45 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
           '${seconds.toString().padLeft(2, '0')}';
     }
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+}
+
+class _LimitedReplayBadge extends StatelessWidget {
+  const _LimitedReplayBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: context.vio.t('目前沒有 DVR，僅能回看最近 20 秒'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0x2EF59E0B),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0x99F59E0B)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.history_rounded,
+              size: 13,
+              color: Color(0xFFFCD34D),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              context.vio.t('僅可回看 20 秒'),
+              maxLines: 1,
+              style: const TextStyle(
+                color: Color(0xFFFCD34D),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
