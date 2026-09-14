@@ -106,34 +106,42 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         compact: compact,
         onPressed: onShowGameMenu,
       ),
-      const SizedBox(width: TwitchUiSpacing.space4),
+      const SizedBox(width: TwitchUiSpacing.space8),
       TwitchStreamHomeToolbarIconButton(
         tooltip: l10n.t('語言篩選'),
         icon: Icons.tune_rounded,
         compact: compact,
         onPressed: onShowLanguageMenu,
       ),
-      const SizedBox(width: TwitchUiSpacing.space4),
+      const SizedBox(width: TwitchUiSpacing.space8),
       TwitchStreamHomeToolbarIconButton(
         tooltip: l10n.t('重新整理'),
         icon: Icons.refresh_rounded,
         compact: compact,
         onPressed: () => onRefresh(),
       ),
-      const SizedBox(width: TwitchUiSpacing.space4),
+      const SizedBox(width: TwitchUiSpacing.space8),
       TwitchStreamHomeToolbarIconButton(
         tooltip: l10n.t('Drops 連接'),
         icon: Icons.card_giftcard_rounded,
         compact: compact,
         onPressed: () => onOpenDropsConnector(),
       ),
-      const SizedBox(width: TwitchUiSpacing.space4),
+      const SizedBox(width: TwitchUiSpacing.space8),
       TwitchStreamHomeAccountMenu(
         onOpenSettings: onOpenSettings,
         compact: compact,
       ),
     ];
   }
+}
+
+Color _homeGlassFill({double alpha = 0.34}) {
+  return TwitchUiColors.surfacePanel.withValues(alpha: alpha);
+}
+
+Color _homeGlassBorder({double alpha = 0.10}) {
+  return Colors.white.withValues(alpha: alpha);
 }
 
 class _FloatingSearchField extends StatelessWidget {
@@ -152,9 +160,9 @@ class _FloatingSearchField extends StatelessWidget {
     final l10n = context.vio;
     return TwitchGlassSurface(
       borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
-      backgroundColor: TwitchUiColors.surfaceGlass,
-      borderColor: TwitchUiColors.border,
-      blurSigma: TwitchUiGlass.blurSoft,
+      backgroundColor: _homeGlassFill(alpha: 0.38),
+      borderColor: _homeGlassBorder(alpha: 0.11),
+      blurSigma: TwitchUiGlass.blurStrong,
       boxShadow: TwitchUiShadows.soft,
       child: TwitchCenteredTextField(
         height: 50,
@@ -198,64 +206,90 @@ class _HomeSectionSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final sections = TwitchHomeSection.values;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var index = 0; index < sections.length; index++) ...[
+          if (index > 0) const SizedBox(width: TwitchUiSpacing.space8),
+          _HomeSectionButton(
+            section: sections[index],
+            selected: selectedSection == sections[index],
+            compact: compact,
+            onPressed: () => onSelectSection(sections[index]),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _HomeSectionButton extends StatelessWidget {
+  final TwitchHomeSection section;
+  final bool selected;
+  final bool compact;
+  final VoidCallback onPressed;
+
+  const _HomeSectionButton({
+    required this.section,
+    required this.selected,
+    required this.compact,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return TwitchGlassSurface(
       borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-      backgroundColor: TwitchUiColors.surfaceGlass,
-      borderColor: TwitchUiColors.border,
-      blurSigma: TwitchUiGlass.blurSoft,
+      backgroundColor: selected
+          ? TwitchUiColors.primary.withValues(alpha: 0.22)
+          : _homeGlassFill(alpha: 0.30),
+      borderColor: selected
+          ? TwitchUiColors.primarySoft.withValues(alpha: 0.28)
+          : _homeGlassBorder(alpha: 0.09),
+      blurSigma: TwitchUiGlass.blurStrong,
       boxShadow: TwitchUiShadows.soft,
-      padding: const EdgeInsets.all(TwitchUiSpacing.space4),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: TwitchHomeSection.values.map((section) {
-          final selected = selectedSection == section;
-          return Padding(
-            padding: const EdgeInsets.only(right: TwitchUiSpacing.space2),
-            child: Material(
-              color: selected
-                  ? TwitchUiColors.surfaceSelected
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-                onTap: () => onSelectSection(section),
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: compact
-                        ? TwitchUiSpacing.space8
-                        : TwitchUiSpacing.space12,
-                    vertical: TwitchUiSpacing.space8,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        section.icon,
-                        size: compact ? 17 : 18,
-                        color: selected
-                            ? TwitchUiColors.primarySoft
-                            : TwitchUiColors.textMuted,
-                      ),
-                      if (!compact) ...[
-                        const SizedBox(width: TwitchUiSpacing.space8),
-                        Text(
-                          section.localizedLabel(context),
-                          style: TextStyle(
-                            color: selected
-                                ? TwitchUiColors.textPrimary
-                                : TwitchUiColors.textSecondary,
-                            fontSize: TwitchUiFontSize.bodyCompact,
-                            fontWeight: TwitchUiFontWeight.strong,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+          onTap: onPressed,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: compact
+                  ? TwitchUiSpacing.space12
+                  : TwitchUiSpacing.space16,
+              vertical: TwitchUiSpacing.space8,
             ),
-          );
-        }).toList(growable: false),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  section.icon,
+                  size: compact ? 17 : 18,
+                  color: selected
+                      ? TwitchUiColors.primarySoft
+                      : TwitchUiColors.textSecondary,
+                ),
+                if (!compact) ...[
+                  const SizedBox(width: TwitchUiSpacing.space8),
+                  Text(
+                    section.localizedLabel(context),
+                    style: TextStyle(
+                      color: selected
+                          ? TwitchUiColors.textPrimary
+                          : TwitchUiColors.textSecondary,
+                      fontSize: TwitchUiFontSize.bodyCompact,
+                      fontWeight: TwitchUiFontWeight.strong,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -282,9 +316,9 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
       message: tooltip,
       child: TwitchGlassSurface(
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        backgroundColor: TwitchUiColors.surfaceGlass,
-        borderColor: TwitchUiColors.border,
-        blurSigma: TwitchUiGlass.blurSoft,
+        backgroundColor: _homeGlassFill(alpha: 0.30),
+        borderColor: _homeGlassBorder(alpha: 0.09),
+        blurSigma: TwitchUiGlass.blurStrong,
         boxShadow: TwitchUiShadows.soft,
         child: Material(
           color: Colors.transparent,
