@@ -48,6 +48,7 @@ dependencies:
   flutter_inappwebview: ^6.1.5
   desktop_webview_window: ^0.2.3
   window_manager: ^0.5.1
+  flutter_acrylic: ^1.1.4
   image: 4.8.0
   native_animated_image: 0.3.4
 
