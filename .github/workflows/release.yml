@@ -272,6 +272,15 @@ jobs:
           set -euo pipefail
 
           if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+              gh api --method PATCH \
+                "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" \
+                -f sha="${TARGET_SHA}" \
+                -F force=true
+              gh release edit "${TAG}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --target "${TARGET_SHA}"
+            fi
             gh release upload "${TAG}" dist/* --clobber --repo "${GITHUB_REPOSITORY}"
             exit 0
           fi
