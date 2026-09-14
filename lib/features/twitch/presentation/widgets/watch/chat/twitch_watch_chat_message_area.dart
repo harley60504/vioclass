@@ -33,33 +33,34 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentRuntime = runtime;
 
-    // The chat feed is a strict viewport between the header and composer.
-    // Rich cards (link previews, special messages, media thumbnails) must never
-    // paint outside this rectangle even while sliver items are entering/leaving
-    // the visible region.
-    return ClipRect(
-      clipBehavior: Clip.hardEdge,
-      child: currentRuntime == null
-          ? const TwitchChatEmptyView()
-          : AnimatedBuilder(
-              animation: Listenable.merge([
-                currentRuntime,
-                thirdPartyEmoteCache,
-                officialEmoteCache,
-                appearanceListenable,
-              ]),
-              builder: (context, _) {
-                return TwitchChatMessageList(
-                  runtime: currentRuntime,
-                  thirdPartyEmoteCache: thirdPartyEmoteCache,
-                  officialEmoteCache: officialEmoteCache,
-                  showTimestamp: showTimestamp,
-                  fontScale: fontScale,
-                  compact: compact,
-                  onOpenMessageContext: onOpenMessageContext,
-                );
-              },
-            ),
+    // This widget owns the exact rectangular viewport between the fixed chat
+    // chrome above and below it. Nothing rendered by the message feed may paint
+    // outside these bounds.
+    return SizedBox.expand(
+      child: ClipRect(
+        clipBehavior: Clip.hardEdge,
+        child: currentRuntime == null
+            ? const TwitchChatEmptyView()
+            : AnimatedBuilder(
+                animation: Listenable.merge([
+                  currentRuntime,
+                  thirdPartyEmoteCache,
+                  officialEmoteCache,
+                  appearanceListenable,
+                ]),
+                builder: (context, _) {
+                  return TwitchChatMessageList(
+                    runtime: currentRuntime,
+                    thirdPartyEmoteCache: thirdPartyEmoteCache,
+                    officialEmoteCache: officialEmoteCache,
+                    showTimestamp: showTimestamp,
+                    fontScale: fontScale,
+                    compact: compact,
+                    onOpenMessageContext: onOpenMessageContext,
+                  );
+                },
+              ),
+      ),
     );
   }
 }
