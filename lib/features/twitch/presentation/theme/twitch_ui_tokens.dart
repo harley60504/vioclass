@@ -60,18 +60,17 @@ class TwitchUiSheetPalette {
 class TwitchUiColors {
   const TwitchUiColors._();
 
-  // Shared page tint. On Windows this sits directly on top of the native
-  // acrylic compositor; on other platforms an opaque fallback remains behind
-  // it so the existing dark appearance is preserved.
-  static const Color appBackground = Color(0x36000000);
+  // Shared page tint. Keep page roots almost clear so Windows acrylic remains
+  // visible instead of being covered by a dark Flutter layer.
+  static const Color appBackground = Color(0x0DFFFFFF);
   static const Color fallbackAppBackground = Color(0xFF08090D);
   static Color get windowBackground =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
       ? Colors.transparent
       : fallbackAppBackground;
 
-  // Translucent-black glass ladder. The desktop acrylic remains visible below
-  // these surfaces while controls keep reliable contrast over bright wallpaper.
+  // Translucent-black glass ladder. These are for local controls/cards only;
+  // large page and sheet roots use appBackground instead.
   static const Color surfaceBase = Color(0x12000000);
   static const Color surfacePanel = Color(0x22000000);
   static const Color surfaceCard = Color(0x2C000000);
@@ -133,15 +132,17 @@ class TwitchUiColors {
         foregroundMuted: Color(0xCCB8B2D8),
       );
 
+  // Sheets use the same low-opacity page tint as watch/home. The modal scrim is
+  // intentionally light so opening a sheet does not turn the whole app black.
   static const TwitchUiSheetPalette sheet = TwitchUiSheetPalette(
-    background: Color(0xB8000000),
-    scrim: Color(0x99000000),
-    shellGradientStart: Color(0x66000000),
-    shellGradientEnd: Color(0x8A000000),
-    headerGradientStart: Color(0x52000000),
-    headerGradientEnd: Color(0x76000000),
+    background: appBackground,
+    scrim: Color(0x33000000),
+    shellGradientStart: Color(0x14FFFFFF),
+    shellGradientEnd: Color(0x00000000),
+    headerGradientStart: Color(0x18FFFFFF),
+    headerGradientEnd: Color(0x06000000),
     border: border,
-    shadow: Color(0x42000000),
+    shadow: Color(0x26000000),
     handle: Color(0x5AFFFFFF),
     cardFill: surfaceCard,
     cardFillActive: surfaceSelected,
