@@ -1,12 +1,15 @@
+import '../theme/twitch_ui_tokens.dart';
+
+/// Compatibility facade. New code should import twitch_ui_tokens.dart directly.
 class TwitchSpacing {
   const TwitchSpacing._();
 
-  static const double xxs = 3;
-  static const double xs = 5;
-  static const double sm = 8;
-  static const double md = 10;
-  static const double lg = 14;
-  static const double xl = 18;
+  static const double xxs = TwitchUiSpacing.space2;
+  static const double xs = TwitchUiSpacing.space4;
+  static const double sm = TwitchUiSpacing.space8;
+  static const double md = TwitchUiSpacing.space12;
+  static const double lg = TwitchUiSpacing.space16;
+  static const double xl = TwitchUiSpacing.space20;
 
   static double compactAware(
     bool compact,
@@ -17,11 +20,12 @@ class TwitchSpacing {
   }
 }
 
+/// Compatibility facade. New code should use TwitchUiRadius.
 class TwitchRadius {
   const TwitchRadius._();
 
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double sheet = 18;
+  static const double sm = TwitchUiRadius.sm;
+  static const double md = TwitchUiRadius.md;
+  static const double lg = TwitchUiRadius.lg;
+  static const double sheet = TwitchUiRadius.sheet;
 }

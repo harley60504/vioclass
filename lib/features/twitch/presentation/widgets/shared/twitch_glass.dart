@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../theme/twitch_ui_tokens.dart';
+
 class TwitchGlassSurface extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -17,11 +19,13 @@ class TwitchGlassSurface extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = EdgeInsets.zero,
-    this.borderRadius = const BorderRadius.all(Radius.circular(18)),
-    this.backgroundColor = const Color(0x6618181B),
-    this.borderColor = const Color(0x1FFFFFFF),
-    this.blurSigma = 14,
-    this.boxShadow = const <BoxShadow>[],
+    this.borderRadius = const BorderRadius.all(
+      Radius.circular(TwitchUiRadius.player),
+    ),
+    this.backgroundColor = TwitchUiGlass.floatingBackground,
+    this.borderColor = TwitchUiGlass.border,
+    this.blurSigma = TwitchUiGlass.blurMedium,
+    this.boxShadow = TwitchUiShadows.floating,
     this.clipBehavior = Clip.antiAlias,
   });
 
@@ -40,16 +44,15 @@ class TwitchGlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // BackdropFilter blur over a video surface is expensive on mobile/tablet.
-    // It forces extra compositing/raster work whenever the video frame changes.
-    // Keep the glass look on desktop, but use a plain translucent surface on
-    // Android/iOS to avoid the FPS drop when player controls are visible.
+    // BackdropFilter over a moving video surface is expensive on mobile.
+    // Midnight Glass keeps the same translucent visual hierarchy there but
+    // removes blur and shadow work.
     final lowCostMobile = _useLowCostMobileGlass;
     final effectiveBlurSigma = lowCostMobile ? 0.0 : blurSigma;
-    final effectiveBoxShadow = lowCostMobile ? const <BoxShadow>[] : boxShadow;
+    final effectiveBoxShadow = lowCostMobile ? TwitchUiShadows.none : boxShadow;
     final effectiveBackgroundColor = lowCostMobile
         ? Color.alphaBlend(
-            Colors.black.withValues(alpha: 0.10),
+            Colors.black.withValues(alpha: 0.12),
             backgroundColor,
           )
         : backgroundColor;

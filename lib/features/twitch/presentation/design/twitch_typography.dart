@@ -1,41 +1,45 @@
 import 'package:flutter/material.dart';
 
+import '../theme/twitch_ui_tokens.dart';
+
+/// Compatibility facade for existing widgets while Midnight Glass typography
+/// moves to the central token layer.
 class TwitchTypography {
   const TwitchTypography._();
 
-  static const double sheetTitle = 13;
-  static const double sectionTitle = 12;
-  static const double body = 11;
-  static const double chatBase = 13;
-  static const double secondary = 10;
-  static const double badge = 10;
+  static const double sheetTitle = TwitchUiFontSize.heading;
+  static const double sectionTitle = TwitchUiFontSize.body;
+  static const double body = TwitchUiFontSize.bodyCompact;
+  static const double chatBase = TwitchUiFontSize.chatMessage;
+  static const double secondary = TwitchUiFontSize.meta;
+  static const double badge = TwitchUiFontSize.micro;
 
-  static TextStyle sheetTitleStyle = const TextStyle(
+  static const TextStyle sheetTitleStyle = TextStyle(
     fontSize: sheetTitle,
-    fontWeight: FontWeight.w900,
-    color: Colors.white,
+    fontWeight: TwitchUiFontWeight.heavy,
+    color: TwitchUiColors.textPrimary,
   );
 
-  static TextStyle sectionTitleStyle = const TextStyle(
+  static const TextStyle sectionTitleStyle = TextStyle(
     fontSize: sectionTitle,
-    fontWeight: FontWeight.w900,
-    color: Colors.white70,
+    fontWeight: TwitchUiFontWeight.strong,
+    color: TwitchUiColors.textSecondary,
   );
 
-  static TextStyle bodyStyle = const TextStyle(
+  static const TextStyle bodyStyle = TextStyle(
     fontSize: body,
-    fontWeight: FontWeight.w700,
-    color: Colors.white,
+    fontWeight: TwitchUiFontWeight.regular,
+    color: TwitchUiColors.textPrimary,
   );
 
-  static TextStyle secondaryStyle = const TextStyle(
+  static const TextStyle secondaryStyle = TextStyle(
     fontSize: secondary,
-    fontWeight: FontWeight.w700,
-    color: Colors.white54,
+    fontWeight: TwitchUiFontWeight.medium,
+    color: TwitchUiColors.textMuted,
   );
 
   static double chatFontSize(double scale, {bool compact = false}) {
-    final compactScale = compact ? 0.92 : 1.0;
+    final compactScale = compact ? 0.94 : 1.0;
     return chatBase * scale * compactScale;
   }
 

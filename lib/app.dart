@@ -6,6 +6,8 @@ import 'features/twitch/presentation/navigation/twitch_route_observer.dart';
 import 'features/twitch/presentation/pages/twitch_stream_page.dart';
 import 'features/twitch/presentation/settings/twitch_app_font_controller.dart';
 import 'features/twitch/presentation/settings/twitch_app_language_controller.dart';
+import 'features/twitch/presentation/theme/twitch_ui_theme.dart';
+import 'features/twitch/presentation/theme/twitch_ui_tokens.dart';
 import 'features/twitch/presentation/widgets/notifications/twitch_app_notification_overlay.dart';
 
 class VioClassApp extends StatefulWidget {
@@ -43,13 +45,9 @@ class _VioClassAppState extends State<VioClassApp> {
   @override
   Widget build(BuildContext context) {
     final appFontFamily = twitchAppFontController.fontFamily;
-    final baseTheme = ThemeData(
-      brightness: Brightness.dark,
-      colorSchemeSeed: const Color(0xFF9146FF),
-      scaffoldBackgroundColor: const Color(0xFF0E0E10),
+    final appTheme = TwitchUiTheme.dark(
       fontFamily: appFontFamily,
       fontFamilyFallback: TwitchAppFontController.fontFallback,
-      useMaterial3: true,
     );
 
     return MaterialApp(
@@ -70,16 +68,7 @@ class _VioClassAppState extends State<VioClassApp> {
         return const Locale('zh', 'TW');
       },
       navigatorObservers: <NavigatorObserver>[twitchRouteObserver],
-      theme: baseTheme.copyWith(
-        textTheme: baseTheme.textTheme.apply(
-          fontFamily: appFontFamily,
-          fontFamilyFallback: TwitchAppFontController.fontFallback,
-        ),
-        primaryTextTheme: baseTheme.primaryTextTheme.apply(
-          fontFamily: appFontFamily,
-          fontFamilyFallback: TwitchAppFontController.fontFallback,
-        ),
-      ),
+      theme: appTheme,
       builder: (context, child) {
         return TwitchAppNotificationOverlay(
           child: child ?? const SizedBox.shrink(),
@@ -120,7 +109,7 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0E10),
+      backgroundColor: TwitchUiColors.appBackground,
       body: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxHeight < 150) {
@@ -129,7 +118,7 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
-                  color: Color(0xFF9146FF),
+                  color: TwitchUiColors.primarySoft,
                   strokeWidth: 2.6,
                 ),
               ),
@@ -140,9 +129,13 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.live_tv_rounded, color: Color(0xFF9146FF), size: 64),
-                SizedBox(height: 14),
-                CircularProgressIndicator(color: Color(0xFF9146FF)),
+                Icon(
+                  Icons.live_tv_rounded,
+                  color: TwitchUiColors.primarySoft,
+                  size: 64,
+                ),
+                SizedBox(height: TwitchUiSpacing.space16),
+                CircularProgressIndicator(color: TwitchUiColors.primarySoft),
               ],
             ),
           );
