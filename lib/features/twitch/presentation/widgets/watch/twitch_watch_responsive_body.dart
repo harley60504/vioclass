@@ -60,9 +60,7 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
       animation: pip,
       builder: (context, _) {
         if (pip.shouldRenderPlayerOnly || fullscreenMode) {
-          return TwitchPlayerOnlySurface(
-            player: _FixedPlayerViewport(child: player),
-          );
+          return TwitchPlayerOnlySurface(player: player);
         }
 
         return DecoratedBox(
@@ -218,9 +216,7 @@ class _BottomChatLayout extends StatelessWidget {
             SizedBox(
               height: playerHeight,
               width: double.infinity,
-              child: _PlayerSurface(
-                child: _FixedPlayerViewport(child: player),
-              ),
+              child: _PlayerSurface(child: player),
             )
           else
             Expanded(
@@ -352,11 +348,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
   @override
   Widget build(BuildContext context) {
     final content = widget.belowPlayer;
-    if (content == null) {
-      return _PlayerSurface(
-        child: _FixedPlayerViewport(child: widget.player),
-      );
-    }
+    if (content == null) return _PlayerSurface(child: widget.player);
 
     return PageView(
       controller: _pageController,
@@ -369,9 +361,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
               _showPage(1);
             }
           },
-          child: _PlayerSurface(
-            child: _FixedPlayerViewport(child: widget.player),
-          ),
+          child: _PlayerSurface(child: widget.player),
         ),
         _WatchSurface(
           child: Listener(
@@ -396,33 +386,6 @@ class _PlayerColumnState extends State<_PlayerColumn> {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _FixedPlayerViewport extends StatelessWidget {
-  static const double _canvasWidth = 1280.0;
-  static const double _canvasHeight = 720.0;
-
-  final Widget child;
-
-  const _FixedPlayerViewport({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black,
-      child: ClipRect(
-        child: FittedBox(
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: _canvasWidth,
-            height: _canvasHeight,
-            child: RepaintBoundary(child: child),
-          ),
-        ),
-      ),
     );
   }
 }
