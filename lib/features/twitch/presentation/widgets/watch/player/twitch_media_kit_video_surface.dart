@@ -34,12 +34,10 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
 class _TwitchMediaKitVideoSurfaceState
     extends State<TwitchMediaKitVideoSurface> {
   final GlobalKey _videoSurfaceKey = GlobalKey();
-  late Widget _stableVideo;
 
   @override
   void initState() {
     super.initState();
-    _stableVideo = _buildVideo();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reportSourceRectHint(),
     );
@@ -48,21 +46,8 @@ class _TwitchMediaKitVideoSurfaceState
   @override
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.controller, widget.controller) ||
-        oldWidget.fit != widget.fit ||
-        oldWidget.controls != widget.controls) {
-      _stableVideo = _buildVideo();
-    }
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reportSourceRectHint(),
-    );
-  }
-
-  Widget _buildVideo() {
-    return Video(
-      controller: widget.controller,
-      fit: widget.fit,
-      controls: widget.controls,
     );
   }
 
@@ -73,11 +58,7 @@ class _TwitchMediaKitVideoSurfaceState
     final context = _videoSurfaceKey.currentContext;
     if (context == null) return;
     final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox ||
-        !renderObject.hasSize ||
-        renderObject.size.isEmpty) {
-      return;
-    }
+    if (renderObject is! RenderBox || !renderObject.hasSize) return;
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final rect = topLeft & renderObject.size;
     unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
@@ -91,55 +72,34 @@ class _TwitchMediaKitVideoSurfaceState
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
-
-          // Keep the native Video widget mounted even when an interactive
-          // layout resize briefly produces a zero-sized constraint. Removing
-          // it from the tree detaches/re-attaches the texture and can expose a
-          // black frame while dragging the chat/player divider.
-          var width = 0.0;
-          var height = 0.0;
-          if (maxWidth > 0 && maxHeight > 0) {
-            width = maxWidth;
-            height = width / widget.aspectRatio;
-            if (height > maxHeight) {
-              height = maxHeight;
-              width = height * widget.aspectRatio;
-            }
-            width = width.clamp(1.0, maxWidth).toDouble();
-            height = height.clamp(1.0, maxHeight).toDouble();
+          if (maxWidth <= 0 || maxHeight <= 0) {
+            return const SizedBox.shrink();
           }
 
+          var width = maxWidth;
+          var height = width / widget.aspectRatio;
+          if (height > maxHeight) {
+            height = maxHeight;
+            width = height * widget.aspectRatio;
+          }
+          width = width.clamp(1.0, maxWidth).toDouble();
+          height = height.clamp(1.0, maxHeight).toDouble();
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _reportSourceRectHint(),
           );
 
-          final transitionMask = TwitchDvrTransitionMaskController.instance;
+          // Keep the active native video path identical to v1.1.4. In
+          // particular, do not cache the Video widget and do not keep a
+          // zero-sized native texture mounted during transient layout sizes.
           return Center(
             child: SizedBox(
               key: _videoSurfaceKey,
               width: width,
               height: height,
-              child: AnimatedBuilder(
-                animation: transitionMask,
-                child: _stableVideo,
-                builder: (context, video) {
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      video ?? const SizedBox.shrink(),
-                      if (transitionMask.visible)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: _PlaybackTransitionOverlay(
-                              previewImageUrl:
-                                  transitionMask.previewImageUrl,
-                              showLoading: transitionMask.showLoading,
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
+              child: Video(
+                controller: widget.controller,
+                fit: widget.fit,
+                controls: widget.controls,
               ),
             ),
           );
