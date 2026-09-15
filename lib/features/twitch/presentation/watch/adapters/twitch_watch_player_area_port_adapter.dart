@@ -31,6 +31,14 @@ const bool _debugMinimalLiveWatch = bool.fromEnvironment(
   defaultValue: kDebugMode,
 );
 
+/// Keep the normal Watch layout/player path but replace the expensive chat
+/// subtree with a flat panel. This isolates whether relayout of live chat
+/// content is what makes Android's external video texture flash during drag.
+const bool _debugBlankChat = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_BLANK_CHAT',
+  defaultValue: false,
+);
+
 class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
   final bool loading;
@@ -336,10 +344,10 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (_debugMinimalLiveWatch) {
-      // Keep the normal draggable side-panel geometry but remove the entire
-      // chat tree. This leaves a blank resize target next to the raw live
-      // Video so the existing divider can still be dragged continuously.
+    if (_debugMinimalLiveWatch || _debugBlankChat) {
+      // Preserve the real side-panel geometry and drag behavior while removing
+      // chat message layout/repaint cost from the frame. This lets us separate
+      // responsive-layout issues from chat-subtree pressure.
       return const ColoredBox(color: Color(0xFF1C1025));
     }
 
