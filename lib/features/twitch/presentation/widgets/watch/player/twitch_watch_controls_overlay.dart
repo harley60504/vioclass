@@ -336,11 +336,11 @@ class _PlayerDimOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!visible) return const SizedBox.shrink();
 
-    return const ColoredBox(
-      color: Color(0x66000000),
-      child: Center(
-        child: CircularProgressIndicator(color: TwitchUiColors.primarySoft),
-      ),
+    // Do not paint a full-frame black scrim while the player reports loading.
+    // If loading toggles during a resize, the spinner may appear but the last
+    // presented video frame remains visible instead of being blacked out.
+    return const Center(
+      child: CircularProgressIndicator(color: TwitchUiColors.primarySoft),
     );
   }
 }
