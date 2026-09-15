@@ -110,6 +110,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
         ? port.runtime.canonicalLiveTimelineDuration ?? liveDvrDuration
         : liveDvrDuration;
     return TwitchWatchPlayerArea(
+      key: GlobalObjectKey(port.runtime),
       playerRuntime: port.runtime,
       player: port.playerOrNull,
       videoController: port.videoControllerOrNull,
