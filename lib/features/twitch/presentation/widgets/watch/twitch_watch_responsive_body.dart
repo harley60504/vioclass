@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
@@ -10,6 +12,14 @@ import 'twitch_watch_chat_resize_handle.dart';
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
   defaultValue: true,
+);
+
+/// Temporary minimal Watch mode for the Android resize-black-frame test.
+/// A normal `flutter run` enables it automatically. Release builds keep the
+/// regular Watch layout unless explicitly enabled with a dart-define.
+const bool _debugMinimalLiveWatch = bool.fromEnvironment(
+  'TWITCH_DEBUG_MINIMAL_LIVE_WATCH',
+  defaultValue: kDebugMode,
 );
 
 class TwitchWatchResponsiveBody extends StatelessWidget {
@@ -54,6 +64,10 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_debugMinimalLiveWatch) {
+      return _DebugMinimalLiveResizeLayout(player: player);
+    }
+
     final pip = TwitchAndroidPipController.instance;
 
     return AnimatedBuilder(
@@ -150,6 +164,66 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
+  }
+}
+
+class _DebugMinimalLiveResizeLayout extends StatefulWidget {
+  final Widget player;
+
+  const _DebugMinimalLiveResizeLayout({required this.player});
+
+  @override
+  State<_DebugMinimalLiveResizeLayout> createState() =>
+      _DebugMinimalLiveResizeLayoutState();
+}
+
+class _DebugMinimalLiveResizeLayoutState
+    extends State<_DebugMinimalLiveResizeLayout> {
+  static const double _dividerWidth = 18.0;
+  static const double _minPlayerFraction = 0.30;
+  static const double _maxPlayerFraction = 0.92;
+
+  double _playerFraction = 0.70;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF1C1025),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final totalWidth = constraints.maxWidth;
+          final available = (totalWidth - _dividerWidth).clamp(1.0, totalWidth);
+          final playerWidth = (available * _playerFraction)
+              .clamp(1.0, available)
+              .toDouble();
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(width: playerWidth, child: widget.player),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragUpdate: (details) {
+                  if (available <= 0) return;
+                  final next = (_playerFraction + details.delta.dx / available)
+                      .clamp(_minPlayerFraction, _maxPlayerFraction)
+                      .toDouble();
+                  if (next == _playerFraction) return;
+                  setState(() => _playerFraction = next);
+                },
+                child: const ColoredBox(
+                  color: Color(0xFF7A5B8C),
+                  child: SizedBox(width: _dividerWidth),
+                ),
+              ),
+              const Expanded(
+                child: ColoredBox(color: Color(0xFF261331)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
