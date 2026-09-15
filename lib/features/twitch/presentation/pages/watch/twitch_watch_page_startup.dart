@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../services/playback/twitch_media_kit_player_host.dart';
 import '../../watch/twitch_playback_session_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
@@ -19,6 +20,11 @@ export 'twitch_recorded_watch_playback.dart';
 // ignore_for_file: invalid_use_of_protected_member
 
 extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
+  bool get _canMutatePlaybackForCurrentActivity {
+    final pip = TwitchAndroidPipController.instance;
+    return !pip.isAndroid || !pip.stoppedOutsidePictureInPicture;
+  }
+
   Future<void> loadAuth() async {
     setState(() => loadingAuth = true);
     try {
@@ -48,6 +54,12 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
   Future<void> loadWatch() async {
     if (loadingWatch) return;
+    if (!_canMutatePlaybackForCurrentActivity) {
+      debugPrint(
+        '[WatchLifecycle] skip loadWatch because Android activity is stopped',
+      );
+      return;
+    }
     final channel = channelLogin;
     cancelDeferredWatchTasks();
     final generation = ++watchLoadGeneration;
@@ -71,6 +83,13 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           ? await restoreCurrentPlaybackBundle(channel, generation)
           : false;
       if (!restoredPlayback) {
+        if (!_canMutatePlaybackForCurrentActivity) {
+          debugPrint(
+            '[WatchLifecycle] abort loadWatch before teardown because '
+            'Android activity stopped during async recovery',
+          );
+          return;
+        }
         await stopCurrentSession(
           clearStatus: false,
           cancelDeferredTasks: false,
@@ -91,6 +110,13 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
       );
     } catch (error) {
       if (!mounted) return;
+      if (!_canMutatePlaybackForCurrentActivity) {
+        debugPrint(
+          '[WatchLifecycle] suppress loadWatch failure teardown while '
+          'Android activity is stopped',
+        );
+        return;
+      }
       if (watchMode == TwitchWatchMode.liveWatch) {
         await showLiveWatchOfflineState(
           channel: channel,
@@ -185,6 +211,13 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     required int generation,
   }) async {
     if (!isCurrentWatchTask(generation, channel)) return;
+    if (!_canMutatePlaybackForCurrentActivity) {
+      debugPrint(
+        '[WatchLifecycle] skip offline teardown because Android activity '
+        'is stopped',
+      );
+      return;
+    }
 
     playbackController.setError(null);
     offlineVodFallbackVideo = null;
@@ -480,12 +513,26 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     bool clearStatus = true,
     bool cancelDeferredTasks = true,
   }) async {
+    if (!_canMutatePlaybackForCurrentActivity) {
+      debugPrint(
+        '[WatchLifecycle] skip stopCurrentSession because Android activity '
+        'is stopped',
+      );
+      return;
+    }
     if (cancelDeferredTasks) {
       watchLoadGeneration++;
       cancelDeferredWatchTasks();
     }
 
     await chatController.disconnect();
+    if (!_canMutatePlaybackForCurrentActivity) {
+      debugPrint(
+        '[WatchLifecycle] abort stopCurrentSession after async disconnect '
+        'because Android activity stopped',
+      );
+      return;
+    }
     watchPorts.emotes.clear();
     engagementController.reset();
     chatController.resetSpecialMessages();
