@@ -13,25 +13,18 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 
 enum _TwitchHlsCacheProfile { lowLatency, liveDvr }
 
-/// Keep the native media_kit [Player] and its [VideoController] warm for fast
-/// re-entry.
+/// Keep the native media_kit [Player] warm for fast re-entry, but let each
+/// visible playback session own its [VideoController] / native texture.
 ///
-/// - CPU profiles showed proxy/player were not the heavy path.
-/// - Replacing only the Video widget with a placeholder restored stable 90 FPS.
-/// - Therefore the expensive / sticky part is the Flutter video surface.
-///
-/// The controller is created once for each native Player. Visible sessions only
-/// transfer the reference to that controller, preventing route, mini-player,
-/// DVR, and live transitions from repeatedly allocating native video textures.
+/// This restores the v1.1.4 ownership model on Android-sensitive video
+/// surfaces while preserving the newer playback, DVR and enhancement logic.
 class TwitchMediaKitPlayerHost {
   static Player? _player;
-  static VideoController? _videoController;
   static int _refCount = 0;
   static int _generation = 0;
   static String? _currentMediaUri;
   static String? _keepPlayingWithoutSessionUri;
   static Future<void>? _creatingPlayer;
-  static Future<void>? _creatingVideoController;
   static _TwitchHlsCacheProfile _hlsCacheProfile =
       _TwitchHlsCacheProfile.lowLatency;
 
@@ -116,8 +109,6 @@ class TwitchMediaKitPlayerHost {
       final player = await Player.create(
         configuration: PlayerConfiguration(
           title: title,
-          // Match the low-latency profile used in the isolated Android test
-          // page.
           bufferSize: 8 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
           options: const <String, String>{
@@ -147,45 +138,15 @@ class TwitchMediaKitPlayerHost {
     return created;
   }
 
-  static Future<VideoController> _ensureVideoController(Player player) async {
-    final existing = _videoController;
-    if (existing != null) return existing;
-
-    final creating = _creatingVideoController;
-    if (creating != null) {
-      await creating;
-      final created = _videoController;
-      if (created == null) {
-        throw StateError(
-          'VideoController creation completed without a controller.',
-        );
-      }
-      return created;
-    }
-
-    _creatingVideoController = () async {
-      final controller = await VideoController.create(
-        player,
-        configuration: const VideoControllerConfiguration(
-          enableHardwareAcceleration: true,
-          androidAttachSurfaceAfterVideoParameters: false,
-          hwdec: 'auto-safe',
-        ),
-      );
-      _videoController = controller;
-    }();
-
-    try {
-      await _creatingVideoController;
-    } finally {
-      _creatingVideoController = null;
-    }
-
-    final created = _videoController;
-    if (created == null) {
-      throw StateError('VideoController creation failed.');
-    }
-    return created;
+  static Future<VideoController> _createVideoController(Player player) {
+    return VideoController.create(
+      player,
+      configuration: const VideoControllerConfiguration(
+        enableHardwareAcceleration: true,
+        androidAttachSurfaceAfterVideoParameters: false,
+        hwdec: 'auto-safe',
+      ),
+    );
   }
 
   static Future<void> openOrResume(
@@ -301,9 +262,6 @@ class TwitchMediaKitPlayerHost {
     _refCount = (_refCount - 1).clamp(0, 1 << 20).toInt();
     if (_refCount > 0) return;
 
-    // Keep the native player and current media attached after the last
-    // WatchPage leaves. Re-entering a stream can resume the same local source
-    // without rebuilding media_kit, but audio stays paused while off-page.
     if (hasKeepAlivePlayback) return;
 
     final player = _player;
@@ -320,8 +278,6 @@ class TwitchMediaKitPlayerHost {
   static Future<void> _disposeCurrent() async {
     final player = _player;
     _player = null;
-    _videoController = null;
-    _creatingVideoController = null;
     _currentMediaUri = null;
     _keepPlayingWithoutSessionUri = null;
     _hlsCacheProfile = _TwitchHlsCacheProfile.lowLatency;
@@ -423,7 +379,7 @@ class TwitchMediaKitPlayerSession {
     }
 
     _creatingVideoController = () async {
-      final controller = await TwitchMediaKitPlayerHost._ensureVideoController(
+      final controller = await TwitchMediaKitPlayerHost._createVideoController(
         hostPlayer,
       );
       if (_released) return;
@@ -475,8 +431,6 @@ class TwitchMediaKitPlayerSession {
   }
 
   void _detachVideoSurface() {
-    // The session releases ownership of the shared surface. The host keeps the
-    // controller alive so the next visible owner reuses the same native texture.
     _videoController = null;
     _creatingVideoController = null;
   }
