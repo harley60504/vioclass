@@ -1,13 +1,21 @@
 import './twitch_chat_fragment.dart';
 import './twitch_chat_message.dart';
 
-enum TwitchChatRenderSegmentType { text, twitchEmote, link, emoji, cheermote }
+enum TwitchChatRenderSegmentType {
+  text,
+  twitchEmote,
+  twitchGif,
+  link,
+  emoji,
+  cheermote,
+}
 
 class TwitchChatRenderSegment {
   final TwitchChatRenderSegmentType type;
   final String content;
   final String? url;
   final String? emoteId;
+  final String? gifId;
   final bool isZeroWidth;
   final int? bitsAmount;
 
@@ -16,12 +24,14 @@ class TwitchChatRenderSegment {
     required this.content,
     this.url,
     this.emoteId,
+    this.gifId,
     this.isZeroWidth = false,
     this.bitsAmount,
   });
 
   bool get isText => type == TwitchChatRenderSegmentType.text;
   bool get isEmote => type == TwitchChatRenderSegmentType.twitchEmote;
+  bool get isGif => type == TwitchChatRenderSegmentType.twitchGif;
   bool get isLink => type == TwitchChatRenderSegmentType.link;
 
   factory TwitchChatRenderSegment.text(String content) {
@@ -52,6 +62,19 @@ class TwitchChatRenderSegment {
     );
   }
 
+  factory TwitchChatRenderSegment.twitchGif({
+    required String content,
+    required String gifId,
+    required String url,
+  }) {
+    return TwitchChatRenderSegment(
+      type: TwitchChatRenderSegmentType.twitchGif,
+      content: content,
+      gifId: gifId,
+      url: url,
+    );
+  }
+
   factory TwitchChatRenderSegment.cheermote({
     required String content,
     required int bitsAmount,
@@ -72,6 +95,20 @@ class TwitchChatRenderSegment {
     for (final fragment in fragments) {
       if (fragment.isText) {
         output.addAll(_splitTextSegment(fragment.text));
+      } else if (fragment.isGif) {
+        final gifUrl = fragment.imageUrl?.trim() ?? '';
+        final gifId = fragment.gifId?.trim() ?? '';
+        if (gifUrl.isNotEmpty && gifId.isNotEmpty) {
+          output.add(
+            TwitchChatRenderSegment.twitchGif(
+              content: fragment.text,
+              gifId: gifId,
+              url: gifUrl,
+            ),
+          );
+        } else if (fragment.text.isNotEmpty) {
+          output.add(TwitchChatRenderSegment.text(fragment.text));
+        }
       } else if (fragment.isEmote) {
         final imageUrl = fragment.imageUrl;
         final emoteId = fragment.emoteId;
@@ -154,6 +191,7 @@ class TwitchChatRenderSegment {
       'content': content,
       'url': url,
       'emoteId': emoteId,
+      'gifId': gifId,
       'isZeroWidth': isZeroWidth,
       'bitsAmount': bitsAmount,
     };

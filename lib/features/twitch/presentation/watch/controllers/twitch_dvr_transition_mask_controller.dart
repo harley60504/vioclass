@@ -20,8 +20,9 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
   static const Duration _readyStabilityWindow = Duration(milliseconds: 40);
   static const Duration _revealTimeout = Duration(milliseconds: 1200);
   static const Duration _liveSwitchRevealTimeout = Duration(seconds: 2);
-  static const Duration _liveSwitchProgressThreshold =
-      Duration(milliseconds: 40);
+  static const Duration _liveSwitchProgressThreshold = Duration(
+    milliseconds: 40,
+  );
   static const int _targetToleranceMs = 650;
 
   bool _visible = false;
@@ -64,8 +65,7 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
     Timer? timeoutTimer;
 
     bool isTargetReady() {
-      final distanceMs =
-          (player.state.position - target).inMilliseconds.abs();
+      final distanceMs = (player.state.position - target).inMilliseconds.abs();
       return player.state.playing &&
           !player.state.buffering &&
           distanceMs <= _targetToleranceMs;
@@ -111,11 +111,11 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
     final reason = await completer.future;
     stopwatch.stop();
 
-    timeoutTimer?.cancel();
+    timeoutTimer.cancel();
     stabilityTimer?.cancel();
-    await positionSubscription?.cancel();
-    await bufferingSubscription?.cancel();
-    await playingSubscription?.cancel();
+    await positionSubscription.cancel();
+    await bufferingSubscription.cancel();
+    await playingSubscription.cancel();
 
     if (generation != _generation) return;
     _hide(
@@ -198,11 +198,11 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
     final reason = await completer.future;
     stopwatch.stop();
 
-    timeoutTimer?.cancel();
+    timeoutTimer.cancel();
     stabilityTimer?.cancel();
-    await positionSubscription?.cancel();
-    await bufferingSubscription?.cancel();
-    await playingSubscription?.cancel();
+    await positionSubscription.cancel();
+    await bufferingSubscription.cancel();
+    await playingSubscription.cancel();
 
     if (generation != _generation) return;
     _hide(
@@ -237,5 +237,7 @@ class TwitchDvrTransitionMaskController extends ChangeNotifier {
   }
 
   String _seconds(Duration value) =>
-      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(
+        3,
+      );
 }

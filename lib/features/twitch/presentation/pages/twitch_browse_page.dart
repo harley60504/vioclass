@@ -17,6 +17,7 @@ import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_login_required_view.dart';
+import '../widgets/shared/twitch_text_field.dart';
 import 'twitch_stream_refresh_reconciler.dart';
 
 class TwitchBrowsePage extends StatefulWidget {
@@ -655,7 +656,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
-              child: TextField(
+              child: TwitchTextField(
+                height: 38,
                 controller: tagSearchController,
                 textInputAction: TextInputAction.done,
                 onSubmitted: _addSelectedTag,
@@ -666,6 +668,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                   fontWeight: FontWeight.w800,
                 ),
                 decoration: InputDecoration(
+                  filled: false,
                   hintText: l10n.t('輸入標籤篩選'),
                   hintStyle: const TextStyle(
                     color: Colors.white38,
@@ -865,7 +868,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
               children: <Widget>[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                  child: TextField(
+                  child: TwitchTextField(
                     controller: searchController,
                     decoration: InputDecoration(
                       hintText: l10n.t('搜尋語言或代碼，例如 zh / en / ja'),

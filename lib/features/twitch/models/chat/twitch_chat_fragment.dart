@@ -1,11 +1,12 @@
 import './twitch_chat_message.dart';
 
-enum TwitchChatFragmentType { text, twitchEmote, unknownEmote }
+enum TwitchChatFragmentType { text, twitchEmote, twitchGif, unknownEmote }
 
 class TwitchChatFragment {
   final TwitchChatFragmentType type;
   final String text;
   final String? emoteId;
+  final String? gifId;
   final String? imageUrl;
   final int? start;
   final int? end;
@@ -14,6 +15,7 @@ class TwitchChatFragment {
     required this.type,
     required this.text,
     this.emoteId,
+    this.gifId,
     this.imageUrl,
     this.start,
     this.end,
@@ -21,6 +23,7 @@ class TwitchChatFragment {
 
   bool get isText => type == TwitchChatFragmentType.text;
   bool get isEmote => type == TwitchChatFragmentType.twitchEmote;
+  bool get isGif => type == TwitchChatFragmentType.twitchGif;
 
   factory TwitchChatFragment.text(String text) {
     return TwitchChatFragment(type: TwitchChatFragmentType.text, text: text);
@@ -42,6 +45,23 @@ class TwitchChatFragment {
     );
   }
 
+  factory TwitchChatFragment.twitchGif({
+    required String gifId,
+    required String gifUrl,
+    required String text,
+    required int start,
+    required int end,
+  }) {
+    return TwitchChatFragment(
+      type: TwitchChatFragmentType.twitchGif,
+      text: text,
+      gifId: gifId,
+      imageUrl: gifUrl,
+      start: start,
+      end: end,
+    );
+  }
+
   factory TwitchChatFragment.unknownEmote({required String emoteId}) {
     return TwitchChatFragment(
       type: TwitchChatFragmentType.unknownEmote,
@@ -56,6 +76,7 @@ class TwitchChatFragment {
       'type': type.name,
       'text': text,
       'emoteId': emoteId,
+      'gifId': gifId,
       'imageUrl': imageUrl,
       'start': start,
       'end': end,
@@ -69,13 +90,12 @@ class TwitchChatFragment {
   static List<TwitchChatFragment> buildFromMessage(TwitchChatMessage message) {
     final text = message.message;
     final emotesTag = message.tags['emotes']?.trim() ?? '';
+    final gifsTag = message.tags['gifs']?.trim() ?? '';
 
-    if (emotesTag.isEmpty) {
-      if (text.isEmpty) return const <TwitchChatFragment>[];
-      return <TwitchChatFragment>[TwitchChatFragment.text(text)];
-    }
-
-    final ranges = _parseEmoteRanges(emotesTag);
+    final ranges = <_TwitchChatAssetRange>[
+      ..._parseEmoteRanges(emotesTag),
+      ..._parseGifRanges(gifsTag),
+    ];
 
     if (ranges.isEmpty) {
       if (text.isEmpty) return const <TwitchChatFragment>[];
@@ -86,8 +106,9 @@ class TwitchChatFragment {
     // 但 trailing text 是空的。此時至少把 emote id render 出來，避免 UI 空白。
     if (text.isEmpty) {
       return ranges
+          .where((range) => !range.isGif)
           .map(
-            (range) => TwitchChatFragment.unknownEmote(emoteId: range.emoteId),
+            (range) => TwitchChatFragment.unknownEmote(emoteId: range.assetId),
           )
           .toList(growable: false);
     }
@@ -113,14 +134,27 @@ class TwitchChatFragment {
         );
       }
 
-      fragments.add(
-        TwitchChatFragment.twitchEmote(
-          emoteId: range.emoteId,
-          text: text.substring(range.start, range.end + 1),
-          start: range.start,
-          end: range.end,
-        ),
-      );
+      final rangeText = text.substring(range.start, range.end + 1);
+      if (range.isGif) {
+        fragments.add(
+          TwitchChatFragment.twitchGif(
+            gifId: range.assetId,
+            gifUrl: range.imageUrl ?? '',
+            text: rangeText,
+            start: range.start,
+            end: range.end,
+          ),
+        );
+      } else {
+        fragments.add(
+          TwitchChatFragment.twitchEmote(
+            emoteId: range.assetId,
+            text: rangeText,
+            start: range.start,
+            end: range.end,
+          ),
+        );
+      }
 
       cursor = range.end + 1;
     }
@@ -136,8 +170,9 @@ class TwitchChatFragment {
     return fragments;
   }
 
-  static List<_TwitchEmoteRange> _parseEmoteRanges(String emotesTag) {
-    final ranges = <_TwitchEmoteRange>[];
+  static List<_TwitchChatAssetRange> _parseEmoteRanges(String emotesTag) {
+    final ranges = <_TwitchChatAssetRange>[];
+    if (emotesTag.isEmpty) return ranges;
 
     for (final group in emotesTag.split('/')) {
       if (group.trim().isEmpty) continue;
@@ -157,22 +192,73 @@ class TwitchChatFragment {
 
         if (start == null || end == null) continue;
 
-        ranges.add(_TwitchEmoteRange(emoteId: emoteId, start: start, end: end));
+        ranges.add(
+          _TwitchChatAssetRange(
+            assetId: emoteId,
+            start: start,
+            end: end,
+          ),
+        );
       }
+    }
+
+    return ranges;
+  }
+
+  static List<_TwitchChatAssetRange> _parseGifRanges(String gifsTag) {
+    final ranges = <_TwitchChatAssetRange>[];
+    if (gifsTag.isEmpty) return ranges;
+
+    // Twitch IRC (2026): comma-separated
+    // <start>-<end>|<gifID>|<gifURL>, using inclusive message positions just
+    // like the emotes tag. Keep the URL exactly as Twitch sends it.
+    for (final entry in gifsTag.split(',')) {
+      final firstPipe = entry.indexOf('|');
+      if (firstPipe <= 0 || firstPipe >= entry.length - 1) continue;
+      final secondPipe = entry.indexOf('|', firstPipe + 1);
+      if (secondPipe <= firstPipe + 1 || secondPipe >= entry.length - 1) {
+        continue;
+      }
+
+      final rangeText = entry.substring(0, firstPipe);
+      final gifId = entry.substring(firstPipe + 1, secondPipe).trim();
+      final gifUrl = entry.substring(secondPipe + 1).trim();
+      final dashIndex = rangeText.indexOf('-');
+      if (dashIndex <= 0 || dashIndex >= rangeText.length - 1) continue;
+
+      final start = int.tryParse(rangeText.substring(0, dashIndex));
+      final end = int.tryParse(rangeText.substring(dashIndex + 1));
+      if (start == null || end == null || gifId.isEmpty || gifUrl.isEmpty) {
+        continue;
+      }
+
+      ranges.add(
+        _TwitchChatAssetRange(
+          assetId: gifId,
+          imageUrl: gifUrl,
+          start: start,
+          end: end,
+          isGif: true,
+        ),
+      );
     }
 
     return ranges;
   }
 }
 
-class _TwitchEmoteRange {
-  final String emoteId;
+class _TwitchChatAssetRange {
+  final String assetId;
+  final String? imageUrl;
   final int start;
   final int end;
+  final bool isGif;
 
-  const _TwitchEmoteRange({
-    required this.emoteId,
+  const _TwitchChatAssetRange({
+    required this.assetId,
     required this.start,
     required this.end,
+    this.imageUrl,
+    this.isGif = false,
   });
 }

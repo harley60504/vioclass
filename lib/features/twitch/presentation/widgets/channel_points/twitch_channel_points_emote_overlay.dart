@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../api/engagement/twitch_channel_points_api_service.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../shared/twitch_text_field.dart';
 
 const int _channelPointEmoteGridCacheSize = 112;
 const int _channelPointModifierCacheSize = 84;
@@ -76,15 +77,14 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                 final compact = constraints.maxWidth < 420;
                 final searchField = SizedBox(
                   height: 38,
-                  child: TextField(
+                  child: TwitchTextField(
+                    height: 38,
                     onChanged: choosingModifier ? null : onQueryChanged,
                     enabled: !choosingModifier,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       isDense: true,
-                      hintText: l10n.t(
-                        choosingModifier ? '選擇修改效果' : '搜尋貼圖名稱',
-                      ),
+                      hintText: l10n.t(choosingModifier ? '選擇修改效果' : '搜尋貼圖名稱'),
                       hintStyle: const TextStyle(
                         color: Colors.white38,
                         fontSize: 13,

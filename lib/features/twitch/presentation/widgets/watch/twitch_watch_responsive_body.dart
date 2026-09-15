@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import '../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../localization/vioclass_localizations.dart';
+import '../../theme/twitch_ui_tokens.dart';
 import '../responsive/twitch_responsive_layout.dart';
 import 'player/twitch_player_only_surface.dart';
 import 'twitch_watch_chat_resize_handle.dart';
@@ -14,7 +15,6 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 class TwitchWatchResponsiveBody extends StatelessWidget {
   static const double _chatMinWidthVisualBoost = 18.0;
   static const double _playerAspectRatio = 16 / 9;
-  static const Color _watchBackgroundColor = Color(0xFF171222);
 
   final bool chatVisible;
   final bool fullscreenMode;
@@ -63,8 +63,20 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
           return TwitchPlayerOnlySurface(player: player);
         }
 
-        return ColoredBox(
-          color: _watchBackgroundColor,
+        return DecoratedBox(
+          decoration: const BoxDecoration(
+            color: TwitchUiColors.appBackground,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: <Color>[
+                Color(0x14FFFFFF),
+                Color(0x08FFFFFF),
+                Color(0x00000000),
+              ],
+              stops: <double>[0.0, 0.48, 1.0],
+            ),
+          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final layout = TwitchResponsiveLayout.fromConstraints(
@@ -204,7 +216,7 @@ class _BottomChatLayout extends StatelessWidget {
             SizedBox(
               height: playerHeight,
               width: double.infinity,
-              child: _WatchSurface(child: player),
+              child: _PlayerSurface(child: player),
             )
           else
             Expanded(
@@ -336,7 +348,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
   @override
   Widget build(BuildContext context) {
     final content = widget.belowPlayer;
-    if (content == null) return _WatchSurface(child: widget.player);
+    if (content == null) return _PlayerSurface(child: widget.player);
 
     return PageView(
       controller: _pageController,
@@ -349,7 +361,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
               _showPage(1);
             }
           },
-          child: _WatchSurface(child: widget.player),
+          child: _PlayerSurface(child: widget.player),
         ),
         _WatchSurface(
           child: Listener(
@@ -378,6 +390,24 @@ class _PlayerColumnState extends State<_PlayerColumn> {
   }
 }
 
+class _PlayerSurface extends StatelessWidget {
+  final Widget child;
+
+  const _PlayerSurface({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border.fromBorderSide(
+          BorderSide(color: TwitchUiColors.borderSubtle),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
 class _WatchSurface extends StatelessWidget {
   final Widget child;
 
@@ -386,9 +416,11 @@ class _WatchSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.045)),
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.surfacePanel,
+        border: Border.fromBorderSide(
+          BorderSide(color: TwitchUiColors.borderSubtle),
+        ),
       ),
       child: child,
     );

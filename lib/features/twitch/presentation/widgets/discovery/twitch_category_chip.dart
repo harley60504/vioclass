@@ -19,51 +19,59 @@ class TwitchCategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 124,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: selected
-                ? TwitchUiColors.primary.withValues(alpha: 0.20)
-                : const Color(0xFF18181B),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: TwitchUiMotion.fast,
+            curve: TwitchUiMotion.standardCurve,
+            padding: const EdgeInsets.all(TwitchUiSpacing.space8),
+            decoration: BoxDecoration(
               color: selected
-                  ? TwitchUiColors.primary.withValues(alpha: 0.65)
-                  : Colors.white.withValues(alpha: 0.08),
+                  ? TwitchUiColors.surfaceSelected
+                  : TwitchUiColors.surfaceCard,
+              borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
+              border: Border.all(
+                color: selected
+                    ? TwitchUiColors.borderInteractive
+                    : TwitchUiColors.borderSubtle,
+              ),
             ),
-          ),
-          child: Column(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: game.boxArtUrl.isEmpty
-                      ? const ColoredBox(color: Color(0xFF242429))
-                      : Image.network(
-                          game.boxArt(width: 188, height: 250),
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          errorBuilder: (_, _, _) =>
-                              const ColoredBox(color: Color(0xFF242429)),
-                        ),
+            child: Column(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+                    child: game.boxArtUrl.isEmpty
+                        ? const ColoredBox(color: TwitchUiColors.surfaceRaised)
+                        : Image.network(
+                            game.boxArt(width: 188, height: 250),
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            errorBuilder: (_, _, _) => const ColoredBox(
+                              color: TwitchUiColors.surfaceRaised,
+                            ),
+                          ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 7),
-              Text(
-                game.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: selected ? TwitchUiColors.primarySoft : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
+                const SizedBox(height: TwitchUiSpacing.space8),
+                Text(
+                  game.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected
+                        ? TwitchUiColors.primarySoft
+                        : TwitchUiColors.textSecondary,
+                    fontSize: TwitchUiFontSize.bodyCompact,
+                    fontWeight: TwitchUiFontWeight.strong,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

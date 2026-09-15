@@ -92,7 +92,7 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 7),
                   DropdownButtonFormField<TwitchVideoEnhancementMode>(
-                    value: controller.videoEnhancementMode,
+                    initialValue: controller.videoEnhancementMode,
                     isExpanded: true,
                     dropdownColor: const Color(0xFF18151F),
                     decoration: InputDecoration(

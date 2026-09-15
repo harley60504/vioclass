@@ -38,11 +38,18 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
     return Container(
       height: headerHeight,
       padding: EdgeInsets.fromLTRB(12, compact ? 5 : 8, 10, compact ? 5 : 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.028),
+      decoration: const BoxDecoration(
+        color: TwitchUiColors.surfaceRaised,
         border: Border(
-          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.060)),
+          bottom: BorderSide(color: TwitchUiColors.borderSubtle),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x52000000),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
       ),
       child: Row(
         children: [

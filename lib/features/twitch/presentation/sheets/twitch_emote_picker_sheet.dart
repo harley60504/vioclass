@@ -10,6 +10,7 @@ import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/emotes/twitch_official_emote_pages.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_emote_image.dart';
+import '../widgets/shared/twitch_text_field.dart';
 
 const int _initialGridCount = 96;
 const int _searchGridLimit = 240;
@@ -315,7 +316,8 @@ class _SearchBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: SizedBox(
         height: 38,
-        child: TextField(
+        child: TwitchTextField(
+          height: 38,
           controller: controller,
           onChanged: onChanged,
           style: const TextStyle(

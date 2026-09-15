@@ -44,6 +44,7 @@ class TwitchWatchChatController extends ChangeNotifier {
   TwitchViewerSpecialMessagesSnapshotStage251? specialMessagesSnapshot;
   bool loadingSpecialMessages = false;
   StreamSubscription<TwitchCommunityRedemptionEvent>? _redemptionSubscription;
+  StreamSubscription<TwitchChatSendRejection>? _sendRejectionSubscription;
 
   TwitchWatchChatController({
     required this.authService,
@@ -68,6 +69,8 @@ class TwitchWatchChatController extends ChangeNotifier {
     connectingChat = true;
     notifyListeners();
     try {
+      await _sendRejectionSubscription?.cancel();
+      _sendRejectionSubscription = null;
       await runtime?.disposeRuntime();
 
       final token = await authService.getValidAccessToken();
@@ -94,6 +97,11 @@ class TwitchWatchChatController extends ChangeNotifier {
       );
 
       runtime = nextRuntime;
+      _sendRejectionSubscription = nextRuntime.sendRejections.listen((
+        rejection,
+      ) {
+        showMessage('訊息未送出：${_sendRejectionReason(rejection)}');
+      });
       _ensureRedemptionSubscription();
       viewerLogin = validation.login;
       resolvedViewerId = validation.userId;
@@ -123,6 +131,30 @@ class TwitchWatchChatController extends ChangeNotifier {
     _redemptionSubscription ??= TwitchPredictionHermesRealtimeBus
         .redemptionStream
         .listen(_handleCommunityRedemption);
+  }
+
+  String _sendRejectionReason(TwitchChatSendRejection rejection) {
+    return switch (rejection.messageId.trim().toLowerCase()) {
+      'msg_slowmode' => '目前是慢速模式，請稍後再發言。',
+      'msg_ratelimit' => '發言速度太快，請稍後再試。',
+      'msg_duplicate' => '訊息與上一則太相似，請修改後再送出。',
+      'msg_banned' => '你已被此聊天室封鎖。',
+      'msg_timedout' => '你目前被暫時禁言。',
+      'msg_emoteonly' => '目前僅能傳送表情。',
+      'msg_subsonly' => '目前僅限訂閱者發言。',
+      'msg_followersonly' ||
+      'msg_followersonly_followed' ||
+      'msg_followersonly_zero' => '尚未符合此聊天室的追隨條件。',
+      'msg_r9k' => '目前是唯一訊息模式，請勿重複相同內容。',
+      'msg_verified_email' => '需要先完成 Twitch 電子郵件驗證。',
+      'msg_requires_verified_phone_number' => '需要先完成 Twitch 手機號碼驗證。',
+      'msg_channel_blocked' || 'msg_suspended' => '目前沒有在此聊天室發言的權限。',
+      'msg_rejected' || 'msg_rejected_mandatory' => '訊息不符合聊天室規則。',
+      _ =>
+        rejection.reason.trim().isEmpty
+            ? 'Twitch 拒絕了這則訊息。'
+            : rejection.reason.trim(),
+    };
   }
 
   void _handleCommunityRedemption(TwitchCommunityRedemptionEvent redemption) {
@@ -400,9 +432,12 @@ class TwitchWatchChatController extends ChangeNotifier {
   }
 
   Future<void> disposeRuntime() async {
+    final rejectionSubscription = _sendRejectionSubscription;
+    _sendRejectionSubscription = null;
     final activeRuntime = runtime;
     runtime = null;
     notifyListeners();
+    await rejectionSubscription?.cancel();
     if (activeRuntime != null) {
       await activeRuntime.disposeRuntime();
     }

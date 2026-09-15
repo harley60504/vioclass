@@ -142,8 +142,8 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       }
 
       if (isSequentialDvr) {
-        dvrTransitionGeneration =
-            TwitchDvrTransitionMaskController.instance.begin();
+        dvrTransitionGeneration = TwitchDvrTransitionMaskController.instance
+            .begin();
       }
 
       if (startPosition != null) {
@@ -157,14 +157,14 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
       if (isSequentialDvr) {
         debugPrint(
           '[TwitchPlayer] sequential DVR start '
-          'target=${_seconds(startPosition!)}s '
+          'target=${_seconds(startPosition)}s '
           'strategy=media-start-single-stream',
         );
       }
 
       final openStopwatch = Stopwatch()..start();
       if (shouldDeferInitialSeek) {
-        final seekTarget = startPosition!;
+        final seekTarget = startPosition;
         await session.openOrResume(
           uri: nextUri,
           play: false,
@@ -180,6 +180,13 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
           forceOpen: forceOpen,
           startPosition: startPosition,
         );
+        // mpv can retain the paused state while reopening the local sequential
+        // DVR transport even when openOrResume(play: true) is requested. Force
+        // the new DVR generation into playing state so its media clock (and the
+        // canonical timeline UI) actually advances after a scrub/seek.
+        if (play && isSequentialDvr) {
+          await session.player.play();
+        }
       }
       openStopwatch.stop();
 
@@ -187,7 +194,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
         debugPrint(
           '[PlaybackLatency] '
           'dvrSequentialStartup=${openStopwatch.elapsedMilliseconds}ms '
-          'target=${_seconds(startPosition!)}s',
+          'target=${_seconds(startPosition)}s',
         );
 
         final transitionGeneration = dvrTransitionGeneration;
@@ -196,7 +203,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
             unawaited(
               TwitchDvrTransitionMaskController.instance.revealWhenReady(
                 player: session.player,
-                target: startPosition!,
+                target: startPosition,
                 generation: transitionGeneration,
               ),
             );
@@ -262,5 +269,7 @@ class TwitchWatchPlaybackController extends ChangeNotifier {
   }
 
   String _seconds(Duration value) =>
-      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(
+        3,
+      );
 }

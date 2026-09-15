@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
-import '../../shared/twitch_glass.dart';
+import 'twitch_player_chrome_button.dart';
 
 class FollowButton extends StatelessWidget {
   final bool followed;
@@ -24,65 +24,16 @@ class FollowButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visualHeight =
-        height ??
-        (tiny
-            ? 36.0
-            : compact
-            ? 42.0
-            : 64.0);
-    final size = visualHeight;
-    final radius = tiny
-        ? 14.0
-        : compact
-        ? 16.0
-        : 20.0;
-
-    return Tooltip(
-      message: context.vio.t(followed ? '取消追隨' : '追隨'),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(radius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: busy ? null : onPressed,
-          child: TwitchGlassSurface(
-            borderRadius: BorderRadius.circular(radius),
-            backgroundColor: followed
-                ? Colors.pinkAccent.withValues(alpha: 0.24)
-                : Colors.black.withValues(alpha: 0.42),
-            borderColor: followed
-                ? Colors.pinkAccent.withValues(alpha: 0.34)
-                : Colors.white.withValues(alpha: 0.10),
-            blurSigma: 0,
-            boxShadow: const <BoxShadow>[],
-            child: SizedBox(
-              width: size,
-              height: visualHeight,
-              child: Center(
-                child: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: TwitchUiColors.primarySoft,
-                        ),
-                      )
-                    : Icon(
-                        followed ? Icons.favorite : Icons.favorite_border,
-                        color: followed ? Colors.pinkAccent : Colors.white,
-                        size: tiny
-                            ? 20
-                            : compact
-                            ? 23
-                            : 32,
-                      ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return PlayerChromeButton(
+      tooltip: context.vio.t(followed ? '取消追隨' : '追隨'),
+      icon: followed ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+      selected: followed,
+      busy: busy,
+      accentColor: TwitchUiColors.live,
+      compact: compact,
+      tiny: tiny,
+      height: height,
+      onPressed: onPressed,
     );
   }
 }
@@ -103,70 +54,16 @@ class SubscribeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.vio;
-    final visualHeight =
-        height ??
-        (tiny
-            ? 36.0
-            : compact
-            ? 42.0
-            : 64.0);
-    final radius = tiny
-        ? 14.0
-        : compact
-        ? 16.0
-        : 20.0;
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(radius),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPressed,
-        child: TwitchGlassSurface(
-          borderRadius: BorderRadius.circular(radius),
-          backgroundColor: TwitchUiColors.primary.withValues(alpha: 0.28),
-          borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.30),
-          blurSigma: 0,
-          boxShadow: const <BoxShadow>[],
-          child: SizedBox(
-            height: visualHeight,
-            width: compact ? visualHeight : null,
-            child: Padding(
-              padding: compact
-                  ? EdgeInsets.zero
-                  : const EdgeInsets.symmetric(horizontal: 22),
-              child: Center(
-                child: compact
-                    ? Icon(
-                        Icons.auto_awesome,
-                        color: Colors.white,
-                        size: tiny ? 19 : 22,
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            l10n.t('訂閱'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.auto_awesome,
-                            color: Colors.white,
-                            size: 19,
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    final label = compact ? null : context.vio.t('訂閱');
+    return PlayerChromeButton(
+      tooltip: context.vio.t('訂閱'),
+      icon: Icons.auto_awesome_rounded,
+      label: label,
+      primary: true,
+      compact: compact,
+      tiny: tiny,
+      height: height,
+      onPressed: onPressed,
     );
   }
 }
@@ -187,72 +84,14 @@ class ChannelLibraryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visualHeight =
-        height ??
-        (tiny
-            ? 36.0
-            : compact
-            ? 42.0
-            : 64.0);
-    final radius = tiny
-        ? 14.0
-        : compact
-        ? 16.0
-        : 20.0;
-
-    return Tooltip(
-      message: context.vio.t('關於 / VOD'),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(radius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: TwitchGlassSurface(
-            borderRadius: BorderRadius.circular(radius),
-            backgroundColor: Colors.black.withValues(alpha: 0.42),
-            borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.22),
-            blurSigma: 0,
-            boxShadow: const <BoxShadow>[],
-            child: SizedBox(
-              height: visualHeight,
-              width: compact ? visualHeight : null,
-              child: Padding(
-                padding: compact
-                    ? EdgeInsets.zero
-                    : const EdgeInsets.symmetric(horizontal: 18),
-                child: Center(
-                  child: compact
-                      ? Icon(
-                          Icons.video_library_rounded,
-                          color: TwitchUiColors.primarySoft,
-                          size: tiny ? 18 : 21,
-                        )
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.video_library_rounded,
-                              color: TwitchUiColors.primarySoft,
-                              size: 19,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              context.vio.t('關於 / VOD'),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return PlayerChromeButton(
+      tooltip: context.vio.t('關於 / VOD'),
+      icon: Icons.video_library_rounded,
+      label: compact ? null : context.vio.t('媒體庫'),
+      compact: compact,
+      tiny: tiny,
+      height: height,
+      onPressed: onPressed,
     );
   }
 }
@@ -275,60 +114,14 @@ class CreateClipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visualHeight =
-        height ??
-        (tiny
-            ? 36.0
-            : compact
-            ? 42.0
-            : 64.0);
-    final radius = tiny
-        ? 14.0
-        : compact
-        ? 16.0
-        : 20.0;
-
-    return Tooltip(
-      message: context.vio.t('建立片段'),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(radius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: busy ? null : onPressed,
-          child: TwitchGlassSurface(
-            borderRadius: BorderRadius.circular(radius),
-            backgroundColor: const Color(0xFF4C1D95).withValues(alpha: 0.24),
-            borderColor: TwitchUiColors.primarySoft.withValues(alpha: 0.26),
-            blurSigma: 0,
-            boxShadow: const <BoxShadow>[],
-            child: SizedBox(
-              height: visualHeight,
-              width: visualHeight,
-              child: Center(
-                child: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: TwitchUiColors.primarySoft,
-                        ),
-                      )
-                    : Icon(
-                        Icons.movie_creation_outlined,
-                        color: TwitchUiColors.primarySoft,
-                        size: tiny
-                            ? 18
-                            : compact
-                            ? 21
-                            : 28,
-                      ),
-              ),
-            ),
-          ),
-        ),
-      ),
+    return PlayerChromeButton(
+      tooltip: context.vio.t('建立片段'),
+      icon: Icons.movie_creation_outlined,
+      busy: busy,
+      compact: compact,
+      tiny: tiny,
+      height: height,
+      onPressed: onPressed,
     );
   }
 }

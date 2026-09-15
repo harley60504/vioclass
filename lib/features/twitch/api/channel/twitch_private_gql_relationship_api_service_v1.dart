@@ -245,7 +245,8 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
         userId: target.id,
         login: target.login.isNotEmpty ? target.login : login,
         displayName: target.displayName.isNotEmpty ? target.displayName : login,
-        isFollowing: following,
+        isFollowing: following.isFollowing,
+        followedAt: following.followedAt,
       );
     }
 
@@ -399,7 +400,7 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
     );
   }
 
-  Future<bool?> _checkFollowingByHelix({
+  Future<({bool isFollowing, DateTime? followedAt})?> _checkFollowingByHelix({
     required String targetUserId,
     String? viewerUserId,
   }) async {
@@ -428,8 +429,14 @@ class TwitchPrivateGqlRelationshipApiServiceV1 {
       );
 
       final data = raw['data'];
-      if (data is List) return data.isNotEmpty;
-      return false;
+      if (data is! List || data.isEmpty) {
+        return (isFollowing: false, followedAt: null);
+      }
+      final first = data.first;
+      final followedAt = first is Map
+          ? DateTime.tryParse(first['followed_at']?.toString() ?? '')
+          : null;
+      return (isFollowing: true, followedAt: followedAt);
     } catch (_) {
       return null;
     }

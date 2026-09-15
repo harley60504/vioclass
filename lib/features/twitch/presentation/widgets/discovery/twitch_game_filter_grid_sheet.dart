@@ -89,25 +89,24 @@ Future<void> showTwitchGameFilterGridSheet({
           final filteredGames = lowerKeyword.isEmpty
               ? currentGames
               : currentGames
-                    .where(
-                      (game) => game.name.toLowerCase().contains(lowerKeyword),
-                    )
+                    .where((game) => game.name.toLowerCase().contains(lowerKeyword))
                     .toList(growable: false);
           final items = <TwitchGameCategory?>[null, ...filteredGames];
 
           return Column(
-            children: <Widget>[
-              Padding(
+            children: [
+              Container(
                 padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                color: TwitchUiColors.surfacePanel,
                 child: TwitchCenteredTextField(
-                  height: 48,
-                  radius: 16,
+                  height: 44,
+                  radius: TwitchUiRadius.md,
                   controller: searchController,
                   hintText: l10n.t('搜尋遊戲分類'),
                   prefixIcon: Icons.search_rounded,
                   onChanged: (value) => setSheetState(() => keyword = value),
-                  fillColor: const Color(0xFF0E0E10),
-                  borderColor: Colors.white.withValues(alpha: 0.08),
+                  fillColor: TwitchUiColors.surfaceInteractive,
+                  borderColor: TwitchUiColors.border,
                   suffixIcon: keyword.isNotEmpty
                       ? IconButton(
                           onPressed: () {
@@ -116,7 +115,7 @@ Future<void> showTwitchGameFilterGridSheet({
                           },
                           icon: const Icon(
                             Icons.close_rounded,
-                            color: Colors.white54,
+                            color: TwitchUiColors.textMuted,
                           ),
                         )
                       : null,
@@ -126,13 +125,8 @@ Future<void> showTwitchGameFilterGridSheet({
                 child: Builder(
                   builder: (context) {
                     if (currentLoading && currentGames.isEmpty) {
-                      return const Center(
-                        child: CircularProgressIndicator(
-                          color: TwitchUiColors.primary,
-                        ),
-                      );
+                      return const Center(child: CircularProgressIndicator());
                     }
-
                     if (filteredGames.isEmpty && lowerKeyword.isNotEmpty) {
                       return Center(
                         child: Padding(
@@ -142,20 +136,21 @@ Future<void> showTwitchGameFilterGridSheet({
                             children: [
                               const Icon(
                                 Icons.search_off_rounded,
-                                color: Colors.white38,
-                                size: 42,
+                                color: TwitchUiColors.textFaint,
+                                size: 40,
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: TwitchUiSpacing.space12),
                               Text(
                                 emptySearchText,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontWeight: FontWeight.w800,
+                                  color: TwitchUiColors.textSecondary,
+                                  fontSize: TwitchUiFontSize.body,
+                                  fontWeight: TwitchUiFontWeight.medium,
                                 ),
                               ),
                               if (currentHasMore && onLoadMore != null) ...[
-                                const SizedBox(height: 12),
+                                const SizedBox(height: TwitchUiSpacing.space12),
                                 OutlinedButton.icon(
                                   onPressed: () => unawaited(requestMore()),
                                   icon: const Icon(Icons.download_rounded),
@@ -174,21 +169,18 @@ Future<void> showTwitchGameFilterGridSheet({
                         final crossAxisCount = maxWidth >= 680
                             ? 4
                             : maxWidth >= 500
-                            ? 3
-                            : 2;
-
+                                ? 3
+                                : 2;
                         return GridView.builder(
                           controller: scrollController,
                           padding: const EdgeInsets.fromLTRB(14, 4, 14, 14),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                childAspectRatio: 0.78,
-                              ),
-                          itemCount:
-                              items.length + (onLoadMore == null ? 0 : 1),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 0.78,
+                          ),
+                          itemCount: items.length + (onLoadMore == null ? 0 : 1),
                           itemBuilder: (context, index) {
                             if (index >= items.length) {
                               return _GameFilterGridFooter(
@@ -198,7 +190,6 @@ Future<void> showTwitchGameFilterGridSheet({
                                 onLoadMore: requestMore,
                               );
                             }
-
                             final game = items[index];
                             final selected = game == null
                                 ? selectedGameId == null
@@ -217,13 +208,9 @@ Future<void> showTwitchGameFilterGridSheet({
               ),
               Container(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111116),
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
+                decoration: const BoxDecoration(
+                  color: TwitchUiColors.surfaceRaised,
+                  border: Border(top: BorderSide(color: TwitchUiColors.divider)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -232,7 +219,7 @@ Future<void> showTwitchGameFilterGridSheet({
                       onPressed: () => selectGame(sheetContext, null),
                       child: Text(l10n.t('全部分類')),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: TwitchUiSpacing.space8),
                     TextButton(
                       onPressed: () => Navigator.of(sheetContext).maybePop(),
                       child: Text(l10n.t('關閉')),
@@ -276,12 +263,9 @@ class _GameFilterGridFooter extends StatelessWidget {
     if (loadingMore) {
       return const Padding(
         padding: EdgeInsets.all(14),
-        child: Center(
-          child: CircularProgressIndicator(color: TwitchUiColors.primary),
-        ),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
-
     if (paginationError != null) {
       return Padding(
         padding: const EdgeInsets.all(10),
@@ -292,7 +276,6 @@ class _GameFilterGridFooter extends StatelessWidget {
         ),
       );
     }
-
     if (hasMore) {
       return Padding(
         padding: const EdgeInsets.all(10),
@@ -303,13 +286,15 @@ class _GameFilterGridFooter extends StatelessWidget {
         ),
       );
     }
-
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Center(
         child: Text(
           l10n.t('分類已經到底了'),
-          style: const TextStyle(color: Colors.white38),
+          style: const TextStyle(
+            color: TwitchUiColors.textFaint,
+            fontSize: TwitchUiFontSize.meta,
+          ),
         ),
       ),
     );
@@ -332,22 +317,21 @@ class _GameFilterGridTile extends StatelessWidget {
     final l10n = context.vio;
     final item = game;
     final isAllCategories = item == null;
-
     return Material(
       color: selected
-          ? TwitchUiColors.primary.withValues(alpha: 0.18)
-          : Colors.white.withValues(alpha: 0.045),
-      borderRadius: BorderRadius.circular(16),
+          ? TwitchUiColors.surfaceSelected
+          : TwitchUiColors.surfaceCard,
+      borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
             border: Border.all(
               color: selected
-                  ? TwitchUiColors.primary.withValues(alpha: 0.72)
-                  : Colors.white.withValues(alpha: 0.075),
+                  ? TwitchUiColors.borderInteractive
+                  : TwitchUiColors.borderSubtle,
             ),
           ),
           child: Column(
@@ -355,41 +339,35 @@ class _GameFilterGridTile extends StatelessWidget {
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
                   child: isAllCategories
                       ? Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: TwitchUiColors.primary.withValues(
-                              alpha: 0.13,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: TwitchUiColors.primary.withValues(
-                                alpha: 0.20,
-                              ),
-                            ),
+                            color: TwitchUiColors.surfaceInteractive,
+                            borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+                            border: Border.all(color: TwitchUiColors.borderSubtle),
                           ),
                           child: const Icon(
                             Icons.grid_view_rounded,
                             color: TwitchUiColors.primarySoft,
-                            size: 42,
+                            size: 38,
                           ),
                         )
                       : _GameFilterBoxArt(game: item),
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
                 child: Row(
                   children: [
                     if (selected) ...[
                       const Icon(
                         Icons.check_circle_rounded,
                         color: TwitchUiColors.primarySoft,
-                        size: 16,
+                        size: 15,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: TwitchUiSpacing.space4),
                     ],
                     Expanded(
                       child: Text(
@@ -400,10 +378,10 @@ class _GameFilterGridTile extends StatelessWidget {
                         style: TextStyle(
                           color: selected
                               ? TwitchUiColors.primarySoft
-                              : Colors.white,
-                          fontSize: 13.2,
-                          height: 1.12,
-                          fontWeight: FontWeight.w900,
+                              : TwitchUiColors.textPrimary,
+                          fontSize: TwitchUiFontSize.body,
+                          height: 1.15,
+                          fontWeight: TwitchUiFontWeight.strong,
                         ),
                       ),
                     ),
@@ -427,9 +405,8 @@ class _GameFilterBoxArt extends StatelessWidget {
   Widget build(BuildContext context) {
     final imageUrl = game.boxArt(width: 188, height: 250).trim();
     if (imageUrl.isEmpty) return _fallback();
-
     return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(TwitchUiRadius.md),
       child: Image.network(
         imageUrl,
         fit: BoxFit.cover,
@@ -444,13 +421,13 @@ class _GameFilterBoxArt extends StatelessWidget {
     return Container(
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(14),
+        color: TwitchUiColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(TwitchUiRadius.md),
       ),
       child: const Icon(
         Icons.videogame_asset_rounded,
-        color: Colors.white54,
-        size: 34,
+        color: TwitchUiColors.textFaint,
+        size: 32,
       ),
     );
   }

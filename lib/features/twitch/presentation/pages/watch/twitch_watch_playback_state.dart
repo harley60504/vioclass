@@ -4,6 +4,10 @@ import '../../../services/playback/twitch_media_kit_player_host.dart';
 import '../../watch/twitch_playback_session_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
 import '../twitch_watch_page.dart';
+import 'twitch_live_watch_state.dart';
+
+export 'twitch_live_watch_state.dart';
+export 'twitch_recorded_watch_state.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
@@ -167,12 +171,6 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
         final liveStatus = await watchPorts.player.runtime.refreshProxyLiveStatus(
           notify: false,
         );
-        // Android may temporarily detach the local media client while the app
-        // is backgrounded, making activeClientCount drop to zero even though
-        // the upstream writer is still healthy. Reconnecting that healthy
-        // upstream after resume can feed the decoder from a partial GOP and
-        // produce a visibly corrupted frame. Keep the warm connection whenever
-        // the upstream writer itself is still running.
         final existingConnectionIsHealthy =
             liveStatus != null && liveStatus.running && liveStatus.hasWriter;
         if (existingConnectionIsHealthy) {
@@ -219,6 +217,7 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
   }
 
   TwitchWatchPlaybackKind get currentPlaybackKind {
+    ensureWatchModeRuntime(this);
     if (currentClipQualityClip != null) return TwitchWatchPlaybackKind.clip;
     if (watchPorts.player.runtime.usingLiveTimelineReplay) {
       return TwitchWatchPlaybackKind.liveDvr;
@@ -229,33 +228,5 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
       return TwitchWatchPlaybackKind.vod;
     }
     return TwitchWatchPlaybackKind.live;
-  }
-
-  bool get usesVodQualityControls {
-    return watchPorts.player.runtime.usingLiveDvrBridge ||
-        watchPorts.player.runtime.usingExternalVodPlayback;
-  }
-
-  bool get hasUsableLiveDvrArchive {
-    final video = activeGrowingVodVideo;
-    return video != null &&
-        warmedLiveDvrVideoId == video.id &&
-        watchPorts.player.runtime.hasWarmLiveDvrBridge;
-  }
-
-  bool get shouldShowVodReplayChat {
-    return offlineVodFallbackVideo != null || vodReplayController.active;
-  }
-
-  bool get hasDvrReplayPlayback {
-    return watchPorts.player.runtime.usingLiveTimelineReplay ||
-        watchPorts.player.runtime.usingExternalVodPlayback ||
-        hasUsableLiveDvrArchive ||
-        watchPorts.player.runtime.hasLiveReplayBuffer;
-  }
-
-  bool get showsLiveDvrEdgeLabel {
-    return watchPorts.player.runtime.usingLiveTimelineReplay ||
-        activeGrowingVodVideo != null;
   }
 }

@@ -1,60 +1,62 @@
 import 'dart:async';
 
+import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/material.dart';
 
 import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
+import '../shared/twitch_notice.dart';
+import '../shared/twitch_text_field.dart';
+import 'twitch_chat_composer_button_style.dart';
+import 'twitch_chat_input_emote_state.dart';
 import 'twitch_chat_text_style.dart';
 
 class TwitchChatInputBar extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
   final bool sending;
-  final bool compact;
+  final String? hintText;
+  final Color? hintColor;
+  final Widget? leadingActions;
   final FutureOr<void> Function() onSend;
-  final VoidCallback onOpenEmotes;
 
   const TwitchChatInputBar({
     super.key,
     required this.controller,
     required this.enabled,
     required this.sending,
-    required this.compact,
+    this.hintText,
+    this.hintColor,
+    this.leadingActions,
     required this.onSend,
-    required this.onOpenEmotes,
   });
 
-  static const double _normalInputRowHeight = 38.0;
-  static const double _compactInputRowHeight = 34.0;
-  static const double _normalInputFontSize = 14.0;
-  static const double _compactInputFontSize = 13.0;
+  static const double _inputRowHeight = 48;
+  static const double _inputFontSize = 13;
   static const double _inputLineHeight = 1.20;
-
-  double get _inputRowHeight =>
-      compact ? _compactInputRowHeight : _normalInputRowHeight;
-
-  double get _inputFontSize =>
-      compact ? _compactInputFontSize : _normalInputFontSize;
 
   double get _inputVerticalPadding =>
       (_inputRowHeight - _inputFontSize * _inputLineHeight) / 2;
 
   Future<void> _submitIfPossible(BuildContext context) async {
-    if (!enabled || sending || controller.text.trim().isEmpty) return;
-
+    if (!enabled ||
+        sending ||
+        TwitchChatInputEmoteState.serialize(controller).trim().isEmpty) {
+      return;
+    }
     try {
       await Future<void>.sync(onSend);
     } catch (error, stackTrace) {
       debugPrint('Twitch chat send failed: $error');
       debugPrint('$stackTrace');
-
       if (!context.mounted) return;
-
       final message = _formatSendError(error);
       if (message.isEmpty) return;
-
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(message), duration: const Duration(seconds: 3)),
+      showTwitchNotice(
+        context,
+        message,
+        tone: TwitchNoticeTone.error,
+        duration: const Duration(seconds: 3),
       );
     }
   }
@@ -62,7 +64,6 @@ class TwitchChatInputBar extends StatelessWidget {
   String _formatSendError(Object error) {
     final raw = error.toString().trim();
     if (raw.isEmpty) return '聊天室訊息送出失敗';
-
     return raw
         .replaceFirst(RegExp(r'^Bad state:\s*'), '')
         .replaceFirst(RegExp(r'^StateError:\s*'), '')
@@ -74,36 +75,40 @@ class TwitchChatInputBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final rowHeight = _inputRowHeight;
     final fontSize = _inputFontSize;
-
     return Padding(
-      padding: EdgeInsets.fromLTRB(10, compact ? 6 : 7, 10, compact ? 8 : 9),
-      child: SizedBox(
-        height: rowHeight,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: _SelfDrawnInputField(
-                height: rowHeight,
-                controller: controller,
+      padding: const EdgeInsets.fromLTRB(
+        TwitchUiSpacing.space12,
+        TwitchUiSpacing.space8,
+        TwitchUiSpacing.space12,
+        TwitchUiSpacing.space8,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _SelfDrawnInputField(
+            height: rowHeight,
+            controller: controller,
+            enabled: enabled && !sending,
+            fontSize: fontSize,
+            lineHeight: _inputLineHeight,
+            verticalPadding: _inputVerticalPadding,
+            hintText: hintText,
+            hintColor: hintColor,
+            onSubmit: () => unawaited(_submitIfPossible(context)),
+          ),
+          const SizedBox(height: TwitchUiSpacing.space8),
+          Row(
+            children: [
+              Expanded(child: leadingActions ?? const SizedBox.shrink()),
+              const SizedBox(width: TwitchUiSpacing.space8),
+              _SelfDrawnSendButton(
                 enabled: enabled && !sending,
-                fontSize: fontSize,
-                lineHeight: _inputLineHeight,
-                verticalPadding: _inputVerticalPadding,
-                onSubmit: () => unawaited(_submitIfPossible(context)),
+                sending: sending,
+                onTap: () => unawaited(_submitIfPossible(context)),
               ),
-            ),
-            const SizedBox(width: 10),
-            _SelfDrawnSendButton(
-              height: rowHeight,
-              minWidth: compact ? rowHeight : 98,
-              compact: compact,
-              enabled: enabled && !sending,
-              sending: sending,
-              onTap: () => unawaited(_submitIfPossible(context)),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -116,6 +121,8 @@ class _SelfDrawnInputField extends StatelessWidget {
   final double fontSize;
   final double lineHeight;
   final double verticalPadding;
+  final String? hintText;
+  final Color? hintColor;
   final VoidCallback onSubmit;
 
   const _SelfDrawnInputField({
@@ -125,6 +132,8 @@ class _SelfDrawnInputField extends StatelessWidget {
     required this.fontSize,
     required this.lineHeight,
     required this.verticalPadding,
+    required this.hintText,
+    required this.hintColor,
     required this.onSubmit,
   });
 
@@ -133,82 +142,113 @@ class _SelfDrawnInputField extends StatelessWidget {
     final l10n = context.vio;
     final textStyle = twitchChatTextStyle(
       TextStyle(
-        color: enabled ? Colors.white : Colors.white38,
+        color: enabled
+            ? TwitchUiColors.textPrimary
+            : TwitchUiColors.disabledForeground,
         fontSize: fontSize,
         height: lineHeight,
-        fontWeight: FontWeight.w700,
+        fontWeight: TwitchUiFontWeight.regular,
+      ),
+    );
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(TwitchUiRadius.md),
+      borderSide: BorderSide(
+        color: enabled ? TwitchUiColors.border : TwitchUiColors.borderSubtle,
       ),
     );
 
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTap: enabled ? () => FocusScope.of(context).requestFocus() : null,
-      child: Container(
-        height: height,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.060),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: enabled
-                ? TwitchUiColors.primarySoft.withValues(alpha: 0.22)
-                : Colors.white.withValues(alpha: 0.065),
-          ),
-          boxShadow: enabled
-              ? <BoxShadow>[
-                  BoxShadow(
-                    color: TwitchUiColors.primary.withValues(alpha: 0.10),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : const <BoxShadow>[],
+    return TwitchTextField(
+      height: height,
+      controller: controller,
+      enabled: enabled,
+      maxLines: 1,
+      textInputAction: TextInputAction.send,
+      onSubmitted: (_) => onSubmit(),
+      style: textStyle,
+      strutStyle: StrutStyle(
+        fontSize: fontSize,
+        height: lineHeight,
+        forceStrutHeight: true,
+      ),
+      specialTextSpanBuilder: _ChatInputSpanBuilder(
+        controller: controller,
+        emoteSize: fontSize * 1.45,
+      ),
+      selectionControls: materialTextSelectionControls,
+      decoration: InputDecoration(
+        constraints: BoxConstraints.tightFor(height: height),
+        hintText: hintText?.trim().isNotEmpty == true
+            ? hintText
+            : l10n.t('輸入聊天室訊息...'),
+        hintStyle: textStyle.copyWith(
+          color: hintColor ?? TwitchUiColors.textMuted,
         ),
-        child: TextField(
-          controller: controller,
-          enabled: enabled,
-          maxLines: 1,
-          textInputAction: TextInputAction.send,
-          onSubmitted: (_) => onSubmit(),
-          textAlignVertical: TextAlignVertical.center,
-          style: textStyle,
-          strutStyle: StrutStyle(
-            fontSize: fontSize,
-            height: lineHeight,
-            forceStrutHeight: true,
-          ),
-          cursorColor: TwitchUiColors.primarySoft,
-          decoration: InputDecoration(
-            isCollapsed: true,
-            hintText: l10n.t('輸入聊天室訊息...'),
-            hintStyle: textStyle.copyWith(color: Colors.white38),
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 13,
-              vertical: verticalPadding,
-            ),
-          ),
+        filled: true,
+        fillColor: TwitchUiColors.surfaceInteractive,
+        border: border,
+        enabledBorder: border,
+        focusedBorder: border.copyWith(
+          borderSide: const BorderSide(color: TwitchUiColors.primarySoft),
+        ),
+        disabledBorder: border.copyWith(
+          borderSide: const BorderSide(color: TwitchUiColors.borderSubtle),
+        ),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: TwitchUiSpacing.space12,
+          vertical: verticalPadding,
         ),
       ),
     );
   }
 }
 
+class _ChatInputSpanBuilder extends SpecialTextSpanBuilder {
+  final TextEditingController controller;
+  final double emoteSize;
+
+  _ChatInputSpanBuilder({required this.controller, required this.emoteSize});
+
+  @override
+  TextSpan build(
+    String data, {
+    TextStyle? textStyle,
+    SpecialTextGestureTapCallback? onTap,
+  }) {
+    final value = controller.value;
+    var sourceStart = 0;
+    if (data != value.text && value.composing.isValid) {
+      final before = value.composing.textBefore(value.text);
+      final after = value.composing.textAfter(value.text);
+      if (data == after && data != before) {
+        sourceStart = value.composing.end;
+      }
+    }
+    return TwitchChatInputEmoteState.buildTextSpanForSource(
+      controller,
+      data,
+      textStyle ?? const TextStyle(),
+      sourceStart: sourceStart,
+      emoteSize: emoteSize,
+    );
+  }
+
+  @override
+  SpecialText? createSpecialText(
+    String flag, {
+    TextStyle? textStyle,
+    SpecialTextGestureTapCallback? onTap,
+    required int index,
+  }) {
+    return null;
+  }
+}
+
 class _SelfDrawnSendButton extends StatelessWidget {
-  final double height;
-  final double minWidth;
-  final bool compact;
   final bool enabled;
   final bool sending;
   final VoidCallback onTap;
 
   const _SelfDrawnSendButton({
-    required this.height,
-    required this.minWidth,
-    required this.compact,
     required this.enabled,
     required this.sending,
     required this.onTap,
@@ -216,75 +256,23 @@ class _SelfDrawnSendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.vio;
-    final foreground = enabled ? Colors.white : Colors.white38;
-    final background = enabled
-        ? TwitchUiColors.primary.withValues(alpha: 0.38)
-        : Colors.white.withValues(alpha: 0.070);
-    final borderColor = enabled
-        ? TwitchUiColors.primarySoft.withValues(alpha: 0.46)
-        : Colors.white.withValues(alpha: 0.085);
-
-    return Material(
-      color: background,
-      borderRadius: BorderRadius.circular(999),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: enabled ? onTap : null,
-        child: Container(
-          height: height,
-          constraints: BoxConstraints(minWidth: minWidth),
-          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: borderColor),
-            boxShadow: enabled
-                ? <BoxShadow>[
-                    BoxShadow(
-                      color: TwitchUiColors.primary.withValues(alpha: 0.22),
-                      blurRadius: 16,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : const <BoxShadow>[],
-          ),
+    return TextButton(
+      onPressed: enabled ? onTap : null,
+      style: twitchChatComposerButtonStyle(enabled: enabled, emphasized: true),
+      child: SizedBox.square(
+        dimension: 16,
+        child: Center(
           child: sending
-              ? SizedBox(
-                  width: compact ? 13 : 14,
-                  height: compact ? 13 : 14,
+              ? SizedBox.square(
+                  dimension: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: foreground,
+                    color: enabled
+                        ? TwitchUiColors.textOnAccent
+                        : TwitchUiColors.disabledForeground,
                   ),
                 )
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.send_rounded,
-                      size: compact ? 16 : 18,
-                      color: foreground,
-                    ),
-                    if (!compact) ...[
-                      const SizedBox(width: 7),
-                      Text(
-                        l10n.t('送出'),
-                        textAlign: TextAlign.center,
-                        style: twitchChatTextStyle(
-                          TextStyle(
-                            color: foreground,
-                            fontSize: 14,
-                            height: 1.0,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+              : const Icon(Icons.send_rounded, size: 16),
         ),
       ),
     );

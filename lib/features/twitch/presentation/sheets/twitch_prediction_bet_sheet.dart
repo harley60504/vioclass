@@ -7,6 +7,7 @@ import '../../models/engagement/twitch_prediction.dart';
 import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../localization/vioclass_localizations.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import '../widgets/shared/twitch_text_field.dart';
 import 'prediction_bet/twitch_prediction_bet_helpers.dart';
 import 'prediction_bet/twitch_prediction_bet_sheet_widgets.dart';
 
@@ -230,7 +231,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                 refreshingGqlFallback: _showRefreshingGqlFallbackChip,
               ),
               const SizedBox(height: 10),
-              TextField(
+              TwitchTextField(
                 controller: _pointsController,
                 enabled: !_submitting && isActive,
                 keyboardType: TextInputType.number,

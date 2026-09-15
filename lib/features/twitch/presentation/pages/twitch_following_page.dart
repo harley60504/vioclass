@@ -17,6 +17,7 @@ import '../widgets/discovery/twitch_discovery_stream_template.dart';
 import '../widgets/discovery/twitch_offline_channel_card.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_login_required_view.dart';
+import '../widgets/shared/twitch_text_field.dart';
 import 'twitch_stream_refresh_reconciler.dart';
 
 class TwitchFollowingPage extends StatefulWidget {
@@ -594,7 +595,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
               children: <Widget>[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-                  child: TextField(
+                  child: TwitchTextField(
                     controller: searchController,
                     decoration: InputDecoration(
                       hintText: l10n.t('搜尋語言或代碼，例如 zh / en / ja'),

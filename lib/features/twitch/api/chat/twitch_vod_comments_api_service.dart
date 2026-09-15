@@ -77,12 +77,13 @@ class TwitchVodCommentsApiService {
           final offset = _readDouble(node['contentOffsetSeconds']);
           final rawLine = _buildIrcLine(node, cleanChannel);
           final message = _parser.parseLine(rawLine);
+          final runtimeMessage = normalizer.normalize(
+            message,
+            receivedAt: normalizer.readMessageTimeOrNow(message),
+          );
           return TwitchVodComment(
             contentOffsetSeconds: offset,
-            message: normalizer.normalize(
-              message,
-              receivedAt: normalizer.readMessageTimeOrNow(message),
-            ),
+            message: runtimeMessage,
           );
         })
         .toList(growable: false);

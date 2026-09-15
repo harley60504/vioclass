@@ -30,7 +30,9 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   static const Duration _playbackTickInterval = Duration(milliseconds: 250);
   static const Duration _mediaRestartTolerance = Duration(milliseconds: 500);
   static const Duration _initialSeekJumpThreshold = Duration(seconds: 3);
-  static const Duration _dvrInitialSeekJumpThreshold = Duration(milliseconds: 80);
+  static const Duration _dvrInitialSeekJumpThreshold = Duration(
+    milliseconds: 80,
+  );
   static const Duration _initialSeekReanchorWindow = Duration(seconds: 2);
   static const Duration _canonicalAnchorTolerance = Duration(seconds: 1);
   static const Duration _liveEdgeTolerance = Duration(milliseconds: 750);
@@ -41,19 +43,20 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   Duration? _position;
   Duration? _duration;
   Duration? _explicitSeekAnchorPosition;
-  DateTime? _lastPlaybackTickAt;
   bool _dragging = false;
   bool _timelineEnabled = true;
   bool _advancing = false;
   bool _foregroundReanchorPending = false;
+  bool _initialSeekReanchorConsumed = false;
 
-  // Live/DVR uses the player's media clock as the authoritative moving clock.
-  // The canonical position supplied by the playback runtime is only an anchor.
-  // This avoids drifting when Flutter timers are throttled in the background,
-  // while still keeping all UI positions in the canonical Twitch timeline.
+  // Twitch defines the canonical position and duration anchors. Once a DVR or
+  // local replay anchor is established, both displayed clocks grow from the
+  // same fixed elapsed-time anchor until a real playback event rebases them.
+  // Ordinary Twitch timing refreshes must not hard-pull the visible timeline.
   String? _mediaAnchorUri;
   Duration? _mediaAnchorPosition;
   Duration? _canonicalAnchorPosition;
+  Duration? _canonicalAnchorDuration;
   Duration? _lastObservedMediaPosition;
   DateTime? _mediaAnchorObservedAt;
 
@@ -98,6 +101,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }) {
     final previousMode = _mode;
     final modeChanged = previousMode != mode;
+    final wasAdvancing = _advancing;
 
     _mode = mode;
     _timelineEnabled = timelineEnabled;
@@ -105,6 +109,22 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
 
     if (mode == TwitchPlaybackTimelineMode.liveDvr) {
       _duration = duration ?? _duration;
+
+      // Rebase only on a real playback-state transition. This intentionally
+      // ignores ordinary canonical-duration refreshes while playback advances.
+      if (!modeChanged && !wasAdvancing && advancing && !_dragging) {
+        final mediaPosition =
+            TwitchMediaKitPlayerHost.playerOrNull?.state.position;
+        if (mediaPosition != null && _position != null && _duration != null) {
+          _mediaAnchorUri = TwitchMediaKitPlayerHost.currentMediaUri;
+          _mediaAnchorPosition = mediaPosition;
+          _canonicalAnchorPosition = _position;
+          _canonicalAnchorDuration = _duration;
+          _lastObservedMediaPosition = mediaPosition;
+          _mediaAnchorObservedAt = DateTime.now();
+        }
+      }
+
       _syncLiveDvrPosition(
         modeChanged: modeChanged,
         canonicalPosition: position,
@@ -174,7 +194,8 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     final behindLive =
         effectiveCanonicalPosition != null &&
         duration != null &&
-        effectiveCanonicalPosition + const Duration(milliseconds: 500) < duration;
+        effectiveCanonicalPosition + const Duration(milliseconds: 500) <
+            duration;
     if (localReplayStart != null &&
         localReplayIntra != null &&
         looksLikeLocalReplaySource &&
@@ -199,6 +220,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         _mediaAnchorUri = mediaUri;
         _mediaAnchorPosition = mediaPosition;
         _canonicalAnchorPosition = pendingCanonicalTarget;
+        _canonicalAnchorDuration = duration;
         _mediaAnchorObservedAt = now;
         _localReplayAnchorRevision = localReplayRevision;
         _position = _clampPosition(pendingCanonicalTarget, duration);
@@ -230,10 +252,12 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
           localSourceChanged ||
           localMediaRestarted;
 
-      if (shouldReanchor && effectiveCanonicalPosition != null) {
+      if (shouldReanchor) {
         final explicitAnchor = _explicitSeekAnchorPosition;
         final canonicalAnchor =
-            explicitAnchor ?? resolvedLocalCanonicalTarget ?? effectiveCanonicalPosition;
+            explicitAnchor ??
+            resolvedLocalCanonicalTarget ??
+            effectiveCanonicalPosition;
         final mediaTarget = localReplayIntra;
         final requiresIntraSegmentSeek =
             mediaTarget > _localMediaSeekTolerance &&
@@ -268,6 +292,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
         _mediaAnchorUri = mediaUri;
         _mediaAnchorPosition = mediaPosition;
         _canonicalAnchorPosition = canonicalAnchor;
+        _canonicalAnchorDuration = duration;
         _mediaAnchorObservedAt = now;
         if (kDebugMode && _verboseTimelineDebug) {
           final runtimeCanonicalLabel = canonicalPosition == null
@@ -291,7 +316,11 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       final mediaAnchor = _mediaAnchorPosition;
       final canonicalAnchor = _canonicalAnchorPosition;
       if (mediaAnchor != null && canonicalAnchor != null) {
-        final mapped = canonicalAnchor + (mediaPosition - mediaAnchor);
+        final mapped = _mappedCanonicalPosition(
+          canonicalAnchor: canonicalAnchor,
+          mediaAnchor: mediaAnchor,
+          mediaPosition: mediaPosition,
+        );
         _position = _clampPosition(mapped, duration);
         if (kDebugMode &&
             _verboseTimelineDebug &&
@@ -342,8 +371,12 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
       _mediaAnchorUri = mediaUri;
       _mediaAnchorPosition = mediaPosition;
       _canonicalAnchorPosition = explicitAnchor ?? canonicalPosition;
+      _canonicalAnchorDuration = duration;
       _mediaAnchorObservedAt = now;
       _explicitSeekAnchorPosition = null;
+      if (initialSeekJumped) {
+        _initialSeekReanchorConsumed = true;
+      }
     }
 
     _lastObservedMediaPosition = mediaPosition;
@@ -355,7 +388,11 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     if (mediaPosition != null &&
         mediaAnchor != null &&
         canonicalAnchor != null) {
-      final mapped = canonicalAnchor + (mediaPosition - mediaAnchor);
+      final mapped = _mappedCanonicalPosition(
+        canonicalAnchor: canonicalAnchor,
+        mediaAnchor: mediaAnchor,
+        mediaPosition: mediaPosition,
+      );
       _position = _clampPosition(mapped, _duration);
       return;
     }
@@ -367,11 +404,40 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     }
   }
 
+  Duration _mappedCanonicalPosition({
+    required Duration canonicalAnchor,
+    required Duration mediaAnchor,
+    required Duration mediaPosition,
+  }) {
+    final anchoredAt = _mediaAnchorObservedAt;
+    if (_advancing && anchoredAt != null) {
+      final elapsed = DateTime.now().difference(anchoredAt);
+      if (!elapsed.isNegative) {
+        return canonicalAnchor + elapsed;
+      }
+    }
+    return canonicalAnchor + (mediaPosition - mediaAnchor);
+  }
+
+  Duration displayDurationFor(Duration sourceDuration) {
+    if (_mode != TwitchPlaybackTimelineMode.liveDvr || !_advancing) {
+      return sourceDuration;
+    }
+    final durationAnchor = _canonicalAnchorDuration;
+    final anchoredAt = _mediaAnchorObservedAt;
+    if (durationAnchor == null || anchoredAt == null) return sourceDuration;
+    final elapsed = DateTime.now().difference(anchoredAt);
+    if (elapsed.isNegative) return sourceDuration;
+    return durationAnchor + elapsed;
+  }
+
   bool _shouldReanchorInitialSeek({
     required DateTime now,
     required Duration? mediaPosition,
     required Duration? canonicalPosition,
   }) {
+    if (_initialSeekReanchorConsumed) return false;
+
     final mediaAnchor = _mediaAnchorPosition;
     final canonicalAnchor = _canonicalAnchorPosition;
     final anchoredAt = _mediaAnchorObservedAt;
@@ -389,8 +455,7 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     }
 
     final mediaAdvance = mediaPosition - mediaAnchor;
-    final isSequentialDvr =
-        _mediaAnchorUri?.contains('/stream.ts?v=') ?? false;
+    final isSequentialDvr = _mediaAnchorUri?.contains('/stream.ts?v=') ?? false;
     final jumpThreshold = isSequentialDvr
         ? _dvrInitialSeekJumpThreshold
         : _initialSeekJumpThreshold;
@@ -409,9 +474,29 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
   }
 
   String _seconds(Duration value) =>
-      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(
+        3,
+      );
 
   Duration positionFor(Duration displayDuration) {
+    if (_mode == TwitchPlaybackTimelineMode.liveDvr && !_dragging) {
+      final mediaPosition =
+          TwitchMediaKitPlayerHost.playerOrNull?.state.position;
+      final mediaAnchor = _mediaAnchorPosition;
+      final canonicalAnchor = _canonicalAnchorPosition;
+      if (mediaPosition != null &&
+          mediaAnchor != null &&
+          canonicalAnchor != null) {
+        return _clampPosition(
+          _mappedCanonicalPosition(
+            canonicalAnchor: canonicalAnchor,
+            mediaAnchor: mediaAnchor,
+            mediaPosition: mediaPosition,
+          ),
+          displayDuration,
+        );
+      }
+    }
     return _clampPosition(_position ?? Duration.zero, displayDuration);
   }
 
@@ -477,15 +562,10 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void suspendClock() {
-    _lastPlaybackTickAt = null;
-  }
+  void suspendClock() {}
 
   void resumeClock() {
     _foregroundReanchorPending = true;
-    if (_playbackTimer != null) {
-      _lastPlaybackTickAt = DateTime.now();
-    }
   }
 
   void reset() {
@@ -495,7 +575,6 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _position = null;
     _duration = null;
     _explicitSeekAnchorPosition = null;
-    _lastPlaybackTickAt = null;
     _dragging = false;
     _advancing = false;
     _foregroundReanchorPending = false;
@@ -514,8 +593,10 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     _mediaAnchorUri = null;
     _mediaAnchorPosition = null;
     _canonicalAnchorPosition = null;
+    _canonicalAnchorDuration = null;
     _lastObservedMediaPosition = null;
     _mediaAnchorObservedAt = null;
+    _initialSeekReanchorConsumed = false;
     _clearPendingLocalMediaSeek();
   }
 
@@ -525,19 +606,15 @@ class TwitchPlaybackTimelineController extends ChangeNotifier {
     if (!shouldTick) {
       _playbackTimer?.cancel();
       _playbackTimer = null;
-      _lastPlaybackTickAt = null;
       return;
     }
     if (_playbackTimer != null) return;
 
-    _lastPlaybackTickAt = DateTime.now();
     _playbackTimer = Timer.periodic(_playbackTickInterval, (_) {
-      _lastPlaybackTickAt = DateTime.now();
-      if (_advancing) {
-        _syncLiveDvrPosition(
-          modeChanged: false,
-          canonicalPosition: null,
-        );
+      final mediaPlaying =
+          TwitchMediaKitPlayerHost.playerOrNull?.state.playing == true;
+      if (_advancing || mediaPlaying) {
+        _syncLiveDvrPosition(modeChanged: false, canonicalPosition: null);
       }
       notifyListeners();
     });

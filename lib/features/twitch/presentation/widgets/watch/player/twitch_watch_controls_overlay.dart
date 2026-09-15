@@ -99,7 +99,7 @@ class WatchControlsOverlay extends StatefulWidget {
 
 class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   static const Duration _fadeDuration = Duration(milliseconds: 180);
-  static const Duration _autoHideDelay = Duration(seconds: 3);
+  static const Duration _autoHideDelay = Duration(seconds: 5);
 
   bool _visible = true;
   Timer? _hideTimer;
@@ -107,6 +107,14 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   bool get _hasError =>
       (widget.error != null && widget.error!.trim().isNotEmpty) ||
       widget.runtimeError != null;
+
+  bool get _hasEditableTextFocus {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext == null) return false;
+    return focusContext.widget is EditableText ||
+        focusContext.findAncestorWidgetOfExactType<EditableText>() != null ||
+        focusContext.findAncestorStateOfType<EditableTextState>() != null;
+  }
 
   @override
   void initState() {
@@ -134,6 +142,10 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
 
     _hideTimer = Timer(_autoHideDelay, () {
       if (!mounted) return;
+      if (_hasEditableTextFocus) {
+        _scheduleAutoHide();
+        return;
+      }
       setState(() => _visible = false);
     });
   }

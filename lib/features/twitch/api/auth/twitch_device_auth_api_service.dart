@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../models/auth/twitch_auth_token.dart';
 import '../core/twitch_api_client.dart';
@@ -119,6 +120,10 @@ class TwitchDeviceAuthApiService {
       );
     }
 
+    debugPrint(
+      '[TwitchDeviceAuth][start] status=$statusCode '
+      'clientId=${clientId.trim()} interval=${authorization.interval}s',
+    );
     return authorization;
   }
 
@@ -128,13 +133,17 @@ class TwitchDeviceAuthApiService {
     required List<String> scopes,
     int currentIntervalSeconds = 5,
   }) async {
+    // RFC 8628 token polling only needs client_id, device_code and grant_type.
+    // The requested scopes belong to the device-authorization request, not the
+    // token exchange. In particular, Twitch's Android/Drops public client uses
+    // an empty scope set; sending an extra `scopes=` field here is unnecessary
+    // and can make this proprietary device grant behave differently.
     final response = await client.dio.post<dynamic>(
       'https://id.twitch.tv/oauth2/token',
       data: <String, dynamic>{
         'client_id': clientId.trim(),
         'device_code': deviceCode.trim(),
         'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
-        'scopes': scopes.join(' '),
       },
       options: Options(
         contentType: Headers.formUrlEncodedContentType,
@@ -148,6 +157,9 @@ class TwitchDeviceAuthApiService {
 
     if (statusCode >= 200 && statusCode < 300) {
       if (data is! Map<String, dynamic>) {
+        debugPrint(
+          '[TwitchDeviceAuth][poll] status=$statusCode result=invalid_response',
+        );
         return TwitchDeviceTokenPollResult(
           status: TwitchDeviceTokenPollStatus.error,
           message: 'Unexpected token response type: ${data.runtimeType}.',
@@ -156,12 +168,19 @@ class TwitchDeviceAuthApiService {
 
       final token = TwitchAuthToken.fromOAuthJson(data);
       if (token.accessToken.isEmpty) {
+        debugPrint(
+          '[TwitchDeviceAuth][poll] status=$statusCode result=missing_token',
+        );
         return const TwitchDeviceTokenPollResult(
           status: TwitchDeviceTokenPollStatus.error,
           message: 'Token response did not contain access_token.',
         );
       }
 
+      debugPrint(
+        '[TwitchDeviceAuth][poll] status=$statusCode result=success '
+        'clientId=${clientId.trim()}',
+      );
       return TwitchDeviceTokenPollResult(
         status: TwitchDeviceTokenPollStatus.success,
         token: token,
@@ -169,6 +188,10 @@ class TwitchDeviceAuthApiService {
     }
 
     final error = _readOAuthError(data) ?? 'unknown_error';
+    debugPrint(
+      '[TwitchDeviceAuth][poll] status=$statusCode result=$error '
+      'clientId=${clientId.trim()}',
+    );
 
     if (error.contains('authorization_pending')) {
       return const TwitchDeviceTokenPollResult(

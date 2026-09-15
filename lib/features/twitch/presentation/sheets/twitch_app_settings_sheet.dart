@@ -12,6 +12,7 @@ import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/settings/twitch_video_enhancement_settings_card.dart';
+import '../widgets/shared/twitch_text_field.dart';
 
 enum _TwitchSettingsTab { account, chat, player, appearance, updates }
 
@@ -596,7 +597,7 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
         Row(
           children: [
             Expanded(
-              child: TextField(
+              child: TwitchTextField(
                 controller: _textController,
                 minLines: 1,
                 maxLines: 1,

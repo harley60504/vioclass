@@ -12,6 +12,7 @@ import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../widgets/chat/twitch_chat_text_style.dart';
 import '../../widgets/chat/twitch_runtime_message_tile.dart';
+import '../../widgets/shared/twitch_notice.dart';
 import 'twitch_reply_thread_builder.dart';
 
 class TwitchReplyThreadMessageCard extends StatelessWidget {
@@ -102,9 +103,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
   ) async {
     await Clipboard.setData(ClipboardData(text: _copyText(message)));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.vio.t('已複製這則聊天室訊息'))));
+    showTwitchNotice(context, '已複製這則聊天室訊息', tone: TwitchNoticeTone.success);
   }
 
   String _copyText(TwitchChatRuntimeMessage message) {

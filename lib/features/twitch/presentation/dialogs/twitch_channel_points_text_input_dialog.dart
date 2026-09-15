@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
+import '../widgets/shared/twitch_text_field.dart';
 
 class _TextInputDialog extends StatefulWidget {
   final String title;
@@ -50,7 +51,7 @@ class _TextInputDialogState extends State<_TextInputDialog> {
             ),
           ),
           const SizedBox(height: 14),
-          TextField(
+          TwitchTextField(
             controller: _controller,
             autofocus: true,
             minLines: widget.minLines,

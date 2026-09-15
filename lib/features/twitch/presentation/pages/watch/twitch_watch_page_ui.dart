@@ -1,7 +1,5 @@
-import 'package:flutter/material.dart';
-
 import '../../../services/window/twitch_fullscreen_controller.dart';
-import '../../localization/vioclass_localizations.dart';
+import '../../widgets/shared/twitch_notice.dart';
 import '../twitch_watch_page.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
@@ -28,8 +26,6 @@ extension TwitchWatchPageUiMethods on TwitchWatchPageState {
 
   void showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(context.vio.t(message))));
+    showTwitchNotice(context, message);
   }
 }
