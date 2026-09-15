@@ -6,7 +6,6 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../theme/twitch_ui_tokens.dart';
-import '../../../watch/controllers/twitch_dvr_transition_mask_controller.dart';
 
 const double twitchWatchVideoAspectRatio = 16 / 9;
 
@@ -86,37 +85,15 @@ class _TwitchMediaKitVideoSurfaceState
             (_) => _reportSourceRectHint(),
           );
 
-          final transitionMask = TwitchDvrTransitionMaskController.instance;
           return Center(
             child: SizedBox(
               key: _videoSurfaceKey,
               width: width,
               height: height,
-              child: AnimatedBuilder(
-                animation: transitionMask,
-                child: Video(
-                  controller: widget.controller,
-                  fit: widget.fit,
-                  controls: widget.controls,
-                ),
-                builder: (context, video) {
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      video ?? const SizedBox.shrink(),
-                      if (transitionMask.visible)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: _PlaybackTransitionOverlay(
-                              previewImageUrl:
-                                  transitionMask.previewImageUrl,
-                              showLoading: transitionMask.showLoading,
-                            ),
-                          ),
-                        ),
-                    ],
-                  );
-                },
+              child: Video(
+                controller: widget.controller,
+                fit: widget.fit,
+                controls: widget.controls,
               ),
             ),
           );
@@ -126,85 +103,23 @@ class _TwitchMediaKitVideoSurfaceState
   }
 }
 
-class _PlaybackTransitionOverlay extends StatelessWidget {
-  final String previewImageUrl;
-  final bool showLoading;
-
-  const _PlaybackTransitionOverlay({
-    required this.previewImageUrl,
-    required this.showLoading,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final imageUrl = previewImageUrl.trim();
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        const ColoredBox(color: Colors.black),
-        if (imageUrl.isNotEmpty)
-          Image.network(
-            imageUrl,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          ),
-        if (imageUrl.isNotEmpty)
-          ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
-        if (showLoading)
-          Center(
-            child: Container(
-              width: 46,
-              height: 46,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.48),
-                shape: BoxShape.circle,
-              ),
-              child: const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: TwitchUiColors.primarySoft,
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
 class TwitchMediaKitVideoWaitingSurface extends StatelessWidget {
   const TwitchMediaKitVideoWaitingSurface({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final transitionMask = TwitchDvrTransitionMaskController.instance;
-    return AnimatedBuilder(
-      animation: transitionMask,
-      builder: (context, _) {
-        if (transitionMask.visible) {
-          return _PlaybackTransitionOverlay(
-            previewImageUrl: transitionMask.previewImageUrl,
-            showLoading: transitionMask.showLoading,
-          );
-        }
-        return const ColoredBox(
-          color: Colors.black,
-          child: Center(
-            child: SizedBox(
-              width: 26,
-              height: 26,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.4,
-                color: TwitchUiColors.primarySoft,
-              ),
-            ),
+    return const ColoredBox(
+      color: Colors.black,
+      child: Center(
+        child: SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: TwitchUiColors.primarySoft,
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
