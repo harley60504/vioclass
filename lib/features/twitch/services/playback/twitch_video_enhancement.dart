@@ -199,6 +199,19 @@ class TwitchVideoEnhancementRuntime {
     Player player, {
     required TwitchVideoEnhancementConfig config,
   }) async {
+    // A/B testing isolated the Android resize black-frame regression to this
+    // mpv renderer-property mutation group. Even the disabled enhancement path
+    // writes glsl-shaders/deband/scale, and that was sufficient to make the
+    // external video texture flash black while its Flutter bounds changed.
+    // Keep Android on mpv's native/default renderer properties; desktop keeps
+    // the enhancement pipeline unchanged.
+    if (Platform.isAndroid) {
+      debugPrint(
+        '[VideoEnhancement] skipped on Android to keep video texture stable',
+      );
+      return;
+    }
+
     // glsl-shaders is a path-list option. Clear the whole chain first so stale
     // shaders from a previous mode cannot survive a live settings change.
     player.setProperty('glsl-shaders', '');
