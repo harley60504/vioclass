@@ -92,6 +92,10 @@ class _TwitchMediaKitVideoSurfaceState
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
 
+          // Keep the native Video widget mounted even when an interactive
+          // layout resize briefly produces a zero-sized constraint. Removing
+          // it from the tree detaches/re-attaches the texture and can expose a
+          // black frame while dragging the chat/player divider.
           var width = 0.0;
           var height = 0.0;
           if (maxWidth > 0 && maxHeight > 0) {
