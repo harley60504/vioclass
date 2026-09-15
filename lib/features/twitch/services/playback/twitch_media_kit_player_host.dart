@@ -16,17 +16,48 @@ const bool _debugMinimalLiveWatch = bool.fromEnvironment(
   defaultValue: kDebugMode,
 );
 
-/// Lets us test the exact v1.1.4 mpv/player behavior inside the *normal* Watch
-/// UI. Previously this behavior was coupled to the minimal-Watch switch, which
-/// made the minimal-vs-normal A/B invalid because it changed both UI and player
-/// configuration at the same time.
+/// Combined control used to confirm that the resize regression is inside the
+/// post-v1.1.4 mpv/player configuration rather than the Watch widget tree.
 const bool _debugV114PlayerConfig = bool.fromEnvironment(
   'TWITCH_WATCH_DEBUG_V114_PLAYER_CONFIG',
   defaultValue: false,
 );
 
-const bool _useV114PlayerConfig =
-    _debugMinimalLiveWatch || _debugV114PlayerConfig;
+/// Group A: only restore the v1.1.4 low-latency startup options. Runtime HLS
+/// profile switching and video enhancement stay enabled.
+const bool _debugV114LowLatencyOptions = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_V114_LOW_LATENCY_OPTIONS',
+  defaultValue: false,
+);
+
+/// Group B: only disable runtime HLS cache/profile mutation. Startup options
+/// and video enhancement stay on the current implementation.
+const bool _debugDisableHlsProfileSwitch = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_DISABLE_HLS_PROFILE_SWITCH',
+  defaultValue: false,
+);
+
+/// Group C: only disable scale/deband/GLSL mutation after Player creation.
+/// Startup options and runtime HLS profile switching stay enabled.
+const bool _debugDisableVideoEnhancement = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_DISABLE_VIDEO_ENHANCEMENT',
+  defaultValue: false,
+);
+
+const bool _useV114StartupOptions =
+    _debugMinimalLiveWatch ||
+    _debugV114PlayerConfig ||
+    _debugV114LowLatencyOptions;
+
+const bool _skipHlsProfileSwitch =
+    _debugMinimalLiveWatch ||
+    _debugV114PlayerConfig ||
+    _debugDisableHlsProfileSwitch;
+
+const bool _skipVideoEnhancement =
+    _debugMinimalLiveWatch ||
+    _debugV114PlayerConfig ||
+    _debugDisableVideoEnhancement;
 
 enum _TwitchHlsCacheProfile { lowLatency, liveDvr }
 
@@ -139,7 +170,7 @@ class TwitchMediaKitPlayerHost {
           title: title,
           bufferSize: 8 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
-          options: _useV114PlayerConfig
+          options: _useV114StartupOptions
               ? _v114LowLatencyOptions
               : const <String, String>{
                   'volume': '100',
@@ -153,13 +184,17 @@ class TwitchMediaKitPlayerHost {
       );
       _player = player;
 
-      // v1.1.4 did not mutate mpv scale/deband/GLSL properties after Player
-      // creation. Keep that exact behavior whenever the dedicated A/B flag is
-      // active, even though the normal Watch UI remains enabled.
-      if (!_useV114PlayerConfig) {
+      debugPrint(
+        '[ResizeDebug] groups '
+        'startupV114=$_useV114StartupOptions '
+        'skipProfileSwitch=$_skipHlsProfileSwitch '
+        'skipEnhancement=$_skipVideoEnhancement',
+      );
+
+      if (!_skipVideoEnhancement) {
         await TwitchVideoEnhancementRuntime.applyStoredToPlayer(player);
       } else {
-        debugPrint('[ResizeDebug] using exact v1.1.4 Player options');
+        debugPrint('[ResizeDebug] video enhancement mutation disabled');
       }
     }();
 
@@ -263,9 +298,12 @@ class TwitchMediaKitPlayerHost {
     TwitchMediaKitPlayerSession session,
     _TwitchHlsCacheProfile profile,
   ) async {
-    // v1.1.4 had no runtime HLS profile mutation. Keep that exact behavior for
-    // either the minimal UI test or the dedicated normal-Watch A/B flag.
-    if (_useV114PlayerConfig) return;
+    if (_skipHlsProfileSwitch) {
+      debugPrint(
+        '[ResizeDebug] skip HLS profile mutation target=${profile.name}',
+      );
+      return;
+    }
 
     await session.ensureReady();
     if (session._released || session.generation != _generation) return;
