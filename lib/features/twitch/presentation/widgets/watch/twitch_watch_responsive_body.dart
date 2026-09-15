@@ -115,10 +115,16 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
                 );
               }
 
+              final bounds = _chatPanelWidthBoundsForViewport(layout);
               return _SideChatLayout(
                 layout: layout,
                 chatVisible: chatVisible,
-                chatPanelWidth: _effectiveChatPanelWidthForViewport(layout),
+                chatPanelWidth: _effectiveChatPanelWidthForViewport(
+                  layout,
+                  bounds: bounds,
+                ),
+                minChatPanelWidth: bounds.min,
+                maxChatPanelWidth: bounds.max,
                 player: player,
                 chat: chat,
                 belowPlayer: belowPlayer,
@@ -145,13 +151,13 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     return 12;
   }
 
-  double _effectiveChatPanelWidthForViewport(TwitchResponsiveLayout layout) {
+  ({double min, double max, double usableWidth})
+  _chatPanelWidthBoundsForViewport(TwitchResponsiveLayout layout) {
     final horizontalPadding = shellPaddingFor(layout).horizontal;
     final gapWidth = chatVisible ? shellGapFor(layout) : 0.0;
     final usableWidth = (layout.width - horizontalPadding - gapWidth)
         .clamp(1.0, layout.width)
         .toDouble();
-    final ratioWidth = usableWidth * chatPanelRatio;
     final minByViewport = usableWidth * minChatPanelRatio;
     final boostedMinChatPanelWidth =
         minChatPanelWidth + _chatMinWidthVisualBoost;
@@ -163,7 +169,18 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     final maxWidth = maxChatPanelWidth
         .clamp(minWidth, usableWidth - 120.0)
         .toDouble();
-    return ratioWidth.clamp(minWidth, maxWidth).toDouble();
+    return (min: minWidth, max: maxWidth, usableWidth: usableWidth);
+  }
+
+  double _effectiveChatPanelWidthForViewport(
+    TwitchResponsiveLayout layout, {
+    ({double min, double max, double usableWidth})? bounds,
+  }) {
+    final resolvedBounds = bounds ?? _chatPanelWidthBoundsForViewport(layout);
+    final ratioWidth = resolvedBounds.usableWidth * chatPanelRatio;
+    return ratioWidth
+        .clamp(resolvedBounds.min, resolvedBounds.max)
+        .toDouble();
   }
 }
 
@@ -304,10 +321,12 @@ class _BottomChatLayout extends StatelessWidget {
   }
 }
 
-class _SideChatLayout extends StatelessWidget {
+class _SideChatLayout extends StatefulWidget {
   final TwitchResponsiveLayout layout;
   final bool chatVisible;
   final double chatPanelWidth;
+  final double minChatPanelWidth;
+  final double maxChatPanelWidth;
   final Widget player;
   final Widget chat;
   final Widget? belowPlayer;
@@ -319,6 +338,8 @@ class _SideChatLayout extends StatelessWidget {
     required this.layout,
     required this.chatVisible,
     required this.chatPanelWidth,
+    required this.minChatPanelWidth,
+    required this.maxChatPanelWidth,
     required this.player,
     required this.chat,
     required this.belowPlayer,
@@ -327,51 +348,113 @@ class _SideChatLayout extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final shellPadding = TwitchWatchResponsiveBody.shellPaddingFor(layout);
-    final shellGap = TwitchWatchResponsiveBody.shellGapFor(layout);
-    final showResizeHandle = !layout.shouldDisableWatchChatResizeHandle;
-    final usableWidth = (layout.width - shellPadding.horizontal - shellGap)
-        .clamp(1.0, layout.width)
-        .toDouble();
-    var dragStartWidth = chatPanelWidth;
-    var accumulatedDx = 0.0;
+  State<_SideChatLayout> createState() => _SideChatLayoutState();
+}
 
-    return Padding(
-      padding: shellPadding,
-      child: Row(
-        children: [
-          Expanded(
-            flex: layout.isPhoneLandscape ? 10 : 1,
-            child: _PlayerColumn(player: player, belowPlayer: belowPlayer),
+class _SideChatLayoutState extends State<_SideChatLayout> {
+  late final ValueNotifier<double> _liveChatPanelWidth;
+  bool _dragging = false;
+  double _dragStartWidth = 0;
+  double _accumulatedDx = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _liveChatPanelWidth = ValueNotifier<double>(widget.chatPanelWidth);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SideChatLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_dragging) return;
+    final next = widget.chatPanelWidth
+        .clamp(widget.minChatPanelWidth, widget.maxChatPanelWidth)
+        .toDouble();
+    if ((_liveChatPanelWidth.value - next).abs() >= 0.5) {
+      _liveChatPanelWidth.value = next;
+    }
+  }
+
+  @override
+  void dispose() {
+    _liveChatPanelWidth.dispose();
+    super.dispose();
+  }
+
+  void _beginDrag() {
+    _dragging = true;
+    _dragStartWidth = _liveChatPanelWidth.value;
+    _accumulatedDx = 0;
+  }
+
+  void _updateDrag(DragUpdateDetails delta) {
+    _accumulatedDx += delta.delta.dx;
+    final next = (_dragStartWidth - _accumulatedDx)
+        .clamp(widget.minChatPanelWidth, widget.maxChatPanelWidth)
+        .toDouble();
+    if ((_liveChatPanelWidth.value - next).abs() < 0.5) return;
+    _liveChatPanelWidth.value = next;
+  }
+
+  void _finishDrag(double usableWidth) {
+    if (!_dragging) return;
+    _dragging = false;
+    widget.onSetChatPanelWidthForViewport(
+      viewportWidth: usableWidth,
+      value: _liveChatPanelWidth.value,
+    );
+    widget.onPersistChatPanelWidth();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shellPadding = TwitchWatchResponsiveBody.shellPaddingFor(
+      widget.layout,
+    );
+    final shellGap = TwitchWatchResponsiveBody.shellGapFor(widget.layout);
+    final showResizeHandle = !widget.layout.shouldDisableWatchChatResizeHandle;
+    final usableWidth =
+        (widget.layout.width - shellPadding.horizontal - shellGap)
+            .clamp(1.0, widget.layout.width)
+            .toDouble();
+
+    // These are created once per parent Watch rebuild. During a drag only the
+    // ValueListenableBuilder below rebuilds, so the exact same player/chat
+    // widget instances stay attached while their layout constraints change.
+    final playerSlot = _PlayerColumn(
+      player: widget.player,
+      belowPlayer: widget.belowPlayer,
+    );
+    final chatSlot = _WatchSurface(child: widget.chat);
+
+    return ValueListenableBuilder<double>(
+      valueListenable: _liveChatPanelWidth,
+      builder: (context, liveChatPanelWidth, _) {
+        return Padding(
+          padding: shellPadding,
+          child: Row(
+            children: [
+              Expanded(
+                flex: widget.layout.isPhoneLandscape ? 10 : 1,
+                child: playerSlot,
+              ),
+              if (widget.chatVisible)
+                SizedBox(
+                  width: shellGap,
+                  child: showResizeHandle
+                      ? TwitchWatchChatResizeHandle(
+                          onDragStart: (_) => _beginDrag(),
+                          onDragUpdate: _updateDrag,
+                          onDragEnd: () => _finishDrag(usableWidth),
+                        )
+                      : const SizedBox.expand(),
+                ),
+              if (widget.chatVisible)
+                SizedBox(width: liveChatPanelWidth, child: chatSlot),
+            ],
           ),
-          if (chatVisible)
-            SizedBox(
-              width: shellGap,
-              child: showResizeHandle
-                  ? TwitchWatchChatResizeHandle(
-                      onDragStart: (_) {
-                        dragStartWidth = chatPanelWidth;
-                        accumulatedDx = 0.0;
-                      },
-                      onDragUpdate: (delta) {
-                        accumulatedDx += delta.delta.dx;
-                        onSetChatPanelWidthForViewport(
-                          viewportWidth: usableWidth,
-                          value: dragStartWidth - accumulatedDx,
-                        );
-                      },
-                      onDragEnd: onPersistChatPanelWidth,
-                    )
-                  : const SizedBox.expand(),
-            ),
-          if (chatVisible)
-            SizedBox(
-              width: chatPanelWidth,
-              child: _WatchSurface(child: chat),
-            ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
