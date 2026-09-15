@@ -428,28 +428,26 @@ class _WatchPlayerViewportShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        clipBehavior: Clip.hardEdge,
-        children: [
-          // The native video surface is a dedicated layer. Controls and state
-          // covers are siblings, so their rebuilds never replace the Video.
-          video,
-          if (cover != null) IgnorePointer(child: cover!),
-          if (!inPipMode && controls != null) controls!,
-          if (debugLabel != null &&
-              (_debugUseVideoPlaceholder || _debugHidePlayerOverlay))
-            Positioned(
-              left: 10,
-              bottom: 10,
-              child: IgnorePointer(
-                child: _WatchPlayerIsolationLabel(text: debugLabel!),
-              ),
+    // Keep normal playback transparent all the way down to the native texture.
+    // The previous opaque black shell could become visible for one Flutter
+    // frame while Android was presenting the texture at its new size.
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        video,
+        if (cover != null) IgnorePointer(child: cover!),
+        if (!inPipMode && controls != null) controls!,
+        if (debugLabel != null &&
+            (_debugUseVideoPlaceholder || _debugHidePlayerOverlay))
+          Positioned(
+            left: 10,
+            bottom: 10,
+            child: IgnorePointer(
+              child: _WatchPlayerIsolationLabel(text: debugLabel!),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
