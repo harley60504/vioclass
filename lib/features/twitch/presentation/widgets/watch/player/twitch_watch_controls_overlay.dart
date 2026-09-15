@@ -13,6 +13,64 @@ import 'twitch_player_error_card.dart';
 import 'twitch_watch_bottom_control_bar.dart';
 import 'twitch_watch_top_action_bar.dart';
 
+class WatchControlsChromeController extends ChangeNotifier {
+  static const Duration _autoHideDelay = Duration(seconds: 5);
+
+  bool _visible = true;
+  bool _keepVisible = false;
+  Timer? _hideTimer;
+
+  bool get visible => _visible;
+
+  void configure({required bool keepVisible}) {
+    _keepVisible = keepVisible;
+    if (keepVisible) {
+      _hideTimer?.cancel();
+      _setVisible(true);
+      return;
+    }
+    _scheduleAutoHide();
+  }
+
+  void wake() {
+    _setVisible(true);
+    _scheduleAutoHide();
+  }
+
+  void _scheduleAutoHide() {
+    _hideTimer?.cancel();
+    if (_keepVisible) return;
+
+    _hideTimer = Timer(_autoHideDelay, () {
+      if (_hasEditableTextFocus) {
+        _scheduleAutoHide();
+        return;
+      }
+      _setVisible(false);
+    });
+  }
+
+  bool get _hasEditableTextFocus {
+    final focusContext = FocusManager.instance.primaryFocus?.context;
+    if (focusContext == null) return false;
+    return focusContext.widget is EditableText ||
+        focusContext.findAncestorWidgetOfExactType<EditableText>() != null ||
+        focusContext.findAncestorStateOfType<EditableTextState>() != null;
+  }
+
+  void _setVisible(bool value) {
+    if (_visible == value) return;
+    _visible = value;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    super.dispose();
+  }
+}
+
 class WatchControlsOverlay extends StatefulWidget {
   final bool loading;
   final String? error;
@@ -51,6 +109,8 @@ class WatchControlsOverlay extends StatefulWidget {
   final TwitchWatchPlaybackKind playbackKind;
   final bool timelineEnabled;
   final TwitchPlaybackTimelineController? playbackTimelineController;
+  final bool showTopActionBar;
+  final WatchControlsChromeController? chromeController;
 
   const WatchControlsOverlay({
     super.key,
@@ -91,6 +151,8 @@ class WatchControlsOverlay extends StatefulWidget {
     this.playbackKind = TwitchWatchPlaybackKind.live,
     this.timelineEnabled = true,
     this.playbackTimelineController,
+    this.showTopActionBar = true,
+    this.chromeController,
   });
 
   @override
@@ -99,84 +161,78 @@ class WatchControlsOverlay extends StatefulWidget {
 
 class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   static const Duration _fadeDuration = Duration(milliseconds: 180);
-  static const Duration _autoHideDelay = Duration(seconds: 5);
 
-  bool _visible = true;
-  Timer? _hideTimer;
+  late WatchControlsChromeController _chromeController;
+  late bool _ownsChromeController;
 
   bool get _hasError =>
       (widget.error != null && widget.error!.trim().isNotEmpty) ||
       widget.runtimeError != null;
 
-  bool get _hasEditableTextFocus {
-    final focusContext = FocusManager.instance.primaryFocus?.context;
-    if (focusContext == null) return false;
-    return focusContext.widget is EditableText ||
-        focusContext.findAncestorWidgetOfExactType<EditableText>() != null ||
-        focusContext.findAncestorStateOfType<EditableTextState>() != null;
-  }
-
   @override
   void initState() {
     super.initState();
-    _scheduleAutoHide();
+    _bindChromeController();
+    _syncChromePolicy();
   }
 
   @override
   void didUpdateWidget(covariant WatchControlsOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.loading || _hasError) {
-      _showAndRestartAutoHide();
+    if (!identical(oldWidget.chromeController, widget.chromeController)) {
+      if (_ownsChromeController) {
+        _chromeController.dispose();
+      }
+      _bindChromeController();
     }
+    _syncChromePolicy();
+  }
+
+  void _bindChromeController() {
+    final external = widget.chromeController;
+    if (external != null) {
+      _chromeController = external;
+      _ownsChromeController = false;
+    } else {
+      _chromeController = WatchControlsChromeController();
+      _ownsChromeController = true;
+    }
+  }
+
+  void _syncChromePolicy() {
+    _chromeController.configure(keepVisible: widget.loading || _hasError);
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
-    super.dispose();
-  }
-
-  void _scheduleAutoHide() {
-    _hideTimer?.cancel();
-    if (widget.loading || _hasError) return;
-
-    _hideTimer = Timer(_autoHideDelay, () {
-      if (!mounted) return;
-      if (_hasEditableTextFocus) {
-        _scheduleAutoHide();
-        return;
-      }
-      setState(() => _visible = false);
-    });
-  }
-
-  void _showAndRestartAutoHide() {
-    _hideTimer?.cancel();
-
-    if (!_visible && mounted) {
-      setState(() => _visible = true);
+    if (_ownsChromeController) {
+      _chromeController.dispose();
     }
-
-    _scheduleAutoHide();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return _WatchControlsInteractionLayer(
-      onWakeControls: _showAndRestartAutoHide,
-      child: Stack(
-        children: [
-          Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
-          _FadingWatchChrome(
-            visible: _visible,
-            fadeDuration: _fadeDuration,
-            child: _WatchChromeStack(widget: widget, hasError: _hasError),
-          ),
-          _WatchErrorOverlay(
-            error: widget.error,
-            runtimeError: widget.runtimeError,
-          ),
-        ],
+      onWakeControls: _chromeController.wake,
+      child: AnimatedBuilder(
+        animation: _chromeController,
+        builder: (context, _) {
+          return Stack(
+            children: [
+              Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
+              _FadingWatchChrome(
+                visible: _chromeController.visible,
+                fadeDuration: _fadeDuration,
+                child: _WatchChromeStack(widget: widget, hasError: _hasError),
+              ),
+              _WatchErrorOverlay(
+                error: widget.error,
+                runtimeError: widget.runtimeError,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -240,23 +296,24 @@ class _WatchChromeStack extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned(
-          left: 12,
-          right: 12,
-          top: 12,
-          child: WatchTopActionBar(
-            metadata: widget.metadata,
-            isFollowing: widget.isFollowing,
-            followBusy: widget.followBusy,
-            onBack: widget.onBack,
-            onHome: widget.onHome,
-            onToggleFollow: widget.onToggleFollow,
-            onSubscribe: widget.onSubscribe,
-            onOpenChannel: widget.onOpenChannel,
-            onCreateClip: widget.onCreateClip,
-            creatingClip: widget.creatingClip,
+        if (widget.showTopActionBar)
+          Positioned(
+            left: 12,
+            right: 12,
+            top: 12,
+            child: WatchTopActionBar(
+              metadata: widget.metadata,
+              isFollowing: widget.isFollowing,
+              followBusy: widget.followBusy,
+              onBack: widget.onBack,
+              onHome: widget.onHome,
+              onToggleFollow: widget.onToggleFollow,
+              onSubscribe: widget.onSubscribe,
+              onOpenChannel: widget.onOpenChannel,
+              onCreateClip: widget.onCreateClip,
+              creatingClip: widget.creatingClip,
+            ),
           ),
-        ),
         Positioned(
           left: 12,
           right: 12,
