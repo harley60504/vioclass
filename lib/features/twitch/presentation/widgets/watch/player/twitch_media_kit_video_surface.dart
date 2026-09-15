@@ -6,6 +6,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../../../theme/twitch_ui_tokens.dart';
+import '../../../watch/controllers/twitch_dvr_transition_mask_controller.dart';
 
 const double twitchWatchVideoAspectRatio = 16 / 9;
 
@@ -33,10 +34,12 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
 class _TwitchMediaKitVideoSurfaceState
     extends State<TwitchMediaKitVideoSurface> {
   final GlobalKey _videoSurfaceKey = GlobalKey();
+  late Widget _stableVideo;
 
   @override
   void initState() {
     super.initState();
+    _stableVideo = _buildVideo();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reportSourceRectHint(),
     );
@@ -45,8 +48,21 @@ class _TwitchMediaKitVideoSurfaceState
   @override
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller) ||
+        oldWidget.fit != widget.fit ||
+        oldWidget.controls != widget.controls) {
+      _stableVideo = _buildVideo();
+    }
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _reportSourceRectHint(),
+    );
+  }
+
+  Widget _buildVideo() {
+    return Video(
+      controller: widget.controller,
+      fit: widget.fit,
+      controls: widget.controls,
     );
   }
 
@@ -57,7 +73,11 @@ class _TwitchMediaKitVideoSurfaceState
     final context = _videoSurfaceKey.currentContext;
     if (context == null) return;
     final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox || !renderObject.hasSize) return;
+    if (renderObject is! RenderBox ||
+        !renderObject.hasSize ||
+        renderObject.size.isEmpty) {
+      return;
+    }
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final rect = topLeft & renderObject.size;
     unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
@@ -71,29 +91,51 @@ class _TwitchMediaKitVideoSurfaceState
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
-          if (maxWidth <= 0 || maxHeight <= 0) return const SizedBox.shrink();
 
-          var width = maxWidth;
-          var height = width / widget.aspectRatio;
-          if (height > maxHeight) {
-            height = maxHeight;
-            width = height * widget.aspectRatio;
+          var width = 0.0;
+          var height = 0.0;
+          if (maxWidth > 0 && maxHeight > 0) {
+            width = maxWidth;
+            height = width / widget.aspectRatio;
+            if (height > maxHeight) {
+              height = maxHeight;
+              width = height * widget.aspectRatio;
+            }
+            width = width.clamp(1.0, maxWidth).toDouble();
+            height = height.clamp(1.0, maxHeight).toDouble();
           }
-          width = width.clamp(1.0, maxWidth).toDouble();
-          height = height.clamp(1.0, maxHeight).toDouble();
+
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _reportSourceRectHint(),
           );
 
+          final transitionMask = TwitchDvrTransitionMaskController.instance;
           return Center(
             child: SizedBox(
               key: _videoSurfaceKey,
               width: width,
               height: height,
-              child: Video(
-                controller: widget.controller,
-                fit: widget.fit,
-                controls: widget.controls,
+              child: AnimatedBuilder(
+                animation: transitionMask,
+                child: _stableVideo,
+                builder: (context, video) {
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      video ?? const SizedBox.shrink(),
+                      if (transitionMask.visible)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: _PlaybackTransitionOverlay(
+                              previewImageUrl:
+                                  transitionMask.previewImageUrl,
+                              showLoading: transitionMask.showLoading,
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           );
@@ -103,23 +145,85 @@ class _TwitchMediaKitVideoSurfaceState
   }
 }
 
+class _PlaybackTransitionOverlay extends StatelessWidget {
+  final String previewImageUrl;
+  final bool showLoading;
+
+  const _PlaybackTransitionOverlay({
+    required this.previewImageUrl,
+    required this.showLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = previewImageUrl.trim();
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: Colors.black),
+        if (imageUrl.isNotEmpty)
+          Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        if (imageUrl.isNotEmpty)
+          ColoredBox(color: Colors.black.withValues(alpha: 0.42)),
+        if (showLoading)
+          Center(
+            child: Container(
+              width: 46,
+              height: 46,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.48),
+                shape: BoxShape.circle,
+              ),
+              child: const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: TwitchUiColors.primarySoft,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class TwitchMediaKitVideoWaitingSurface extends StatelessWidget {
   const TwitchMediaKitVideoWaitingSurface({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Colors.black,
-      child: Center(
-        child: SizedBox(
-          width: 26,
-          height: 26,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.4,
-            color: TwitchUiColors.primarySoft,
+    final transitionMask = TwitchDvrTransitionMaskController.instance;
+    return AnimatedBuilder(
+      animation: transitionMask,
+      builder: (context, _) {
+        if (transitionMask.visible) {
+          return _PlaybackTransitionOverlay(
+            previewImageUrl: transitionMask.previewImageUrl,
+            showLoading: transitionMask.showLoading,
+          );
+        }
+        return const ColoredBox(
+          color: Colors.black,
+          child: Center(
+            child: SizedBox(
+              width: 26,
+              height: 26,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: TwitchUiColors.primarySoft,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
