@@ -31,6 +31,15 @@ const bool _debugMinimalLiveWatch = bool.fromEnvironment(
   defaultValue: kDebugMode,
 );
 
+/// Keep the normal Watch responsive layout, chat slot and resize handle, but
+/// bypass TwitchWatchPlayerArea entirely and insert a raw media_kit Video.
+/// This removes the persistent surface wrapper, RepaintBoundary,
+/// player-runtime AnimatedBuilder, PiP observer and all Watch player chrome.
+const bool _debugBypassPlayerArea = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_BYPASS_PLAYER_AREA',
+  defaultValue: false,
+);
+
 /// Keep the normal Watch layout/player path but replace the expensive chat
 /// subtree with a flat panel. This isolates whether relayout of live chat
 /// content is what makes Android's external video texture flash during drag.
@@ -127,7 +136,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   Widget build(BuildContext context) {
     final port = TwitchWatchPortScope.playerOf(context);
 
-    if (_debugMinimalLiveWatch) {
+    if (_debugMinimalLiveWatch || _debugBypassPlayerArea) {
       return _MinimalLiveResizeVideo(
         playbackKind: playbackKind,
         controller: port.videoControllerOrNull,
