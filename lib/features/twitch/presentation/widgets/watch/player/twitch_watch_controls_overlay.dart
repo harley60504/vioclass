@@ -23,9 +23,21 @@ class WatchControlsChromeController extends ChangeNotifier {
   bool get visible => _visible;
 
   void configure({required bool keepVisible}) {
+    if (_keepVisible == keepVisible) {
+      if (keepVisible) {
+        _hideTimer?.cancel();
+        _hideTimer = null;
+        _setVisible(true);
+      } else if (_visible && _hideTimer == null) {
+        _scheduleAutoHide();
+      }
+      return;
+    }
+
     _keepVisible = keepVisible;
     if (keepVisible) {
       _hideTimer?.cancel();
+      _hideTimer = null;
       _setVisible(true);
       return;
     }
@@ -39,9 +51,13 @@ class WatchControlsChromeController extends ChangeNotifier {
 
   void _scheduleAutoHide() {
     _hideTimer?.cancel();
-    if (_keepVisible) return;
+    if (_keepVisible) {
+      _hideTimer = null;
+      return;
+    }
 
     _hideTimer = Timer(_autoHideDelay, () {
+      _hideTimer = null;
       if (_hasEditableTextFocus) {
         _scheduleAutoHide();
         return;
