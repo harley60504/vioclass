@@ -10,6 +10,19 @@ import '../../../watch/controllers/twitch_dvr_transition_mask_controller.dart';
 
 const double twitchWatchVideoAspectRatio = 16 / 9;
 
+/// Diagnostic switch: keep the entire normal Watch page, chat, controls and
+/// responsive layout, but replace VioClass' custom video sizing/PiP rect layer
+/// with a raw media_kit [Video].
+///
+/// Run with:
+/// flutter run --profile \
+///   --dart-define=TWITCH_DEBUG_MINIMAL_LIVE_WATCH=false \
+///   --dart-define=TWITCH_WATCH_DEBUG_RAW_VIDEO_SURFACE=true
+const bool _debugRawVideoSurface = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_RAW_VIDEO_SURFACE',
+  defaultValue: false,
+);
+
 class TwitchMediaKitVideoSurface extends StatefulWidget {
   final VideoController controller;
   final double aspectRatio;
@@ -38,21 +51,28 @@ class _TwitchMediaKitVideoSurfaceState
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _reportSourceRectHint(),
-    );
+    if (!_debugRawVideoSurface) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _reportSourceRectHint(),
+      );
+    }
   }
 
   @override
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _reportSourceRectHint(),
-    );
+    if (!_debugRawVideoSurface) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _reportSourceRectHint(),
+      );
+    }
   }
 
   void _reportSourceRectHint() {
-    if (!mounted || !Platform.isAndroid || !widget.reportAndroidPipSourceRect) {
+    if (_debugRawVideoSurface ||
+        !mounted ||
+        !Platform.isAndroid ||
+        !widget.reportAndroidPipSourceRect) {
       return;
     }
     final context = _videoSurfaceKey.currentContext;
@@ -66,6 +86,18 @@ class _TwitchMediaKitVideoSurfaceState
 
   @override
   Widget build(BuildContext context) {
+    if (_debugRawVideoSurface) {
+      // Keep all normal Watch UI around the player, but remove every custom
+      // sizing and Android PiP source-rect operation from the video subtree.
+      // This is intentionally the same raw Video shape that did not flash in
+      // the minimal profile test.
+      return Video(
+        controller: widget.controller,
+        fit: widget.fit,
+        controls: widget.controls,
+      );
+    }
+
     // Deliberately keep the active playback path transparent. During an
     // Android texture resize the Flutter layout can advance one frame before
     // the next texture frame is presented; an opaque backing color here would
