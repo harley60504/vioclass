@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/engagement/twitch_prediction.dart';
@@ -15,6 +17,19 @@ import '../twitch_watch_feature_ports.dart';
 import '../twitch_watch_playback_kind.dart';
 import '../twitch_watch_port_scope.dart';
 import '../controllers/twitch_playback_timeline_controller.dart';
+
+/// Temporary isolation mode for the Android resize-black-frame investigation.
+///
+/// In a normal `flutter run` this is enabled by default because kDebugMode is
+/// true. The mode can be disabled explicitly with:
+/// --dart-define=TWITCH_DEBUG_MINIMAL_LIVE_WATCH=false
+///
+/// Release builds keep the normal Watch UI unless the define is explicitly
+/// enabled.
+const bool _debugMinimalLiveWatch = bool.fromEnvironment(
+  'TWITCH_DEBUG_MINIMAL_LIVE_WATCH',
+  defaultValue: kDebugMode,
+);
 
 class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
@@ -103,6 +118,15 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final port = TwitchWatchPortScope.playerOf(context);
+
+    if (_debugMinimalLiveWatch) {
+      return _MinimalLiveResizeVideo(
+        playbackKind: playbackKind,
+        controller: port.videoControllerOrNull,
+        error: error ?? port.runtime.error?.toString(),
+      );
+    }
+
     final usesLiveTimeline =
         playbackKind == TwitchWatchPlaybackKind.live ||
         playbackKind == TwitchWatchPlaybackKind.liveDvr;
@@ -170,6 +194,90 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
   }
 }
 
+class _MinimalLiveResizeVideo extends StatelessWidget {
+  final TwitchWatchPlaybackKind playbackKind;
+  final VideoController? controller;
+  final String? error;
+
+  const _MinimalLiveResizeVideo({
+    required this.playbackKind,
+    required this.controller,
+    required this.error,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Use a conspicuous non-black backing color. If a resize exposes Flutter's
+    // layout underneath the native texture, the flash will be purple instead
+    // of black. If it still flashes pure black, that black comes from the raw
+    // Video/native texture path rather than our Watch chrome or masks.
+    const diagnosticBackground = Color(0xFF35134A);
+
+    if (playbackKind != TwitchWatchPlaybackKind.live &&
+        playbackKind != TwitchWatchPlaybackKind.none) {
+      return const ColoredBox(
+        color: diagnosticBackground,
+        child: Center(
+          child: Text(
+            'DEBUG LIVE ONLY',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      );
+    }
+
+    final videoController = controller;
+    if (videoController == null) {
+      return ColoredBox(
+        color: diagnosticBackground,
+        child: Center(
+          child: Text(
+            error?.trim().isNotEmpty == true
+                ? 'LIVE ERROR\n$error'
+                : 'WAITING FOR RAW LIVE VIDEO',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Deliberately bypass TwitchMediaKitVideoSurface, transition masks,
+    // loading overlays, Watch controls, RepaintBoundary wrappers and all
+    // custom player chrome. This is the closest possible test to raw
+    // media_kit Video under the existing live playback session.
+    return const ColoredBox(
+      color: diagnosticBackground,
+      child: SizedBox.expand(),
+    ).withRawVideo(videoController);
+  }
+}
+
+extension on Widget {
+  Widget withRawVideo(VideoController controller) {
+    return Stack(
+      fit: StackFit.expand,
+      clipBehavior: Clip.none,
+      children: [
+        this,
+        Video(
+          controller: controller,
+          fit: BoxFit.contain,
+          controls: NoVideoControls,
+        ),
+      ],
+    );
+  }
+}
+
 class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
@@ -228,6 +336,13 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_debugMinimalLiveWatch) {
+      // Keep the normal draggable side-panel geometry but remove the entire
+      // chat tree. This leaves a blank resize target next to the raw live
+      // Video so the existing divider can still be dragged continuously.
+      return const ColoredBox(color: Color(0xFF1C1025));
+    }
+
     final emotes = TwitchWatchPortScope.emotesOf(context);
     final openAction = onOpenSpecialActions;
     return TwitchWatchChatPanel(
