@@ -5,6 +5,25 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Android-only A/B switches for the resize-black-frame investigation.
+///
+/// The safe default remains: do not mutate mpv renderer properties on Android.
+/// Each switch below adds back exactly one property from the enhancement-off
+/// path so we can identify whether scale, deband, or glsl-shaders is the
+/// trigger. Enable only one switch at a time.
+const bool _debugAndroidTestScaleOnly = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_ANDROID_TEST_SCALE',
+  defaultValue: false,
+);
+const bool _debugAndroidTestDebandOnly = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_ANDROID_TEST_DEBAND',
+  defaultValue: false,
+);
+const bool _debugAndroidTestGlslOnly = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_ANDROID_TEST_GLSL',
+  defaultValue: false,
+);
+
 enum TwitchVideoEnhancementMode {
   lanczos,
   ewaLanczos,
@@ -200,12 +219,27 @@ class TwitchVideoEnhancementRuntime {
     required TwitchVideoEnhancementConfig config,
   }) async {
     // A/B testing isolated the Android resize black-frame regression to this
-    // mpv renderer-property mutation group. Even the disabled enhancement path
-    // writes glsl-shaders/deband/scale, and that was sufficient to make the
-    // external video texture flash black while its Flutter bounds changed.
-    // Keep Android on mpv's native/default renderer properties; desktop keeps
-    // the enhancement pipeline unchanged.
+    // mpv renderer-property mutation group. The safe default is still to leave
+    // Android on mpv's native renderer state. The three compile-time switches
+    // below add back one neutral property write at a time so resize behavior
+    // can be compared without enabling the actual enhancement pipeline.
     if (Platform.isAndroid) {
+      if (_debugAndroidTestScaleOnly) {
+        player.setProperty('scale', 'lanczos');
+        debugPrint('[ResizeDebug] Android renderer test: scale=lanczos only');
+        return;
+      }
+      if (_debugAndroidTestDebandOnly) {
+        player.setProperty('deband', 'no');
+        debugPrint('[ResizeDebug] Android renderer test: deband=no only');
+        return;
+      }
+      if (_debugAndroidTestGlslOnly) {
+        player.setProperty('glsl-shaders', '');
+        debugPrint('[ResizeDebug] Android renderer test: glsl-shaders clear only');
+        return;
+      }
+
       debugPrint(
         '[VideoEnhancement] skipped on Android to keep video texture stable',
       );
