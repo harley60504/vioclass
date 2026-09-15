@@ -2,7 +2,6 @@ library;
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
@@ -47,17 +46,13 @@ import '../watch/twitch_watch_port_scope.dart';
 import '../watch/twitch_watch_playback_kind.dart';
 import '../watch/twitch_watch_scope.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
-import '../theme/twitch_ui_tokens.dart';
 import '../watch/twitch_playback_session_controller.dart';
 import '../dialogs/twitch_clip_editor_dialog.dart';
 import '../widgets/channel/twitch_channel_about_section.dart';
-import '../widgets/watch/twitch_offline_latest_vod_card.dart';
 import '../widgets/watch/chat/twitch_vod_replay_chat_panel.dart';
-import '../widgets/shared/twitch_notice.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import 'twitch_channel_page.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'watch/twitch_watch_page_session.dart';
@@ -245,8 +240,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   StreamSubscription<VioClassConnectivitySnapshot>? networkLostSubscription;
   bool wasPlayingBeforeNetworkLoss = false;
   DateTime? livePlaybackBackgroundedAt;
-  Future<void>? foregroundRecoveryInFlight;
-  Future<void>? networkRecoveryInFlight;
   int watchLoadGeneration = 0;
   TwitchPlaybackSessionState? restorePlaybackOnDispose;
   TwitchPlaybackSessionState? ownedPlaybackForVisibleRoute;
@@ -305,7 +298,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       engagementController.hypeTrainController;
   List<dynamic> get pinnedMessages => engagementController.pinnedMessages;
   TwitchChannelVideo? offlineVodFallbackVideo;
-  TwitchChannelVideo? offlineLatestVodVideo;
   bool showOfflineChannelPlaceholder = false;
   TwitchChannelVideo? activeGrowingVodVideo;
   TwitchChannelVideo? currentVodQualityVideo;
@@ -378,7 +370,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   void showSnack(String message) {
     if (!mounted) return;
-    showTwitchNotice(context, message);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> createLiveClip() async {
@@ -568,7 +562,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       relationshipController.seedKnownFollowStatus(
         knownFollowStatus,
         resolvedUserId: widget.resolvedInitialOfflineChannel?.broadcasterId,
-        followedAt: widget.resolvedInitialOfflineChannel?.followedAt,
       );
     }
     playbackController = TwitchWatchPlaybackController(
@@ -630,7 +623,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         unawaited(
           recoverWatchAfterForeground(
             shouldProbeLiveRecovery:
-                defaultTargetPlatform != TargetPlatform.windows &&
                 backgroundDuration >= _foregroundRecoveryMinimumBackground,
           ),
         );
@@ -650,28 +642,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   Future<void> recoverWatchAfterForeground({
     bool shouldProbeLiveRecovery = false,
-  }) {
-    final existing = foregroundRecoveryInFlight;
-    if (existing != null) {
-      debugPrint('[WatchForeground] reuse in-flight recovery');
-      return existing;
-    }
-
-    late final Future<void> recovery;
-    recovery =
-        _recoverWatchAfterForegroundOnce(
-          shouldProbeLiveRecovery: shouldProbeLiveRecovery,
-        ).whenComplete(() {
-          if (identical(foregroundRecoveryInFlight, recovery)) {
-            foregroundRecoveryInFlight = null;
-          }
-        });
-    foregroundRecoveryInFlight = recovery;
-    return recovery;
-  }
-
-  Future<void> _recoverWatchAfterForegroundOnce({
-    required bool shouldProbeLiveRecovery,
   }) async {
     if (!mounted) return;
     final channel = channelLogin;
@@ -679,22 +649,13 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     try {
       final isVisiblePlaybackRoute = TwitchPlaybackSessionController.instance
           .isTopRouteOwner(playbackRouteOwner);
-      if (defaultTargetPlatform == TargetPlatform.windows) {
-        // Minimizing or restoring a Windows window does not suspend the shared
-        // media player or either localhost proxy. Running the mobile recovery
-        // path here can turn a harmless window lifecycle transition into a
-        // discovery refresh, reconcile, or full player reload.
-        debugPrint(
-          '[WatchPlaybackState] keep Windows playback untouched on foreground '
-          'channel=$channel',
-        );
-      } else if (!isVisiblePlaybackRoute) {
+      if (!isVisiblePlaybackRoute) {
         debugPrint(
           '[WatchPlaybackState] skip foreground playback recovery '
           'because route is hidden channel=$channel',
         );
       } else {
-        final liveStatus = await refreshLiveStatusForRecovery();
+        final liveStatus = await refreshLiveTimelineStartedAt();
         if (!mounted) return;
         if (liveStatus == false) {
           await loadWatch();
@@ -881,46 +842,19 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     }
   }
 
-  Future<void> recoverWatchAfterNetworkRestored() {
-    final existing = networkRecoveryInFlight;
-    if (existing != null) {
-      debugPrint('[WatchForeground] reuse in-flight network recovery');
-      return existing;
-    }
-
-    late final Future<void> recovery;
-    recovery = _recoverWatchAfterNetworkRestoredOnce().whenComplete(() {
-      if (identical(networkRecoveryInFlight, recovery)) {
-        networkRecoveryInFlight = null;
-      }
-    });
-    networkRecoveryInFlight = recovery;
-    return recovery;
-  }
-
-  Future<void> _recoverWatchAfterNetworkRestoredOnce() async {
+  Future<void> recoverWatchAfterNetworkRestored() async {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted || !VioClassConnectivityService.instance.hasInternetAccess) {
       return;
     }
 
     unawaited(chatController.reconnectAfterNetworkRestored());
-    final foregroundRecovery = foregroundRecoveryInFlight;
-    if (foregroundRecovery != null) {
-      try {
-        await foregroundRecovery;
-      } catch (_) {}
-      debugPrint(
-        '[WatchForeground] network recovery coalesced with foreground recovery',
-      );
-      return;
-    }
     if (!TwitchPlaybackSessionController.instance.isTopRouteOwner(
       playbackRouteOwner,
     )) {
       return;
     }
-    final liveStatus = await refreshLiveStatusForRecovery();
+    final liveStatus = await refreshLiveTimelineStartedAt();
     if (!mounted) return;
     if (liveStatus == false) {
       await loadWatch();
@@ -930,20 +864,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     final shouldResumePlayback = wasPlayingBeforeNetworkLoss;
     wasPlayingBeforeNetworkLoss = false;
     if (!shouldResumePlayback) return;
-
-    final owned =
-        TwitchPlaybackSessionController.instance.playableStateForRouteOwner(
-          playbackRouteOwner,
-        ) ??
-        ownedPlaybackForVisibleRoute;
-    if (owned?.kind == TwitchWatchPlaybackKind.live) {
-      // LIVE already has a proxy-aware recovery path. Reusing it here avoids
-      // the old unconditional force-open after a fixed 1.2 second wait, which
-      // could repeatedly reload the same URI while Android network transports
-      // were still settling after foreground resume.
-      await _recoverLivePlaybackAfterForeground();
-      return;
-    }
 
     await reconcileVisibleRoutePlayback();
     final player = playerSession.playerOrNull;
@@ -965,28 +885,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     }
   }
 
-  Future<bool?> refreshLiveStatusForRecovery() async {
-    final initial = await refreshLiveTimelineStartedAt(
-      preserveStateWhenOffline: true,
-    );
-    if (initial != false) return initial;
-
-    // Android network transports can be reachable before the first Twitch
-    // discovery response is populated. Do not tear down healthy playback from
-    // one transient null stream result.
-    await Future<void>.delayed(const Duration(milliseconds: 1500));
-    if (!mounted ||
-        !TwitchPlaybackSessionController.instance.isTopRouteOwner(
-          playbackRouteOwner,
-        )) {
-      return null;
-    }
-    return refreshLiveTimelineStartedAt();
-  }
-
   Future<bool?> refreshLiveTimelineStartedAt({
     bool allowWithoutLivePlayback = false,
-    bool preserveStateWhenOffline = false,
   }) async {
     if (!allowWithoutLivePlayback &&
         currentPlaybackKind != TwitchWatchPlaybackKind.live &&
@@ -1009,7 +909,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       final streamId = rawStreamId.isEmpty ? null : rawStreamId;
       if (!mounted || channelLogin != login) return null;
       if (startedAt == null) {
-        if (preserveStateWhenOffline) return false;
         liveTimelineStreamId = null;
         liveTimelineStartedAt = null;
         activeGrowingVodVideo = null;
@@ -1265,7 +1164,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       clearStartedAt: usesLiveTimeline && liveTimelineStartedAt == null,
     );
 
-    final basePlayerArea = TwitchWatchPlayerAreaPortAdapter(
+    final playerArea = TwitchWatchPlayerAreaPortAdapter(
       metadata: metadata,
       loading: loadingPlayer,
       error: playerError,
@@ -1316,21 +1215,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         showSnack('播放器操作失敗，請稍後再試。');
       },
     );
-    final playerArea = Stack(
-      fit: StackFit.expand,
-      children: [
-        Positioned.fill(child: basePlayerArea),
-        if (showOfflineChannelPlaceholder && offlineLatestVodVideo != null)
-          Positioned(
-            top: 76,
-            right: 16,
-            child: TwitchOfflineLatestVodCard(
-              video: offlineLatestVodVideo!,
-              onTap: () => unawaited(openOfflineLatestVod()),
-            ),
-          ),
-      ],
-    );
     final belowPlayer = TwitchChannelAboutSection(
       metadata: metadata,
       description: widget.resolvedInitialOfflineChannel?.description ?? '',
@@ -1346,8 +1230,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         runtime: runtime,
         viewerLogin: viewerLogin,
         viewerId: viewerId,
-        viewerIsFollowing: effectiveIsFollowing,
-        viewerFollowedAt: relationshipController.followedAt,
         metadata: metadata,
         channelPoints: channelPointsSnapshot,
         pendingSpecialMessage: pendingSpecialMessage,
@@ -1392,11 +1274,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         unawaited(leaveToMiniPlayer());
       },
       child: Scaffold(
-        // The watch route owns an opaque canvas. Android devices can briefly
-        // lose the route below this one while recreating the window surface;
-        // a transparent scaffold would then expose the platform's white
-        // fallback behind every translucent watch control.
-        backgroundColor: TwitchUiColors.appBackground,
+        backgroundColor: const Color(0xFF0E0E10),
         body: Stack(
           children: [
             Positioned.fill(
