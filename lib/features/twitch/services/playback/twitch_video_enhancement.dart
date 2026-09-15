@@ -199,32 +199,24 @@ class TwitchVideoEnhancementRuntime {
     Player player, {
     required TwitchVideoEnhancementConfig config,
   }) async {
-    final isAndroid = Platform.isAndroid;
-
-    // Android A/B testing showed that changing mpv's `scale` property is the
-    // resize-black-frame trigger. `deband` and `glsl-shaders` are safe, so keep
-    // the shader-based enhancement pipeline available while leaving Android's
-    // scaler at the native/default value for the lifetime of the player.
-    player.setProperty('glsl-shaders', '');
-    player.setProperty('deband', config.enabled && config.deband ? 'yes' : 'no');
-
+    // Disabled means disabled: do not write any mpv renderer properties at all.
+    // This keeps the default playback path completely untouched on devices
+    // where changing renderer properties during resize can flash black.
     if (!config.enabled) {
-      if (!isAndroid) {
-        player.setProperty('scale', 'lanczos');
-      }
-      debugPrint(
-        isAndroid
-            ? '[VideoEnhancement] disabled; Android native scale preserved'
-            : '[VideoEnhancement] disabled scale=lanczos deband=no',
-      );
+      debugPrint('[VideoEnhancement] disabled; renderer left untouched');
       return;
     }
 
+    // Once the user explicitly enables enhancement, apply the selected
+    // renderer/scaler/shader settings normally on every platform. Some Android
+    // devices may visibly flash while the video surface is resized; that is an
+    // accepted device-specific trade-off for opting into enhancement.
+    player.setProperty('glsl-shaders', '');
+    player.setProperty('deband', config.deband ? 'yes' : 'no');
+
     final mode = config.mode;
     var activeScale = mode.mpvScale;
-    if (!isAndroid) {
-      player.setProperty('scale', activeScale);
-    }
+    player.setProperty('scale', activeScale);
 
     final assets = <_TwitchVideoShaderAsset>[];
     final mainAsset = _shaderAssetForMode(mode);
@@ -241,18 +233,10 @@ class TwitchVideoEnhancementRuntime {
       }
 
       if (asset == mainAsset) {
-        // A main upscaler failure should never break playback. On desktop we
-        // fall back to the built-in scaler. Android must keep its native scale
-        // untouched because any `scale` mutation reproduces the resize flash.
+        // A main upscaler failure should never break playback. Optional
+        // post-processors can still run on top of the built-in fallback.
         activeScale = 'ewa_lanczossharp';
-        if (!isAndroid) {
-          player.setProperty('scale', activeScale);
-        } else {
-          debugPrint(
-            '[VideoEnhancement] Android main shader unavailable; '
-            'native scale preserved',
-          );
-        }
+        player.setProperty('scale', activeScale);
       }
     }
 
@@ -260,9 +244,8 @@ class TwitchVideoEnhancementRuntime {
       player.setProperty('glsl-shaders', _joinShaderPaths(shaderPaths));
     }
 
-    final scaleLabel = isAndroid ? 'native' : activeScale;
     debugPrint(
-      '[VideoEnhancement] mode=${mode.name} scale=$scaleLabel '
+      '[VideoEnhancement] mode=${mode.name} scale=$activeScale '
       'shaders=${shaderPaths.length} chroma=${config.chromaEnhance} '
       'deband=${config.deband} sharpen=${config.sharpen}',
     );
