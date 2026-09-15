@@ -33,19 +33,13 @@ class TwitchMediaKitVideoSurface extends StatefulWidget {
 
 class _TwitchMediaKitVideoSurfaceState
     extends State<TwitchMediaKitVideoSurface> {
-  static const Duration _androidSourceRectSettleDelay = Duration(
-    milliseconds: 140,
-  );
-
   final GlobalKey _videoSurfaceKey = GlobalKey();
-  Timer? _sourceRectSettleTimer;
-  Rect? _lastReportedSourceRect;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scheduleSourceRectHint(),
+      (_) => _reportSourceRectHint(),
     );
   }
 
@@ -53,26 +47,8 @@ class _TwitchMediaKitVideoSurfaceState
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _scheduleSourceRectHint(),
+      (_) => _reportSourceRectHint(),
     );
-  }
-
-  @override
-  void dispose() {
-    _sourceRectSettleTimer?.cancel();
-    super.dispose();
-  }
-
-  void _scheduleSourceRectHint() {
-    if (!mounted || !Platform.isAndroid || !widget.reportAndroidPipSourceRect) {
-      return;
-    }
-
-    _sourceRectSettleTimer?.cancel();
-    _sourceRectSettleTimer = Timer(_androidSourceRectSettleDelay, () {
-      if (!mounted) return;
-      _reportSourceRectHint();
-    });
   }
 
   void _reportSourceRectHint() {
@@ -82,25 +58,10 @@ class _TwitchMediaKitVideoSurfaceState
     final context = _videoSurfaceKey.currentContext;
     if (context == null) return;
     final renderObject = context.findRenderObject();
-    if (renderObject is! RenderBox ||
-        !renderObject.hasSize ||
-        renderObject.size.isEmpty) {
-      return;
-    }
+    if (renderObject is! RenderBox || !renderObject.hasSize) return;
     final topLeft = renderObject.localToGlobal(Offset.zero);
     final rect = topLeft & renderObject.size;
-    final lastRect = _lastReportedSourceRect;
-    if (lastRect != null && _rectNearlyEqual(lastRect, rect)) return;
-    _lastReportedSourceRect = rect;
     unawaited(TwitchAndroidPipController.instance.setSourceRectHint(rect));
-  }
-
-  bool _rectNearlyEqual(Rect a, Rect b) {
-    const tolerance = 1.0;
-    return (a.left - b.left).abs() <= tolerance &&
-        (a.top - b.top).abs() <= tolerance &&
-        (a.right - b.right).abs() <= tolerance &&
-        (a.bottom - b.bottom).abs() <= tolerance;
   }
 
   @override
@@ -111,9 +72,7 @@ class _TwitchMediaKitVideoSurfaceState
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
-          if (maxWidth <= 0 || maxHeight <= 0) {
-            return const SizedBox.shrink();
-          }
+          if (maxWidth <= 0 || maxHeight <= 0) return const SizedBox.shrink();
 
           var width = maxWidth;
           var height = width / widget.aspectRatio;
@@ -123,13 +82,8 @@ class _TwitchMediaKitVideoSurfaceState
           }
           width = width.clamp(1.0, maxWidth).toDouble();
           height = height.clamp(1.0, maxHeight).toDouble();
-
-          // Keep PiP geometry updates coalesced, but let media_kit's Video
-          // widget follow the Flutter layout normally. Caching the Video widget
-          // and forcing it through zero-sized intermediate constraints caused
-          // Android SurfaceTexture resize flashes on some devices.
           WidgetsBinding.instance.addPostFrameCallback(
-            (_) => _scheduleSourceRectHint(),
+            (_) => _reportSourceRectHint(),
           );
 
           final transitionMask = TwitchDvrTransitionMaskController.instance;
