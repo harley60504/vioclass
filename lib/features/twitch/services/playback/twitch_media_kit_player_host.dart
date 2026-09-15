@@ -16,6 +16,18 @@ const bool _debugMinimalLiveWatch = bool.fromEnvironment(
   defaultValue: kDebugMode,
 );
 
+/// Lets us test the exact v1.1.4 mpv/player behavior inside the *normal* Watch
+/// UI. Previously this behavior was coupled to the minimal-Watch switch, which
+/// made the minimal-vs-normal A/B invalid because it changed both UI and player
+/// configuration at the same time.
+const bool _debugV114PlayerConfig = bool.fromEnvironment(
+  'TWITCH_WATCH_DEBUG_V114_PLAYER_CONFIG',
+  defaultValue: false,
+);
+
+const bool _useV114PlayerConfig =
+    _debugMinimalLiveWatch || _debugV114PlayerConfig;
+
 enum _TwitchHlsCacheProfile { lowLatency, liveDvr }
 
 /// Keep the native media_kit [Player] warm for fast re-entry, but let each
@@ -127,7 +139,7 @@ class TwitchMediaKitPlayerHost {
           title: title,
           bufferSize: 8 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
-          options: _debugMinimalLiveWatch
+          options: _useV114PlayerConfig
               ? _v114LowLatencyOptions
               : const <String, String>{
                   'volume': '100',
@@ -141,9 +153,10 @@ class TwitchMediaKitPlayerHost {
       );
       _player = player;
 
-      // The resize-isolation build must match v1.1.4 exactly. v1.1.4 did not
-      // mutate mpv scale/deband/GLSL properties after Player creation.
-      if (!_debugMinimalLiveWatch) {
+      // v1.1.4 did not mutate mpv scale/deband/GLSL properties after Player
+      // creation. Keep that exact behavior whenever the dedicated A/B flag is
+      // active, even though the normal Watch UI remains enabled.
+      if (!_useV114PlayerConfig) {
         await TwitchVideoEnhancementRuntime.applyStoredToPlayer(player);
       } else {
         debugPrint('[ResizeDebug] using exact v1.1.4 Player options');
@@ -250,9 +263,9 @@ class TwitchMediaKitPlayerHost {
     TwitchMediaKitPlayerSession session,
     _TwitchHlsCacheProfile profile,
   ) async {
-    // v1.1.4 had no runtime HLS profile mutation. Keep the debug build on that
-    // exact behavior so this test isolates Player/Video rendering semantics.
-    if (_debugMinimalLiveWatch) return;
+    // v1.1.4 had no runtime HLS profile mutation. Keep that exact behavior for
+    // either the minimal UI test or the dedicated normal-Watch A/B flag.
+    if (_useV114PlayerConfig) return;
 
     await session.ensureReady();
     if (session._released || session.generation != _generation) return;
