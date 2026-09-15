@@ -135,98 +135,171 @@ class TwitchWatchPlayerArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _TwitchWatchPlayerFrame(area: this);
+  }
+}
+
+class _TwitchWatchPlayerFrame extends StatefulWidget {
+  final TwitchWatchPlayerArea area;
+
+  const _TwitchWatchPlayerFrame({required this.area});
+
+  @override
+  State<_TwitchWatchPlayerFrame> createState() =>
+      _TwitchWatchPlayerFrameState();
+}
+
+class _TwitchWatchPlayerFrameState extends State<_TwitchWatchPlayerFrame> {
+  late final WatchControlsChromeController _chromeController;
+
+  @override
+  void initState() {
+    super.initState();
+    _chromeController = WatchControlsChromeController();
+  }
+
+  @override
+  void dispose() {
+    _chromeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final area = widget.area;
     final pip = TwitchAndroidPipController.instance;
     final stableVideoStage = _WatchPlayerVideoStage(
-      controller: videoController,
+      controller: area.videoController,
       usePlaceholder: _debugUseVideoPlaceholder,
-      showOfflinePlaceholder: showOfflinePlaceholder,
-      offlineImageUrl: offlineImageUrl,
+      showOfflinePlaceholder: area.showOfflinePlaceholder,
+      offlineImageUrl: area.offlineImageUrl,
     );
 
     return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[playerRuntime, pip]),
+      animation: Listenable.merge(<Listenable>[area.playerRuntime, pip]),
       child: stableVideoStage,
       builder: (context, child) {
-        final state = _WatchPlayerAreaState.fromWidget(widget: this, pip: pip);
+        final state = _WatchPlayerAreaState.fromWidget(widget: area, pip: pip);
         final showOfflineControls =
-            showOfflinePlaceholder &&
+            area.showOfflinePlaceholder &&
             !state.inPipMode &&
             !_debugHidePlayerOverlay;
         final showPlayerControls =
-            !showOfflinePlaceholder &&
+            !area.showOfflinePlaceholder &&
             state.shouldShowControlsOverlay &&
             !_debugHidePlayerOverlay;
 
-        return _WatchPlayerShell(
+        final fixedPlayer = _FixedPlayerCanvas(
+          child: _WatchPlayerShell(
+            inPipMode: state.inPipMode,
+            video: state.effectiveCurrentVariant?.isAudioOnly == true
+                ? const ColoredBox(color: Colors.black)
+                : child ?? stableVideoStage,
+            overlay: showOfflineControls
+                ? RepaintBoundary(
+                    child: _WatchOfflineControlsOverlay(
+                      chatVisible: state.effectiveChatVisible,
+                      fullscreen: state.effectiveFullscreen,
+                      showFullscreenButton: area.showFullscreenButton,
+                      onToggleChat: area.onToggleChat,
+                      onToggleFullscreen: area.onToggleFullscreen,
+                    ),
+                  )
+                : showPlayerControls
+                ? RepaintBoundary(
+                    child: WatchControlsOverlay(
+                      loading: state.overlayLoading,
+                      error: area.error,
+                      runtimeError: area.playerRuntime.error,
+                      metadata: area.metadata,
+                      isFollowing: area.isFollowing,
+                      followBusy: state.effectiveFollowBusy,
+                      onBack: area.onBack,
+                      onHome: area.onHome,
+                      onToggleFollow: area.onToggleFollow,
+                      onSubscribe: area.onSubscribe,
+                      onOpenChannel: area.onOpenChannel,
+                      onCreateClip: area.onCreateClip,
+                      creatingClip: area.creatingClip,
+                      player: state.player!,
+                      playerRuntime: area.playerRuntime,
+                      muted: area.muted,
+                      volume: area.volume,
+                      fullscreen: state.effectiveFullscreen,
+                      chatVisible: state.effectiveChatVisible,
+                      showFullscreenButton: area.showFullscreenButton,
+                      onToggleMute: area.onToggleMute,
+                      onVolumeChanged: area.onVolumeChanged,
+                      qualityVariants: state.effectiveQualityVariants,
+                      currentVariant: state.effectiveCurrentVariant,
+                      onQualityChanged: state.effectiveOnQualityChanged,
+                      onToggleChat: area.onToggleChat,
+                      onToggleFullscreen: area.onToggleFullscreen,
+                      hasDvrReplay: area.hasDvrReplay,
+                      hasFullLiveDvr: area.hasFullLiveDvr,
+                      showLiveEdgeLabel: area.showLiveEdgeLabel,
+                      liveDvrDuration: area.liveDvrDuration,
+                      liveDvrStartedAt: area.liveDvrStartedAt,
+                      onOpenDvrReplayAtPosition:
+                          area.onOpenDvrReplayAtPosition,
+                      onReturnToLive: area.onReturnToLive,
+                      playbackKind: area.playbackKind,
+                      playbackTimelineController:
+                          area.playbackTimelineController,
+                      timelineEnabled: !state.hasError,
+                      showTopActionBar: false,
+                      chromeController: _chromeController,
+                    ),
+                  )
+                : null,
+            waitingOverlay: null,
+            debugLabel: _debugShowPlayerIsolationLabel
+                ? _buildIsolationDebugLabel()
+                : null,
+          ),
+        );
+
+        Widget? topActionBar;
+        if (showOfflineControls) {
+          topActionBar = _WatchTopActionBarViewport(
+            persistent: true,
+            controller: _chromeController,
+            child: WatchTopActionBar(
+              metadata: area.metadata,
+              isFollowing: area.isFollowing,
+              followBusy: state.effectiveFollowBusy,
+              onBack: area.onBack,
+              onHome: area.onHome,
+              onToggleFollow: area.onToggleFollow,
+              onSubscribe: area.onSubscribe,
+              onOpenChannel: area.onOpenChannel,
+              onCreateClip: null,
+              creatingClip: false,
+            ),
+          );
+        } else if (showPlayerControls) {
+          topActionBar = _WatchTopActionBarViewport(
+            persistent: false,
+            controller: _chromeController,
+            child: WatchTopActionBar(
+              metadata: area.metadata,
+              isFollowing: area.isFollowing,
+              followBusy: state.effectiveFollowBusy,
+              onBack: area.onBack,
+              onHome: area.onHome,
+              onToggleFollow: area.onToggleFollow,
+              onSubscribe: area.onSubscribe,
+              onOpenChannel: area.onOpenChannel,
+              onCreateClip: area.onCreateClip,
+              creatingClip: area.creatingClip,
+            ),
+          );
+        }
+
+        return _WatchPlayerViewportShell(
           inPipMode: state.inPipMode,
-          video: state.effectiveCurrentVariant?.isAudioOnly == true
-              ? const ColoredBox(color: Colors.black)
-              : child ?? stableVideoStage,
-          overlay: showOfflineControls
-              ? RepaintBoundary(
-                  child: _WatchOfflineControlsOverlay(
-                    metadata: metadata,
-                    isFollowing: isFollowing,
-                    followBusy: state.effectiveFollowBusy,
-                    onBack: onBack,
-                    onHome: onHome,
-                    onToggleFollow: onToggleFollow,
-                    onSubscribe: onSubscribe,
-                    onOpenChannel: onOpenChannel,
-                    chatVisible: state.effectiveChatVisible,
-                    fullscreen: state.effectiveFullscreen,
-                    showFullscreenButton: showFullscreenButton,
-                    onToggleChat: onToggleChat,
-                    onToggleFullscreen: onToggleFullscreen,
-                  ),
-                )
-              : showPlayerControls
-              ? RepaintBoundary(
-                  child: WatchControlsOverlay(
-                    loading: state.overlayLoading,
-                    error: error,
-                    runtimeError: playerRuntime.error,
-                    metadata: metadata,
-                    isFollowing: isFollowing,
-                    followBusy: state.effectiveFollowBusy,
-                    onBack: onBack,
-                    onHome: onHome,
-                    onToggleFollow: onToggleFollow,
-                    onSubscribe: onSubscribe,
-                    onOpenChannel: onOpenChannel,
-                    onCreateClip: onCreateClip,
-                    creatingClip: creatingClip,
-                    player: state.player!,
-                    playerRuntime: playerRuntime,
-                    muted: muted,
-                    volume: volume,
-                    fullscreen: state.effectiveFullscreen,
-                    chatVisible: state.effectiveChatVisible,
-                    showFullscreenButton: showFullscreenButton,
-                    onToggleMute: onToggleMute,
-                    onVolumeChanged: onVolumeChanged,
-                    qualityVariants: state.effectiveQualityVariants,
-                    currentVariant: state.effectiveCurrentVariant,
-                    onQualityChanged: state.effectiveOnQualityChanged,
-                    onToggleChat: onToggleChat,
-                    onToggleFullscreen: onToggleFullscreen,
-                    hasDvrReplay: hasDvrReplay,
-                    hasFullLiveDvr: hasFullLiveDvr,
-                    showLiveEdgeLabel: showLiveEdgeLabel,
-                    liveDvrDuration: liveDvrDuration,
-                    liveDvrStartedAt: liveDvrStartedAt,
-                    onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
-                    onReturnToLive: onReturnToLive,
-                    playbackKind: playbackKind,
-                    playbackTimelineController: playbackTimelineController,
-                    timelineEnabled: !state.hasError,
-                  ),
-                )
-              : null,
-          waitingOverlay: null,
-          debugLabel: _debugShowPlayerIsolationLabel
-              ? _buildIsolationDebugLabel()
-              : null,
+          fixedPlayer: fixedPlayer,
+          topActionBar: topActionBar,
         );
       },
     );
@@ -308,6 +381,110 @@ class _WatchPlayerAreaState {
   bool get shouldShowWaitingOverlay => !playerReady && !inPipMode;
 }
 
+class _WatchPlayerViewportShell extends StatelessWidget {
+  final bool inPipMode;
+  final Widget fixedPlayer;
+  final Widget? topActionBar;
+
+  const _WatchPlayerViewportShell({
+    required this.inPipMode,
+    required this.fixedPlayer,
+    required this.topActionBar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: fixedPlayer),
+          if (!inPipMode && topActionBar != null)
+            Positioned(
+              left: 12,
+              right: 12,
+              top: 12,
+              child: topActionBar!,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FixedPlayerCanvas extends StatelessWidget {
+  static const double _canvasWidth = 1280.0;
+  static const double _canvasHeight = 720.0;
+
+  final Widget child;
+
+  const _FixedPlayerCanvas({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black,
+      child: ClipRect(
+        child: FittedBox(
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: _canvasWidth,
+            height: _canvasHeight,
+            child: RepaintBoundary(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _WatchTopActionBarViewport extends StatelessWidget {
+  static const Duration _fadeDuration = Duration(milliseconds: 180);
+
+  final bool persistent;
+  final WatchControlsChromeController controller;
+  final Widget child;
+
+  const _WatchTopActionBarViewport({
+    required this.persistent,
+    required this.controller,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (persistent) {
+      return child;
+    }
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final visible = controller.visible;
+        return IgnorePointer(
+          ignoring: !visible,
+          child: AnimatedOpacity(
+            opacity: visible ? 1 : 0,
+            duration: _fadeDuration,
+            curve: Curves.easeOutCubic,
+            child: MouseRegion(
+              onEnter: (_) => controller.wake(),
+              onHover: (_) => controller.wake(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: controller.wake,
+                child: RepaintBoundary(child: child),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _WatchPlayerShell extends StatelessWidget {
   final bool inPipMode;
   final Widget video;
@@ -378,14 +555,6 @@ class _WatchPlayerVideoStage extends StatelessWidget {
 }
 
 class _WatchOfflineControlsOverlay extends StatelessWidget {
-  final TwitchStreamHeaderMetadata metadata;
-  final bool isFollowing;
-  final bool followBusy;
-  final VoidCallback onBack;
-  final VoidCallback? onHome;
-  final VoidCallback? onToggleFollow;
-  final VoidCallback? onSubscribe;
-  final VoidCallback? onOpenChannel;
   final bool chatVisible;
   final bool fullscreen;
   final bool showFullscreenButton;
@@ -393,14 +562,6 @@ class _WatchOfflineControlsOverlay extends StatelessWidget {
   final VoidCallback? onToggleFullscreen;
 
   const _WatchOfflineControlsOverlay({
-    required this.metadata,
-    required this.isFollowing,
-    required this.followBusy,
-    required this.onBack,
-    required this.onHome,
-    required this.onToggleFollow,
-    required this.onSubscribe,
-    required this.onOpenChannel,
     required this.chatVisible,
     required this.fullscreen,
     required this.showFullscreenButton,
@@ -412,44 +573,6 @@ class _WatchOfflineControlsOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: 136,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.74),
-                    Colors.black.withValues(alpha: 0.38),
-                    Colors.black.withValues(alpha: 0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 12,
-          right: 12,
-          top: 12,
-          child: WatchTopActionBar(
-            metadata: metadata,
-            isFollowing: isFollowing,
-            followBusy: followBusy,
-            onBack: onBack,
-            onHome: onHome,
-            onToggleFollow: onToggleFollow,
-            onSubscribe: onSubscribe,
-            onOpenChannel: onOpenChannel,
-            onCreateClip: null,
-            creatingClip: false,
-          ),
-        ),
         Positioned(
           left: 12,
           right: 12,
