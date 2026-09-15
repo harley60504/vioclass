@@ -11,13 +11,15 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
   defaultValue: true,
 );
 
+const bool _debugMinimalLiveWatch = bool.fromEnvironment(
+  'TWITCH_DEBUG_MINIMAL_LIVE_WATCH',
+  defaultValue: kDebugMode,
+);
+
 enum _TwitchHlsCacheProfile { lowLatency, liveDvr }
 
 /// Keep the native media_kit [Player] warm for fast re-entry, but let each
 /// visible playback session own its [VideoController] / native texture.
-///
-/// This restores the v1.1.4 ownership model on Android-sensitive video
-/// surfaces while preserving the newer playback, DVR and enhancement logic.
 class TwitchMediaKitPlayerHost {
   static Player? _player;
   static int _refCount = 0;
@@ -27,6 +29,20 @@ class TwitchMediaKitPlayerHost {
   static Future<void>? _creatingPlayer;
   static _TwitchHlsCacheProfile _hlsCacheProfile =
       _TwitchHlsCacheProfile.lowLatency;
+
+  static const Map<String, String> _v114LowLatencyOptions = <String, String>{
+    'volume': '100',
+    'volume-max': '100',
+    'force-seekable': 'yes',
+    'video-sync': 'audio',
+    'autosync': '0',
+    'cache': 'no',
+    'cache-pause': 'no',
+    'demuxer-seekable-cache': 'no',
+    'demuxer-readahead-secs': '0',
+    'demuxer-max-back-bytes': '0',
+    'demuxer-max-bytes': '1048576',
+  };
 
   static const Map<String, String> _lowLatencyHlsOptions = <String, String>{
     'cache': 'no',
@@ -111,18 +127,27 @@ class TwitchMediaKitPlayerHost {
           title: title,
           bufferSize: 8 * 1024 * 1024,
           logLevel: kDebugMode ? MPVLogLevel.warn : MPVLogLevel.error,
-          options: const <String, String>{
-            'volume': '100',
-            'volume-max': '100',
-            'force-seekable': 'yes',
-            'video-sync': 'audio',
-            'autosync': '0',
-            ..._lowLatencyHlsOptions,
-          },
+          options: _debugMinimalLiveWatch
+              ? _v114LowLatencyOptions
+              : const <String, String>{
+                  'volume': '100',
+                  'volume-max': '100',
+                  'force-seekable': 'yes',
+                  'video-sync': 'audio',
+                  'autosync': '0',
+                  ..._lowLatencyHlsOptions,
+                },
         ),
       );
       _player = player;
-      await TwitchVideoEnhancementRuntime.applyStoredToPlayer(player);
+
+      // The resize-isolation build must match v1.1.4 exactly. v1.1.4 did not
+      // mutate mpv scale/deband/GLSL properties after Player creation.
+      if (!_debugMinimalLiveWatch) {
+        await TwitchVideoEnhancementRuntime.applyStoredToPlayer(player);
+      } else {
+        debugPrint('[ResizeDebug] using exact v1.1.4 Player options');
+      }
     }();
 
     try {
@@ -225,6 +250,10 @@ class TwitchMediaKitPlayerHost {
     TwitchMediaKitPlayerSession session,
     _TwitchHlsCacheProfile profile,
   ) async {
+    // v1.1.4 had no runtime HLS profile mutation. Keep the debug build on that
+    // exact behavior so this test isolates Player/Video rendering semantics.
+    if (_debugMinimalLiveWatch) return;
+
     await session.ensureReady();
     if (session._released || session.generation != _generation) return;
     if (_hlsCacheProfile == profile) return;
