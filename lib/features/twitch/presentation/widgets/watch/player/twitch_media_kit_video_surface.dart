@@ -66,45 +66,43 @@ class _TwitchMediaKitVideoSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: Colors.black,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final maxWidth = constraints.maxWidth;
-          final maxHeight = constraints.maxHeight;
-          if (maxWidth <= 0 || maxHeight <= 0) {
-            return const SizedBox.shrink();
-          }
+    // Deliberately keep the active playback path transparent. During an
+    // Android texture resize the Flutter layout can advance one frame before
+    // the next texture frame is presented; an opaque backing color here would
+    // become a visible black flash even though playback never stopped.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth;
+        final maxHeight = constraints.maxHeight;
+        if (maxWidth <= 0 || maxHeight <= 0) {
+          return const SizedBox.shrink();
+        }
 
-          var width = maxWidth;
-          var height = width / widget.aspectRatio;
-          if (height > maxHeight) {
-            height = maxHeight;
-            width = height * widget.aspectRatio;
-          }
-          width = width.clamp(1.0, maxWidth).toDouble();
-          height = height.clamp(1.0, maxHeight).toDouble();
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => _reportSourceRectHint(),
-          );
+        var width = maxWidth;
+        var height = width / widget.aspectRatio;
+        if (height > maxHeight) {
+          height = maxHeight;
+          width = height * widget.aspectRatio;
+        }
+        width = width.clamp(1.0, maxWidth).toDouble();
+        height = height.clamp(1.0, maxHeight).toDouble();
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _reportSourceRectHint(),
+        );
 
-          // Keep the active native video path identical to v1.1.4. In
-          // particular, do not cache the Video widget and do not keep a
-          // zero-sized native texture mounted during transient layout sizes.
-          return Center(
-            child: SizedBox(
-              key: _videoSurfaceKey,
-              width: width,
-              height: height,
-              child: Video(
-                controller: widget.controller,
-                fit: widget.fit,
-                controls: widget.controls,
-              ),
+        return Center(
+          child: SizedBox(
+            key: _videoSurfaceKey,
+            width: width,
+            height: height,
+            child: Video(
+              controller: widget.controller,
+              fit: widget.fit,
+              controls: widget.controls,
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
