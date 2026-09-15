@@ -38,14 +38,12 @@ class _TwitchMediaKitVideoSurfaceState
   );
 
   final GlobalKey _videoSurfaceKey = GlobalKey();
-  late Widget _stableVideo;
   Timer? _sourceRectSettleTimer;
   Rect? _lastReportedSourceRect;
 
   @override
   void initState() {
     super.initState();
-    _stableVideo = _buildVideo();
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _scheduleSourceRectHint(),
     );
@@ -54,11 +52,6 @@ class _TwitchMediaKitVideoSurfaceState
   @override
   void didUpdateWidget(covariant TwitchMediaKitVideoSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.controller, widget.controller) ||
-        oldWidget.fit != widget.fit ||
-        oldWidget.controls != widget.controls) {
-      _stableVideo = _buildVideo();
-    }
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _scheduleSourceRectHint(),
     );
@@ -68,14 +61,6 @@ class _TwitchMediaKitVideoSurfaceState
   void dispose() {
     _sourceRectSettleTimer?.cancel();
     super.dispose();
-  }
-
-  Widget _buildVideo() {
-    return Video(
-      controller: widget.controller,
-      fit: widget.fit,
-      controls: widget.controls,
-    );
   }
 
   void _scheduleSourceRectHint() {
@@ -126,29 +111,23 @@ class _TwitchMediaKitVideoSurfaceState
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
           final maxHeight = constraints.maxHeight;
-
-          // Keep the native Video widget mounted even when an interactive
-          // layout resize briefly produces a zero-sized constraint. Removing
-          // it from the tree detaches/re-attaches the texture and can expose a
-          // black frame while dragging the chat/player divider.
-          var width = 0.0;
-          var height = 0.0;
-          if (maxWidth > 0 && maxHeight > 0) {
-            width = maxWidth;
-            height = width / widget.aspectRatio;
-            if (height > maxHeight) {
-              height = maxHeight;
-              width = height * widget.aspectRatio;
-            }
-            width = width.clamp(1.0, maxWidth).toDouble();
-            height = height.clamp(1.0, maxHeight).toDouble();
+          if (maxWidth <= 0 || maxHeight <= 0) {
+            return const SizedBox.shrink();
           }
 
-          // Android PiP source-rect updates are intentionally coalesced.
-          // During an interactive resize this builder can run every pointer
-          // frame; pushing PictureInPictureParams for each intermediate size
-          // causes unnecessary native window/surface work and visible flashes
-          // on some devices. Wait until the geometry settles instead.
+          var width = maxWidth;
+          var height = width / widget.aspectRatio;
+          if (height > maxHeight) {
+            height = maxHeight;
+            width = height * widget.aspectRatio;
+          }
+          width = width.clamp(1.0, maxWidth).toDouble();
+          height = height.clamp(1.0, maxHeight).toDouble();
+
+          // Keep PiP geometry updates coalesced, but let media_kit's Video
+          // widget follow the Flutter layout normally. Caching the Video widget
+          // and forcing it through zero-sized intermediate constraints caused
+          // Android SurfaceTexture resize flashes on some devices.
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scheduleSourceRectHint(),
           );
@@ -161,7 +140,11 @@ class _TwitchMediaKitVideoSurfaceState
               height: height,
               child: AnimatedBuilder(
                 animation: transitionMask,
-                child: _stableVideo,
+                child: Video(
+                  controller: widget.controller,
+                  fit: widget.fit,
+                  controls: widget.controls,
+                ),
                 builder: (context, video) {
                   return Stack(
                     fit: StackFit.expand,
