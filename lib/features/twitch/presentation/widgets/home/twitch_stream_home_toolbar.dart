@@ -19,6 +19,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   final Future<void> Function() onOpenDropsConnector;
   final Future<void> Function() onOpenSettings;
   final bool forceTwoRows;
+  final bool showSectionSwitcher;
 
   const TwitchStreamHomeToolbar({
     super.key,
@@ -33,6 +34,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
     required this.onOpenDropsConnector,
     required this.onOpenSettings,
     this.forceTwoRows = false,
+    this.showSectionSwitcher = true,
   });
 
   @override
@@ -53,12 +55,14 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _HomeSectionSwitcher(
-                    selectedSection: selectedSection,
-                    onSelectSection: onSelectSection,
-                    compact: true,
-                  ),
-                  const SizedBox(width: TwitchUiSpacing.space8),
+                  if (showSectionSwitcher) ...[
+                    _HomeSectionSwitcher(
+                      selectedSection: selectedSection,
+                      onSelectSection: onSelectSection,
+                      compact: true,
+                    ),
+                    const SizedBox(width: TwitchUiSpacing.space8),
+                  ],
                   ..._buildActions(context, compact: true),
                 ],
               ),
@@ -72,11 +76,13 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
       height: 54,
       child: Row(
         children: [
-          _HomeSectionSwitcher(
-            selectedSection: selectedSection,
-            onSelectSection: onSelectSection,
-          ),
-          const SizedBox(width: TwitchUiSpacing.space12),
+          if (showSectionSwitcher) ...[
+            _HomeSectionSwitcher(
+              selectedSection: selectedSection,
+              onSelectSection: onSelectSection,
+            ),
+            const SizedBox(width: TwitchUiSpacing.space12),
+          ],
           Expanded(
             child: Align(
               alignment: Alignment.center,
@@ -239,58 +245,12 @@ class _HomeSectionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TwitchGlassSurface(
-      borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-      backgroundColor: selected
-          ? TwitchUiColors.primary.withValues(alpha: 0.22)
-          : _homeGlassFill(alpha: 0.30),
-      borderColor: selected
-          ? TwitchUiColors.primarySoft.withValues(alpha: 0.28)
-          : _homeGlassBorder(alpha: 0.09),
-      blurSigma: TwitchUiGlass.blurStrong,
-      boxShadow: TwitchUiShadows.soft,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-          onTap: onPressed,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact
-                  ? TwitchUiSpacing.space12
-                  : TwitchUiSpacing.space16,
-              vertical: TwitchUiSpacing.space8,
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  section.icon,
-                  size: compact ? 17 : 18,
-                  color: selected
-                      ? TwitchUiColors.primarySoft
-                      : TwitchUiColors.textSecondary,
-                ),
-                if (!compact) ...[
-                  const SizedBox(width: TwitchUiSpacing.space8),
-                  Text(
-                    section.localizedLabel(context),
-                    style: TextStyle(
-                      color: selected
-                          ? TwitchUiColors.textPrimary
-                          : TwitchUiColors.textSecondary,
-                      fontSize: TwitchUiFontSize.bodyCompact,
-                      fontWeight: TwitchUiFontWeight.strong,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    return TwitchStreamHomeToolbarIconButton(
+      tooltip: section.localizedLabel(context),
+      icon: section.icon,
+      selected: selected,
+      compact: compact,
+      onPressed: onPressed,
     );
   }
 }
@@ -300,6 +260,7 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onPressed;
   final bool compact;
+  final bool selected;
 
   const TwitchStreamHomeToolbarIconButton({
     super.key,
@@ -307,6 +268,7 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
     required this.icon,
     required this.onPressed,
     this.compact = false,
+    this.selected = false,
   });
 
   @override
@@ -316,8 +278,12 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
       message: tooltip,
       child: TwitchGlassSurface(
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        backgroundColor: _homeGlassFill(alpha: 0.30),
-        borderColor: _homeGlassBorder(alpha: 0.09),
+        backgroundColor: selected
+            ? TwitchUiColors.primary.withValues(alpha: 0.22)
+            : _homeGlassFill(alpha: 0.30),
+        borderColor: selected
+            ? TwitchUiColors.primarySoft.withValues(alpha: 0.28)
+            : _homeGlassBorder(alpha: 0.09),
         blurSigma: TwitchUiGlass.blurStrong,
         boxShadow: TwitchUiShadows.soft,
         child: Material(
@@ -333,6 +299,8 @@ class TwitchStreamHomeToolbarIconButton extends StatelessWidget {
                 icon,
                 color: onPressed == null
                     ? TwitchUiColors.disabledForeground
+                    : selected
+                    ? TwitchUiColors.primarySoft
                     : TwitchUiColors.textSecondary,
                 size: compact ? 19 : 21,
               ),

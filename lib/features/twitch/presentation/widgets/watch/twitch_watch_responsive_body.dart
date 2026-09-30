@@ -13,7 +13,6 @@ const bool _enableWatchPlayer = bool.fromEnvironment(
 );
 
 class TwitchWatchResponsiveBody extends StatelessWidget {
-  static const double _chatMinWidthVisualBoost = 18.0;
   static const double _playerAspectRatio = 16 / 9;
 
   final bool chatVisible;
@@ -131,23 +130,28 @@ class TwitchWatchResponsiveBody extends StatelessWidget {
     return 12;
   }
 
+  static double chatResizeHandleWidthFor(TwitchResponsiveLayout layout) {
+    if (layout.isDesktop) return shellGapFor(layout);
+    return 18;
+  }
+
   double _effectiveChatPanelWidthForViewport(TwitchResponsiveLayout layout) {
     final horizontalPadding = shellPaddingFor(layout).horizontal;
-    final gapWidth = chatVisible ? shellGapFor(layout) : 0.0;
+    final gapWidth = chatVisible ? chatResizeHandleWidthFor(layout) : 0.0;
     final usableWidth = (layout.width - horizontalPadding - gapWidth)
         .clamp(1.0, layout.width)
         .toDouble();
     final ratioWidth = usableWidth * chatPanelRatio;
     final minByViewport = usableWidth * minChatPanelRatio;
-    final boostedMinChatPanelWidth =
-        minChatPanelWidth + _chatMinWidthVisualBoost;
-    final boostedMaxEffectiveMinChatPanelWidth =
-        maxEffectiveMinChatPanelWidth + _chatMinWidthVisualBoost;
-    final minWidth = minByViewport
-        .clamp(boostedMinChatPanelWidth, boostedMaxEffectiveMinChatPanelWidth)
+    final preferredMinWidth = minByViewport
+        .clamp(minChatPanelWidth, maxEffectiveMinChatPanelWidth)
         .toDouble();
+    final availableMaxWidth = (usableWidth - 120.0)
+        .clamp(1.0, maxChatPanelWidth)
+        .toDouble();
+    final minWidth = preferredMinWidth.clamp(1.0, availableMaxWidth).toDouble();
     final maxWidth = maxChatPanelWidth
-        .clamp(minWidth, usableWidth - 120.0)
+        .clamp(minWidth, availableMaxWidth)
         .toDouble();
     return ratioWidth.clamp(minWidth, maxWidth).toDouble();
   }
@@ -255,11 +259,12 @@ class _SideChatLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shellPadding = TwitchWatchResponsiveBody.shellPaddingFor(layout);
-    final shellGap = TwitchWatchResponsiveBody.shellGapFor(layout);
-    final showResizeHandle = !layout.shouldDisableWatchChatResizeHandle;
-    final usableWidth = (layout.width - shellPadding.horizontal - shellGap)
-        .clamp(1.0, layout.width)
-        .toDouble();
+    final resizeHandleWidth =
+        TwitchWatchResponsiveBody.chatResizeHandleWidthFor(layout);
+    final usableWidth =
+        (layout.width - shellPadding.horizontal - resizeHandleWidth)
+            .clamp(1.0, layout.width)
+            .toDouble();
     var dragStartWidth = chatPanelWidth;
     var accumulatedDx = 0.0;
 
@@ -273,23 +278,21 @@ class _SideChatLayout extends StatelessWidget {
           ),
           if (chatVisible)
             SizedBox(
-              width: shellGap,
-              child: showResizeHandle
-                  ? TwitchWatchChatResizeHandle(
-                      onDragStart: (_) {
-                        dragStartWidth = chatPanelWidth;
-                        accumulatedDx = 0.0;
-                      },
-                      onDragUpdate: (delta) {
-                        accumulatedDx += delta.delta.dx;
-                        onSetChatPanelWidthForViewport(
-                          viewportWidth: usableWidth,
-                          value: dragStartWidth - accumulatedDx,
-                        );
-                      },
-                      onDragEnd: onPersistChatPanelWidth,
-                    )
-                  : const SizedBox.expand(),
+              width: resizeHandleWidth,
+              child: TwitchWatchChatResizeHandle(
+                onDragStart: (_) {
+                  dragStartWidth = chatPanelWidth;
+                  accumulatedDx = 0.0;
+                },
+                onDragUpdate: (delta) {
+                  accumulatedDx += delta.delta.dx;
+                  onSetChatPanelWidthForViewport(
+                    viewportWidth: usableWidth,
+                    value: dragStartWidth - accumulatedDx,
+                  );
+                },
+                onDragEnd: onPersistChatPanelWidth,
+              ),
             ),
           if (chatVisible)
             SizedBox(

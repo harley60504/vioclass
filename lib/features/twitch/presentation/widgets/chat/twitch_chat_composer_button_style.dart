@@ -26,6 +26,7 @@ ButtonStyle twitchChatComposerButtonStyle({
   return TextButton.styleFrom(
     minimumSize: const Size(36, 36),
     maximumSize: const Size(double.infinity, 36),
+    visualDensity: VisualDensity.standard,
     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     padding: padding,
     backgroundColor: background,

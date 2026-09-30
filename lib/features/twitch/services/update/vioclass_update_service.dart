@@ -7,10 +7,16 @@ import 'package:path_provider/path_provider.dart';
 const String _vioclassVersionOverride = String.fromEnvironment(
   'VIOCLASS_VERSION',
 );
+const String _vioclassUpdateChannel = String.fromEnvironment(
+  'VIOCLASS_UPDATE_CHANNEL',
+  defaultValue: 'stable',
+);
 
 class VioClassUpdateService {
   static const String latestReleaseUrl =
       'https://api.github.com/repos/harley60504/vioclass/releases/latest';
+  static const String releasesUrl =
+      'https://api.github.com/repos/harley60504/vioclass/releases';
 
   final Dio _dio;
   final bool _closeDioOnDispose;
@@ -32,9 +38,9 @@ class VioClassUpdateService {
 
   Future<VioClassUpdateInfo> checkLatest() async {
     final currentVersion = await _currentVersion();
-    final response = await _dio.get<Map<String, dynamic>>(latestReleaseUrl);
-    final raw = response.data ?? const <String, dynamic>{};
-    final release = VioClassRelease.fromGithubJson(raw);
+    final release = _vioclassUpdateChannel == 'beta'
+        ? await _latestBetaRelease()
+        : await _latestStableRelease();
     return VioClassUpdateInfo(
       currentVersion: currentVersion,
       release: release,
@@ -43,6 +49,37 @@ class VioClassUpdateService {
         currentVersion,
       ).isNewer,
     );
+  }
+
+  Future<VioClassRelease> _latestStableRelease() async {
+    final response = await _dio.get<Map<String, dynamic>>(latestReleaseUrl);
+    return VioClassRelease.fromGithubJson(
+      response.data ?? const <String, dynamic>{},
+    );
+  }
+
+  Future<VioClassRelease> _latestBetaRelease() async {
+    final response = await _dio.get<List<dynamic>>(
+      releasesUrl,
+      queryParameters: const <String, Object>{'per_page': 20},
+    );
+    final releases = (response.data ?? const <dynamic>[])
+        .whereType<Map<String, dynamic>>()
+        .where((json) => json['draft'] != true)
+        .map(VioClassRelease.fromGithubJson)
+        .where((release) => release.tagName.isNotEmpty)
+        .toList(growable: false);
+    if (releases.isEmpty) {
+      throw StateError('GitHub 上找不到可用的更新版本。');
+    }
+
+    var latest = releases.first;
+    for (final release in releases.skip(1)) {
+      if (_compareVersions(release.version, latest.version).isNewer) {
+        latest = release;
+      }
+    }
+    return latest;
   }
 
   Future<String> _currentVersion() async {

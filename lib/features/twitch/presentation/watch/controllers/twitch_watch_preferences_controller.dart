@@ -46,8 +46,8 @@ class TwitchWatchPreferencesController extends ChangeNotifier {
     this.lastNonZeroVolume = 100.0,
     this.muted = false,
     this.chatVisible = true,
-    this.minChatPanelWidth = 180.0,
-    this.maxEffectiveMinChatPanelWidth = 280.0,
+    this.minChatPanelWidth = 300.0,
+    this.maxEffectiveMinChatPanelWidth = 340.0,
     this.maxChatPanelWidth = 620.0,
     this.minChatPanelRatio = 0.22,
     this.minStoredChatPanelRatio = 0.08,
@@ -137,11 +137,17 @@ class TwitchWatchPreferencesController extends ChangeNotifier {
   }) {
     if (viewportWidth <= 0) return;
     final ratioLimitedMin = viewportWidth * minChatPanelRatio;
-    final effectiveMinWidth = ratioLimitedMin
+    final preferredMinWidth = ratioLimitedMin
         .clamp(minChatPanelWidth, maxEffectiveMinChatPanelWidth)
         .toDouble();
+    final availableMaxWidth = (viewportWidth - 120.0)
+        .clamp(1.0, maxChatPanelWidth)
+        .toDouble();
+    final effectiveMinWidth = preferredMinWidth
+        .clamp(1.0, availableMaxWidth)
+        .toDouble();
     final effectiveMaxWidth = maxChatPanelWidth
-        .clamp(effectiveMinWidth, viewportWidth - 120.0)
+        .clamp(effectiveMinWidth, availableMaxWidth)
         .toDouble();
     final nextWidth = value
         .clamp(effectiveMinWidth, effectiveMaxWidth)

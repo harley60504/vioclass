@@ -7,7 +7,7 @@ import '../../../models/engagement/twitch_prediction.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
-import '../../../services/notifications/twitch_app_notification_service.dart';
+import '../../../services/notifications/twitch_system_notification_service.dart';
 
 class TwitchWatchEngagementController extends ChangeNotifier {
   final dynamic emotesPort;
@@ -239,19 +239,21 @@ class TwitchWatchEngagementController extends ChangeNotifier {
       final earned = result.pointsEarned > 0
           ? result.pointsEarned
           : fallbackPoints;
-      twitchAppNotificationCenter.showSuccess(
-        title: '已領取 $pointName',
-        message: '${channelLogin()} +$earned',
-        duration: const Duration(seconds: 5),
+      unawaited(
+        twitchSystemNotificationService.showChannelPoints(
+          title: '已領取 $pointName',
+          message: '${channelLogin()} +$earned',
+        ),
       );
 
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
       if (_disposed) return;
-      twitchAppNotificationCenter.showWarning(
-        title: '$pointName 領取失敗',
-        message: '請稍後再試，或重新整理聊天室活動。',
-        duration: const Duration(seconds: 8),
+      unawaited(
+        twitchSystemNotificationService.showChannelPoints(
+          title: '$pointName 領取失敗',
+          message: '請稍後再試，或重新整理聊天室活動。',
+        ),
       );
     } finally {
       _processingChannelPointBonusByState[stateKey]?.remove(bonusKey);
@@ -281,10 +283,11 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     final name = channelPoints.pointsName?.trim();
     final pointName = name == null || name.isEmpty ? 'Channel Points' : name;
 
-    twitchAppNotificationCenter.showInfo(
-      title: '可領取 $pointName',
-      message: '${channelLogin()} 可領取 $pointsText',
-      duration: const Duration(seconds: 7),
+    unawaited(
+      twitchSystemNotificationService.showChannelPoints(
+        title: '可領取 $pointName',
+        message: '${channelLogin()} 可領取 $pointsText',
+      ),
     );
   }
 
@@ -306,10 +309,11 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     final name = channelPoints.pointsName?.trim();
     final pointName = name == null || name.isEmpty ? 'Channel Points' : name;
 
-    twitchAppNotificationCenter.showInfo(
-      title: '$pointName 增加',
-      message: '${channelLogin()} +$delta，目前 $balance',
-      duration: const Duration(seconds: 5),
+    unawaited(
+      twitchSystemNotificationService.showChannelPoints(
+        title: '$pointName 增加',
+        message: '${channelLogin()} +$delta，目前 $balance',
+      ),
     );
   }
 

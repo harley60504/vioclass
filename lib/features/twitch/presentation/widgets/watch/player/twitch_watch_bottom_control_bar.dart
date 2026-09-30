@@ -273,7 +273,9 @@ class _WatchBottomControlBarLayout {
   factory _WatchBottomControlBarLayout.fromWidth(double width) {
     final veryNarrow = width < 430;
     final useCompactLayout = width < 700;
-    final barHeight = useCompactLayout ? 58.0 : 72.0;
+    final barHeight = useCompactLayout
+        ? TwitchUiControlSize.playerBarCompact
+        : TwitchUiControlSize.playerBar;
 
     return _WatchBottomControlBarLayout(
       veryNarrow: veryNarrow,
@@ -299,7 +301,7 @@ class _WatchBottomControlSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TwitchGlassSurface(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(TwitchUiRadius.lg),
       backgroundColor: Colors.black.withValues(alpha: 0.56),
       borderColor: Colors.white.withValues(alpha: 0.12),
       blurSigma: 0,

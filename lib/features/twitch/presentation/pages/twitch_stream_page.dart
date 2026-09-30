@@ -12,6 +12,7 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/connectivity/vioclass_connectivity_service.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../../services/notifications/twitch_system_notification_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../platform/android_pip/twitch_android_pip_controller.dart';
 import '../settings/twitch_chat_appearance_controller.dart';

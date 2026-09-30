@@ -11,6 +11,8 @@ class TwitchStreamPage extends StatefulWidget {
 
 class _TwitchStreamPageState extends State<TwitchStreamPage>
     with WidgetsBindingObserver {
+  static const Duration _followedLivePollInterval = Duration(minutes: 2);
+
   final TextEditingController searchController = TextEditingController();
 
   final GlobalKey<TwitchFollowingPageState> followingPageKey =
@@ -49,6 +51,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   bool _loginStateLoadRunning = false;
   int _channelSearchGeneration = 0;
   Timer? _channelSearchDebounce;
+  Timer? _followedLiveNotificationTimer;
+  Set<String> _knownFollowedLiveStreamIds = <String>{};
+  bool _hasFollowedLiveBaseline = false;
+  bool _checkingFollowedLiveNotifications = false;
   StreamSubscription<VioClassConnectivitySnapshot>?
   _networkRestoredSubscription;
   StreamSubscription<VioClassConnectivitySnapshot>? _networkLostSubscription;
@@ -125,6 +131,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     );
     unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(false));
     _channelSearchDebounce?.cancel();
+    _followedLiveNotificationTimer?.cancel();
     unawaited(_networkRestoredSubscription?.cancel());
     unawaited(_networkLostSubscription?.cancel());
     searchController.dispose();
@@ -139,6 +146,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _syncRootAutoPip();
+      if (_followedLiveNotificationTimer != null) {
+        unawaited(_checkFollowedLiveNotifications());
+      }
     }
   }
 
@@ -177,6 +187,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       final token = await authService.getValidAccessToken();
       var nextViewerLabel = '未登入';
       var nextStatus = '未登入 Twitch';
+      var canReadFollows = false;
 
       if (token != null && token.trim().isNotEmpty) {
         try {
@@ -185,6 +196,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
               ? '已登入'
               : '@${validation.login}';
           final hasFollows = validation.scopes.contains('user:read:follows');
+          canReadFollows = hasFollows;
           final hasChatRead = validation.scopes.contains('chat:read');
           final hasChatEdit = validation.scopes.contains('chat:edit');
           nextStatus = hasFollows && hasChatRead && hasChatEdit
@@ -203,6 +215,11 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
         loadingLoginState = false;
         if (refreshPages) reloadTick++;
       });
+      if (canReadFollows) {
+        _startFollowedLiveNotificationMonitor();
+      } else {
+        _stopFollowedLiveNotificationMonitor();
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -257,6 +274,73 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       loginStatus = '已登出';
       reloadTick++;
     });
+    _stopFollowedLiveNotificationMonitor();
+  }
+
+  void _startFollowedLiveNotificationMonitor() {
+    if (_followedLiveNotificationTimer != null) return;
+    unawaited(_checkFollowedLiveNotifications());
+    _followedLiveNotificationTimer = Timer.periodic(
+      _followedLivePollInterval,
+      (_) => unawaited(_checkFollowedLiveNotifications()),
+    );
+  }
+
+  void _stopFollowedLiveNotificationMonitor() {
+    _followedLiveNotificationTimer?.cancel();
+    _followedLiveNotificationTimer = null;
+    _knownFollowedLiveStreamIds = <String>{};
+    _hasFollowedLiveBaseline = false;
+  }
+
+  Future<void> _checkFollowedLiveNotifications() async {
+    if (_checkingFollowedLiveNotifications) return;
+    _checkingFollowedLiveNotifications = true;
+
+    try {
+      final page = await discoveryService.fetchFollowedStreams(first: 100);
+      if (!mounted || _followedLiveNotificationTimer == null) return;
+
+      final currentIds = <String>{};
+      for (final stream in page.streams) {
+        currentIds.add(_liveNotificationIdentity(stream));
+      }
+
+      if (!_hasFollowedLiveBaseline) {
+        _knownFollowedLiveStreamIds = currentIds;
+        _hasFollowedLiveBaseline = true;
+        return;
+      }
+
+      final newlyLive = page.streams
+          .where(
+            (stream) => !_knownFollowedLiveStreamIds.contains(
+              _liveNotificationIdentity(stream),
+            ),
+          )
+          .toList(growable: false);
+      _knownFollowedLiveStreamIds = currentIds;
+
+      if (newlyLive.length > 3) {
+        await twitchSystemNotificationService.showMultipleStreamsLive(
+          newlyLive,
+        );
+      } else {
+        for (final stream in newlyLive) {
+          await twitchSystemNotificationService.showStreamLive(stream);
+        }
+      }
+    } catch (_) {
+      // Login, network and Twitch API failures are retried on the next poll.
+    } finally {
+      _checkingFollowedLiveNotifications = false;
+    }
+  }
+
+  String _liveNotificationIdentity(TwitchLiveStream stream) {
+    final streamId = stream.id.trim();
+    if (streamId.isNotEmpty) return streamId;
+    return '${stream.userId.trim()}:${stream.startedAt?.toIso8601String() ?? ''}';
   }
 
   Future<void> openDropsConnectorPage() async {

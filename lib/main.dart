@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'app.dart';
 import 'features/twitch/platform/twitch_desktop_webview_entry.dart';
+import 'features/twitch/services/notifications/twitch_system_notification_service.dart';
 
 const bool _disableDebugSemantics = bool.fromEnvironment(
   'TWITCH_DISABLE_DEBUG_SEMANTICS',
@@ -14,11 +15,12 @@ const bool _filterAxTreeDebugLogs = bool.fromEnvironment(
   defaultValue: true,
 );
 
-void main(List<String> args) {
+Future<void> main(List<String> args) async {
   if (tryRunTwitchDesktopWebViewEntry(args)) return;
 
   WidgetsFlutterBinding.ensureInitialized();
   _installDebugLogFilter();
+  await twitchSystemNotificationService.initialize();
 
   final app = kDebugMode && _disableDebugSemantics
       ? const ExcludeSemantics(child: VioClassApp())

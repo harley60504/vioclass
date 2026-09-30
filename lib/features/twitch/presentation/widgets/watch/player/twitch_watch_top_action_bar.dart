@@ -95,19 +95,21 @@ class _WatchTopActionBarMetrics {
   });
 
   factory _WatchTopActionBarMetrics.fromWidth(double width) {
-    final compact = width < 680;
+    final compact = width < 700;
     final tiny = width < 430;
     final controlHeight = tiny
         ? TwitchUiControlSize.hitCompact
         : compact
-            ? TwitchUiControlSize.hit
-            : TwitchUiControlSize.hitLarge;
+        ? TwitchUiControlSize.hit
+        : TwitchUiControlSize.hitLarge;
 
     return _WatchTopActionBarMetrics(
       compact: compact,
       tiny: tiny,
       actionGap: tiny ? TwitchUiSpacing.space4 : TwitchUiSpacing.space8,
-      slotHeight: controlHeight + TwitchUiSpacing.space12,
+      slotHeight: compact
+          ? TwitchUiControlSize.playerBarCompact
+          : TwitchUiControlSize.playerBar,
       controlHeight: controlHeight,
       designWidth: compact ? (tiny ? 430.0 : 560.0) : 940.0,
     );

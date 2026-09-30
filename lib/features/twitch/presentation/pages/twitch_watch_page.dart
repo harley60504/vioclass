@@ -77,8 +77,8 @@ const bool enableWatchPlayer = bool.fromEnvironment(
 
 const bool enableChannelPointEmoteMenu = true;
 
-const double minChatPanelWidth = 180.0;
-const double maxEffectiveMinChatPanelWidth = 280.0;
+const double minChatPanelWidth = 300.0;
+const double maxEffectiveMinChatPanelWidth = 340.0;
 const double maxChatPanelWidth = 620.0;
 const double minChatPanelRatio = 0.22;
 const double minStoredChatPanelRatio = 0.08;

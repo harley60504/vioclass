@@ -242,8 +242,8 @@ class TwitchUiControlSize {
   static const double hitCompact = 34;
   static const double hit = 40;
   static const double hitLarge = 46;
-  static const double playerBarCompact = 58;
-  static const double playerBar = 68;
+  static const double playerBarCompact = hitLarge;
+  static const double playerBar = hitLarge;
 }
 
 class TwitchUiGlass {
@@ -274,11 +274,7 @@ class TwitchUiShadows {
   static const List<BoxShadow> none = <BoxShadow>[];
 
   static const List<BoxShadow> soft = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x66000000),
-      blurRadius: 16,
-      offset: Offset(0, 5),
-    ),
+    BoxShadow(color: Color(0x66000000), blurRadius: 16, offset: Offset(0, 5)),
   ];
 
   static const List<BoxShadow> floating = <BoxShadow>[

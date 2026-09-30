@@ -44,7 +44,9 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
   Widget _buildMobileShell(TwitchResponsiveLayout layout) {
     return Column(
       children: <Widget>[
-        Expanded(child: _buildContentColumn(layout)),
+        Expanded(
+          child: _buildContentColumn(layout, showSectionSwitcher: false),
+        ),
         TwitchStreamHomeBottomNavigation(
           selectedSection: selectedSection,
           onSelectSection: selectSection,
@@ -53,7 +55,10 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
     );
   }
 
-  Widget _buildContentColumn(TwitchResponsiveLayout layout) {
+  Widget _buildContentColumn(
+    TwitchResponsiveLayout layout, {
+    bool showSectionSwitcher = true,
+  }) {
     final twoRows = layout.shouldUseTwoRowHomeToolbar;
 
     return DecoratedBox(
@@ -82,6 +87,7 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
               onSelectSection: selectSection,
               searchController: searchController,
               forceTwoRows: twoRows,
+              showSectionSwitcher: showSectionSwitcher,
               onSearchChanged: updateSearchText,
               onClearSearch: () {
                 searchController.clear();
@@ -189,9 +195,7 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
           );
           videoResults.addAll(
             page.videos
-                .where(
-                  (video) => _matchesSearchMediaVideo(video, cleanKeyword),
-                )
+                .where((video) => _matchesSearchMediaVideo(video, cleanKeyword))
                 .take(4)
                 .map(
                   (video) =>
@@ -209,9 +213,7 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
           );
           clipResults.addAll(
             page.clips
-                .where(
-                  (clip) => _matchesSearchMediaClip(clip, cleanKeyword),
-                )
+                .where((clip) => _matchesSearchMediaClip(clip, cleanKeyword))
                 .take(4)
                 .map(
                   (clip) =>
