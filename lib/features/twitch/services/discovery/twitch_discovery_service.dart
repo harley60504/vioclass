@@ -109,6 +109,37 @@ class TwitchDiscoveryService {
     return page;
   }
 
+  /// Complete followed-live snapshot in the same order as the follows API.
+  /// Rail data is transient; no new account/token or disk storage is used.
+  Future<List<TwitchLiveStream>> fetchFollowedLiveRailStreams() async {
+    await resolveViewerAuth(forceValidate: true);
+    final streams = <TwitchLiveStream>[];
+    final ids = <String>{};
+    final cursors = <String>{};
+    String? cursor;
+    do {
+      final page = await fetchFollowedStreams(after: cursor);
+      for (final stream in page.streams) {
+        if (ids.add(stream.userId)) streams.add(stream);
+      }
+      cursor = page.cursor;
+      if (cursor != null && cursor.isNotEmpty && !cursors.add(cursor)) {
+        throw const TwitchApiException('追隨直播分頁重複，請稍後再試。');
+      }
+    } while (cursor != null && cursor.isNotEmpty);
+    if (streams.isEmpty) return streams;
+    final auth = await resolveViewerAuth();
+    final result = await _attachLiveStreamProfiles(
+      auth: auth,
+      streams: streams,
+    );
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(
+      result,
+      isFollowed: true,
+    );
+    return result;
+  }
+
   Future<TwitchFollowedChannelPageResult> fetchFollowedChannels({
     String? after,
     int first = 100,

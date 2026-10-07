@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'features/twitch/platform/twitch_desktop_webview_entry.dart';
@@ -20,6 +21,13 @@ Future<void> main(List<String> args) async {
 
   WidgetsFlutterBinding.ensureInitialized();
   _installDebugLogFilter();
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+    await windowManager.ensureInitialized();
+    await windowManager.setTitleBarStyle(
+      TitleBarStyle.hidden,
+      windowButtonVisibility: false,
+    );
+  }
   await twitchSystemNotificationService.initialize();
 
   final app = kDebugMode && _disableDebugSemantics

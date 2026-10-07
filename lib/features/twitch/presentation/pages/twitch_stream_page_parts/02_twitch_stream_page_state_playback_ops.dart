@@ -158,6 +158,7 @@ extension _TwitchStreamPageStateSessionOps on _TwitchStreamPageState {
     if (!mounted || !updateController.autoCheckEnabled) return;
     final info = await updateController.checkNow();
     if (!mounted || info?.updateAvailable != true) return;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) return;
     unawaited(
       showVioClassUpdateSheet(
         context: context,

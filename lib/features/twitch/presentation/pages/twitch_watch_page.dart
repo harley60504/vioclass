@@ -21,6 +21,8 @@ import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
 import '../../services/chat/twitch_chat_runtime.dart';
+import '../../services/chat/twitch_moderation_log_archive_store.dart';
+import '../../services/chat/twitch_moderation_log_controller.dart';
 import '../../services/chat/twitch_vod_chat_replay_runtime.dart';
 import '../../services/connectivity/vioclass_connectivity_service.dart';
 import '../../services/discovery/twitch_channel_snapshot_cache.dart';
@@ -54,6 +56,8 @@ import '../widgets/channel/twitch_channel_about_section.dart';
 import '../widgets/watch/twitch_offline_latest_vod_card.dart';
 import '../widgets/watch/chat/twitch_vod_replay_chat_panel.dart';
 import '../widgets/shared/twitch_notice.dart';
+import '../widgets/home/twitch_followed_live_rail.dart';
+import 'twitch_watch_route_guard.dart';
 import '../widgets/watch/twitch_watch_responsive_body.dart';
 import '../settings/twitch_player_settings_controller.dart';
 import 'twitch_channel_page.dart';
@@ -77,8 +81,8 @@ const bool enableWatchPlayer = bool.fromEnvironment(
 
 const bool enableChannelPointEmoteMenu = true;
 
-const double minChatPanelWidth = 300.0;
-const double maxEffectiveMinChatPanelWidth = 340.0;
+const double minChatPanelWidth = 220.0;
+const double maxEffectiveMinChatPanelWidth = 260.0;
 const double maxChatPanelWidth = 620.0;
 const double minChatPanelRatio = 0.22;
 const double minStoredChatPanelRatio = 0.08;
@@ -223,6 +227,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   late final TwitchWatchSessionHandles session;
   late final TwitchWatchPreferencesController preferencesController;
   late final TwitchWatchChatController chatController;
+  final moderationLogController = TwitchModerationLogController(
+    archive: TwitchModerationLogArchiveStore.local(),
+  );
+  String? moderationLogContextKey;
+  TwitchChatRuntime? moderationLogRuntime;
   late final TwitchWatchEngagementController engagementController;
   late final TwitchWatchRelationshipController relationshipController;
   late final TwitchWatchPlaybackController playbackController;
@@ -547,6 +556,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       },
       showMessage: showSnack,
     )..addListener(notifyControllerChanged);
+    chatController.addListener(syncModerationLogContext);
     engagementController = TwitchWatchEngagementController(
       emotesPort: watchPorts.emotes,
       engagementPort: watchPorts.engagement,
@@ -1110,6 +1120,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     relationshipController.removeListener(notifyControllerChanged);
     engagementController.removeListener(notifyControllerChanged);
     chatController.removeListener(notifyControllerChanged);
+    chatController.removeListener(syncModerationLogContext);
+    moderationLogController.dispose();
     preferencesController.removeListener(notifyControllerChanged);
     playbackController.dispose();
     playbackTimelineController.dispose();
@@ -1343,6 +1355,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
     Widget buildLiveChatPanel({bool showHeader = true}) {
       return TwitchWatchChatPanelPortAdapter(
+        moderationApi: createChatModerationApi(),
         runtime: runtime,
         viewerLogin: viewerLogin,
         viewerId: viewerId,
@@ -1365,7 +1378,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         onRefreshEngagement: () => refreshEngagement(showSnackOnError: true),
         onOpenChannelPoints: openChannelPointsSheet,
         onOpenPrediction: openPredictionBetSheet,
-        onOpenSpecialActions: openSpecialMessagesSheet,
+        onOpenSpecialActions: openChatTools,
+        onOpenUser: openChatUserProfile,
+        messageActionBuilder: canManageChat
+            ? buildMessageModerationActions
+            : null,
         onCancelPendingSpecialMessage: clearPendingSpecialMessage,
         showHeader: showHeader,
       );
@@ -1397,30 +1414,36 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         // a transparent scaffold would then expose the platform's white
         // fallback behind every translucent watch control.
         backgroundColor: TwitchUiColors.appBackground,
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: TwitchWatchResponsiveBody(
-                chatVisible: fullscreenMode ? false : chatVisible,
-                fullscreenMode: fullscreenMode,
-                chatPanelWidth: chatPanelWidth,
-                chatPanelRatio: chatPanelRatio,
-                minChatPanelWidth: minChatPanelWidth,
-                maxEffectiveMinChatPanelWidth: maxEffectiveMinChatPanelWidth,
-                maxChatPanelWidth: maxChatPanelWidth,
-                minChatPanelRatio: minChatPanelRatio,
-                minStoredChatPanelRatio: minStoredChatPanelRatio,
-                maxChatPanelRatio: maxChatPanelRatio,
-                player: playerArea,
-                chat: chatPanel,
-                belowPlayer: belowPlayer,
-                onSetChatPanelWidthForViewport: setChatPanelWidthForViewport,
-                onPersistChatPanelWidth: () {
-                  unawaited(saveChatPanelWidthPreference());
-                },
+        body: TwitchFollowedLiveRailShell(
+          enabled: !fullscreenMode,
+          selectedLogin: channelLogin,
+          loadStreams: _loadFollowedRailStreams,
+          onSelect: _switchFromLiveRail,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: TwitchWatchResponsiveBody(
+                  chatVisible: fullscreenMode ? false : chatVisible,
+                  fullscreenMode: fullscreenMode,
+                  chatPanelWidth: chatPanelWidth,
+                  chatPanelRatio: chatPanelRatio,
+                  minChatPanelWidth: minChatPanelWidth,
+                  maxEffectiveMinChatPanelWidth: maxEffectiveMinChatPanelWidth,
+                  maxChatPanelWidth: maxChatPanelWidth,
+                  minChatPanelRatio: minChatPanelRatio,
+                  minStoredChatPanelRatio: minStoredChatPanelRatio,
+                  maxChatPanelRatio: maxChatPanelRatio,
+                  player: playerArea,
+                  chat: chatPanel,
+                  belowPlayer: belowPlayer,
+                  onSetChatPanelWidthForViewport: setChatPanelWidthForViewport,
+                  onPersistChatPanelWidth: () {
+                    unawaited(saveChatPanelWidthPreference());
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1429,5 +1452,47 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       services: watchServices,
       child: TwitchWatchPortScope(ports: watchPorts, child: scaffold),
     );
+  }
+
+  Future<List<TwitchLiveStream>> _loadFollowedRailStreams() {
+    final service =
+        widget.initialDiscoveryService ??
+        TwitchDiscoveryService(
+          client: watchServices.apiClient,
+          authService: authService,
+          authApi: authApi,
+          webTokenProvider: webGqlAuthService.getToken,
+        );
+    return service.fetchFollowedLiveRailStreams();
+  }
+
+  Future<void> _switchFromLiveRail(TwitchLiveStream stream) async {
+    if (stream.channelLogin == channelLogin || leavingToMiniPlayer) return;
+    leavingToMiniPlayer = true;
+    try {
+      // Reuse the established session teardown; a fresh watch route gets fresh
+      // chat, engagement and relationship controllers for the selected channel.
+      await stopCurrentSession(clearStatus: false);
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement<void, void>(
+        PageRouteBuilder(
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+          pageBuilder: (_, animation, secondaryAnimation) =>
+              TwitchWatchRouteGuard(
+                initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(
+                  stream,
+                ),
+                initialDiscoveryService: widget.initialDiscoveryService,
+                initialKnownFollowing: true,
+              ),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        leavingToMiniPlayer = false;
+        showSnack('切換頻道失敗，請稍後再試。');
+      }
+    }
   }
 }

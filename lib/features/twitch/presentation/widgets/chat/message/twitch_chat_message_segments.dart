@@ -9,6 +9,7 @@ import '../links/twitch_chat_link_preview.dart';
 import '../twitch_chat_text_style.dart';
 import '../../shared/twitch_emote_image.dart';
 import 'twitch_chat_message_visual_metrics.dart';
+import 'twitch_chat_mention.dart';
 
 List<InlineSpan> buildTwitchChatMessageSegmentSpans({
   required BuildContext context,
@@ -78,7 +79,18 @@ List<InlineSpan> buildTwitchChatMessageSegmentSpans({
     }
   }
 
-  return spans;
+  return spans.map((span) {
+    if (span is TextSpan &&
+        span.text != null &&
+        _mentionRegex.stringMatch(span.text!) == span.text) {
+      return twitchChatMentionSpan(
+        context: context,
+        mention: span.text!,
+        fontSize: metrics.messageFontSize,
+      );
+    }
+    return span;
+  }).toList();
 }
 
 void _appendTwitchEmoteSegment({
@@ -302,7 +314,9 @@ class _ChatTextToken {
 
 const int _tokenCacheLimit = 4096;
 final RegExp _chatTokenRegex = RegExp(r'(\s+|\S+)');
-final RegExp _mentionRegex = RegExp(r'@[A-Za-z0-9_]{3,25}');
+final RegExp _mentionRegex = RegExp(
+  r'(?<![A-Za-z0-9_])@[A-Za-z0-9_]{3,25}(?![A-Za-z0-9_])',
+);
 final Map<String, List<_ChatTextToken>> _tokenCache =
     <String, List<_ChatTextToken>>{};
 

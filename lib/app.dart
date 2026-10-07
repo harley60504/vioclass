@@ -9,6 +9,7 @@ import 'features/twitch/presentation/settings/twitch_app_language_controller.dar
 import 'features/twitch/presentation/theme/twitch_ui_theme.dart';
 import 'features/twitch/presentation/theme/twitch_ui_tokens.dart';
 import 'features/twitch/presentation/widgets/notifications/twitch_app_notification_overlay.dart';
+import 'features/twitch/presentation/widgets/shared/twitch_app_scroll_behavior.dart';
 
 class VioClassApp extends StatefulWidget {
   const VioClassApp({super.key});
@@ -52,6 +53,7 @@ class _VioClassAppState extends State<VioClassApp> {
 
     return MaterialApp(
       title: 'VioClass',
+      scrollBehavior: twitchAppScrollBehavior,
       debugShowCheckedModeBanner: false,
       color: TwitchUiColors.windowBackground,
       locale: twitchAppLanguageController.locale,

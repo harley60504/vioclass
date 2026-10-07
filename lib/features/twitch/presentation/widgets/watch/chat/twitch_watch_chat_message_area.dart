@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
+import '../../../../models/chat/twitch_chat_moderation_shortcut.dart';
 import '../../../../services/chat/twitch_chat_runtime.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
@@ -8,6 +9,9 @@ import '../../chat/twitch_chat_empty_view.dart';
 import '../../chat/twitch_chat_message_list.dart';
 
 class TwitchWatchChatMessageArea extends StatelessWidget {
+  final void Function(TwitchChatRuntimeMessage, TwitchChatModerationShortcut)?
+  onModerationShortcut;
+  final bool Function()? canStartKeyboardModeration;
   final TwitchChatRuntime? runtime;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
   final TwitchOfficialEmoteCacheService officialEmoteCache;
@@ -16,8 +20,11 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
   final bool showTimestamp;
   final bool compact;
   final ValueChanged<TwitchChatRuntimeMessage> onOpenMessageContext;
+  final ValueChanged<TwitchChatRuntimeMessage>? onOpenUser;
 
   const TwitchWatchChatMessageArea({
+    this.onModerationShortcut,
+    this.canStartKeyboardModeration,
     super.key,
     required this.runtime,
     required this.thirdPartyEmoteCache,
@@ -27,6 +34,7 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
     required this.showTimestamp,
     required this.compact,
     required this.onOpenMessageContext,
+    this.onOpenUser,
   });
 
   @override
@@ -43,6 +51,9 @@ class TwitchWatchChatMessageArea extends StatelessWidget {
       ]),
       builder: (context, _) {
         return TwitchChatMessageList(
+          onModerationShortcut: onModerationShortcut,
+          canStartKeyboardModeration: canStartKeyboardModeration,
+          onOpenUser: onOpenUser,
           runtime: currentRuntime,
           thirdPartyEmoteCache: thirdPartyEmoteCache,
           officialEmoteCache: officialEmoteCache,

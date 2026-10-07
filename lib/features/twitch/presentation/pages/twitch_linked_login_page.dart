@@ -8,8 +8,8 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/chat/twitch_whisper_login_integrity_service.dart';
 import '../theme/twitch_ui_tokens.dart';
-import 'twitch_drops_device_login_page.dart';
 import 'twitch_oauth_webview_login_page.dart';
 
 class TwitchLinkedLoginPage extends StatefulWidget {
@@ -42,11 +42,13 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
   bool _webGqlReady = false;
   bool _mainReady = false;
   bool _dropsReady = false;
+  bool _whispersReady = false;
 
   String _statusText = '正在確認登入狀態…';
   String? _errorText;
 
-  bool get _complete => _webGqlReady && _mainReady && _dropsReady;
+  bool get _complete =>
+      _webGqlReady && _mainReady && _dropsReady && _whispersReady;
   bool get _busy => _loading || _loggingIn || _loggingOut;
 
   @override
@@ -72,7 +74,21 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     }
 
     final mainToken = await widget.mainAuthService.getValidAccessToken();
-    final mainReady = mainToken != null && mainToken.trim().isNotEmpty;
+    var mainReady = mainToken != null && mainToken.trim().isNotEmpty;
+    var whispersReady = false;
+    if (mainReady) {
+      try {
+        final validation = await widget.authApi.validateToken(mainToken);
+        mainReady = validation.userId.isNotEmpty;
+        whispersReady =
+            mainReady &&
+            TwitchOAuthWebViewLoginPage.whisperScopes.every(
+              validation.scopes.contains,
+            );
+      } catch (_) {
+        mainReady = false;
+      }
+    }
 
     final dropsToken = await widget.dropsAuthService.getToken();
     var dropsReady = dropsToken != null && dropsToken.trim().isNotEmpty;
@@ -84,6 +100,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       webGqlReady: webGqlReady,
       mainReady: mainReady,
       dropsReady: dropsReady,
+      whispersReady: whispersReady,
     );
   }
 
@@ -101,7 +118,11 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       _applyStatus(status);
       setState(() {
         _loading = false;
-        _statusText = status.complete ? '已登入' : '尚未登入';
+        _statusText = status.complete
+            ? '已登入'
+            : status.mainReady && !status.whispersReady
+            ? '已登入 Twitch，請再次授權以啟用私訊收發。'
+            : '尚未登入';
       });
     } catch (_) {
       if (!mounted) return;
@@ -117,6 +138,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     _webGqlReady = status.webGqlReady;
     _mainReady = status.mainReady;
     _dropsReady = status.dropsReady;
+    _whispersReady = status.whispersReady;
   }
 
   Future<void> _login() async {
@@ -133,7 +155,13 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() => _applyStatus(status));
 
-      if (!status.mainReady || !status.webGqlReady) {
+      if (!status.mainReady ||
+          !status.webGqlReady ||
+          !status.whispersReady ||
+          !status.dropsReady ||
+          !TwitchWhisperLoginIntegrityService.instance.hasValidContextFor(
+            widget.webGqlAuthService.accessToken,
+          )) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
             builder: (_) => TwitchOAuthWebViewLoginPage(
@@ -143,6 +171,8 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
               apiClient: widget.apiClient,
               captureWebGqlToken: true,
               mirrorMainTokenToInteraction: false,
+              interactionAuthService: widget.dropsAuthService,
+              completeDropsInSameWebView: !status.dropsReady,
             ),
           ),
         );
@@ -151,24 +181,11 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         if (!mounted) return;
         setState(() {
           _applyStatus(status);
-          _statusText = status.mainReady && status.webGqlReady
+          _statusText =
+              status.mainReady && status.webGqlReady && status.whispersReady
               ? 'Twitch 登入完成，正在完成最後設定…'
               : '登入尚未完成';
         });
-      }
-
-      if (status.mainReady && status.webGqlReady && !status.dropsReady) {
-        await Navigator.of(context).push<bool>(
-          MaterialPageRoute<bool>(
-            builder: (_) => TwitchDropsDeviceLoginPage(
-              dropsAuthService: widget.dropsAuthService,
-            ),
-          ),
-        );
-
-        status = await _readStatus();
-        if (!mounted) return;
-        setState(() => _applyStatus(status));
       }
 
       if (!mounted) return;
@@ -183,7 +200,9 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       } else {
         setState(() {
           _statusText = '登入尚未完成';
-          _errorText = '登入沒有完成，請再試一次。';
+          _errorText = status.mainReady && !status.whispersReady
+              ? '私訊收發授權尚未完成，請再次登入並允許私訊權限。'
+              : '登入沒有完成，請再試一次。';
         });
       }
     } catch (_) {
@@ -244,6 +263,7 @@ query ChannelPointsContext($channelLogin: String!) {
   }
 
   Future<void> _logout() async {
+    TwitchWhisperLoginIntegrityService.instance.clear();
     if (_busy) return;
     setState(() {
       _loggingOut = true;
@@ -260,6 +280,7 @@ query ChannelPointsContext($channelLogin: String!) {
         _webGqlReady = false;
         _mainReady = false;
         _dropsReady = false;
+        _whispersReady = false;
         _statusText = '已登出';
       });
     } catch (_) {
@@ -364,7 +385,7 @@ query ChannelPointsContext($channelLogin: String!) {
                             ),
                     ),
                   ),
-                  if (_complete) ...[
+                  if (_mainReady || _webGqlReady || _dropsReady) ...[
                     const SizedBox(height: 12),
                     TextButton(
                       onPressed: _busy ? null : _logout,
@@ -391,12 +412,14 @@ class _LinkedLoginStatus {
   final bool webGqlReady;
   final bool mainReady;
   final bool dropsReady;
+  final bool whispersReady;
 
   const _LinkedLoginStatus({
     required this.webGqlReady,
     required this.mainReady,
     required this.dropsReady,
+    required this.whispersReady,
   });
 
-  bool get complete => webGqlReady && mainReady && dropsReady;
+  bool get complete => webGqlReady && mainReady && dropsReady && whispersReady;
 }

@@ -72,6 +72,29 @@ class TwitchPinnedChatMessage {
     );
   }
 
+  factory TwitchPinnedChatMessage.fromHelixJson(Map<String, dynamic> row) {
+    final content = row['message'];
+    return TwitchPinnedChatMessage(
+      pinId: row['message_id']?.toString() ?? '',
+      type: 'MOD',
+      messageId: row['message_id']?.toString() ?? '',
+      text: content is Map ? content['text']?.toString() ?? '' : '',
+      startsAt: DateTime.tryParse(row['starts_at']?.toString() ?? ''),
+      updatedAt: DateTime.tryParse(row['updated_at']?.toString() ?? ''),
+      endsAt: DateTime.tryParse(row['ends_at']?.toString() ?? ''),
+      sender: TwitchPinnedChatUser(
+        id: row['sender_user_id']?.toString() ?? '',
+        login: row['sender_user_login']?.toString() ?? '',
+        displayName: row['sender_user_name']?.toString() ?? '',
+      ),
+      pinnedBy: TwitchPinnedChatUser(
+        id: row['pinned_by_user_id']?.toString() ?? '',
+        login: row['pinned_by_user_login']?.toString() ?? '',
+        displayName: row['pinned_by_user_name']?.toString() ?? '',
+      ),
+    );
+  }
+
   static List<TwitchPinnedChatMessage> listFromGqlResponse(Object? response) {
     if (response is! Map<String, dynamic>) {
       return const <TwitchPinnedChatMessage>[];

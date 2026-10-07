@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../pages/twitch_stream_home_models.dart';
 import '../../localization/vioclass_localizations.dart';
+import '../../settings/twitch_app_settings_launcher.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_centered_text_field.dart';
 import '../shared/twitch_glass.dart';
@@ -106,6 +108,45 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   List<Widget> _buildActions(BuildContext context, {bool compact = false}) {
     final l10n = context.vio;
     return <Widget>[
+      if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) ...[
+        PopupMenuButton<String>(
+          tooltip: l10n.t('私訊與更新'),
+          icon: AnimatedBuilder(
+            animation: twitchAppSettingsLauncher,
+            builder: (context, _) => Badge(
+              isLabelVisible: twitchAppSettingsLauncher.whisperUnreadCount > 0,
+              label: Text('${twitchAppSettingsLauncher.whisperUnreadCount}'),
+              child: const Icon(Icons.more_horiz),
+            ),
+          ),
+          onSelected: (value) {
+            if (value == 'whispers') {
+              twitchAppSettingsLauncher.openWhispers();
+            } else {
+              twitchAppSettingsLauncher.openUpdate();
+            }
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(
+              value: 'whispers',
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(l10n.t('Twitch 私訊')),
+                  if (twitchAppSettingsLauncher.whisperUnreadCount > 0) ...[
+                    const SizedBox(width: 8),
+                    Badge.count(
+                      count: twitchAppSettingsLauncher.whisperUnreadCount,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            PopupMenuItem(value: 'updates', child: Text(l10n.t('App 更新'))),
+          ],
+        ),
+        const SizedBox(width: TwitchUiSpacing.space8),
+      ],
       TwitchStreamHomeToolbarIconButton(
         tooltip: l10n.t('遊戲分類'),
         icon: Icons.sports_esports_rounded,
@@ -133,11 +174,13 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         compact: compact,
         onPressed: () => onOpenDropsConnector(),
       ),
-      const SizedBox(width: TwitchUiSpacing.space8),
-      TwitchStreamHomeAccountMenu(
-        onOpenSettings: onOpenSettings,
-        compact: compact,
-      ),
+      if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) ...[
+        const SizedBox(width: TwitchUiSpacing.space8),
+        TwitchStreamHomeAccountMenu(
+          onOpenSettings: onOpenSettings,
+          compact: compact,
+        ),
+      ],
     ];
   }
 }

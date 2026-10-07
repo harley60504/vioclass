@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../services/notifications/twitch_system_notification_service.dart';
 import '../design/twitch_breakpoints.dart';
 import '../design/twitch_typography.dart';
 import '../localization/vioclass_localizations.dart';
@@ -12,6 +14,7 @@ import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/settings/twitch_video_enhancement_settings_card.dart';
+import '../widgets/settings/twitch_chat_keyboard_settings_card.dart';
 import '../widgets/shared/twitch_text_field.dart';
 
 enum _TwitchSettingsTab { account, chat, player, appearance, updates }
@@ -547,6 +550,12 @@ class _ChatSettingsPane extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+            _SettingsSection(
+              title: l10n.t('聊天室鍵盤操作'),
+              subtitle: l10n.t('電腦與外接鍵盤共用；設定僅保存於本機'),
+              child: const TwitchChatKeyboardSettingsCard(),
+            ),
           ],
         );
       },
@@ -965,6 +974,29 @@ class _UpdateSettingsPane extends StatelessWidget {
                 ],
               ),
             ),
+            if (kDebugMode &&
+                !kIsWeb &&
+                defaultTargetPlatform == TargetPlatform.windows) ...[
+              const SizedBox(height: 12),
+              _SettingsSection(
+                title: 'Debug',
+                subtitle: '確認 Windows App 內通知列是否正常',
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await twitchSystemNotificationService.showDebugTest();
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('測試通知已加入 App 內通知列。')),
+                      );
+                    },
+                    icon: const Icon(Icons.notifications_active_rounded),
+                    label: const Text('測試 App 內通知'),
+                  ),
+                ),
+              ),
+            ],
           ],
         );
       },

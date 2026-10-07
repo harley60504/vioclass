@@ -29,6 +29,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   late final TwitchChatAppearanceController chatAppearanceController;
   late final TwitchPlayerSettingsController playerSettingsController;
   late final VioClassUpdateController updateController;
+  late final TwitchWhisperInboxController whisperInbox;
 
   TwitchHomeSection selectedSection = TwitchHomeSection.following;
 
@@ -55,6 +56,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   Set<String> _knownFollowedLiveStreamIds = <String>{};
   bool _hasFollowedLiveBaseline = false;
   bool _checkingFollowedLiveNotifications = false;
+  bool _settingsSheetOpen = false;
   StreamSubscription<VioClassConnectivitySnapshot>?
   _networkRestoredSubscription;
   StreamSubscription<VioClassConnectivitySnapshot>? _networkLostSubscription;
@@ -82,6 +84,47 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     chatAppearanceController = twitchChatAppearanceController;
     playerSettingsController = TwitchPlayerSettingsController();
     updateController = VioClassUpdateController();
+    final whisperHistory = TwitchWhisperHistoryApiService(
+      client: apiClient,
+      webTokenProviders: [webGqlAuthService.getToken],
+      integrityHeadersProvider:
+          TwitchWhisperLoginIntegrityService.instance.headersFor,
+      integrityInvalidator:
+          TwitchWhisperLoginIntegrityService.instance.invalidateRejected,
+    );
+    whisperInbox = TwitchWhisperInboxController(
+      historyApi: whisperHistory,
+      threadsApi: TwitchWhisperThreadsApiService(
+        history: whisperHistory,
+        integrityProvider:
+            TwitchWhisperLoginIntegrityService.instance.forSession,
+        integrityInvalidator:
+            TwitchWhisperLoginIntegrityService.instance.invalidateRejected,
+      ),
+      onIncomingNotification: (peer) => unawaited(
+        twitchSystemNotificationService.showWhisper(
+          sender: peer.displayName,
+          userId: peer.userId,
+          ownerId: whisperInbox.ownerId ?? '',
+        ),
+      ),
+      api: TwitchWhisperApiService(
+        client: apiClient,
+        tokenProviders: [
+          authService.getValidAccessToken,
+          webGqlAuthService.getToken,
+          dropsAuthService.getToken,
+        ],
+      ),
+    );
+    twitchAppSettingsLauncher.attach(
+      openSettings,
+      updateController: updateController,
+      updateOpener: openUpdates,
+      whisperOpener: openWhispers,
+      whisperInbox: whisperInbox,
+      navigationReady: false,
+    );
     playerSettingsController.addListener(_handleRootPlaybackPolicyChanged);
     TwitchPlaybackSessionController.instance.addListener(
       _handleRootPlaybackPolicyChanged,
@@ -108,6 +151,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
         );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      twitchAppSettingsLauncher.setNavigationReady(true);
+      unawaited(twitchSystemNotificationService.initialize());
       unawaited(VioClassConnectivityService.instance.start());
       unawaited(_loadLoginState());
       unawaited(chatAppearanceController.load());
@@ -118,6 +164,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
 
   @override
   void dispose() {
+    twitchAppSettingsLauncher.detach();
     WidgetsBinding.instance.removeObserver(this);
     playerSettingsController.removeListener(_handleRootPlaybackPolicyChanged);
     TwitchPlaybackSessionController.instance.removeListener(
@@ -136,6 +183,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     unawaited(_networkLostSubscription?.cancel());
     searchController.dispose();
     updateController.dispose();
+    whisperInbox.dispose();
     playerSettingsController.dispose();
     apiClient.close(force: true);
     super.dispose();
@@ -144,6 +192,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    whisperInbox.setAppForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
       _syncRootAutoPip();
       if (_followedLiveNotificationTimer != null) {
@@ -230,6 +279,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       });
     } finally {
       _loginStateLoadRunning = false;
+      if (mounted) unawaited(whisperInbox.refreshSession());
     }
   }
 
@@ -257,7 +307,24 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     setState(() => reloadTick++);
   }
 
+  Future<void> runWhisperAuthorizationFlow() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => createTwitchWhisperAuthorizationPage(
+          mainAuthService: authService,
+          webGqlAuthService: webGqlAuthService,
+          authApi: authApi,
+          apiClient: apiClient,
+        ),
+      ),
+    );
+    if (mounted) await _loadLoginState(refreshPages: true);
+  }
+
   Future<void> logout() async {
+    TwitchWhisperLoginIntegrityService.instance.clear();
+    await whisperInbox.flushDrafts();
+    whisperInbox.clearSession();
     try {
       await Future.wait<void>(<Future<void>>[
         authService.logout(),
@@ -356,19 +423,59 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     );
   }
 
-  Future<void> openSettings() {
-    return showTwitchAppSettingsSheet(
-      context: context,
-      chatAppearanceController: chatAppearanceController,
-      playerSettingsController: playerSettingsController,
-      updateController: updateController,
-      viewerLabel: () => viewerLabel,
-      loginStatus: () => loginStatus,
-      loadingLoginState: () => loadingLoginState,
-      onLogin: runLinkedTwitchLoginFlow,
-      onRefreshLogin: () => _loadLoginState(refreshPages: true),
-      onLogout: logout,
-    );
+  Future<void> openSettings() async {
+    if (_settingsSheetOpen) {
+      await Navigator.of(context).maybePop();
+      return;
+    }
+
+    _settingsSheetOpen = true;
+    try {
+      await showTwitchAppSettingsSheet(
+        context: context,
+        chatAppearanceController: chatAppearanceController,
+        playerSettingsController: playerSettingsController,
+        updateController: updateController,
+        viewerLabel: () => viewerLabel,
+        loginStatus: () => loginStatus,
+        loadingLoginState: () => loadingLoginState,
+        onLogin: runLinkedTwitchLoginFlow,
+        onRefreshLogin: () => _loadLoginState(refreshPages: true),
+        onLogout: logout,
+      );
+    } finally {
+      _settingsSheetOpen = false;
+    }
+  }
+
+  bool _updateSheetOpen = false;
+  bool _whisperSheetOpen = false;
+
+  Future<void> openWhispers() async {
+    if (!mounted || _whisperSheetOpen) return;
+    _whisperSheetOpen = true;
+    try {
+      await showTwitchWhisperSheet(
+        context: context,
+        controller: whisperInbox,
+        onAuthorize: runWhisperAuthorizationFlow,
+      );
+    } finally {
+      _whisperSheetOpen = false;
+    }
+  }
+
+  Future<void> openUpdates() async {
+    if (_updateSheetOpen || !mounted) return;
+    _updateSheetOpen = true;
+    try {
+      await showVioClassUpdateSheet(
+        context: context,
+        controller: updateController,
+      );
+    } finally {
+      _updateSheetOpen = false;
+    }
   }
 
   void selectSection(TwitchHomeSection section) {
@@ -576,9 +683,30 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
                         final layout = TwitchResponsiveLayout.fromConstraints(
                           constraints,
                         );
-                        return layout.shouldUseBottomHomeNavigation
-                            ? _buildMobileShell(layout)
-                            : _buildDesktopShell(layout);
+                        return TwitchFollowedLiveRailShell(
+                          key: ValueKey(
+                            'home-live-rail:$viewerLabel:$reloadTick',
+                          ),
+                          loadStreams:
+                              discoveryService.fetchFollowedLiveRailStreams,
+                          onSelect: (stream) async {
+                            await Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) => TwitchWatchRouteGuard(
+                                  initialMetadata:
+                                      TwitchStreamHeaderMetadata.fromLiveStream(
+                                        stream,
+                                      ),
+                                  initialDiscoveryService: discoveryService,
+                                  initialKnownFollowing: true,
+                                ),
+                              ),
+                            );
+                          },
+                          child: layout.shouldUseBottomHomeNavigation
+                              ? _buildMobileShell(layout)
+                              : _buildDesktopShell(layout),
+                        );
                       },
                     ),
                   ),

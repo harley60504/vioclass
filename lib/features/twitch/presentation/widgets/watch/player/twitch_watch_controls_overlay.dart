@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 
 import '../../../../models/discovery/twitch_stream_header_metadata.dart';
@@ -103,6 +104,9 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
 
   bool _visible = true;
   Timer? _hideTimer;
+  final FocusNode _keyboardFocusNode = FocusNode(
+    debugLabel: 'watch-player-keyboard-controls',
+  );
 
   bool get _hasError =>
       (widget.error != null && widget.error!.trim().isNotEmpty) ||
@@ -133,6 +137,7 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _keyboardFocusNode.dispose();
     super.dispose();
   }
 
@@ -160,23 +165,93 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
     _scheduleAutoHide();
   }
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (_hasEditableTextFocus) return KeyEventResult.ignored;
+
+    final seconds = switch (event.logicalKey) {
+      LogicalKeyboardKey.arrowLeft => -10,
+      LogicalKeyboardKey.arrowRight => 10,
+      _ => 0,
+    };
+    if (seconds == 0 || !_jumpBy(seconds)) {
+      return KeyEventResult.ignored;
+    }
+
+    _showAndRestartAutoHide();
+    return KeyEventResult.handled;
+  }
+
+  bool _jumpBy(int seconds) {
+    final controller = widget.playbackTimelineController;
+    if (controller == null) return false;
+
+    final snapshot = controller.snapshot;
+    final duration = snapshot.duration;
+    if (!snapshot.canSeek || duration == null || duration <= Duration.zero) {
+      return false;
+    }
+
+    controller.queueJumpBy(
+      delta: Duration(seconds: seconds),
+      current: snapshot.position,
+      duration: duration,
+      fromLiveEdge: snapshot.isAtLiveEdge,
+      minimum:
+          !widget.hasFullLiveDvr &&
+              snapshot.mode == TwitchPlaybackTimelineMode.liveDvr
+          ? duration - const Duration(seconds: 20)
+          : Duration.zero,
+      onCommit: (target) {
+        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
+            target >= duration &&
+            widget.onReturnToLive != null) {
+          controller.returnToLive();
+          widget.onReturnToLive!();
+          return;
+        }
+        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
+            widget.onOpenDvrReplayAtPosition != null) {
+          widget.onOpenDvrReplayAtPosition!(target);
+          return;
+        }
+        unawaited(widget.player.seek(target));
+      },
+    );
+    return true;
+  }
+
+  void _requestKeyboardFocus() {
+    if (!_hasEditableTextFocus) {
+      _keyboardFocusNode.requestFocus();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _WatchControlsInteractionLayer(
-      onWakeControls: _showAndRestartAutoHide,
-      child: Stack(
-        children: [
-          Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
-          _FadingWatchChrome(
-            visible: _visible,
-            fadeDuration: _fadeDuration,
-            child: _WatchChromeStack(widget: widget, hasError: _hasError),
-          ),
-          _WatchErrorOverlay(
-            error: widget.error,
-            runtimeError: widget.runtimeError,
-          ),
-        ],
+    return Focus(
+      focusNode: _keyboardFocusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: _WatchControlsInteractionLayer(
+        onWakeControls: _showAndRestartAutoHide,
+        onRequestKeyboardFocus: _requestKeyboardFocus,
+        child: Stack(
+          children: [
+            Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
+            _FadingWatchChrome(
+              visible: _visible,
+              fadeDuration: _fadeDuration,
+              child: _WatchChromeStack(widget: widget, hasError: _hasError),
+            ),
+            _WatchErrorOverlay(
+              error: widget.error,
+              runtimeError: widget.runtimeError,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -184,10 +259,12 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
 
 class _WatchControlsInteractionLayer extends StatelessWidget {
   final VoidCallback onWakeControls;
+  final VoidCallback onRequestKeyboardFocus;
   final Widget child;
 
   const _WatchControlsInteractionLayer({
     required this.onWakeControls,
+    required this.onRequestKeyboardFocus,
     required this.child,
   });
 
@@ -198,7 +275,10 @@ class _WatchControlsInteractionLayer extends StatelessWidget {
       onHover: (_) => onWakeControls(),
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onTap: onWakeControls,
+        onTap: () {
+          onRequestKeyboardFocus();
+          onWakeControls();
+        },
         child: child,
       ),
     );

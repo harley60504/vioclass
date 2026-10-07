@@ -1,17 +1,21 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Directory, Platform;
 import 'dart:math';
 
+import 'package:desktop_webview_window/desktop_webview_window.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../../api/core/twitch_api_constants.dart';
+import '../../api/auth/twitch_drops_browser_auth.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_notice.dart';
 import '../widgets/shared/twitch_text_field.dart';
+import '../widgets/shared/twitch_login_webview_host.dart';
 
 /// Drops / Android token login through an embedded WebView OAuth page.
 ///
@@ -36,7 +40,8 @@ class TwitchDropsWebViewLoginPage extends StatefulWidget {
     required this.dropsAuthService,
   });
 
-  static const String defaultRedirectUri = 'http://localhost:3000';
+  static const String defaultRedirectUri =
+      TwitchDropsBrowserAuth.defaultRedirectUri;
 
   @override
   State<TwitchDropsWebViewLoginPage> createState() =>
@@ -46,6 +51,12 @@ class TwitchDropsWebViewLoginPage extends StatefulWidget {
 class _TwitchDropsWebViewLoginPageState
     extends State<TwitchDropsWebViewLoginPage> {
   InAppWebViewController? _controller;
+  Webview? _desktopWindow;
+  Timer? _desktopUrlTimer;
+  bool _probingDesktopUrl = false;
+  bool _desktopWindowOpen = false;
+
+  bool get _useDesktopWindow => Platform.isLinux || Platform.isMacOS;
 
   late final TextEditingController _clientIdController;
   late final TextEditingController _redirectUriController;
@@ -90,10 +101,14 @@ class _TwitchDropsWebViewLoginPageState
     );
     _manualTextController = TextEditingController();
     _currentUrlText = _buildAuthorizationUri().toString();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_useDesktopWindow) unawaited(_openDesktopWindow());
+    });
   }
 
   @override
   void dispose() {
+    _closeDesktopWindow();
     _clientIdController.dispose();
     _redirectUriController.dispose();
     _manualTextController.dispose();
@@ -107,45 +122,18 @@ class _TwitchDropsWebViewLoginPageState
   }
 
   Uri _buildAuthorizationUri() {
-    final params = <String, String>{
-      'response_type': 'token',
-      'client_id': _clientId,
-      'redirect_uri': _redirectUri,
-      'scope': '',
-      'state': _state,
-      'force_verify': 'false',
-    };
-
-    return Uri.parse(
-      'https://id.twitch.tv/oauth2/authorize',
-    ).replace(queryParameters: params);
+    return TwitchDropsBrowserAuth.authorizationUri(
+      clientId: _clientId,
+      state: _state,
+      redirectUri: _redirectUri,
+    );
   }
 
   bool _isRedirectUri(Uri uri) {
-    final configured = Uri.tryParse(_redirectUri);
-    if (configured != null) {
-      final schemeMatches =
-          uri.scheme.toLowerCase() == configured.scheme.toLowerCase();
-      final hostMatches =
-          uri.host.toLowerCase() == configured.host.toLowerCase();
-      final portMatches = uri.hasPort
-          ? uri.port == configured.port
-          : configured.hasPort
-          ? false
-          : true;
-      if (schemeMatches && hostMatches && portMatches) return true;
-    }
-
-    final host = uri.host.toLowerCase();
-    if ((host == 'localhost' || host == '127.0.0.1') && uri.scheme == 'http') {
-      return true;
-    }
-
-    // Some mobile OAuth clients redirect to a custom scheme. We cannot load it,
-    // but shouldOverrideUrlLoading can still intercept it before WebView fails.
-    if (uri.scheme.toLowerCase() == 'twitch') return true;
-
-    return false;
+    return TwitchDropsBrowserAuth.isRedirectResponse(
+      uri,
+      redirectUri: _redirectUri,
+    );
   }
 
   Future<bool> _tryHandleOAuthRedirect(Uri? uri) async {
@@ -260,6 +248,7 @@ class _TwitchDropsWebViewLoginPageState
       }
 
       if (!mounted) return;
+      _closeDesktopWindow();
       Navigator.of(context).pop(true);
     } catch (e) {
       _isCompleting = false;
@@ -301,6 +290,14 @@ class _TwitchDropsWebViewLoginPageState
         _progress = 0.0;
         _currentUrlText = uri.toString();
       });
+    }
+    if (_useDesktopWindow) {
+      if (_desktopWindow != null) {
+        _desktopWindow!.launch(uri.toString());
+      } else {
+        await _openDesktopWindow();
+      }
+      return;
     }
     await _controller?.loadUrl(
       urlRequest: URLRequest(url: WebUri(uri.toString())),
@@ -348,10 +345,11 @@ class _TwitchDropsWebViewLoginPageState
     NavigationAction navigationAction,
   ) async {
     final uri = navigationAction.request.url;
-    final handled = await _tryHandleOAuthRedirect(
-      uri == null ? null : Uri.tryParse(uri.toString()),
-    );
-    if (handled) return NavigationActionPolicy.CANCEL;
+    final parsed = uri == null ? null : Uri.tryParse(uri.toString());
+    if (parsed != null && _isRedirectUri(parsed)) {
+      unawaited(_tryHandleOAuthRedirect(parsed));
+      return NavigationActionPolicy.CANCEL;
+    }
     return NavigationActionPolicy.ALLOW;
   }
 
@@ -360,10 +358,99 @@ class _TwitchDropsWebViewLoginPageState
     if (uri == null) return;
     if (mounted) {
       setState(() {
-        _currentUrlText = uri.toString();
+        _currentUrlText = TwitchDropsBrowserAuth.displayUrl(uri);
       });
     }
     await _tryHandleOAuthRedirect(uri);
+  }
+
+  void _closeDesktopWindow() {
+    _desktopUrlTimer?.cancel();
+    _desktopUrlTimer = null;
+    final window = _desktopWindow;
+    _desktopWindow = null;
+    if (window != null) {
+      try {
+        window.close();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _openDesktopWindow() async {
+    if (!mounted || _desktopWindow != null) return;
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+      _statusText = '正在開啟獨立 Drops 授權視窗…';
+    });
+    try {
+      final folder =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}'
+          'new_twitch_app_shared_twitch_desktop_webview_v30';
+      final window = await WebviewWindow.create(
+        configuration: CreateConfiguration(
+          title: 'Twitch Drops 授權',
+          windowWidth: 1080,
+          windowHeight: 760,
+          userDataFolderWindows: folder,
+        ),
+      );
+      if (!mounted) {
+        window.close();
+        return;
+      }
+      _desktopWindow = window;
+      window.addOnUrlRequestCallback((String url) {
+        if (!mounted || _desktopWindow != window) return;
+        unawaited(_handleUrlMaybe(WebUri(url)));
+      });
+      window.onClose.whenComplete(() {
+        if (!mounted || _desktopWindow != window) return;
+        _desktopWindow = null;
+        _desktopUrlTimer?.cancel();
+        setState(() {
+          _desktopWindowOpen = false;
+          _statusText = '授權視窗已關閉，可按重新載入再試。';
+        });
+      });
+      window.launch(_buildAuthorizationUri().toString());
+      _desktopUrlTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        unawaited(_probeDesktopUrl(window));
+      });
+      setState(() {
+        _desktopWindowOpen = true;
+        _isLoading = false;
+        _progress = 1;
+        _statusText = '請在獨立視窗完成 Twitch Drops 授權。';
+      });
+    } catch (_) {
+      _closeDesktopWindow();
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorText = '無法開啟 Drops 授權視窗，請重新載入再試。';
+      });
+    }
+  }
+
+  Future<void> _probeDesktopUrl(Webview window) async {
+    if (_probingDesktopUrl || _isCompleting || _desktopWindow != window) return;
+    _probingDesktopUrl = true;
+    try {
+      final raw = await window.evaluateJavaScript('window.location.href');
+      if (!mounted || _desktopWindow != window || raw is! String) return;
+      var url = raw;
+      if (raw.startsWith('"')) {
+        final decoded = jsonDecode(raw);
+        if (decoded is! String) return;
+        url = decoded;
+      }
+      await _handleUrlMaybe(WebUri(url));
+    } catch (_) {
+      // Navigation can temporarily make the WebView unavailable.
+    } finally {
+      _probingDesktopUrl = false;
+    }
   }
 
   @override
@@ -385,64 +472,79 @@ class _TwitchDropsWebViewLoginPageState
               ),
             if (_showAdvanced) _buildAdvancedPanel(),
             Expanded(
-              child: ClipRect(
-                child: InAppWebView(
-                  initialUrlRequest: URLRequest(
-                    url: WebUri(initialUri.toString()),
-                  ),
-                  initialSettings: InAppWebViewSettings(
-                    javaScriptEnabled: true,
-                    domStorageEnabled: true,
-                    databaseEnabled: true,
-                    supportZoom: false,
-                    transparentBackground: false,
-                    useShouldOverrideUrlLoading: true,
-                    userAgent: TwitchApiConstants.browserUserAgent,
-                  ),
-                  onWebViewCreated: (controller) {
-                    _controller = controller;
-                  },
-                  shouldOverrideUrlLoading: _handleNavigation,
-                  onLoadStart: (controller, url) async {
-                    await _handleUrlMaybe(url);
-                    if (!mounted) return;
-                    setState(() {
-                      _isLoading = true;
-                      _statusText = '正在載入 Drops / Android 授權頁...';
-                    });
-                  },
-                  onLoadStop: (controller, url) async {
-                    await _handleUrlMaybe(url);
-                    if (!mounted) return;
-                    setState(() {
-                      _isLoading = false;
-                      _progress = 1.0;
-                      _statusText = _isCompleting
-                          ? '正在儲存 Drops / Android 授權...'
-                          : '請在 WebView 完成 Drops / Android 授權。';
-                    });
-                  },
-                  onUpdateVisitedHistory: (controller, url, androidIsReload) {
-                    unawaited(_handleUrlMaybe(url));
-                  },
-                  onProgressChanged: (controller, value) {
-                    if (!mounted) return;
-                    setState(() {
-                      _progress = value / 100.0;
-                    });
-                  },
-                  onReceivedError: (controller, request, error) async {
-                    final handled = await _tryHandleOAuthRedirect(
-                      Uri.tryParse(request.url.toString()),
-                    );
-                    if (handled) return;
-                    if (!mounted) return;
-                    setState(() {
-                      _statusText = 'Drops / Android 授權頁暫時載入失敗，請稍後重試。';
-                    });
-                  },
-                ),
-              ),
+              child: _useDesktopWindow
+                  ? Center(
+                      child: Text(
+                        _desktopWindowOpen
+                            ? '請在獨立視窗完成 Drops 授權'
+                            : '按重新載入開啟 Drops 授權視窗',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    )
+                  : ClipRect(
+                      child: TwitchLoginWebViewHost(
+                        builder: (environment) => InAppWebView(
+                          webViewEnvironment: environment,
+                          initialUrlRequest: URLRequest(
+                            url: WebUri(initialUri.toString()),
+                          ),
+                          initialSettings: InAppWebViewSettings(
+                            javaScriptEnabled: true,
+                            domStorageEnabled: true,
+                            databaseEnabled: true,
+                            supportZoom: false,
+                            transparentBackground: false,
+                            useShouldOverrideUrlLoading: true,
+                            userAgent: Platform.isWindows
+                                ? null
+                                : TwitchApiConstants.browserUserAgent,
+                          ),
+                          onWebViewCreated: (controller) {
+                            _controller = controller;
+                          },
+                          shouldOverrideUrlLoading: _handleNavigation,
+                          onLoadStart: (controller, url) async {
+                            await _handleUrlMaybe(url);
+                            if (!mounted) return;
+                            setState(() {
+                              _isLoading = true;
+                              _statusText = '正在載入 Drops / Android 授權頁...';
+                            });
+                          },
+                          onLoadStop: (controller, url) async {
+                            await _handleUrlMaybe(url);
+                            if (!mounted) return;
+                            setState(() {
+                              _isLoading = false;
+                              _progress = 1.0;
+                              _statusText = _isCompleting
+                                  ? '正在儲存 Drops / Android 授權...'
+                                  : '請在 WebView 完成 Drops / Android 授權。';
+                            });
+                          },
+                          onUpdateVisitedHistory:
+                              (controller, url, androidIsReload) {
+                                unawaited(_handleUrlMaybe(url));
+                              },
+                          onProgressChanged: (controller, value) {
+                            if (!mounted) return;
+                            setState(() {
+                              _progress = value / 100.0;
+                            });
+                          },
+                          onReceivedError: (controller, request, error) async {
+                            final handled = await _tryHandleOAuthRedirect(
+                              Uri.tryParse(request.url.toString()),
+                            );
+                            if (handled) return;
+                            if (!mounted) return;
+                            setState(() {
+                              _statusText = 'Drops / Android 授權頁暫時載入失敗，請稍後重試。';
+                            });
+                          },
+                        ),
+                      ),
+                    ),
             ),
             _buildBottomStatus(),
           ],

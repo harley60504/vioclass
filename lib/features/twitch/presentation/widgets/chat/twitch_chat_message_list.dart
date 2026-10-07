@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../models/chat/twitch_chat_message.dart';
+import '../../../models/chat/twitch_chat_moderation_shortcut.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
 import '../../../services/chat/twitch_official_emote_cache_service.dart';
@@ -12,8 +14,15 @@ import '../../localization/vioclass_localizations.dart';
 import '../../sheets/twitch_chat_message_context_sheet.dart';
 import 'twitch_chat_text_style.dart';
 import 'twitch_runtime_message_tile.dart';
+import 'message/twitch_chat_message_keyboard_access.dart';
+import '../../settings/twitch_chat_keyboard_controller.dart';
 
 class TwitchChatMessageList extends StatefulWidget {
+  final void Function(TwitchChatRuntimeMessage, TwitchChatModerationShortcut)?
+  onModerationShortcut;
+  final TwitchChatKeyboardController? keyboardController;
+  final bool Function()? canStartKeyboardModeration;
+  final ValueChanged<TwitchChatRuntimeMessage>? onOpenUser;
   final TwitchChatRuntime runtime;
   final TwitchThirdPartyEmoteCacheService thirdPartyEmoteCache;
   final TwitchOfficialEmoteCacheService? officialEmoteCache;
@@ -23,6 +32,10 @@ class TwitchChatMessageList extends StatefulWidget {
   final ValueChanged<TwitchChatRuntimeMessage>? onOpenMessageContext;
 
   const TwitchChatMessageList({
+    this.onModerationShortcut,
+    this.keyboardController,
+    this.canStartKeyboardModeration,
+    this.onOpenUser,
     super.key,
     required this.runtime,
     required this.thirdPartyEmoteCache,
@@ -38,6 +51,11 @@ class TwitchChatMessageList extends StatefulWidget {
 }
 
 class TwitchChatMessageFeed extends StatefulWidget {
+  final void Function(TwitchChatRuntimeMessage, TwitchChatModerationShortcut)?
+  onModerationShortcut;
+  final TwitchChatKeyboardController? keyboardController;
+  final bool Function()? canStartKeyboardModeration;
+  final ValueChanged<TwitchChatRuntimeMessage>? onOpenUser;
   final List<TwitchChatRuntimeMessage> messages;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
   final TwitchOfficialEmoteCacheService? officialEmoteCache;
@@ -49,6 +67,10 @@ class TwitchChatMessageFeed extends StatefulWidget {
   final ValueChanged<TwitchChatRuntimeMessage>? onOpenMessageContext;
 
   const TwitchChatMessageFeed({
+    this.onModerationShortcut,
+    this.keyboardController,
+    this.canStartKeyboardModeration,
+    this.onOpenUser,
     super.key,
     required this.messages,
     this.thirdPartyEmoteCache,
@@ -84,6 +106,10 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
   @override
   Widget build(BuildContext context) {
     return TwitchChatMessageFeed(
+      onModerationShortcut: widget.onModerationShortcut,
+      keyboardController: widget.keyboardController,
+      canStartKeyboardModeration: widget.canStartKeyboardModeration,
+      onOpenUser: widget.onOpenUser,
       messages: widget.runtime.messages,
       thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
       officialEmoteCache: widget.officialEmoteCache,
@@ -96,6 +122,18 @@ class _TwitchChatMessageListState extends State<TwitchChatMessageList> {
 }
 
 class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
+  TwitchChatKeyboardController get _keyboardSettings =>
+      widget.keyboardController ?? twitchChatKeyboardController;
+  void _keysChanged() {
+    if (mounted) {
+      setState(() => _keyboardGeneration++);
+    }
+  }
+
+  void _loadKeys() {
+    unawaited(_keyboardSettings.load().catchError((Object _) {}));
+  }
+
   static const double _autoScrollThreshold = 36;
   static const double _cheapResumeAnimationDistance = 420;
   static const int _autoFollowRenderMessageLimit = 100;
@@ -103,6 +141,12 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   static const Duration _scrollAnimationDuration = Duration(milliseconds: 120);
 
   final ScrollController _scrollController = ScrollController();
+  final ListController _keyboardListController = ListController();
+  final _keyboardPaneFocus = FocusNode(debugLabel: 'chat keyboard entry');
+  final _keyboardNodes = <String, FocusNode>{};
+  int _keyboardGeneration = 0;
+  bool _keyboardBrowsing = false;
+  bool _keyboardPruneScheduled = false;
   final Expando<String> _messageFingerprintCache = Expando<String>(
     'twitch-chat-message-fingerprint',
   );
@@ -125,6 +169,8 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   @override
   void initState() {
     super.initState();
+    _keyboardSettings.addListener(_keysChanged);
+    _loadKeys();
     _resetVisibleMessagesFromRuntime(forceAutoScroll: true);
     _scrollController.addListener(_handleScrollChanged);
   }
@@ -132,6 +178,13 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   @override
   void didUpdateWidget(covariant TwitchChatMessageFeed oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.keyboardController != widget.keyboardController) {
+      (oldWidget.keyboardController ?? twitchChatKeyboardController)
+          .removeListener(_keysChanged);
+      _keyboardSettings.addListener(_keysChanged);
+      _loadKeys();
+      _keyboardGeneration++;
+    }
 
     if (!identical(oldWidget.messages, widget.messages) &&
         oldWidget.messages.isNotEmpty &&
@@ -147,6 +200,13 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
 
   @override
   void dispose() {
+    _keyboardSettings.removeListener(_keysChanged);
+    _keyboardGeneration++;
+    _keyboardListController.dispose();
+    _keyboardPaneFocus.dispose();
+    for (final node in _keyboardNodes.values) {
+      node.dispose();
+    }
     _bufferFlushTimer?.cancel();
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
@@ -199,7 +259,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
     _lastSourceNewestFingerprint = sourceNewestFingerprint;
 
     final nearLatest = _isNearLatest;
-    final shouldAutoFollow = nearLatest;
+    final shouldAutoFollow = nearLatest && !_keyboardBrowsing;
 
     if (shouldAutoFollow) {
       _autoScroll = true;
@@ -221,6 +281,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
       final sourceMessages = _pendingBufferedSourceMessages ?? widget.messages;
       _pendingBufferedSourceMessages = null;
       if (!mounted) return;
+      if (_keyboardBrowsing) return;
       if (!_autoScroll && !_isNearLatest) return;
 
       setState(() {
@@ -285,7 +346,11 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   }
 
   void _handleScrollChanged() {
-    if (!_scrollController.hasClients || _programmaticScrollActive) return;
+    if (!_scrollController.hasClients ||
+        _programmaticScrollActive ||
+        _keyboardBrowsing) {
+      return;
+    }
 
     final nearLatest = _isNearLatest;
 
@@ -326,6 +391,7 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
       _followLatestScheduled = false;
       _followLatestScheduledAnimated = false;
       if (!mounted) return;
+      if (_keyboardBrowsing) return;
       if (shouldAnimate) {
         _animateOrJumpToLatest();
       } else {
@@ -335,7 +401,12 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   }
 
   void _settleLatestFollowState() {
-    if (!mounted || !_scrollController.hasClients || !_isNearLatest) return;
+    if (!mounted ||
+        _keyboardBrowsing ||
+        !_scrollController.hasClients ||
+        !_isNearLatest) {
+      return;
+    }
 
     final sourceMessages = widget.messages;
     final nextVisibleMessages = _renderMessagesForCurrentMode(sourceMessages);
@@ -397,6 +468,8 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
   }
 
   void _resumeLatest() {
+    _keyboardBrowsing = false;
+    _keyboardGeneration++;
     _bufferFlushTimer?.cancel();
     _pendingBufferedSourceMessages = null;
 
@@ -415,8 +488,108 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
     widget.onOpenMessageContext?.call(message);
   }
 
+  KeyEventResult _startKeyboardNavigation(FocusNode node, KeyEvent event) {
+    if (!node.hasPrimaryFocus ||
+        event is! KeyDownEvent ||
+        widget.canStartKeyboardModeration?.call() != true ||
+        widget.messages.isEmpty) {
+      return KeyEventResult.ignored;
+    }
+    final keys = HardwareKeyboard.instance;
+    if (keys.isControlPressed ||
+        keys.isAltPressed ||
+        keys.isMetaPressed ||
+        keys.isShiftPressed ||
+        (event.logicalKey !=
+                _keyboardSettings.keyFor(TwitchChatKeyboardCommand.newer) &&
+            event.logicalKey !=
+                _keyboardSettings.keyFor(TwitchChatKeyboardCommand.older))) {
+      return KeyEventResult.ignored;
+    }
+    _navigateMessage(widget.messages.last, 0, requiresModeration: true);
+    return KeyEventResult.handled;
+  }
+
+  void _navigateMessage(
+    TwitchChatRuntimeMessage from,
+    int direction, {
+    bool requiresModeration = false,
+  }) {
+    final source = widget.messages;
+    final origin = source.indexWhere(
+      (message) => _messageStableKey(message) == _messageStableKey(from),
+    );
+    if (origin < 0 || source.isEmpty) return;
+    final target = source[(origin + direction).clamp(0, source.length - 1)];
+    final key = _messageStableKey(target);
+    final generation = ++_keyboardGeneration;
+    _bufferFlushTimer?.cancel();
+    _pendingBufferedSourceMessages = null;
+    setState(() {
+      _keyboardBrowsing = true;
+      _autoScroll = false;
+      _visibleMessages = List.of(source);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          generation != _keyboardGeneration ||
+          !_keyboardListController.isAttached ||
+          !_scrollController.hasClients ||
+          (requiresModeration &&
+              widget.canStartKeyboardModeration?.call() != true)) {
+        return;
+      }
+      final entries = _visibleEntriesFor(_visibleMessages);
+      final index = entries.indexWhere(
+        (entry) =>
+            entry is _ChatMessageItemEntry &&
+            _messageStableKey(entry.message) == key,
+      );
+      if (index < 0 ||
+          !widget.messages.any(
+            (message) => _messageStableKey(message) == key,
+          )) {
+        return;
+      }
+      _keyboardListController.jumpToItem(
+        index: entries.length - 1 - index,
+        scrollController: _scrollController,
+        alignment: 0.5,
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            generation != _keyboardGeneration ||
+            !widget.messages.any(
+              (message) => _messageStableKey(message) == key,
+            ) ||
+            (requiresModeration &&
+                widget.canStartKeyboardModeration?.call() != true)) {
+          return;
+        }
+        _keyboardNodes[key]?.requestFocus();
+      });
+    });
+  }
+
+  void _scheduleKeyboardPrune() {
+    if (_keyboardPruneScheduled) return;
+    _keyboardPruneScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _keyboardPruneScheduled = false;
+      if (!mounted) return;
+      final retained = {
+        for (final message in widget.messages) _messageStableKey(message),
+        for (final message in _visibleMessages) _messageStableKey(message),
+      };
+      for (final key in _keyboardNodes.keys.toList()) {
+        if (!retained.contains(key)) _keyboardNodes.remove(key)?.dispose();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    _scheduleKeyboardPrune();
     final visibleMessages = _visibleMessages;
     final visibleEntries = _visibleEntriesFor(visibleMessages);
 
@@ -432,62 +605,98 @@ class _TwitchChatMessageFeedState extends State<TwitchChatMessageFeed> {
           );
     }
 
-    return ColoredBox(
-      color: Colors.transparent,
-      child: Stack(
-        children: [
-          SuperListView.builder(
-            controller: _scrollController,
-            reverse: true,
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-            itemCount: visibleEntries.length,
-            itemBuilder: (context, index) {
-              final chronologicalIndex = visibleEntries.length - 1 - index;
-              final entry = visibleEntries[chronologicalIndex];
-              if (entry is _ChatMessageDividerEntry) {
-                return _ChatMessageDivider(
-                  key: ValueKey<String>('divider-${entry.timestampMillis}'),
-                  timestamp: entry.timestamp,
-                  compact: widget.compact,
+    return Focus(
+      focusNode: _keyboardPaneFocus,
+      canRequestFocus: widget.canStartKeyboardModeration?.call() == true,
+      onKeyEvent: _startKeyboardNavigation,
+      child: ColoredBox(
+        color: Colors.transparent,
+        child: Stack(
+          children: [
+            SuperListView.builder(
+              listController: _keyboardListController,
+              controller: _scrollController,
+              reverse: true,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
+              itemCount: visibleEntries.length,
+              itemBuilder: (context, index) {
+                final chronologicalIndex = visibleEntries.length - 1 - index;
+                final entry = visibleEntries[chronologicalIndex];
+                if (entry is _ChatMessageDividerEntry) {
+                  return _ChatMessageDivider(
+                    key: ValueKey<String>('divider-${entry.timestampMillis}'),
+                    timestamp: entry.timestamp,
+                    compact: widget.compact,
+                  );
+                }
+
+                final message = (entry as _ChatMessageItemEntry).message;
+                final messageKey = _messageStableKey(message);
+
+                return TwitchChatMessageKeyboardAccess(
+                  onModerationShortcut: widget.onModerationShortcut == null
+                      ? null
+                      : (action) {
+                          if (widget.canStartKeyboardModeration?.call() ==
+                              true) {
+                            widget.onModerationShortcut!(message, action);
+                          }
+                        },
+                  bindings: _keyboardSettings.bindings,
+                  key: ValueKey<String>(messageKey),
+                  focusNode: _keyboardNodes.putIfAbsent(
+                    messageKey,
+                    () => FocusNode(debugLabel: 'chat $messageKey'),
+                  ),
+                  onOlder: () => _navigateMessage(message, -1),
+                  onNewer: () => _navigateMessage(message, 1),
+                  onClearFocus: () {
+                    _keyboardBrowsing = false;
+                    _keyboardGeneration++;
+                  },
+                  onOpenContext: () => _openContextSheet(message),
+                  onOpenUser:
+                      widget.onOpenUser == null || message.userLogin.isEmpty
+                      ? null
+                      : () => widget.onOpenUser!(message),
+                  child: TwitchRuntimeMessageTile(
+                    onOpenUser:
+                        widget.onOpenUser == null || message.userLogin.isEmpty
+                        ? null
+                        : () => widget.onOpenUser!(message),
+                    message: message,
+                    thirdPartyEmotes: widget.thirdPartyEmoteCache,
+                    officialEmotes: widget.officialEmoteCache,
+                    showTimestamp: widget.showTimestamp,
+                    fontScale: widget.fontScale,
+                    compact: widget.compact,
+                    animateEmotes: widget.animateEmotes,
+                    onOpenContext: () => _openContextSheet(message),
+                  ),
                 );
-              }
-
-              final message = (entry as _ChatMessageItemEntry).message;
-              final messageKey = _messageStableKey(message);
-
-              return TwitchRuntimeMessageTile(
-                key: ValueKey<String>(messageKey),
-                message: message,
-                thirdPartyEmotes: widget.thirdPartyEmoteCache,
-                officialEmotes: widget.officialEmoteCache,
-                showTimestamp: widget.showTimestamp,
-                fontScale: widget.fontScale,
-                compact: widget.compact,
-                animateEmotes: widget.animateEmotes,
-                onOpenContext: () => _openContextSheet(message),
-              );
-            },
-          ),
-          Positioned(
-            left: 12,
-            right: 12,
-            bottom: 12,
-            child: IgnorePointer(
-              ignoring: _hiddenNewMessageCount <= 0 && _autoScroll,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 120),
-                opacity: _hiddenNewMessageCount > 0 || !_autoScroll ? 1 : 0,
-                child: Center(
-                  child: _ScrollResumePill(
-                    hiddenNewMessageCount: _hiddenNewMessageCount,
-                    onPressed: _resumeLatest,
+              },
+            ),
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 12,
+              child: IgnorePointer(
+                ignoring: _hiddenNewMessageCount <= 0 && _autoScroll,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 120),
+                  opacity: _hiddenNewMessageCount > 0 || !_autoScroll ? 1 : 0,
+                  child: Center(
+                    child: _ScrollResumePill(
+                      hiddenNewMessageCount: _hiddenNewMessageCount,
+                      onPressed: _resumeLatest,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

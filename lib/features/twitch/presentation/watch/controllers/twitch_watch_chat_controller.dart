@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../api/auth/twitch_auth_api_service.dart';
 import '../../../api/chat/twitch_irc_api_service.dart';
 import '../../../api/chat/twitch_recent_messages_api_service.dart';
+import '../../../models/chat/twitch_chat_startup.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../../parsers/chat/twitch_recent_message_parser.dart';
@@ -80,14 +81,7 @@ class TwitchWatchChatController extends ChangeNotifier {
 
       await dropsAuthService.loadStoredSession();
       final validation = await authApi.validateToken(token);
-      final startup = await chatPort.fetchStartupSnapshot(
-        channelLogin: channel,
-      );
-      final startupRecentMessages = const TwitchRecentMessageParser()
-          .parseMessagesField(
-            messagesField: startup.recentMessages,
-            channelLogin: channel,
-          );
+      final startupFuture = _fetchStartupSupplement(channel);
       final nextRuntime = TwitchChatRuntime(
         ircApi: TwitchIrcApiService(),
         writeIrcApi: TwitchIrcApiService(),
@@ -106,7 +100,6 @@ class TwitchWatchChatController extends ChangeNotifier {
       viewerLogin = validation.login;
       resolvedViewerId = validation.userId;
       onViewerResolved(viewerLogin, resolvedViewerId);
-      onChannelIdResolved(startup.channelId);
       notifyListeners();
 
       await nextRuntime.connect(
@@ -116,14 +109,69 @@ class TwitchWatchChatController extends ChangeNotifier {
         viewerLogin: validation.login,
         viewerDisplayName: validation.login,
         viewerUserId: validation.userId,
-        badgeCatalog: startup.badgeCatalog,
         preloadRecentMessages: true,
         recentMessageLimit: 700,
-        startupRecentMessages: startupRecentMessages.messages,
+      );
+      unawaited(
+        _applyStartupSupplement(
+          runtime: nextRuntime,
+          channel: channel,
+          startupFuture: startupFuture,
+        ),
       );
     } finally {
       connectingChat = false;
       notifyListeners();
+    }
+  }
+
+  Future<TwitchChatStartupSnapshot?> _fetchStartupSupplement(
+    String channel,
+  ) async {
+    TwitchChatStartupSnapshot? partialSnapshot;
+
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final snapshot = await chatPort
+            .fetchStartupSnapshot(channelLogin: channel)
+            .timeout(const Duration(seconds: 7));
+        partialSnapshot = snapshot;
+        if (snapshot.channelId.trim().isNotEmpty) return snapshot;
+      } catch (error) {
+        debugPrint(
+          'watch chat GQL supplement attempt ${attempt + 1} failed: $error',
+        );
+      }
+
+      if (attempt == 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 450));
+      }
+    }
+
+    return partialSnapshot;
+  }
+
+  Future<void> _applyStartupSupplement({
+    required TwitchChatRuntime runtime,
+    required String channel,
+    required Future<TwitchChatStartupSnapshot?> startupFuture,
+  }) async {
+    final startup = await startupFuture;
+    if (startup == null || this.runtime != runtime) return;
+
+    final startupRecentMessages = const TwitchRecentMessageParser()
+        .parseMessagesField(
+          messagesField: startup.recentMessages,
+          channelLogin: channel,
+        );
+    runtime.applyStartupSupplement(
+      badgeCatalog: startup.badgeCatalog,
+      fallbackRecentMessages: startupRecentMessages.messages,
+    );
+
+    final resolvedChannelId = startup.channelId.trim();
+    if (resolvedChannelId.isNotEmpty) {
+      onChannelIdResolved(resolvedChannelId);
     }
   }
 

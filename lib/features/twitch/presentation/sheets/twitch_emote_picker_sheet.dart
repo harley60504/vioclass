@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 import '../../models/emotes/twitch_official_emote.dart';
 import '../../models/emotes/twitch_third_party_emote.dart';
@@ -10,12 +9,13 @@ import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/emotes/twitch_official_emote_pages.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/shared/twitch_emote_image.dart';
+import '../widgets/shared/twitch_emote_picker_flow.dart';
+import '../widgets/shared/twitch_emote_picker_panel.dart';
+import '../widgets/shared/twitch_emoji_picker.dart';
 import '../widgets/shared/twitch_text_field.dart';
 
 const int _initialGridCount = 96;
 const int _searchGridLimit = 240;
-const double _cardMaxExtent = 154.0;
-const double _cardAspectRatio = 0.98;
 
 Future<void> showTwitchEmotePickerSheet({
   required BuildContext context,
@@ -44,6 +44,8 @@ class TwitchUnifiedEmotePickerSheet extends StatefulWidget {
   final bool loading;
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onEmoteSelected;
+  final VoidCallback? onClose;
+  final bool embedded;
 
   const TwitchUnifiedEmotePickerSheet({
     super.key,
@@ -52,6 +54,8 @@ class TwitchUnifiedEmotePickerSheet extends StatefulWidget {
     required this.onRefresh,
     required this.onEmoteSelected,
     this.officialCache,
+    this.onClose,
+    this.embedded = false,
   });
 
   @override
@@ -93,6 +97,56 @@ class _TwitchUnifiedEmotePickerSheetState
           _thirdPartyTab('BTTV', TwitchThirdPartyEmoteProvider.bttv),
           _thirdPartyTab('FFZ', TwitchThirdPartyEmoteProvider.ffz),
         ];
+
+        if (widget.embedded) {
+          // Preserve official sub-pages in the vertical rail instead of
+          // flattening subscribed channels into a single Twitch category.
+          final sections = <String, _InnerPage>{
+            for (final tab in tabs)
+              if (tab.label == 'Twitch')
+                for (var i = 0; i < tab.pages.length; i++)
+                  'official-$i': tab.pages[i]
+              else
+                tab.label: _InnerPage(
+                  label: tab.label,
+                  entries: [for (final page in tab.pages) ...page.entries],
+                ),
+          };
+          return TwitchEmotePickerPanel(
+            loading: loading,
+            onClose: widget.onClose,
+            categories: [
+              for (final entry in sections.entries)
+                TwitchEmotePickerCategory(
+                  id: entry.key,
+                  label: entry.value.label,
+                  count: entry.value.entries.length,
+                ),
+              TwitchEmotePickerCategory(
+                id: 'emoji',
+                label: 'Emoji',
+                count: twitchPickerEmoji.length,
+              ),
+            ],
+            categoryBuilder: (context, id, query) {
+              if (id == 'emoji') {
+                return TwitchEmojiPicker(
+                  query: query,
+                  onSelected: widget.onEmoteSelected,
+                );
+              }
+              final page = sections[id]!;
+              return _EmoteSection(
+                key: PageStorageKey('embedded-$id'),
+                entries: page.entries,
+                query: query,
+                emptyText: l10n.t(loading ? '正在載入貼圖...' : '沒有可用貼圖'),
+                onSelect: _selectEntry,
+                onLongPress: _toggleFavorite,
+              );
+            },
+          );
+        }
 
         return SafeArea(
           child: TwitchUnifiedSheetScaffold(
@@ -508,24 +562,22 @@ class _EmoteSectionState extends State<_EmoteSection>
     return MediaQuery.removePadding(
       context: context,
       removeTop: true,
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 18),
-        addAutomaticKeepAlives: false,
-        addRepaintBoundaries: true,
-        addSemanticIndexes: false,
-        scrollCacheExtent: const ScrollCacheExtent.pixels(360),
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: _cardMaxExtent,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: _cardAspectRatio,
-        ),
+      child: TwitchEmotePickerFlow(
         itemCount: entries.length,
         itemBuilder: (context, index) {
           final entry = entries[index];
-          return _EmoteTile(
+          return TwitchEmotePickerTile(
             key: ValueKey<String>(entry.stableKey),
-            entry: entry,
+            id: entry.id,
+            name: entry.name,
+            imageUrl: entry.imageUrl,
+            staticImageUrl: entry.staticImageUrl,
+            providerLabel: entry.providerLabel,
+            isOfficial: entry.isOfficial,
+            isAnimated: entry.isAnimated,
+            locked: entry.locked,
+            favorite: entry.favorite,
+            zeroWidth: entry.zeroWidth,
             onTap: () => widget.onSelect(entry),
             onLongPress: () => widget.onLongPress(entry),
           );
@@ -551,144 +603,6 @@ class _EmoteSectionState extends State<_EmoteSection>
 
   @override
   bool get wantKeepAlive => true;
-}
-
-class _EmoteTile extends StatelessWidget {
-  final _EmoteEntry entry;
-  final VoidCallback onTap;
-  final VoidCallback onLongPress;
-
-  const _EmoteTile({
-    super.key,
-    required this.entry,
-    required this.onTap,
-    required this.onLongPress,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final locked = entry.locked;
-
-    return RepaintBoundary(
-      child: Tooltip(
-        message: context.vio.t(entry.favorite ? '長按取消收藏' : '長按加入收藏'),
-        waitDuration: const Duration(milliseconds: 650),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: locked ? null : onTap,
-          onLongPress: onLongPress,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(8, 9, 8, 8),
-            decoration: BoxDecoration(
-              color: TwitchUiColors.sheet.cardFill,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: entry.favorite
-                    ? const Color(0xFFEAB308).withValues(alpha: 0.78)
-                    : locked
-                    ? const Color(0xFFFFD166).withValues(alpha: 0.38)
-                    : TwitchUiColors.sheet.backplate.border,
-              ),
-              boxShadow: const <BoxShadow>[
-                BoxShadow(
-                  color: Color(0x26000000),
-                  blurRadius: 10,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Expanded(
-                      child: Center(
-                        child: entry.imageUrl.trim().isEmpty
-                            ? Icon(
-                                locked
-                                    ? Icons.lock_rounded
-                                    : Icons.broken_image_rounded,
-                                color: Colors.white38,
-                                size: 24,
-                              )
-                            : TwitchEmoteImage(
-                                id: entry.id,
-                                name: entry.name,
-                                imageUrl: entry.imageUrl,
-                                staticImageUrl: entry.staticImageUrl,
-                                providerLabel: entry.providerLabel,
-                                isOfficial: entry.isOfficial,
-                                isAnimated: entry.isAnimated,
-                                locked: locked,
-                                fit: BoxFit.contain,
-                                memCacheWidth: 144,
-                                memCacheHeight: 144,
-                                placeholder: const SizedBox.shrink(),
-                                errorPlaceholder: const Icon(
-                                  Icons.broken_image_rounded,
-                                  color: Colors.white38,
-                                  size: 22,
-                                ),
-                                debug: false,
-                                debugTag: 'TwitchEmotePickerImage',
-                              ),
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      entry.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        height: 1.1,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                if (entry.favorite)
-                  const Positioned(
-                    top: 0,
-                    right: 0,
-                    child: Icon(
-                      Icons.star_rounded,
-                      color: Color(0xFFEAB308),
-                      size: 17,
-                    ),
-                  ),
-                if (locked)
-                  const Positioned(
-                    right: 0,
-                    bottom: 20,
-                    child: Icon(
-                      Icons.lock_rounded,
-                      color: Color(0xFFFFD166),
-                      size: 17,
-                    ),
-                  ),
-                if (entry.zeroWidth)
-                  const Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Text(
-                      'ZW',
-                      style: TextStyle(
-                        color: Color(0xFFEAB308),
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _OuterTab {

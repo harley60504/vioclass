@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../api/engagement/twitch_hype_train_api_service.dart';
 import '../../../models/engagement/twitch_prediction.dart';
+import '../../../models/engagement/twitch_pinned_chat.dart';
 import '../../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../../services/engagement/twitch_hype_train_controller.dart';
 import '../../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
@@ -33,6 +34,18 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   TwitchChannelPointsRuntimeSnapshot? channelPointsSnapshot;
   TwitchPredictionSnapshot? prediction;
   List<dynamic> pinnedMessages = const <dynamic>[];
+  int _pinsRevision = 0;
+
+  void applyModerationPins(
+    String targetChannelId,
+    List<TwitchPinnedChatMessage> pins,
+  ) {
+    if (_disposed || channelId() != targetChannelId) return;
+    _pinsRevision++;
+    pinnedMessages = List.unmodifiable(pins);
+    _notifyListenersIfAlive();
+  }
+
   bool _disposed = false;
   late final StreamSubscription<TwitchPredictionSnapshot?>
   _predictionSubscription;
@@ -122,6 +135,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     engagementError = null;
     _notifyListenersIfAlive();
 
+    final pinsRevision = _pinsRevision;
     final snapshot = await engagementPort.refresh(
       channelLogin: login,
       channelId: currentChannelId,
@@ -135,9 +149,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
       ),
     );
     final lastError = snapshot.error;
-    if (snapshot.channelPoints != null) {
-      channelPointsSnapshot = snapshot.channelPoints;
-    }
+    channelPointsSnapshot = snapshot.channelPoints;
     _applyPrediction(snapshot.prediction, notify: false);
     final realtimeChannelId =
         snapshot.channelPoints?.channelId ?? currentChannelId;
@@ -150,7 +162,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
         ),
       );
     }
-    pinnedMessages = snapshot.pinnedMessages;
+    if (pinsRevision == _pinsRevision) pinnedMessages = snapshot.pinnedMessages;
     engagementError = lastError?.toString();
     loadingEngagement = false;
     _notifyListenersIfAlive();
@@ -319,6 +331,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
 
   void reset() {
     if (_disposed) return;
+    _pinsRevision++;
     channelPointsSnapshot = null;
     prediction = null;
     pinnedMessages = const <dynamic>[];

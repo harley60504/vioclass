@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../api/moderation/twitch_moderation_api_service.dart';
 
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
+import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
@@ -170,6 +172,7 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
 }
 
 class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
+  final TwitchModerationApiService? moderationApi;
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
   final String? viewerId;
@@ -193,11 +196,15 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
   final VoidCallback? onOpenSpecialActions;
+  final Widget Function(BuildContext, TwitchChatRuntimeMessage)?
+  messageActionBuilder;
+  final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final VoidCallback? onCancelPendingSpecialMessage;
   final bool showHeader;
 
   const TwitchWatchChatPanelPortAdapter({
     super.key,
+    this.moderationApi,
     required this.runtime,
     required this.viewerLogin,
     required this.viewerId,
@@ -221,6 +228,8 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
     this.onOpenSpecialActions,
+    this.messageActionBuilder,
+    this.onOpenUser,
     this.onCancelPendingSpecialMessage,
     this.showHeader = true,
   });
@@ -230,6 +239,7 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     final emotes = TwitchWatchPortScope.emotesOf(context);
     final openAction = onOpenSpecialActions;
     return TwitchWatchChatPanel(
+      moderationApi: moderationApi,
       runtime: runtime,
       viewerLogin: viewerLogin,
       viewerId: viewerId,
@@ -260,6 +270,8 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onOpenChannelPoints: onOpenChannelPoints,
       onOpenPrediction: onOpenPrediction,
       onOpenSpecialActions: openAction,
+      messageActionBuilder: messageActionBuilder,
+      onOpenUser: onOpenUser,
       onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
       showHeader: showHeader,
     );

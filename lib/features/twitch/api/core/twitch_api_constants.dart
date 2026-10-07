@@ -51,6 +51,9 @@ class TwitchApiConstants {
   /// Twitch GraphQL endpoint.
   static const String gqlEndpoint = 'https://gql.twitch.tv/gql';
 
+  /// Short-lived integrity token endpoint required by Twitch Web GQL.
+  static const String gqlIntegrityEndpoint = 'https://gql.twitch.tv/integrity';
+
   /// Twitch IRC WebSocket endpoint.
   static const String ircWebSocketUrl = 'wss://irc-ws.chat.twitch.tv:443';
 

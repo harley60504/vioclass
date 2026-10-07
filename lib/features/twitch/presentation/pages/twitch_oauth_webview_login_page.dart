@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io' show Directory, Platform;
 import 'dart:math';
@@ -9,13 +10,19 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
+import '../../api/auth/twitch_drops_browser_auth.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/chat/twitch_whisper_login_integrity_service.dart';
+import '../../api/chat/twitch_whisper_api_service.dart';
 import '../theme/twitch_ui_tokens.dart';
+import '../widgets/shared/twitch_login_webview_host.dart';
+import '../widgets/shared/twitch_login_navigation_errors.dart';
+import '../widgets/shared/twitch_login_popup.dart';
 import 'twitch_interaction_web_login_page.dart';
 
 enum TwitchOAuthWebViewTokenTarget { main }
@@ -32,6 +39,7 @@ class TwitchOAuthWebViewLoginPage extends StatefulWidget {
   final String initialRedirectUri;
   final List<String> scopes;
   final bool mirrorMainTokenToInteraction;
+  final bool completeDropsInSameWebView;
 
   const TwitchOAuthWebViewLoginPage({
     super.key,
@@ -46,10 +54,16 @@ class TwitchOAuthWebViewLoginPage extends StatefulWidget {
     this.initialRedirectUri = legacyRedirectUri,
     this.scopes = legacyScopes,
     this.mirrorMainTokenToInteraction = true,
+    this.completeDropsInSameWebView = false,
   });
 
   static const String legacyClientId = 'euyqoof00efejc6vk5f4gv0nze20ue';
   static const String legacyRedirectUri = 'http://localhost:3000';
+
+  static const List<String> whisperScopes = <String>[
+    'user:read:whispers',
+    'user:manage:whispers',
+  ];
 
   static const List<String> legacyScopes = <String>[
     'user:read:email',
@@ -58,6 +72,7 @@ class TwitchOAuthWebViewLoginPage extends StatefulWidget {
     'chat:edit',
     'user:read:emotes',
     'clips:edit',
+    ...whisperScopes,
   ];
 
   @override
@@ -82,12 +97,13 @@ class _TwitchOAuthWebViewLoginPageState
   bool _windowOpen = false;
   bool _isCompleting = false;
   bool _capturingGql = false;
+  bool _dropsPhase = false;
+  String? _dropsOwnerId;
   String? _errorText;
 
   bool get _isMain => widget.target == TwitchOAuthWebViewTokenTarget.main;
 
-  bool get _isDesktopAuthWindowPlatform =>
-      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  bool get _isDesktopAuthWindowPlatform => Platform.isLinux || Platform.isMacOS;
 
   bool get _useEmbeddedMobileWebView => !_isDesktopAuthWindowPlatform;
 
@@ -144,6 +160,13 @@ class _TwitchOAuthWebViewLoginPageState
   }
 
   Uri _buildAuthorizationUri() {
+    if (_dropsPhase) {
+      return TwitchDropsBrowserAuth.authorizationUri(
+        clientId: widget.interactionAuthService!.dropsClientId,
+        state: _state,
+        redirectUri: TwitchDropsBrowserAuth.defaultRedirectUri,
+      );
+    }
     return Uri.parse('https://id.twitch.tv/oauth2/authorize').replace(
       queryParameters: <String, String>{
         'response_type': 'token',
@@ -157,6 +180,12 @@ class _TwitchOAuthWebViewLoginPageState
   }
 
   bool _isRedirectUri(Uri uri) {
+    if (_dropsPhase) {
+      return TwitchDropsBrowserAuth.isRedirectResponse(
+        uri,
+        redirectUri: TwitchDropsBrowserAuth.defaultRedirectUri,
+      );
+    }
     final configured = Uri.tryParse(_redirectUri);
     if (configured != null) {
       final sameScheme =
@@ -165,8 +194,8 @@ class _TwitchOAuthWebViewLoginPageState
       final samePort = uri.hasPort
           ? uri.port == configured.port
           : configured.hasPort
-              ? false
-              : true;
+          ? false
+          : true;
       if (sameScheme && sameHost && samePort) return true;
     }
 
@@ -197,13 +226,19 @@ class _TwitchOAuthWebViewLoginPageState
 
   Future<bool> _tryHandleOAuthRedirect(Uri? uri) async {
     if (uri == null || !_isRedirectUri(uri)) return false;
-    debugPrint('[TwitchAuth][oauth-callback] ${uri.scheme}://${uri.host}:${uri.port}${uri.path}');
+    debugPrint(
+      '[TwitchAuth][oauth-callback] ${uri.scheme}://${uri.host}:${uri.port}${uri.path}',
+    );
     await _handleOAuthRedirect(uri);
     return true;
   }
 
   Future<void> _handleOAuthRedirect(Uri uri) async {
     if (_isCompleting) return;
+    if (_dropsPhase) {
+      await _completeDropsRedirect(uri);
+      return;
+    }
 
     final params = _parseOAuthResponse(uri);
     final error = params['error'];
@@ -268,7 +303,25 @@ class _TwitchOAuthWebViewLoginPageState
       }
 
       if (_shouldCaptureGql) {
-        await _captureWebGqlTokenFromSameWindow();
+        await _captureWebGqlTokenFromSameWindow(ownerId: validation.userId);
+      }
+
+      if (widget.completeDropsInSameWebView &&
+          widget.interactionAuthService != null) {
+        if (!mounted) return;
+        _dropsOwnerId = validation.userId;
+        _state = _createStateToken();
+        _dropsPhase = true;
+        _isCompleting = false;
+        final dropsUrl = _buildAuthorizationUri().toString();
+        if (_isDesktopAuthWindowPlatform) {
+          _webWindow.launch(dropsUrl);
+        } else {
+          await _embeddedController!.loadUrl(
+            urlRequest: URLRequest(url: WebUri(dropsUrl)),
+          );
+        }
+        return;
       }
 
       await _closeWindow();
@@ -281,7 +334,61 @@ class _TwitchOAuthWebViewLoginPageState
     }
   }
 
-  Future<void> _captureWebGqlTokenFromSameWindow() async {
+  Future<void> _completeDropsRedirect(Uri uri) async {
+    final params = _parseOAuthResponse(uri);
+    if (params['error']?.isNotEmpty == true) {
+      _showError('Drops 授權未完成，請重試。');
+      return;
+    }
+    if (params['state'] != _state) {
+      _showError('Drops 登入驗證失敗，已阻擋這次授權。');
+      return;
+    }
+    final accessToken = params['access_token']?.trim();
+    if (accessToken == null || accessToken.isEmpty) {
+      _showError('沒有取得 Drops 授權，請重試。');
+      return;
+    }
+    _isCompleting = true;
+    try {
+      final service = widget.interactionAuthService!;
+      final validation = await service.authApi.validateToken(accessToken);
+      if (validation.clientId != service.dropsClientId ||
+          validation.userId != _dropsOwnerId) {
+        throw StateError('Drops client or account mismatch');
+      }
+      // Existing Drops storage API and token shape are unchanged. Never mirror
+      // the main OAuth or Web/GQL token into the Drops slot in this flow.
+      await service.saveSession(
+        TwitchAuthToken(
+          accessToken: accessToken,
+          refreshToken: '',
+          tokenType: 'bearer',
+          scopes: validation.scopes.isNotEmpty
+              ? validation.scopes
+              : (params['scope'] ?? '')
+                    .split(RegExp(r'[ +]'))
+                    .where((s) => s.isNotEmpty)
+                    .toList(),
+          expiresIn: validation.expiresIn <= 0
+              ? int.tryParse(params['expires_in'] ?? '') ?? 0
+              : validation.expiresIn,
+          obtainedAt: DateTime.now(),
+        ),
+      );
+      if (!await service.validateToken())
+        throw StateError('Drops validation failed');
+      await _closeWindow();
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      _isCompleting = false;
+      _showError('Drops 授權驗證或儲存失敗，請重試。');
+    }
+  }
+
+  Future<void> _captureWebGqlTokenFromSameWindow({
+    required String ownerId,
+  }) async {
     final webGqlAuthService = widget.webGqlAuthService;
     final apiClient = widget.apiClient;
     if (webGqlAuthService == null || apiClient == null) return;
@@ -336,6 +443,38 @@ class _TwitchOAuthWebViewLoginPageState
 
     await webGqlAuthService.saveSession(token);
     await _verifyKimneGql(apiClient, webToken);
+
+    // Finish private integrity in this same login window before closing it.
+    // An optional private SDK failure must not invalidate a valid main login.
+    try {
+      final validation = await TwitchAuthApiService(
+        client: apiClient,
+      ).validateToken(webToken);
+      if (validation.userId != ownerId ||
+          validation.clientId != TwitchApiConstants.twitchWebClientId) {
+        throw StateError('Web login account mismatch');
+      }
+      await TwitchWhisperLoginIntegrityService.instance.captureFromLogin(
+        session: TwitchWhisperSession(webToken, validation),
+        evaluate: (script) async => _isDesktopAuthWindowPlatform
+            ? await window.evaluateJavaScript(script)
+            : await embeddedController!.evaluateJavascript(source: script),
+        stillCurrent: () =>
+            mounted &&
+            webGqlAuthService.accessToken == webToken &&
+            (_isDesktopAuthWindowPlatform
+                ? identical(_webWindow, window)
+                : identical(_embeddedController, embeddedController)),
+      );
+      debugPrint(
+        '[TwitchAuth] private integrity prepared in existing login window',
+      );
+    } catch (error) {
+      debugPrint(
+        '[TwitchAuth] login valid; private integrity not prepared: '
+        '${error is TwitchWhisperException ? error.message : 'local capture/storage failed'}',
+      );
+    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -628,6 +767,9 @@ query ChannelPointsContext($channelLogin: String!) {
 
       _webWindow = window;
       _windowOpen = true;
+      window.addScriptToExecuteOnDocumentCreated(
+        TwitchWhisperLoginIntegrityService.documentStartScript,
+      );
       debugPrint('[TwitchAuth][open] desktop WebView created');
       debugPrint('[TwitchAuth][ua] using native WebView2 / Edge user agent');
 
@@ -699,54 +841,132 @@ query ChannelPointsContext($channelLogin: String!) {
     setState(() => _errorText = message);
   }
 
+  Future<void> _retryCurrentLogin() async {
+    if (_isCompleting || _capturingGql) return;
+    _state = _createStateToken();
+    setState(() => _errorText = null);
+    final url = _buildAuthorizationUri().toString();
+    if (_isDesktopAuthWindowPlatform) {
+      _webWindow?.launch(url);
+    } else {
+      await _embeddedController?.loadUrl(
+        urlRequest: URLRequest(url: WebUri(url)),
+      );
+    }
+  }
+
   Widget _buildEmbeddedOAuthWebView() {
-    return InAppWebView(
-      initialUrlRequest: URLRequest(
-        url: WebUri(_buildAuthorizationUri().toString()),
+    return TwitchLoginWebViewHost(
+      builder: (environment) => InAppWebView(
+        webViewEnvironment: environment,
+        initialUserScripts: UnmodifiableListView<UserScript>([
+          UserScript(
+            source: TwitchWhisperLoginIntegrityService.documentStartScript,
+            injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+          ),
+        ]),
+        initialUrlRequest: URLRequest(
+          url: WebUri(_buildAuthorizationUri().toString()),
+        ),
+        initialSettings: InAppWebViewSettings(
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
+          databaseEnabled: true,
+          supportZoom: false,
+          transparentBackground: false,
+          useShouldOverrideUrlLoading: true,
+          mediaPlaybackRequiresUserGesture: false,
+        ),
+        onWebViewCreated: (controller) {
+          _embeddedController = controller;
+        },
+        shouldOverrideUrlLoading: (controller, action) async {
+          final uri = action.request.url;
+          final parsed = uri == null ? null : Uri.tryParse(uri.toString());
+          debugPrint(
+            '[TwitchAuth][embedded-navigation] '
+            'scheme=${parsed?.scheme ?? '?'} host=${parsed?.host ?? '?'} '
+            'policy=${parsed != null && _isRedirectUri(parsed) ? 'callback' : 'allow'}',
+          );
+          if (parsed != null && _isRedirectUri(parsed)) {
+            // Resolve navigation before validation / home navigation / closing
+            // the view. Waiting for the whole login leaves the native request
+            // paused and can report its expected cancellation as a failure.
+            unawaited(_tryHandleOAuthRedirect(parsed));
+            return NavigationActionPolicy.CANCEL;
+          }
+          return NavigationActionPolicy.ALLOW;
+        },
+        onCreateWindow: Platform.isWindows
+            ? (controller, action) async {
+                final url = action.request.url;
+                debugPrint(
+                  '[TwitchAuth][embedded-new-window] '
+                  'scheme=${url?.scheme ?? '?'} host=${url?.host ?? '?'}',
+                );
+                if (environment == null || !mounted) return false;
+                final loginRoute = ModalRoute.of(context);
+                return openTwitchLoginPopup(
+                  context: context,
+                  action: action,
+                  environment: environment,
+                  isOAuthRedirect: _isRedirectUri,
+                  onOAuthRedirect: (uri) {
+                    if (!mounted) return;
+                    // Return to the login owner before its existing completion
+                    // flow navigates home or closes the login route.
+                    Navigator.of(
+                      context,
+                    ).popUntil((route) => identical(route, loginRoute));
+                    unawaited(_tryHandleOAuthRedirect(uri));
+                  },
+                );
+              }
+            : null,
+        onLoadStart: (controller, webUri) {
+          final nextUrl = webUri?.toString();
+          if (nextUrl != null) {
+            final uri = Uri.tryParse(nextUrl);
+            if (mounted && uri != null && !_isRedirectUri(uri)) {
+              setState(() => _errorText = null);
+            }
+            unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
+          }
+        },
+        onLoadStop: (controller, webUri) {
+          final nextUrl = webUri?.toString();
+          if (nextUrl != null) {
+            unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
+          }
+        },
+        onUpdateVisitedHistory: (controller, webUri, androidIsReload) {
+          final nextUrl = webUri?.toString();
+          if (nextUrl != null) {
+            unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
+          }
+        },
+        onReceivedError: (controller, request, error) {
+          if (!mounted || request.isForMainFrame != true) return;
+          final uri = Uri.tryParse(request.url.toString());
+          if (uri != null && _isRedirectUri(uri)) {
+            unawaited(_tryHandleOAuthRedirect(uri));
+            return;
+          }
+          if (isExpectedTwitchLoginNavigationAbort(
+            uri: uri,
+            type: error.type,
+            completingLogin: _isCompleting || _capturingGql,
+          )) {
+            debugPrint('[TwitchAuth][embedded-load] expected navigation abort');
+            return;
+          }
+          debugPrint(
+            '[TwitchAuth][embedded-load-error] type=${error.type} '
+            'host=${uri?.host ?? '?'} path=${uri?.path ?? ''}',
+          );
+          _showError('Twitch 登入頁載入失敗，請稍後再試。');
+        },
       ),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        domStorageEnabled: true,
-        databaseEnabled: true,
-        supportZoom: false,
-        transparentBackground: false,
-        useShouldOverrideUrlLoading: true,
-        mediaPlaybackRequiresUserGesture: false,
-      ),
-      onWebViewCreated: (controller) {
-        _embeddedController = controller;
-      },
-      shouldOverrideUrlLoading: (controller, action) async {
-        final uri = action.request.url;
-        if (await _tryHandleOAuthRedirect(
-          uri == null ? null : Uri.tryParse(uri.toString()),
-        )) {
-          return NavigationActionPolicy.CANCEL;
-        }
-        return NavigationActionPolicy.ALLOW;
-      },
-      onLoadStart: (controller, webUri) {
-        final nextUrl = webUri?.toString();
-        if (nextUrl != null) {
-          unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
-        }
-      },
-      onLoadStop: (controller, webUri) {
-        final nextUrl = webUri?.toString();
-        if (nextUrl != null) {
-          unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
-        }
-      },
-      onUpdateVisitedHistory: (controller, webUri, androidIsReload) {
-        final nextUrl = webUri?.toString();
-        if (nextUrl != null) {
-          unawaited(_tryHandleOAuthRedirect(Uri.tryParse(nextUrl)));
-        }
-      },
-      onReceivedError: (controller, request, error) {
-        if (!mounted || request.isForMainFrame != true) return;
-        _showError('Twitch 登入頁載入失敗，請稍後再試。');
-      },
     );
   }
 
@@ -760,11 +980,13 @@ query ChannelPointsContext($channelLogin: String!) {
         backgroundColor: const Color(0xFF0E0E10),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          '登入 Twitch',
-          style: TextStyle(fontWeight: FontWeight.w800),
-        ),
+        toolbarHeight: 44,
         actions: [
+          if (_errorText != null)
+            TextButton(
+              onPressed: busy ? null : _retryCurrentLogin,
+              child: const Text('重試'),
+            ),
           IconButton(
             tooltip: '關閉',
             onPressed: _isCompleting
@@ -816,8 +1038,8 @@ query ChannelPointsContext($channelLogin: String!) {
                             _capturingGql
                                 ? '正在完成登入…'
                                 : _windowOpen
-                                    ? '請在 Twitch 視窗完成登入'
-                                    : 'Twitch 登入視窗已關閉',
+                                ? '請在 Twitch 視窗完成登入'
+                                : 'Twitch 登入視窗已關閉',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: Colors.white,

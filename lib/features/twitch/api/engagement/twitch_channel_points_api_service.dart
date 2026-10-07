@@ -338,12 +338,18 @@ query ChannelPointsContext($channelLogin: String!) {
     ]);
     final self = _readMap(channel, const <String>['self']);
     final points = _readMap(self, const <String>['communityPoints']);
+    final balance = _readInt(points, const <String>['balance']);
+    if (balance == null) {
+      throw const TwitchApiException(
+        'ChannelPointsContext did not contain a viewer balance.',
+      );
+    }
     final availableClaim = _readMap(points, const <String>['availableClaim']);
 
     return TwitchChannelPointsContext(
       channelId: channelId,
       channelLogin: login,
-      balance: _readInt(points, const <String>['balance']) ?? 0,
+      balance: balance,
       availableClaimId: _readString(availableClaim, const <String>['id']),
       availableClaimPoints: 50,
       pointsName: _readString(settings, const <String>['name']),

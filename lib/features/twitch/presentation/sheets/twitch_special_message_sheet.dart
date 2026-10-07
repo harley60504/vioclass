@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../api/chat/twitch_chat_identity_api_service.dart';
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
@@ -10,6 +11,10 @@ Future<void> showTwitchSpecialMessageSheetStage251({
   required BuildContext context,
   required TwitchViewerSpecialMessagesSnapshotStage251? initialSnapshot,
   required bool loading,
+  String viewerName = 'You',
+  String initialColor = '',
+  Future<void> Function(String color)? onSetColor,
+  Future<void> Function()? onOpenModeration,
   required Future<TwitchViewerSpecialMessagesSnapshotStage251?> Function()
   onRefresh,
   required void Function(TwitchWatchStreakStatusStage251 status)
@@ -24,6 +29,10 @@ Future<void> showTwitchSpecialMessageSheetStage251({
     builder: (_) => _TwitchSpecialMessageSheetStage251(
       initialSnapshot: initialSnapshot,
       loading: loading,
+      viewerName: viewerName,
+      initialColor: initialColor,
+      onSetColor: onSetColor,
+      onOpenModeration: onOpenModeration,
       onRefresh: onRefresh,
       onShareWatchStreak: onShareWatchStreak,
       onShareResub: onShareResub,
@@ -35,6 +44,10 @@ Future<void> showTwitchSpecialMessageSheetStage251({
 class _TwitchSpecialMessageSheetStage251 extends StatefulWidget {
   final TwitchViewerSpecialMessagesSnapshotStage251? initialSnapshot;
   final bool loading;
+  final String viewerName;
+  final String initialColor;
+  final Future<void> Function(String color)? onSetColor;
+  final Future<void> Function()? onOpenModeration;
   final Future<TwitchViewerSpecialMessagesSnapshotStage251?> Function()
   onRefresh;
   final void Function(TwitchWatchStreakStatusStage251 status)
@@ -46,6 +59,10 @@ class _TwitchSpecialMessageSheetStage251 extends StatefulWidget {
   const _TwitchSpecialMessageSheetStage251({
     required this.initialSnapshot,
     required this.loading,
+    required this.viewerName,
+    required this.initialColor,
+    required this.onSetColor,
+    required this.onOpenModeration,
     required this.onRefresh,
     required this.onShareWatchStreak,
     required this.onShareResub,
@@ -63,12 +80,20 @@ class _TwitchSpecialMessageSheetStage251State
   bool _loading = false;
   String? _errorText;
   String? _selectingBadgeId;
+  String? _pendingBadgeId;
+  String? _pendingBadgeChannel;
+  TwitchChatIdentityBadgeStage251? _draftBadge;
+  late final TextEditingController _hexController;
+  String? _namedColor;
+  bool _applyingColor = false;
+  String? _identityStatus;
 
   @override
   void initState() {
     super.initState();
     _snapshot = widget.initialSnapshot;
     _loading = widget.loading;
+    _hexController = TextEditingController(text: widget.initialColor);
     if (_snapshot == null && !_loading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _refresh();
@@ -77,16 +102,24 @@ class _TwitchSpecialMessageSheetStage251State
   }
 
   @override
+  void dispose() {
+    _hexController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     final l10n = context.vio;
 
     return TwitchUnifiedSheetScaffold(
-      title: l10n.t('特殊訊息'),
-      subtitle: l10n.t('連續觀看、續訂與聊天室身分'),
+      title: l10n.t('聊天身分與互動'),
+      subtitle: l10n.t('ID 顏色、徽章、續訂與連續觀看'),
       icon: Icons.auto_awesome_rounded,
       loading: _loading,
-      onRefresh: _loading ? null : _refresh,
+      onRefresh: _loading || _selectingBadgeId != null || _applyingColor
+          ? null
+          : _refresh,
       child: TwitchChatTextScope(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
@@ -116,11 +149,59 @@ class _TwitchSpecialMessageSheetStage251State
                             },
                           ),
                           const SizedBox(height: 12),
+                          _buildIdentityPreview(),
+                          const SizedBox(height: 12),
                           _BadgeSection(
                             snapshot: snapshot,
                             selectingBadgeId: _selectingBadgeId,
-                            onSelectBadge: _selectBadge,
+                            draftBadgeId: _draftBadge?.id,
+                            onSelectBadge: (badge) {
+                              if (_selectingBadgeId != null ||
+                                  _loading ||
+                                  _applyingColor) {
+                                return;
+                              }
+                              setState(() {
+                                _draftBadge = badge;
+                                _identityStatus = null;
+                              });
+                            },
                           ),
+                          if (_draftBadge != null) ...[
+                            const SizedBox(height: 8),
+                            FilledButton.icon(
+                              onPressed:
+                                  _selectingBadgeId != null ||
+                                      _loading ||
+                                      _applyingColor
+                                  ? null
+                                  : () => _selectBadge(_draftBadge!),
+                              icon: const Icon(Icons.check_rounded),
+                              label: Text(l10n.t('套用徽章')),
+                            ),
+                          ],
+                          if (widget.onOpenModeration != null) ...[
+                            const SizedBox(height: 12),
+                            _Section(
+                              title: l10n.t('聊天室管理'),
+                              children: [
+                                ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.shield_outlined),
+                                  title: Text(l10n.t('管理員與台主工具')),
+                                  trailing: const Icon(
+                                    Icons.chevron_right_rounded,
+                                  ),
+                                  onTap:
+                                      _loading ||
+                                          _selectingBadgeId != null ||
+                                          _applyingColor
+                                      ? null
+                                      : widget.onOpenModeration,
+                                ),
+                              ],
+                            ),
+                          ],
                           if (snapshot?.hasIssues ?? false) ...<Widget>[
                             const SizedBox(height: 12),
                             _IssuesSection(snapshot: snapshot!),
@@ -136,6 +217,7 @@ class _TwitchSpecialMessageSheetStage251State
   }
 
   Future<void> _refresh() async {
+    if (_loading || _selectingBadgeId != null || _applyingColor) return;
     setState(() {
       _loading = true;
       _errorText = null;
@@ -143,16 +225,31 @@ class _TwitchSpecialMessageSheetStage251State
     try {
       final snapshot = await widget.onRefresh();
       if (!mounted) return;
-      setState(() => _snapshot = snapshot);
+      setState(() {
+        if (_pendingBadgeId == null) {
+          _snapshot = snapshot;
+        } else {
+          _confirmPendingBadge(snapshot);
+        }
+      });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = context.vio.t('特殊訊息暫時載入失敗，稍後再試。'));
+      setState(
+        () => _errorText = context.vio.t(
+          _pendingBadgeId == null
+              ? '特殊訊息暫時載入失敗，稍後再試。'
+              : '徽章套用已提交，但身分重新載入失敗；請重新整理確認，勿直接重複套用。',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
   Future<void> _selectBadge(TwitchChatIdentityBadgeStage251 badge) async {
+    if (_selectingBadgeId != null || _loading || _applyingColor) return;
+    var accepted = false;
+    final channel = _snapshot?.channelLogin;
     setState(() {
       _selectingBadgeId = badge.id;
       _errorText = null;
@@ -161,17 +258,247 @@ class _TwitchSpecialMessageSheetStage251State
       final ok = await widget.onSelectBadge(badge);
       if (!mounted) return;
       if (ok) {
+        accepted = true;
+        setState(() {
+          _draftBadge = null;
+          _pendingBadgeId = badge.id;
+          _pendingBadgeChannel = channel;
+          _identityStatus = context.vio.t('徽章套用已提交；請重新整理確認目前配戴。');
+        });
         final snapshot = await widget.onRefresh();
         if (!mounted) return;
-        setState(() => _snapshot = snapshot);
+        setState(() {
+          _draftBadge = null;
+          _confirmPendingBadge(snapshot);
+        });
+      } else {
+        setState(() => _errorText = context.vio.t('聊天室身分更新失敗，稍後再試。'));
       }
     } catch (error) {
       if (!mounted) return;
-      setState(() => _errorText = context.vio.t('聊天室身分更新失敗，稍後再試。'));
+      setState(
+        () => _errorText = context.vio.t(
+          accepted ? '徽章套用已提交，但身分重新載入失敗；請重新整理確認，勿直接重複套用。' : '聊天室身分更新失敗，稍後再試。',
+        ),
+      );
     } finally {
       if (mounted) setState(() => _selectingBadgeId = null);
     }
   }
+
+  void _confirmPendingBadge(
+    TwitchViewerSpecialMessagesSnapshotStage251? snapshot,
+  ) {
+    if (_pendingBadgeId == null) return;
+    final sameChannel =
+        snapshot != null && snapshot.channelLogin == _pendingBadgeChannel;
+    if (sameChannel) _snapshot = snapshot;
+    final confirmed =
+        sameChannel &&
+        snapshot.chatIdentity?.selectedBadge?.id == _pendingBadgeId;
+    if (_draftBadge == null) {
+      _identityStatus = context.vio.t(
+        confirmed ? '已套用徽章' : '徽章套用已提交；請重新整理確認目前配戴。',
+      );
+    }
+    if (confirmed) {
+      _pendingBadgeId = null;
+      _pendingBadgeChannel = null;
+    }
+  }
+
+  Widget _buildIdentityPreview() {
+    final badge = _draftBadge ?? _snapshot?.chatIdentity?.selectedBadge;
+    final hex = _hexController.text.trim();
+    final value = RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)
+        ? int.parse(hex.substring(1), radix: 16)
+        : 0xB99AFF;
+    final color = Color(0xFF000000 | value);
+    final l10n = context.vio;
+    return _Section(
+      title: l10n.t('聊天室身分預覽'),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: TwitchUiColors.surfaceAlt,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              if (badge != null) ...[
+                _badgeImage(badge, 22),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  widget.viewerName,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(l10n.t('這是訊息預覽'), overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(l10n.t('ID 顏色（套用到 Twitch）')),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _chatColors.entries.map((entry) {
+            final selected = hex.toUpperCase() == entry.value.toUpperCase();
+            return Tooltip(
+              message: entry.key,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: _applyingColor || _loading || _selectingBadgeId != null
+                    ? null
+                    : () => setState(() {
+                        _namedColor = entry.key;
+                        _hexController.text = entry.value;
+                        _identityStatus = null;
+                      }),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(
+                      0xFF000000 |
+                          int.parse(entry.value.substring(1), radix: 16),
+                    ),
+                    border: Border.all(
+                      color: selected ? Colors.white : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(Icons.check, size: 18, color: Colors.white)
+                      : null,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _hexController,
+          enabled: !_applyingColor && !_loading && _selectingBadgeId == null,
+          maxLength: 7,
+          decoration: InputDecoration(
+            labelText: l10n.t('自訂色碼（Prime／Turbo）'),
+            hintText: '#9146FF',
+            errorText:
+                hex.isNotEmpty && !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)
+                ? l10n.t('請輸入 # 加上六位色碼')
+                : null,
+          ),
+          onChanged: (_) => setState(() {
+            _namedColor = null;
+            _identityStatus = null;
+          }),
+        ),
+        FilledButton.icon(
+          onPressed:
+              _applyingColor ||
+                  _loading ||
+                  _selectingBadgeId != null ||
+                  widget.onSetColor == null ||
+                  !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)
+              ? null
+              : _applyColor,
+          icon: _applyingColor
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.palette_outlined),
+          label: Text(l10n.t('套用 ID 顏色')),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          l10n.t('預覽不會立即修改身分；按套用後才更新。此處僅列出 Twitch 可用徽章。'),
+          style: const TextStyle(
+            fontSize: 12,
+            color: TwitchUiColors.textSecondary,
+          ),
+        ),
+        if (_identityStatus != null)
+          Text(
+            _identityStatus!,
+            style: const TextStyle(color: TwitchUiColors.primarySoft),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _applyColor() async {
+    if (_applyingColor ||
+        _loading ||
+        _selectingBadgeId != null ||
+        widget.onSetColor == null) {
+      return;
+    }
+    setState(() {
+      _applyingColor = true;
+      _errorText = null;
+      _identityStatus = null;
+    });
+    try {
+      await widget.onSetColor!(_namedColor ?? _hexController.text.trim());
+      if (mounted) {
+        setState(() => _identityStatus = context.vio.t('ID 顏色已更新；新訊息會使用新顏色。'));
+      }
+    } on TwitchChatColorException catch (error) {
+      if (mounted) setState(() => _errorText = context.vio.t(error.message));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _errorText = context.vio.t('ID 顏色更新失敗，請稍後再試。'));
+      }
+    } finally {
+      if (mounted) setState(() => _applyingColor = false);
+    }
+  }
+}
+
+const _chatColors = <String, String>{
+  'blue': '#0000FF',
+  'blue_violet': '#8A2BE2',
+  'cadet_blue': '#5F9EA0',
+  'chocolate': '#D2691E',
+  'coral': '#FF7F50',
+  'dodger_blue': '#1E90FF',
+  'firebrick': '#B22222',
+  'golden_rod': '#DAA520',
+  'green': '#008000',
+  'hot_pink': '#FF69B4',
+  'orange_red': '#FF4500',
+  'red': '#FF0000',
+  'sea_green': '#2E8B57',
+  'spring_green': '#00FF7F',
+  'yellow_green': '#9ACD32',
+};
+
+Widget _badgeImage(TwitchChatIdentityBadgeStage251 badge, double size) {
+  final url = badge.imageUrl;
+  return SizedBox(
+    width: size,
+    height: size,
+    child: url == null || url.isEmpty
+        ? Icon(Icons.workspace_premium_rounded, size: size)
+        : Image.network(
+            url,
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) =>
+                Icon(Icons.workspace_premium_rounded, size: size),
+          ),
+  );
 }
 
 class _ShareSection extends StatelessWidget {
@@ -270,11 +597,13 @@ class _ShareSection extends StatelessWidget {
 class _BadgeSection extends StatelessWidget {
   final TwitchViewerSpecialMessagesSnapshotStage251? snapshot;
   final String? selectingBadgeId;
+  final String? draftBadgeId;
   final void Function(TwitchChatIdentityBadgeStage251 badge) onSelectBadge;
 
   const _BadgeSection({
     required this.snapshot,
     required this.selectingBadgeId,
+    required this.draftBadgeId,
     required this.onSelectBadge,
   });
 
@@ -287,6 +616,16 @@ class _BadgeSection extends StatelessWidget {
     return _Section(
       title: context.vio.t('聊天室身分徽章'),
       children: <Widget>[
+        if (badges.isNotEmpty) ...[
+          Text(
+            context.vio.t('點選徽章可預覽，再按「套用徽章」。眼睛代表預覽，勾勾代表目前配戴。'),
+            style: const TextStyle(
+              color: TwitchUiColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         if (badges.isEmpty)
           Text(
             context.vio.t('目前沒有可切換的徽章'),
@@ -305,6 +644,8 @@ class _BadgeSection extends StatelessWidget {
                   (badge) => _BadgeChoice(
                     badge: badge,
                     busy: selectingBadgeId == badge.id,
+                    previewSelected: draftBadgeId == badge.id,
+                    enabled: selectingBadgeId == null,
                     onTap: () => onSelectBadge(badge),
                   ),
                 )
@@ -476,11 +817,15 @@ class _ActionTile extends StatelessWidget {
 class _BadgeChoice extends StatelessWidget {
   final TwitchChatIdentityBadgeStage251 badge;
   final bool busy;
+  final bool previewSelected;
+  final bool enabled;
   final VoidCallback onTap;
 
   const _BadgeChoice({
     required this.badge,
     required this.busy,
+    required this.previewSelected,
+    required this.enabled,
     required this.onTap,
   });
 
@@ -490,17 +835,17 @@ class _BadgeChoice extends StatelessWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(10),
-      onTap: busy ? null : onTap,
+      onTap: busy || !enabled ? null : onTap,
       child: Container(
         width: 132,
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: badge.selected
+          color: previewSelected || badge.selected
               ? TwitchUiColors.sheet.cardFillActive
               : TwitchUiColors.sheet.cardFill,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: badge.selected
+            color: previewSelected || badge.selected
                 ? TwitchUiColors.sheet.cardBorderActive
                 : TwitchUiColors.sheet.cardBorder,
           ),
@@ -521,7 +866,7 @@ class _BadgeChoice extends StatelessWidget {
                       color: TwitchUiColors.textSecondary,
                       size: 22,
                     )
-                  : Image.network(imageUrl, fit: BoxFit.contain),
+                  : _badgeImage(badge, 28),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -539,6 +884,14 @@ class _BadgeChoice extends StatelessWidget {
                 ),
               ),
             ),
+            if (previewSelected || badge.selected)
+              Icon(
+                previewSelected
+                    ? Icons.visibility_outlined
+                    : Icons.check_circle,
+                size: 15,
+                color: TwitchUiColors.primarySoft,
+              ),
           ],
         ),
       ),

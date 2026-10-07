@@ -43,14 +43,14 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
             hasClaim: hasClaim,
             onTap: onOpenChannelPoints,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 3),
           _UtilityButton(
-            tooltip: l10n.t('特殊訊息'),
+            tooltip: l10n.t('聊天身分與互動'),
             icon: Icons.auto_awesome_rounded,
             active: false,
             onTap: onOpenSpecialActions,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 3),
           _UtilityButton(
             tooltip: l10n.t(loadingEmotes ? '貼圖載入中' : '貼圖'),
             icon: loadingEmotes ? Icons.sync_rounded : Icons.tag_faces_rounded,
@@ -99,17 +99,15 @@ class _ChannelPointsCompactButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             _ChannelPointsIcon(iconUrl: iconUrl, hasClaim: hasClaim),
-            if (balance != null) ...[
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 11,
-                  height: 1,
-                  fontWeight: TwitchUiFontWeight.heavy,
-                ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                height: 1,
+                fontWeight: TwitchUiFontWeight.heavy,
               ),
-            ],
+            ),
           ],
         ),
       ),

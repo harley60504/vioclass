@@ -376,15 +376,10 @@ class _PlayerColumnState extends State<_PlayerColumn> {
                 _showPage(0);
               }
             },
-            child: Scrollbar(
+            child: SingleChildScrollView(
               controller: _aboutScrollController,
-              thumbVisibility: true,
-              interactive: true,
-              child: SingleChildScrollView(
-                controller: _aboutScrollController,
-                padding: EdgeInsets.zero,
-                child: content,
-              ),
+              padding: EdgeInsets.zero,
+              child: content,
             ),
           ),
         ),

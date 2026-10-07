@@ -14,12 +14,13 @@ import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_notice.dart';
+import '../widgets/shared/twitch_login_webview_host.dart';
 
 /// Official Twitch Web session + kimne Web GQL token capture.
 ///
 /// v30: kept as the single-repair page only.
-/// - Desktop uses desktop_webview_window.
-/// - Android / iOS uses an embedded InAppWebView.
+/// - Linux / macOS use desktop_webview_window.
+/// - Windows / Android / iOS use an embedded InAppWebView.
 /// Unified login normally captures Web/GQL from the main OAuth container, so
 /// this page is no longer opened in the normal one-click path.
 class TwitchInteractionWebLoginPage extends StatefulWidget {
@@ -62,8 +63,7 @@ class _TwitchInteractionWebLoginPageState
   String? _lastTokenPreview;
   String? _lastProbeText;
 
-  bool get _isDesktopAuthWindowPlatform =>
-      Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+  bool get _isDesktopAuthWindowPlatform => Platform.isLinux || Platform.isMacOS;
 
   bool get _useEmbeddedMobileWebView => !_isDesktopAuthWindowPlatform;
 
@@ -726,7 +726,7 @@ query ChannelPointsContext($channelLogin: String!) {
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'Android / iOS：App 內 Twitch 官方 Web / GQL 登入',
+                  'App 內 Twitch 官方 Web / GQL 登入',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -755,62 +755,65 @@ query ChannelPointsContext($channelLogin: String!) {
           ),
         ),
         Expanded(
-          child: InAppWebView(
-            initialUrlRequest: URLRequest(url: WebUri(url)),
-            initialSettings: InAppWebViewSettings(
-              javaScriptEnabled: true,
-              domStorageEnabled: true,
-              databaseEnabled: true,
-              supportZoom: false,
-              transparentBackground: false,
-              useShouldOverrideUrlLoading: true,
-              mediaPlaybackRequiresUserGesture: false,
-            ),
-            onWebViewCreated: (controller) {
-              _embeddedController = controller;
-            },
-            shouldOverrideUrlLoading: (controller, action) async {
-              final nextUrl = action.request.url?.toString();
-              if (mounted && nextUrl != null) {
-                setState(() => _lastUrl = nextUrl);
-              }
-              _scheduleProbe();
-              return NavigationActionPolicy.ALLOW;
-            },
-            onLoadStart: (controller, webUri) {
-              final nextUrl = webUri?.toString();
-              if (!mounted) return;
-              setState(() {
-                _embeddedWebViewReady = false;
-                if (nextUrl != null) _lastUrl = nextUrl;
-                _statusText = 'App 內 WebView 正在載入 Twitch 官方頁...';
-              });
-            },
-            onLoadStop: (controller, webUri) {
-              final nextUrl = webUri?.toString();
-              if (!mounted) return;
-              setState(() {
-                _embeddedWebViewReady = true;
-                if (nextUrl != null) _lastUrl = nextUrl;
-                if (!_saving) {
-                  _statusText = '登入 Twitch 官方 Web 後會自動檢查授權資訊。';
+          child: TwitchLoginWebViewHost(
+            builder: (environment) => InAppWebView(
+              webViewEnvironment: environment,
+              initialUrlRequest: URLRequest(url: WebUri(url)),
+              initialSettings: InAppWebViewSettings(
+                javaScriptEnabled: true,
+                domStorageEnabled: true,
+                databaseEnabled: true,
+                supportZoom: false,
+                transparentBackground: false,
+                useShouldOverrideUrlLoading: true,
+                mediaPlaybackRequiresUserGesture: false,
+              ),
+              onWebViewCreated: (controller) {
+                _embeddedController = controller;
+              },
+              shouldOverrideUrlLoading: (controller, action) async {
+                final nextUrl = action.request.url?.toString();
+                if (mounted && nextUrl != null) {
+                  setState(() => _lastUrl = nextUrl);
                 }
-              });
-              _scheduleProbe();
-            },
-            onUpdateVisitedHistory: (controller, webUri, androidIsReload) {
-              final nextUrl = webUri?.toString();
-              if (mounted && nextUrl != null) {
-                setState(() => _lastUrl = nextUrl);
-              }
-              _scheduleProbe();
-            },
-            onReceivedError: (controller, request, error) {
-              if (!mounted || request.isForMainFrame != true) return;
-              setState(() {
-                _errorText = 'App 內 Twitch Web 登入頁暫時載入失敗，請稍後重試。';
-              });
-            },
+                _scheduleProbe();
+                return NavigationActionPolicy.ALLOW;
+              },
+              onLoadStart: (controller, webUri) {
+                final nextUrl = webUri?.toString();
+                if (!mounted) return;
+                setState(() {
+                  _embeddedWebViewReady = false;
+                  if (nextUrl != null) _lastUrl = nextUrl;
+                  _statusText = 'App 內 WebView 正在載入 Twitch 官方頁...';
+                });
+              },
+              onLoadStop: (controller, webUri) {
+                final nextUrl = webUri?.toString();
+                if (!mounted) return;
+                setState(() {
+                  _embeddedWebViewReady = true;
+                  if (nextUrl != null) _lastUrl = nextUrl;
+                  if (!_saving) {
+                    _statusText = '登入 Twitch 官方 Web 後會自動檢查授權資訊。';
+                  }
+                });
+                _scheduleProbe();
+              },
+              onUpdateVisitedHistory: (controller, webUri, androidIsReload) {
+                final nextUrl = webUri?.toString();
+                if (mounted && nextUrl != null) {
+                  setState(() => _lastUrl = nextUrl);
+                }
+                _scheduleProbe();
+              },
+              onReceivedError: (controller, request, error) {
+                if (!mounted || request.isForMainFrame != true) return;
+                setState(() {
+                  _errorText = 'App 內 Twitch Web 登入頁暫時載入失敗，請稍後重試。';
+                });
+              },
+            ),
           ),
         ),
       ],

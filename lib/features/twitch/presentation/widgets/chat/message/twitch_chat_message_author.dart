@@ -4,6 +4,7 @@
 // badge rendering.
 
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_chips.dart';
@@ -16,10 +17,15 @@ List<InlineSpan> buildTwitchChatMessageAuthorSpans({
   required bool isFirstMessage,
   required bool compact,
   required TwitchChatMessageVisualMetrics metrics,
+  GestureRecognizer? onOpenUserRecognizer,
 }) {
   return <InlineSpan>[
     TextSpan(
       text: displayNameText,
+      recognizer: onOpenUserRecognizer,
+      mouseCursor: onOpenUserRecognizer == null
+          ? null
+          : SystemMouseCursors.click,
       style: twitchChatTextStyle(
         TextStyle(
           color: displayColor,

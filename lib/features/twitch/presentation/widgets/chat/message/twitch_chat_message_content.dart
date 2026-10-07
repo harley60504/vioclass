@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 
 import '../../../../models/chat/twitch_chat_fragment.dart';
 import '../../../../models/chat/twitch_chat_render_segment.dart';
@@ -16,7 +17,7 @@ import 'twitch_chat_message_segments.dart';
 import 'twitch_chat_message_timestamp.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
-class TwitchChatMessageContent extends StatelessWidget {
+class TwitchChatMessageContent extends StatefulWidget {
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final TwitchOfficialEmoteCacheService? officialEmotes;
@@ -27,6 +28,7 @@ class TwitchChatMessageContent extends StatelessWidget {
   final bool compact;
   final bool animateEmotes;
   final TwitchChatMessageVisualMetrics metrics;
+  final VoidCallback? onOpenUser;
 
   const TwitchChatMessageContent({
     super.key,
@@ -40,10 +42,36 @@ class TwitchChatMessageContent extends StatelessWidget {
     required this.metrics,
     this.compact = false,
     this.animateEmotes = true,
+    this.onOpenUser,
   });
 
   @override
+  State<TwitchChatMessageContent> createState() => _ChatMessageContentState();
+}
+
+class _ChatMessageContentState extends State<TwitchChatMessageContent> {
+  final _authorTap = TapGestureRecognizer();
+  TwitchChatRuntimeMessage get message => widget.message;
+  TwitchThirdPartyEmoteCacheService? get thirdPartyEmotes =>
+      widget.thirdPartyEmotes;
+  TwitchOfficialEmoteCacheService? get officialEmotes => widget.officialEmotes;
+  Color get displayColor => widget.displayColor;
+  String get displayNameText => widget.displayNameText;
+  bool get showSystemMessage => widget.showSystemMessage;
+  bool get showTimestamp => widget.showTimestamp;
+  bool get compact => widget.compact;
+  bool get animateEmotes => widget.animateEmotes;
+  TwitchChatMessageVisualMetrics get metrics => widget.metrics;
+
+  @override
+  void dispose() {
+    _authorTap.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    _authorTap.onTap = widget.onOpenUser;
     final metadata = message.metadata;
     final detached = _resolveDetachedVisuals();
 
@@ -90,7 +118,9 @@ class TwitchChatMessageContent extends StatelessWidget {
   _TwitchDetachedChatVisuals _resolveDetachedVisuals() {
     final sourceSegments = message.segments;
     final gifs = sourceSegments
-        .where((segment) => segment.type == TwitchChatRenderSegmentType.twitchGif)
+        .where(
+          (segment) => segment.type == TwitchChatRenderSegmentType.twitchGif,
+        )
         .toList(growable: false);
 
     var giantIndex = -1;
@@ -196,10 +226,7 @@ class TwitchChatMessageContent extends StatelessWidget {
       child: Align(
         alignment: Alignment.center,
         child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: height,
-            maxWidth: height * 3,
-          ),
+          constraints: BoxConstraints(maxHeight: height, maxWidth: height * 3),
           child: TwitchEmoteImage(
             id: '',
             name: segment.content,
@@ -265,6 +292,7 @@ class TwitchChatMessageContent extends StatelessWidget {
 
     spans.addAll(
       buildTwitchChatMessageAuthorSpans(
+        onOpenUserRecognizer: widget.onOpenUser == null ? null : _authorTap,
         displayNameText: displayNameText,
         displayColor: displayColor,
         isAction: message.metadata.isAction,

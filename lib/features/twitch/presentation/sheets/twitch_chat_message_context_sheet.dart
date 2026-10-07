@@ -20,6 +20,8 @@ Future<void> showTwitchChatMessageContextSheet({
   TwitchThirdPartyEmoteCacheService? thirdPartyEmotes,
   TwitchOfficialEmoteCacheService? officialEmotes,
   double fontScale = 1.0,
+  Widget Function(BuildContext, TwitchChatRuntimeMessage)? messageActionBuilder,
+  Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser,
 }) {
   final l10n = context.vio;
   final entries = TwitchReplyThreadBuilder.build(
@@ -40,6 +42,8 @@ Future<void> showTwitchChatMessageContextSheet({
       thirdPartyEmotes: thirdPartyEmotes,
       officialEmotes: officialEmotes,
       fontScale: fontScale,
+      messageActionBuilder: messageActionBuilder,
+      onOpenUser: onOpenUser,
     ),
   );
 }
@@ -50,6 +54,9 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final TwitchOfficialEmoteCacheService? officialEmotes;
   final double fontScale;
+  final Widget Function(BuildContext, TwitchChatRuntimeMessage)?
+  messageActionBuilder;
+  final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
 
   const _TwitchChatMessageContextSheet({
     required this.selectedMessage,
@@ -57,6 +64,8 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
     required this.thirdPartyEmotes,
     required this.officialEmotes,
     required this.fontScale,
+    required this.messageActionBuilder,
+    required this.onOpenUser,
   });
 
   @override
@@ -74,6 +83,18 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
             thirdPartyEmotes: thirdPartyEmotes,
             officialEmotes: officialEmotes,
             fontScale: fontScale,
+            actions: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (onOpenUser != null && entry.message.userLogin.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => onOpenUser!(entry.message),
+                    icon: const Icon(Icons.person_outline),
+                    label: Text(context.vio.t('使用者資料')),
+                  ),
+                ?messageActionBuilder?.call(context, entry.message),
+              ],
+            ),
           );
         },
       ),

@@ -17,6 +17,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
   final bool compact;
   final bool animateEmotes;
   final VoidCallback? onOpenContext;
+  final VoidCallback? onOpenUser;
 
   const TwitchRuntimeMessageTile({
     super.key,
@@ -28,6 +29,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     this.compact = false,
     this.animateEmotes = true,
     this.onOpenContext,
+    this.onOpenUser,
   });
 
   @override
@@ -42,6 +44,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
 
     if (style != null) {
       return TwitchChatSpecialMessageCard(
+        onOpenUser: onOpenUser,
         message: message,
         thirdPartyEmotes: thirdPartyEmotes,
         officialEmotes: officialEmotes,
@@ -56,6 +59,7 @@ class TwitchRuntimeMessageTile extends StatelessWidget {
     }
 
     return TwitchChatNormalMessageCard(
+      onOpenUser: onOpenUser,
       message: message,
       thirdPartyEmotes: thirdPartyEmotes,
       officialEmotes: officialEmotes,

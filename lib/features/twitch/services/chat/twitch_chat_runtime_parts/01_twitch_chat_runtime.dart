@@ -112,6 +112,31 @@ class TwitchChatRuntime extends ChangeNotifier {
     return TwitchChatMessageNormalizer(badgeCache: badgeCache);
   }
 
+  void applyStartupSupplement({
+    required TwitchBadgeCatalog badgeCatalog,
+    Iterable<TwitchChatMessage> fallbackRecentMessages =
+        const <TwitchChatMessage>[],
+  }) {
+    badgeCache.updateCatalog(badgeCatalog);
+
+    for (var index = 0; index < _messages.length; index++) {
+      final current = _messages[index];
+      _messages[index] = normalizer.normalize(
+        current.source,
+        receivedAt: current.receivedAt,
+      );
+    }
+
+    if (_recentMessageCount == 0) {
+      _loadInitialRecentMessages(
+        startupMessages: fallbackRecentMessages,
+        recentMessages: null,
+      );
+    } else {
+      notifyListeners();
+    }
+  }
+
   Future<void> connect({
     required String channelLogin,
     String? accessToken,

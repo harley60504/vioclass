@@ -21,6 +21,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final TwitchOfficialEmoteCacheService? officialEmotes;
   final double fontScale;
+  final Widget? actions;
 
   const TwitchReplyThreadMessageCard({
     super.key,
@@ -29,6 +30,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
     required this.thirdPartyEmotes,
     this.officialEmotes,
     this.fontScale = 1.0,
+    this.actions,
   });
 
   @override
@@ -83,6 +85,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
                     fontScale: compactBodyScale,
                     compact: true,
                   ),
+                  ?actions,
                 ],
               ),
             ),

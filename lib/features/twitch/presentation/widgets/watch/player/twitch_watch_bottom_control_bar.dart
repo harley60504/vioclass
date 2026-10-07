@@ -719,7 +719,9 @@ class _TimelineStepButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = timelineController;
-    if (controller == null) return const SizedBox.shrink();
+    if (controller == null) {
+      return _buildButtons(context, enabled: false);
+    }
 
     return AnimatedBuilder(
       animation: controller,
@@ -729,29 +731,43 @@ class _TimelineStepButtons extends StatelessWidget {
         if (!snapshot.canSeek ||
             duration == null ||
             duration <= Duration.zero) {
-          return const SizedBox.shrink();
+          return _buildButtons(context, enabled: false);
         }
 
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PlainIconButton(
-              tooltip: context.vio.t('倒退 10 秒'),
-              icon: Icons.replay_10_rounded,
-              size: iconSize,
-              dense: dense,
-              onPressed: () => _jumpBy(controller, snapshot, duration, -10),
-            ),
-            PlainIconButton(
-              tooltip: context.vio.t('快轉 10 秒'),
-              icon: Icons.forward_10_rounded,
-              size: iconSize,
-              dense: dense,
-              onPressed: () => _jumpBy(controller, snapshot, duration, 10),
-            ),
-          ],
+        return _buildButtons(
+          context,
+          enabled: true,
+          onBack: () => _jumpBy(controller, snapshot, duration, -10),
+          onForward: () => _jumpBy(controller, snapshot, duration, 10),
         );
       },
+    );
+  }
+
+  Widget _buildButtons(
+    BuildContext context, {
+    required bool enabled,
+    VoidCallback? onBack,
+    VoidCallback? onForward,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PlainIconButton(
+          tooltip: context.vio.t('倒退 10 秒'),
+          icon: Icons.replay_10_rounded,
+          size: iconSize,
+          dense: dense,
+          onPressed: enabled ? onBack : null,
+        ),
+        PlainIconButton(
+          tooltip: context.vio.t('快轉 10 秒'),
+          icon: Icons.forward_10_rounded,
+          size: iconSize,
+          dense: dense,
+          onPressed: enabled ? onForward : null,
+        ),
+      ],
     );
   }
 

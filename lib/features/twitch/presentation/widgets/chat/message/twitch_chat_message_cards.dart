@@ -12,6 +12,7 @@ import 'twitch_chat_message_timestamp.dart';
 import 'twitch_chat_message_visual_metrics.dart';
 
 class TwitchChatNormalMessageCard extends StatelessWidget {
+  final VoidCallback? onOpenUser;
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final TwitchOfficialEmoteCacheService? officialEmotes;
@@ -23,6 +24,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
   final VoidCallback? onOpenContext;
 
   const TwitchChatNormalMessageCard({
+    this.onOpenUser,
     super.key,
     required this.message,
     required this.thirdPartyEmotes,
@@ -49,6 +51,7 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
           _ChatHoverSurface(
             onOpenContext: onOpenContext,
             child: TwitchChatMessageContent(
+              onOpenUser: onOpenUser,
               message: message,
               thirdPartyEmotes: thirdPartyEmotes,
               officialEmotes: officialEmotes,
@@ -115,6 +118,7 @@ class _ChatHoverSurfaceState extends State<_ChatHoverSurface> {
 }
 
 class TwitchChatSpecialMessageCard extends StatelessWidget {
+  final VoidCallback? onOpenUser;
   final TwitchChatRuntimeMessage message;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
   final TwitchOfficialEmoteCacheService? officialEmotes;
@@ -127,6 +131,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
   final VoidCallback? onOpenContext;
 
   const TwitchChatSpecialMessageCard({
+    this.onOpenUser,
     super.key,
     required this.message,
     required this.thirdPartyEmotes,
@@ -242,6 +247,7 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
                               if (bannerText != null && bannerText.isNotEmpty)
                                 const SizedBox(height: TwitchUiSpacing.space8),
                               TwitchChatMessageContent(
+                                onOpenUser: onOpenUser,
                                 message: message,
                                 thirdPartyEmotes: thirdPartyEmotes,
                                 officialEmotes: officialEmotes,

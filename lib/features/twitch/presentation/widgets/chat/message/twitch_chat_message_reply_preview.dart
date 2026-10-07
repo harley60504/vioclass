@@ -9,6 +9,7 @@ import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../twitch_chat_text_style.dart';
 import 'twitch_chat_message_visual_metrics.dart';
+import 'twitch_chat_mention.dart';
 
 class TwitchChatMessageReplyPreview extends StatelessWidget {
   final TwitchChatRuntimeMessage message;
@@ -73,13 +74,17 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
     }
 
     if (cleanBody.isNotEmpty) {
-      _appendMentionAwareText(spans, cleanBody);
+      _appendMentionAwareText(context, spans, cleanBody);
     }
 
     return spans;
   }
 
-  void _appendMentionAwareText(List<InlineSpan> spans, String text) {
+  void _appendMentionAwareText(
+    BuildContext context,
+    List<InlineSpan> spans,
+    String text,
+  ) {
     var cursor = 0;
 
     for (final match in _mentionRegex.allMatches(text)) {
@@ -92,7 +97,13 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
         );
       }
 
-      spans.add(TextSpan(text: match.group(0) ?? '', style: _mentionStyle()));
+      spans.add(
+        twitchChatMentionSpan(
+          context: context,
+          mention: match.group(0)!,
+          fontSize: metrics.metaFontSize,
+        ),
+      );
 
       cursor = match.end;
     }
@@ -123,17 +134,8 @@ class TwitchChatMessageReplyPreview extends StatelessWidget {
       ),
     );
   }
-
-  TextStyle _mentionStyle() {
-    return twitchChatTextStyle(
-      TextStyle(
-        color: const Color(0xFFD6CCEA),
-        fontSize: metrics.metaFontSize,
-        fontWeight: FontWeight.w900,
-        height: 1.15,
-      ),
-    );
-  }
 }
 
-final RegExp _mentionRegex = RegExp(r'@[A-Za-z0-9_]{3,25}');
+final RegExp _mentionRegex = RegExp(
+  r'(?<![A-Za-z0-9_])@[A-Za-z0-9_]{3,25}(?![A-Za-z0-9_])',
+);
