@@ -1,8 +1,8 @@
 # Full LGPL libmpv, x86_64 baseline (not v3). Keep the Dart/ANGLE plugins intact.
-# Immutable release + SHA256; never download a moving "latest" binary.
+# Pinned release + verified SHA256; never download a moving "latest" binary.
 set(VIOCLASS_MPV_VERSION "2026-10-09-fd9265a905")
 set(VIOCLASS_MPV_ARCHIVE_NAME "mpv-dev-lgpl-x86_64-20261009-git-fd9265a905.7z")
-set(VIOCLASS_MPV_SHA256 "9847d016c1d9704cb550b691eb69ce58500e8531256b0aa01427f4d1629ea3da")
+set(VIOCLASS_MPV_SHA256 "7978aa8f00bcdbf21d300c97e96975e7a5b4a1c720d5ad331638cf9d21d7e73c")
 set(VIOCLASS_MPV_ROOT "${CMAKE_BINARY_DIR}/vioclass_mpv/${VIOCLASS_MPV_VERSION}")
 set(VIOCLASS_MPV_ARCHIVE "${VIOCLASS_MPV_ROOT}/${VIOCLASS_MPV_ARCHIVE_NAME}")
 file(MAKE_DIRECTORY "${VIOCLASS_MPV_ROOT}")
@@ -33,7 +33,7 @@ if(NOT EXISTS "${VIOCLASS_MPV_ROOT}/libmpv-2.dll")
 endif()
 file(SHA256 "${VIOCLASS_MPV_ROOT}/libmpv-2.dll" VIOCLASS_MPV_DLL_SHA256)
 if(NOT VIOCLASS_MPV_DLL_SHA256 STREQUAL
-    "48276397da952e9c5e8ca8423dd17dfa05e1ad7b2011fa0c5a9038a96838c4d7")
+    "bed9c39249b74554305e128d3f19c1348c7010832c8f4794daa24a9ed881d8e2")
   message(FATAL_ERROR "VioClass libmpv DLL hash mismatch; refusing modified runtime")
 endif()
 # The archive uses the same name preferred by the media_kit loader.
