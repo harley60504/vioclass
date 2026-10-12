@@ -861,6 +861,50 @@ class _PlayerSettingsPane extends StatelessWidget {
             const SizedBox(height: 12),
             TwitchVideoEnhancementSettingsCard(controller: controller),
             const SizedBox(height: 12),
+            _SettingsSection(
+              title: l10n.t('播放手勢與快捷鍵'),
+              child: Column(
+                children: [
+                  for (final setting in [
+                    (
+                      '方向鍵快轉／倒退',
+                      '左右方向鍵跳轉 10 秒；輸入訊息時不觸發',
+                      controller.keyboardSeekEnabled,
+                      controller.setKeyboardSeekEnabled,
+                    ),
+                    (
+                      '雙擊快轉／倒退',
+                      '雙擊影片左側倒退 10 秒，右側快轉 10 秒',
+                      controller.doubleTapSeekEnabled,
+                      controller.setDoubleTapSeekEnabled,
+                    ),
+                    (
+                      '水平拖曳跳轉',
+                      '拖曳影片預覽進度，放開才跳轉；全寬約 60 秒',
+                      controller.dragSeekEnabled,
+                      controller.setDragSeekEnabled,
+                    ),
+                  ])
+                    _SettingsSwitchRow(
+                      title: l10n.t(setting.$1),
+                      subtitle: l10n.t(setting.$2),
+                      value: setting.$3,
+                      onChanged: (value) async {
+                        try {
+                          await setting.$4(value);
+                        } catch (_) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             const TwitchAudioSettingsCard(),
           ],
         );

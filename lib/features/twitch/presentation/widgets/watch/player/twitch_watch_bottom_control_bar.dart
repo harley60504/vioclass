@@ -382,7 +382,7 @@ class _CompactWatchBottomControls extends StatelessWidget {
         children: [
           Column(
             mainAxisAlignment: MainAxisAlignment.end,
-              children: [slider, const SizedBox(height: 29)],
+            children: [slider, const SizedBox(height: 29)],
           ),
           Positioned(
             left: 0,
@@ -390,80 +390,70 @@ class _CompactWatchBottomControls extends StatelessWidget {
             bottom: 0,
             child: _WatchBottomControlSurface(
               height: 48,
-              child: Padding(
-                padding: EdgeInsets.zero,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _PlayPauseButton(
+              child: _WatchControlZones(
+                left: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PlayPauseButton(
+                      player: player,
+                      playing: playing,
+                      size: veryNarrow ? 26 : 28,
+                      dense: true,
+                    ),
+                  ],
+                ),
+                center: timeControls,
+                right: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (veryNarrow) ...[
+                      _LivePlaybackSheetButton(
                         player: player,
-                        playing: playing,
-                        size: veryNarrow ? 26 : 28,
-                        dense: true,
-                      ),
-                      _TimelineStepButtons(
-                        player: player,
-                        timelineController: playbackTimelineController,
-                        playbackKind: playbackKind,
-                        limitToLiveBuffer: !hasFullLiveDvr,
+                        playerRuntime: playerRuntime,
+                        hasDvrReplay: hasDvrReplay,
+                        hasFullLiveDvr: hasFullLiveDvr,
+                        showLiveEdgeLabel: showLiveEdgeLabel,
+                        liveDvrDuration: liveDvrDuration,
+                        liveDvrStartedAt: liveDvrStartedAt,
                         onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
                         onReturnToLive: onReturnToLive,
-                        iconSize: veryNarrow ? 18 : 20,
-                        dense: true,
+                        playbackKind: playbackKind,
+                        timelineEnabled: timelineEnabled,
+                        playbackTimelineController: playbackTimelineController,
                       ),
-                      const SizedBox(width: 12),
-                      timeControls,
-                      const SizedBox(width: 12),
-                      if (veryNarrow) ...[
-                        _LivePlaybackSheetButton(
-                          player: player,
-                          playerRuntime: playerRuntime,
-                          hasDvrReplay: hasDvrReplay,
-                          hasFullLiveDvr: hasFullLiveDvr,
-                          showLiveEdgeLabel: showLiveEdgeLabel,
-                          liveDvrDuration: liveDvrDuration,
-                          liveDvrStartedAt: liveDvrStartedAt,
-                          onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
-                          onReturnToLive: onReturnToLive,
-                          playbackKind: playbackKind,
-                          timelineEnabled: timelineEnabled,
-                          playbackTimelineController:
-                              playbackTimelineController,
-                        ),
-                      ],
-                      SizedBox(width: veryNarrow ? 2 : 6),
-                      CompactInlineVolumeControl(
-                        muted: muted,
-                        volume: volume,
-                        sliderWidth: veryNarrow ? 50 : 76,
-                        onToggleMute: onToggleMute,
-                        onVolumeChanged: onVolumeChanged,
-                      ),
-                      SizedBox(width: veryNarrow ? 1 : 4),
-                      QualityButton(
+                    ],
+                    SizedBox(width: veryNarrow ? 2 : 6),
+                    PlayerVolumeButton(
+                      muted: muted,
+                      volume: volume,
+                      onToggleMute: onToggleMute,
+                      onVolumeChanged: onVolumeChanged,
+                    ),
+                    SizedBox(width: veryNarrow ? 1 : 4),
+                    SizedBox.square(
+                      dimension: 36,
+                      child: QualityButton(
                         variants: qualityVariants,
                         currentVariant: currentVariant,
                         onChanged: onQualityChanged,
                       ),
-                      _ChatToggleButton(
-                        chatVisible: chatVisible,
-                        size: veryNarrow ? 21 : 23,
+                    ),
+                    _ChatToggleButton(
+                      chatVisible: chatVisible,
+                      size: veryNarrow ? 21 : 23,
+                      dense: true,
+                      onPressed: onToggleChat,
+                    ),
+                    if (showFullscreenButton)
+                      _FullscreenToggleButton(
+                        fullscreen: fullscreen,
+                        size: veryNarrow ? 23 : 25,
                         dense: true,
-                        onPressed: onToggleChat,
+                        onPressed: onToggleFullscreen,
                       ),
-                      if (showFullscreenButton)
-                        _FullscreenToggleButton(
-                          fullscreen: fullscreen,
-                          size: veryNarrow ? 23 : 25,
-                          dense: true,
-                          onPressed: onToggleFullscreen,
-                        ),
-                      const AndroidPipButton(dense: true, size: 22),
-                      PlayerMoreActionsButton(playerRuntime: playerRuntime),
-                    ],
-                  ),
+                    const AndroidPipButton(dense: true, size: 22),
+                    PlayerMoreActionsButton(playerRuntime: playerRuntime),
+                  ],
                 ),
               ),
             ),
@@ -548,7 +538,7 @@ class _WideWatchBottomControls extends StatelessWidget {
         children: [
           Column(
             mainAxisAlignment: MainAxisAlignment.end,
-              children: [slider, const SizedBox(height: 29)],
+            children: [slider, const SizedBox(height: 29)],
           ),
           Positioned(
             left: 0,
@@ -556,70 +546,48 @@ class _WideWatchBottomControls extends StatelessWidget {
             bottom: 0,
             child: _WatchBottomControlSurface(
               height: 48,
-              child: Padding(
-                padding: EdgeInsets.zero,
-                child: Row(
+              child: _WatchControlZones(
+                left: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          _PlayPauseButton(
-                            player: player,
-                            playing: playing,
-                            size: 32,
-                          ),
-                          _TimelineStepButtons(
-                            player: player,
-                            timelineController: playbackTimelineController,
-                            playbackKind: playbackKind,
-                            limitToLiveBuffer: !hasFullLiveDvr,
-                            onOpenDvrReplayAtPosition:
-                                onOpenDvrReplayAtPosition,
-                            onReturnToLive: onReturnToLive,
-                            iconSize: 21,
-                          ),
-                        ],
+                    _PlayPauseButton(
+                      player: player,
+                      playing: playing,
+                      size: 26,
+                    ),
+                  ],
+                ),
+                center: timeControls,
+                right: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PlayerVolumeButton(
+                      muted: muted,
+                      volume: volume,
+                      onToggleMute: onToggleMute,
+                      onVolumeChanged: onVolumeChanged,
+                    ),
+                    SizedBox.square(
+                      dimension: 36,
+                      child: QualityButton(
+                        variants: qualityVariants,
+                        currentVariant: currentVariant,
+                        onChanged: onQualityChanged,
                       ),
                     ),
-                    timeControls,
-                    Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        reverse: true,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(width: 12),
-                            _WideVolumeControl(
-                              muted: muted,
-                              volume: volume,
-                              onToggleMute: onToggleMute,
-                              onVolumeChanged: onVolumeChanged,
-                            ),
-                            QualityButton(
-                              variants: qualityVariants,
-                              currentVariant: currentVariant,
-                              onChanged: onQualityChanged,
-                            ),
-                            _ChatToggleButton(
-                              chatVisible: chatVisible,
-                              size: 23,
-                              onPressed: onToggleChat,
-                            ),
-                            if (showFullscreenButton)
-                              _FullscreenToggleButton(
-                                fullscreen: fullscreen,
-                                size: 25,
-                                onPressed: onToggleFullscreen,
-                              ),
-                            const AndroidPipButton(size: 23),
-                            PlayerMoreActionsButton(
-                              playerRuntime: playerRuntime,
-                            ),
-                          ],
-                        ),
-                      ),
+                    _ChatToggleButton(
+                      chatVisible: chatVisible,
+                      size: 23,
+                      onPressed: onToggleChat,
                     ),
+                    if (showFullscreenButton)
+                      _FullscreenToggleButton(
+                        fullscreen: fullscreen,
+                        size: 25,
+                        onPressed: onToggleFullscreen,
+                      ),
+                    const AndroidPipButton(dense: true, size: 20),
+                    PlayerMoreActionsButton(playerRuntime: playerRuntime),
                   ],
                 ),
               ),
@@ -750,6 +718,7 @@ class _PlayPauseButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
+      controlSize: 36,
       tooltip: context.vio.t(playing ? '暫停' : '播放'),
       icon: playing ? Icons.pause : Icons.play_arrow,
       size: size,
@@ -757,156 +726,6 @@ class _PlayPauseButton extends StatelessWidget {
       onPressed: () {
         unawaited(playing ? player.pause() : player.play());
       },
-    );
-  }
-}
-
-class _TimelineStepButtons extends StatelessWidget {
-  final Player player;
-  final TwitchPlaybackTimelineController? timelineController;
-  final TwitchWatchPlaybackKind playbackKind;
-  final bool limitToLiveBuffer;
-  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
-  final VoidCallback? onReturnToLive;
-  final double iconSize;
-  final bool dense;
-
-  const _TimelineStepButtons({
-    required this.player,
-    required this.timelineController,
-    required this.playbackKind,
-    required this.limitToLiveBuffer,
-    required this.onOpenDvrReplayAtPosition,
-    required this.onReturnToLive,
-    required this.iconSize,
-    this.dense = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = timelineController;
-    if (controller == null) {
-      return _buildButtons(context, enabled: false);
-    }
-
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        final snapshot = controller.snapshot;
-        final duration = snapshot.duration;
-        if (!snapshot.canSeek ||
-            duration == null ||
-            duration <= Duration.zero) {
-          return _buildButtons(context, enabled: false);
-        }
-
-        return _buildButtons(
-          context,
-          enabled: true,
-          onBack: () => _jumpBy(controller, snapshot, duration, -10),
-          onForward: () => _jumpBy(controller, snapshot, duration, 10),
-        );
-      },
-    );
-  }
-
-  Widget _buildButtons(
-    BuildContext context, {
-    required bool enabled,
-    VoidCallback? onBack,
-    VoidCallback? onForward,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        PlainIconButton(
-          tooltip: context.vio.t('倒退 10 秒'),
-          icon: Icons.replay_10_rounded,
-          size: iconSize,
-          dense: dense,
-          onPressed: enabled ? onBack : null,
-        ),
-        PlainIconButton(
-          tooltip: context.vio.t('快轉 10 秒'),
-          icon: Icons.forward_10_rounded,
-          size: iconSize,
-          dense: dense,
-          onPressed: enabled ? onForward : null,
-        ),
-      ],
-    );
-  }
-
-  void _jumpBy(
-    TwitchPlaybackTimelineController controller,
-    TwitchPlaybackTimelineSnapshot snapshot,
-    Duration duration,
-    int seconds,
-  ) {
-    controller.queueJumpBy(
-      delta: Duration(seconds: seconds),
-      current: snapshot.position,
-      duration: duration,
-      fromLiveEdge: snapshot.isAtLiveEdge,
-      minimum:
-          limitToLiveBuffer &&
-              snapshot.mode == TwitchPlaybackTimelineMode.liveDvr
-          ? duration - _liveSeekWindowDuration
-          : Duration.zero,
-      onCommit: (target) {
-        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
-            target >= duration &&
-            onReturnToLive != null) {
-          controller.returnToLive();
-          onReturnToLive!();
-          return;
-        }
-        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
-            onOpenDvrReplayAtPosition != null) {
-          onOpenDvrReplayAtPosition!(target);
-          return;
-        }
-        unawaited(player.seek(target));
-      },
-    );
-  }
-}
-
-class _WideVolumeControl extends StatelessWidget {
-  final bool muted;
-  final double volume;
-  final VoidCallback? onToggleMute;
-  final ValueChanged<double>? onVolumeChanged;
-
-  const _WideVolumeControl({
-    required this.muted,
-    required this.volume,
-    required this.onToggleMute,
-    required this.onVolumeChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.vio;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        PlainIconButton(
-          tooltip: l10n.t(muted ? '取消靜音' : '靜音'),
-          icon: muted || volume <= 0 ? Icons.volume_off : Icons.volume_up,
-          size: 24,
-          onPressed: onToggleMute,
-        ),
-        SizedBox(
-          width: 92,
-          child: Slider(
-            value: volume.clamp(0.0, 100.0).toDouble(),
-            min: 0,
-            max: 100,
-            onChanged: onVolumeChanged,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -927,6 +746,7 @@ class _ChatToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
+      controlSize: 36,
       tooltip: context.vio.t(chatVisible ? '隱藏聊天室' : '顯示聊天室'),
       icon: chatVisible ? Icons.chat_bubble : Icons.chat_bubble_outline,
       size: size,
@@ -953,6 +773,7 @@ class _FullscreenToggleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
+      controlSize: 36,
       tooltip: context.vio.t(fullscreen ? '離開全螢幕' : '全螢幕'),
       icon: fullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
       size: size,
@@ -1098,6 +919,7 @@ class _LivePlaybackSheetButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlainIconButton(
+      controlSize: 36,
       tooltip: context.vio.t('打開播放進度'),
       icon: Icons.timeline_rounded,
       size: 22,
@@ -1105,4 +927,51 @@ class _LivePlaybackSheetButton extends StatelessWidget {
       onPressed: timelineEnabled ? () => _showPlaybackSheet(context) : null,
     );
   }
+}
+
+/// Keeps the time label geometrically centered regardless of side-group width.
+class _WatchControlZones extends StatelessWidget {
+  final Widget left;
+  final Widget center;
+  final Widget right;
+  const _WatchControlZones({
+    required this.left,
+    required this.center,
+    required this.right,
+  });
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Row(
+      children: [
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: SingleChildScrollView(
+              key: const ValueKey('player-control-left'),
+              scrollDirection: Axis.horizontal,
+              clipBehavior: Clip.hardEdge,
+              child: left,
+            ),
+          ),
+        ),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.5),
+          child: FittedBox(fit: BoxFit.scaleDown, child: center),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(left: 12),
+            child: SingleChildScrollView(
+              key: const ValueKey('player-control-right'),
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              clipBehavior: Clip.hardEdge,
+              child: right,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

@@ -10,6 +10,7 @@ import '../../models/chat/twitch_chat_runtime_message.dart';
 import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../localization/vioclass_localizations.dart';
+import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/message/twitch_chat_mention.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 
@@ -216,7 +217,9 @@ class _ProfileState extends State<TwitchChatUserProfileCard> {
   void initState() {
     super.initState();
     final cached = _cache[widget.cacheKey];
-    if (cached != null && DateTime.now().difference(cached.loadedAt) < const Duration(minutes: 1)) {
+    if (cached != null &&
+        DateTime.now().difference(cached.loadedAt) <
+            const Duration(minutes: 1)) {
       _user = cached.user;
       _appearance = cached.appearance;
       _publicProfile = cached.publicProfile;
@@ -239,13 +242,25 @@ class _ProfileState extends State<TwitchChatUserProfileCard> {
     ]);
     if (!mounted || generation != _profileGeneration) return;
     final key = widget.cacheKey;
-    if (key != null && (_user != null || _appearance?.user != null || _publicProfile?.user != null)) {
-      _cache.removeWhere((_, entry) => DateTime.now().difference(entry.loadedAt) >= const Duration(minutes: 1));
+    if (key != null &&
+        (_user != null ||
+            _appearance?.user != null ||
+            _publicProfile?.user != null)) {
+      _cache.removeWhere(
+        (_, entry) =>
+            DateTime.now().difference(entry.loadedAt) >=
+            const Duration(minutes: 1),
+      );
       _cache.remove(key);
       if (_cache.length >= 64) {
         _cache.remove(_cache.keys.first);
       }
-      _cache[key] = _ProfileSnapshot(_user, _appearance, _publicProfile, _followInfo);
+      _cache[key] = _ProfileSnapshot(
+        _user,
+        _appearance,
+        _publicProfile,
+        _followInfo,
+      );
     }
     setState(() => _loadingProfile = false);
   }
@@ -521,15 +536,25 @@ class _ProfileState extends State<TwitchChatUserProfileCard> {
         ),
       ],
     );
-    final whisperAction = OutlinedButton.icon(
-      key: const ValueKey('profile-whisper-action'),
-      onPressed: widget.canWhisper ? () => Navigator.pop(context, true) : null,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, 40),
-        padding: const EdgeInsets.symmetric(horizontal: 10),
+    final whisperAction = SizedBox(
+      height: TwitchUiControlSize.hitCompact,
+      child: OutlinedButton.icon(
+        key: const ValueKey('profile-whisper-action'),
+        onPressed: widget.canWhisper
+            ? () => Navigator.pop(context, true)
+            : null,
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, TwitchUiControlSize.hitCompact),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.standard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(TwitchUiRadius.sm),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+        ),
+        icon: const Icon(Icons.chat_bubble_outline, size: 16),
+        label: Text(t('私訊')),
       ),
-      icon: const Icon(Icons.chat_bubble_outline, size: 16),
-      label: Text(t('私訊')),
     );
     final actions = Wrap(
       key: const ValueKey('profile-actions-and-badges'),
@@ -796,5 +821,10 @@ class _ProfileSnapshot {
   final TwitchChatUserAppearance? appearance;
   final TwitchChatUserPublicProfile? publicProfile;
   final TwitchChatUserFollowInfo followInfo;
-  _ProfileSnapshot(this.user, this.appearance, this.publicProfile, this.followInfo);
+  _ProfileSnapshot(
+    this.user,
+    this.appearance,
+    this.publicProfile,
+    this.followInfo,
+  );
 }

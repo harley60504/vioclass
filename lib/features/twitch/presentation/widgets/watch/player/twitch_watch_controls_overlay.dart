@@ -13,6 +13,8 @@ import '../../../theme/twitch_ui_tokens.dart';
 import 'twitch_player_error_card.dart';
 import 'twitch_watch_bottom_control_bar.dart';
 import 'twitch_watch_top_action_bar.dart';
+import '../../../settings/twitch_player_settings_controller.dart';
+import 'twitch_player_seek_gestures.dart';
 
 class WatchControlsOverlay extends StatefulWidget {
   final bool loading;
@@ -99,6 +101,21 @@ class WatchControlsOverlay extends StatefulWidget {
 }
 
 class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
+  final _gestureSettings = TwitchPlayerSettingsController();
+  bool _gesturesReady = false;
+  void _gesturePreferencesChanged() {
+    unawaited(_reloadGesturePreferences());
+  }
+
+  Future<void> _reloadGesturePreferences() async {
+    try {
+      await _gestureSettings.reloadGestures();
+    } catch (_) {
+      return;
+    }
+    if (mounted) setState(() => _gesturesReady = true);
+  }
+
   static const Duration _fadeDuration = Duration(milliseconds: 180);
   static const Duration _autoHideDelay = Duration(seconds: 5);
 
@@ -123,6 +140,10 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   @override
   void initState() {
     super.initState();
+    TwitchPlayerSettingsController.gestureSettingsChanged.addListener(
+      _gesturePreferencesChanged,
+    );
+    _gesturePreferencesChanged();
     _scheduleAutoHide();
   }
 
@@ -137,6 +158,10 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    TwitchPlayerSettingsController.gestureSettingsChanged.removeListener(
+      _gesturePreferencesChanged,
+    );
+    _gestureSettings.dispose();
     _keyboardFocusNode.dispose();
     super.dispose();
   }
@@ -170,6 +195,12 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
       return KeyEventResult.ignored;
     }
     if (_hasEditableTextFocus) return KeyEventResult.ignored;
+    if (!_gesturesReady ||
+        !_gestureSettings.keyboardSeekEnabled ||
+        widget.loading ||
+        _hasError) {
+      return KeyEventResult.ignored;
+    }
 
     final seconds = switch (event.logicalKey) {
       LogicalKeyboardKey.arrowLeft => -10,
@@ -194,33 +225,40 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
       return false;
     }
 
-    controller.queueJumpBy(
-      delta: Duration(seconds: seconds),
-      current: snapshot.position,
-      duration: duration,
-      fromLiveEdge: snapshot.isAtLiveEdge,
-      minimum:
-          !widget.hasFullLiveDvr &&
-              snapshot.mode == TwitchPlaybackTimelineMode.liveDvr
-          ? duration - const Duration(seconds: 20)
-          : Duration.zero,
-      onCommit: (target) {
-        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
-            target >= duration &&
-            widget.onReturnToLive != null) {
-          controller.returnToLive();
-          widget.onReturnToLive!();
-          return;
-        }
-        if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
-            widget.onOpenDvrReplayAtPosition != null) {
-          widget.onOpenDvrReplayAtPosition!(target);
-          return;
-        }
-        unawaited(widget.player.seek(target));
-      },
-    );
+    final base = snapshot.isAtLiveEdge && seconds < 0
+        ? duration
+        : snapshot.position;
+    final minimumMs =
+        !widget.hasFullLiveDvr &&
+            snapshot.mode == TwitchPlaybackTimelineMode.liveDvr
+        ? (duration.inMilliseconds - 20000).clamp(0, duration.inMilliseconds)
+        : 0;
+    final targetMs = (base.inMilliseconds + seconds * 1000)
+        .clamp(minimumMs, duration.inMilliseconds)
+        .toInt();
+    controller.seekTo(Duration(milliseconds: targetMs), _commitSeek);
     return true;
+  }
+
+  void _commitSeek(Duration target) {
+    final controller = widget.playbackTimelineController;
+    if (controller == null) return;
+    final snapshot = controller.snapshot;
+    final duration = snapshot.duration;
+    if (duration == null) return;
+    if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
+        target >= duration &&
+        widget.onReturnToLive != null) {
+      controller.returnToLive();
+      widget.onReturnToLive!();
+      return;
+    }
+    if (snapshot.mode == TwitchPlaybackTimelineMode.liveDvr &&
+        widget.onOpenDvrReplayAtPosition != null) {
+      widget.onOpenDvrReplayAtPosition!(target);
+      return;
+    }
+    unawaited(widget.player.seek(target));
   }
 
   void _requestKeyboardFocus() {
@@ -240,6 +278,26 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
         onRequestKeyboardFocus: _requestKeyboardFocus,
         child: Stack(
           children: [
+            Positioned.fill(
+              child: PlayerSeekGestures(
+                controller: widget.playbackTimelineController,
+                enabled: _gesturesReady && !widget.loading && !_hasError,
+                doubleTapEnabled: _gestureSettings.doubleTapSeekEnabled,
+                dragEnabled: _gestureSettings.dragSeekEnabled,
+                limitToLiveBuffer: !widget.hasFullLiveDvr,
+                onJump: (seconds) {
+                  _showAndRestartAutoHide();
+                  return _jumpBy(seconds);
+                },
+                onSeek: (target) {
+                  _showAndRestartAutoHide();
+                  widget.playbackTimelineController?.seekTo(
+                    target,
+                    _commitSeek,
+                  );
+                },
+              ),
+            ),
             Positioned.fill(child: _PlayerDimOverlay(visible: widget.loading)),
             _FadingWatchChrome(
               visible: _visible,

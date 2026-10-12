@@ -6,6 +6,45 @@ import '../../services/playback/twitch_video_enhancement.dart';
 import '../watch/controllers/twitch_watch_preferences_controller.dart';
 
 class TwitchPlayerSettingsController extends ChangeNotifier {
+  bool _disposed = false;
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  static final gestureSettingsChanged = ChangeNotifier();
+  static const keyboardSeekKey = 'twitch_player_keyboard_seek_v1';
+  static const doubleTapSeekKey = 'twitch_player_double_tap_seek_v1';
+  static const dragSeekKey = 'twitch_player_drag_seek_v1';
+  bool _keyboardSeekEnabled = true;
+  bool _doubleTapSeekEnabled = true;
+  bool _dragSeekEnabled = true;
+  bool get keyboardSeekEnabled => _keyboardSeekEnabled;
+  bool get doubleTapSeekEnabled => _doubleTapSeekEnabled;
+  bool get dragSeekEnabled => _dragSeekEnabled;
+
+  Future<void> reloadGestures() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_disposed) return;
+    _keyboardSeekEnabled = prefs.getBool(keyboardSeekKey) ?? true;
+    _doubleTapSeekEnabled = prefs.getBool(doubleTapSeekKey) ?? true;
+    _dragSeekEnabled = prefs.getBool(dragSeekKey) ?? true;
+    notifyListeners();
+  }
+
+  Future<void> _setGesture(String key, bool value) =>
+      _queuePlaybackWrite(() async {
+        await _saveBoolPreference(key, value);
+        await reloadGestures();
+        gestureSettingsChanged.notifyListeners();
+      });
+  Future<void> setKeyboardSeekEnabled(bool value) =>
+      _setGesture(keyboardSeekKey, value);
+  Future<void> setDoubleTapSeekEnabled(bool value) =>
+      _setGesture(doubleTapSeekKey, value);
+  Future<void> setDragSeekEnabled(bool value) =>
+      _setGesture(dragSeekKey, value);
   static const String androidPipEnabledPreferenceKey =
       'twitch_player_android_pip_enabled_v1';
   static const String homeKeepsMiniPlayerPreferenceKey =
@@ -44,6 +83,7 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   Future<void> load() async {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
+    await reloadGestures();
     _volume =
         (prefs.getDouble(
                   TwitchWatchPreferencesController.playerVolumePreferenceKey,

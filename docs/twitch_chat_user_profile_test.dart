@@ -155,7 +155,7 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  for (final width in [320.0, 1000.0]) {
+  for (final width in [320.0, 844.0, 1000.0]) {
     testWidgets(
       'Compact profile aligns facts and separates optional metadata at $width',
       (tester) async {
@@ -200,6 +200,12 @@ void main() {
         expect(header.icon, Icons.person_outline);
         expect(header.showRefresh, false);
         expect(header.trailing, hasLength(1));
+        expect(
+          tester
+              .getRect(find.byKey(const ValueKey('profile-whisper-action')))
+              .height,
+          tester.getRect(find.byTooltip('關閉')).height,
+        );
         expect(find.textContaining('2020-01-01'), findsOneWidget);
         expect(find.text('#8A2BE2'), findsOneWidget);
         expect(

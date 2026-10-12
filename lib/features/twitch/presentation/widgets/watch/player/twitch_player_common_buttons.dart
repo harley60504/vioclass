@@ -47,6 +47,7 @@ class RoundIconButton extends StatelessWidget {
 }
 
 class PlainIconButton extends StatelessWidget {
+  final double? controlSize;
   final String tooltip;
   final IconData icon;
   final VoidCallback? onPressed;
@@ -56,6 +57,7 @@ class PlainIconButton extends StatelessWidget {
 
   const PlainIconButton({
     super.key,
+    this.controlSize,
     required this.tooltip,
     required this.icon,
     required this.onPressed,
@@ -66,20 +68,31 @@ class PlainIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hitSize = dense
-        ? (size + 16).clamp(
-            TwitchUiControlSize.hitCompact,
-            TwitchUiControlSize.hitLarge,
-          ).toDouble()
-        : TwitchUiControlSize.hitLarge;
+    final hitSize =
+        controlSize ??
+        (dense
+            ? (size + 16)
+                  .clamp(
+                    TwitchUiControlSize.hitCompact,
+                    TwitchUiControlSize.hitLarge,
+                  )
+                  .toDouble()
+            : TwitchUiControlSize.hitLarge);
 
     return IconButton(
       tooltip: tooltip,
-      visualDensity: dense ? VisualDensity.compact : VisualDensity.standard,
+      visualDensity: controlSize != null
+          ? VisualDensity.standard
+          : dense
+          ? VisualDensity.compact
+          : VisualDensity.standard,
       padding: EdgeInsets.zero,
       constraints: BoxConstraints.tightFor(width: hitSize, height: hitSize),
       onPressed: onPressed,
       style: ButtonStyle(
+        tapTargetSize: controlSize != null
+            ? MaterialTapTargetSize.shrinkWrap
+            : null,
         backgroundColor: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.hovered)) {
             return TwitchUiColors.hoverOverlay;
