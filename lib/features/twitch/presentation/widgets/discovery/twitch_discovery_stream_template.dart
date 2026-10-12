@@ -8,12 +8,49 @@ import 'package:flutter/rendering.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
+import '../../../services/watch/twitch_watch_services.dart';
+import '../../watch/controllers/twitch_watch_chat_controller.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_watch_route_guard.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../twitch_follow_status_resolver.dart';
 import '../responsive/twitch_responsive_layout.dart';
 import 'twitch_stream_card.dart';
+
+/// Shared home content surface, including space below the floating toolbar.
+class TwitchDiscoveryScrollSurface extends StatelessWidget {
+  final List<Widget> slivers;
+  final ScrollController? controller;
+  final Key? scrollViewKey;
+
+  const TwitchDiscoveryScrollSurface({
+    super.key,
+    required this.slivers,
+    this.controller,
+    this.scrollViewKey,
+  });
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final layout = TwitchResponsiveLayout.fromConstraints(constraints);
+      final inset = layout.shouldUseTwoRowHomeToolbar ? 118.0 : 70.0;
+      return ColoredBox(
+        color: TwitchUiColors.appBackground,
+        child: CustomScrollView(
+          key: scrollViewKey,
+          controller: controller,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(840),
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: SizedBox(height: inset)),
+            ...slivers,
+          ],
+        ),
+      );
+    },
+  );
+}
 
 class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final ScrollController controller;
@@ -27,6 +64,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   final Future<void> Function()? onReturnFromStream;
   final TwitchDiscoveryService? discoveryService;
   final bool showSectionCount;
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final bool? streamKnownFollowing;
   final TwitchFollowStatusResolver? followStatusFor;
 
@@ -43,6 +82,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
     this.onReturnFromStream,
     this.discoveryService,
     this.showSectionCount = true,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     this.streamKnownFollowing,
     this.followStatusFor,
   });
@@ -51,67 +92,60 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final layout = TwitchResponsiveLayout.fromConstraints(constraints);
-        final homeToolbarInset = layout.shouldUseTwoRowHomeToolbar
-            ? 118.0
-            : 70.0;
         final mainAxisExtent = twitchStreamCardGridMainAxisExtent(
           constraints.maxWidth,
         );
-        return ColoredBox(
-          color: TwitchUiColors.appBackground,
-          child: CustomScrollView(
-            key: PageStorageKey<String>('twitch_discovery_grid_$sectionTitle'),
-            controller: controller,
-            scrollCacheExtent: const ScrollCacheExtent.pixels(840),
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: <Widget>[
-              SliverToBoxAdapter(child: SizedBox(height: homeToolbarInset)),
-              SliverToBoxAdapter(
-                child: TwitchDiscoverySectionHeader(
-                  icon: sectionIcon,
-                  title: sectionTitle,
-                  count: streamCount,
-                  showCount: showSectionCount,
-                ),
-              ),
-              ...extraSliversAfterHeader,
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                    maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
-                    mainAxisExtent: mainAxisExtent,
-                    crossAxisSpacing: twitchStreamCardGridSpacing,
-                    mainAxisSpacing: twitchStreamCardGridSpacing,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final stream = streams[index];
-                      return RepaintBoundary(
-                        child: TwitchStreamCard(
-                          stream: stream,
-                          onTap: () => _openStreamTarget(context, stream),
-                        ),
-                      );
-                    },
-                    childCount: streams.length,
-                    addAutomaticKeepAlives: false,
-                    addRepaintBoundaries: true,
-                    addSemanticIndexes: false,
-                  ),
-                ),
-              ),
-              ...extraSliversBeforeFooter,
-              SliverToBoxAdapter(child: footer),
-            ],
+        return TwitchDiscoveryScrollSurface(
+          scrollViewKey: PageStorageKey<String>(
+            'twitch_discovery_grid_$sectionTitle',
           ),
+          controller: controller,
+          slivers: <Widget>[
+            SliverToBoxAdapter(
+              child: TwitchDiscoverySectionHeader(
+                icon: sectionIcon,
+                title: sectionTitle,
+                count: streamCount,
+                showCount: showSectionCount,
+              ),
+            ),
+            ...extraSliversAfterHeader,
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              sliver: SliverGrid(
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: twitchStreamCardGridMaxCrossAxisExtent,
+                  mainAxisExtent: mainAxisExtent,
+                  crossAxisSpacing: twitchStreamCardGridSpacing,
+                  mainAxisSpacing: twitchStreamCardGridSpacing,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final stream = streams[index];
+                    return RepaintBoundary(
+                      child: TwitchStreamCard(
+                        stream: stream,
+                        onTap: () => _openStreamTarget(context, stream),
+                      ),
+                    );
+                  },
+                  childCount: streams.length,
+                  addAutomaticKeepAlives: false,
+                  addRepaintBoundaries: true,
+                  addSemanticIndexes: false,
+                ),
+              ),
+            ),
+            ...extraSliversBeforeFooter,
+            SliverToBoxAdapter(child: footer),
+          ],
         );
       },
     );
   }
 
   void _openStreamTarget(BuildContext context, TwitchLiveStream stream) {
+    final watchServices = watchServicesFactory?.call();
     Navigator.of(context)
         .push(
           MaterialPageRoute<void>(
@@ -128,6 +162,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
               ),
               initialDiscoveryService: discoveryService,
               initialKnownFollowing: _knownFollowStatusFor(stream),
+              initialServices: watchServices,
+              initialChatRuntimeFactory: watchChatRuntimeFactory,
             ),
           ),
         )
@@ -148,6 +184,8 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
 }
 
 class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final IconData icon;
   final String title;
   final List<TwitchLiveStream> streams;
@@ -158,6 +196,8 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
 
   const TwitchDiscoveryStreamSliverSection({
     super.key,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     required this.icon,
     required this.title,
     required this.streams,
@@ -217,6 +257,7 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
   }
 
   void _openStreamTarget(BuildContext context, TwitchLiveStream stream) {
+    final watchServices = watchServicesFactory?.call();
     Navigator.of(context)
         .push(
           MaterialPageRoute<void>(
@@ -233,6 +274,8 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
               ),
               initialDiscoveryService: discoveryService,
               initialKnownFollowing: _knownFollowStatusFor(stream),
+              initialServices: watchServices,
+              initialChatRuntimeFactory: watchChatRuntimeFactory,
             ),
           ),
         )

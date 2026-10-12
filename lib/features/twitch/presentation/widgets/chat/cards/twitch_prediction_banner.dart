@@ -11,6 +11,7 @@ import '../../../../models/engagement/twitch_prediction.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../twitch_chat_text_style.dart';
+import '../../../sheets/prediction_bet/twitch_prediction_bet_helpers.dart';
 
 class TwitchPredictionBanner extends StatelessWidget {
   final TwitchPredictionSnapshot prediction;
@@ -55,17 +56,15 @@ class TwitchPredictionBanner extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                const Color(0xFF251640).withValues(alpha: 0.97),
-                const Color(0xFF171420).withValues(alpha: 0.98),
+                const Color(0xFF242031).withValues(alpha: 0.85),
+                const Color(0xFF17171E).withValues(alpha: 0.90),
               ],
             ),
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: TwitchUiColors.primary.withValues(alpha: 0.44),
-            ),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: TwitchUiColors.primary.withValues(alpha: 0.20),
+                color: Colors.black.withValues(alpha: 0.10),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -120,7 +119,7 @@ class TwitchPredictionBanner extends StatelessWidget {
                               .clamp(12.5, 19.0)
                               .toDouble(),
                           height: 1.16,
-                          fontWeight: TwitchUiFontWeight.heavy,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -242,7 +241,7 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
         ? remaining.inSeconds > 0
               ? '${context.vio.t('關盤')} ${_formatLockCountdown(remaining)}'
               : context.vio.t('即將關盤')
-        : widget.label;
+        : context.vio.t(twitchPredictionStatusLabel(widget.label));
     final urgent =
         widget.active &&
         !widget.resolved &&
@@ -260,9 +259,9 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        border: Border.all(color: color.withValues(alpha: 0.40)),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
         boxShadow: <BoxShadow>[
           BoxShadow(color: color.withValues(alpha: 0.14), blurRadius: 10),
         ],
@@ -306,63 +305,68 @@ class _PredictionSplitBar extends StatelessWidget {
         : (left.points / total).clamp(0.0, 1.0).toDouble();
     final rightPercent = (1.0 - leftPercent).clamp(0.0, 1.0).toDouble();
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-      child: Container(
-        height: 31,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-        ),
-        child: Row(
+    final leftColor = left.isWinner
+        ? const Color(0xFF76D5A3)
+        : const Color(0xFF79B9F7);
+    final rightColor = right.isWinner
+        ? const Color(0xFF76D5A3)
+        : const Color(0xFFEBA1C9);
+    return Column(
+      children: [
+        Row(
           children: [
             Expanded(
-              flex: (leftPercent * 1000).round().clamp(1, 999).toInt(),
-              child: Container(
-                height: 31,
-                color: TwitchUiColors.blue.withValues(
-                  alpha: left.isWinner ? 0.96 : 0.82,
-                ),
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.only(left: 10),
-                child: Text(
-                  '${(leftPercent * 100).round()}%',
-                  style: twitchChatTextStyle(
-                    TextStyle(
-                      color: TwitchUiColors.textPrimary,
-                      fontSize: (10 * fontScale).clamp(9.0, 12.0).toDouble(),
-                      fontWeight: TwitchUiFontWeight.heavy,
-                    ),
-                  ),
-                ),
+              child: Text(
+                '${left.title} · ${(leftPercent * 100).round()}%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: leftColor, fontSize: 11 * fontScale),
               ),
             ),
-            Container(width: 1, color: Colors.black.withValues(alpha: 0.30)),
+            const SizedBox(width: 10),
             Expanded(
-              flex: (rightPercent * 1000).round().clamp(1, 999).toInt(),
-              child: Container(
-                height: 31,
-                color: TwitchUiColors.red.withValues(
-                  alpha: right.isWinner ? 0.96 : 0.82,
-                ),
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 10),
-                child: Text(
-                  '${(rightPercent * 100).round()}%',
-                  style: twitchChatTextStyle(
-                    TextStyle(
-                      color: TwitchUiColors.textPrimary,
-                      fontSize: (10 * fontScale).clamp(9.0, 12.0).toDouble(),
-                      fontWeight: TwitchUiFontWeight.heavy,
-                    ),
-                  ),
-                ),
+              child: Text(
+                '${right.title} · ${(rightPercent * 100).round()}%',
+                textAlign: TextAlign.right,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: rightColor, fontSize: 11 * fontScale),
               ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(99),
+          child: SizedBox(
+            height: 5,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: leftPercent, end: leftPercent),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 450),
+              builder: (_, value, _) => Row(
+                children: [
+                  Expanded(
+                    flex: (value * 1000).round().clamp(1, 999),
+                    child: ColoredBox(
+                      color: leftColor,
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                  Expanded(
+                    flex: ((1 - value) * 1000).round().clamp(1, 999),
+                    child: ColoredBox(
+                      color: rightColor,
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

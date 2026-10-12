@@ -25,6 +25,8 @@ Future<void> showTwitchWhisperSheet({
   Future<void> Function()? onAuthorize,
   bool automaticSync = true,
 }) async {
+  await controller.preparePanelOpen();
+  if (!context.mounted) return;
   controller.setPanelVisible(true);
   try {
     await showTwitchResponsiveSheet<void>(
@@ -76,7 +78,69 @@ class _WhisperSheetState extends State<_WhisperSheet> {
   bool _emojiOnly = false;
   bool _openingSync = false;
   bool _historyQueued = false;
-  bool _enteredAtLatest = false;
+  bool _confirmingDelete = false;
+
+  bool get _canDeleteConversation =>
+      inbox.ownerId != null &&
+      !inbox.loading &&
+      !inbox.sending &&
+      !inbox.managingHistory &&
+      !inbox.syncingHistory &&
+      !inbox.syncingThreads;
+
+  Future<void> _deleteConversation(
+    TwitchWhisperConversation peer, {
+    bool localOnly = false,
+  }) async {
+    final owner = inbox.ownerId;
+    if (!_canDeleteConversation || _confirmingDelete) return;
+    _confirmingDelete = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(context.vio.t(localOnly ? '只刪除本機紀錄' : '刪除對話紀錄')),
+          content: Text(
+            localOnly
+                ? '清除與 ${peer.displayName} 的本機對話、訊息及草稿？\n\n'
+                      '不會變更 Twitch 官方紀錄；如果官方仍有這個對話，後續同步可能再次出現。'
+                : '從 Twitch 對話列表移除與 ${peer.displayName} 的對話，'
+                      '並清除本機訊息及草稿？\n\n'
+                      '這會封存對話，不會抹除對方的訊息。收到新私訊時可再次出現。',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(context.vio.t('取消')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(context.vio.t('刪除')),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true || inbox.ownerId != owner) return;
+      if (!_canDeleteConversation) {
+        showTwitchNotice(context, '目前正在處理私訊，請稍後再刪除。');
+        return;
+      }
+      if (localOnly) {
+        await inbox.removeConversation(peer.userId);
+      } else {
+        await inbox.archiveConversation(peer.userId);
+      }
+      if (mounted && inbox.errorText != null) {
+        showTwitchNotice(
+          context,
+          inbox.errorText!,
+          tone: TwitchNoticeTone.error,
+        );
+      }
+    } finally {
+      _confirmingDelete = false;
+    }
+  }
 
   bool _canAutoSync(String? owner) =>
       mounted && inbox.panelVisible && owner != null && inbox.ownerId == owner;
@@ -91,10 +155,11 @@ class _WhisperSheetState extends State<_WhisperSheet> {
           !inbox.syncingThreads &&
           !inbox.syncingHistory) {
         await inbox.syncThreads();
-        // Bound automatic pagination; a long inbox continues when scrolled.
+        // Enumerate the official list before reconciling stale cached peers.
+        // Safety bound: incomplete reads never prune the cache.
         for (
           var page = 1;
-          page < 10 &&
+          page < 500 &&
               _canAutoSync(owner) &&
               !inbox.threadsComplete &&
               inbox.threadsError == null;
@@ -230,20 +295,6 @@ class _WhisperSheetState extends State<_WhisperSheet> {
         (_messageCount == 0 || _lastBubbleKey.currentContext != null);
     final changed = inbox.readingLatest != latest;
     inbox.setReadingLatest(latest);
-    if (latest) _enteredAtLatest = true;
-    if (widget.automaticSync &&
-        _enteredAtLatest &&
-        !latest &&
-        _scroll.position.extentAfter <= 24 &&
-        inbox.historyApi != null &&
-        inbox.historyError == null &&
-        !_openingSync &&
-        !_historyAutoBusy &&
-        !inbox.syncingThreads &&
-        !inbox.syncingHistory &&
-        inbox.activeConversation?.remoteHistoryComplete == false) {
-      unawaited(inbox.syncActiveHistory(older: true));
-    }
     if (changed || (latest && _latestCount != 0)) {
       setState(() {
         if (latest) _latestCount = 0;
@@ -349,7 +400,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
           ? '正在恢復對話 ${(work!.peerIndex + 1)}/${work.peerIds.length}…'
           : '正在列舉全部對話…';
     }
-    return inbox.recoveryError ??
+    return (inbox.recoveryError != null ? '歷史同步失敗，請稍後再試。' : null) ??
         inbox.recoveryStatus ??
         (inbox.recoveryProgress?.complete == false
             ? '有未完成的歷史恢復，可從保存進度續接。'
@@ -592,7 +643,6 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       final peerKey = peer == null ? null : '${inbox.ownerId}:${peer.userId}';
       final changed = _displayedPeer != peerKey;
       if (changed) {
-        _enteredAtLatest = false;
         _showEmotes = false;
         ++_scrollRequest;
         _seekingLatest = false;
@@ -635,8 +685,6 @@ class _WhisperSheetState extends State<_WhisperSheet> {
               inbox.readingLatest) {
             // The initial tail is anchored during layout, not sought afterwards.
             _onScroll();
-            _historyQueued = true;
-            unawaited(_syncOpenedHistory());
           }
         });
       }
@@ -984,19 +1032,6 @@ class _WhisperSheetState extends State<_WhisperSheet> {
     });
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
-        if (widget.automaticSync &&
-            notification.depth == 0 &&
-            notification is ScrollUpdateNotification &&
-            notification.scrollDelta != 0 &&
-            notification.metrics.extentAfter < 160 &&
-            !_openingSync &&
-            !_historyAutoBusy &&
-            !inbox.syncingThreads &&
-            !inbox.syncingHistory &&
-            !inbox.threadsComplete &&
-            inbox.threadsError == null) {
-          unawaited(inbox.syncThreads(more: true));
-        }
         return false;
       },
       child: CustomScrollView(
@@ -1119,7 +1154,9 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                       context.vio.t(
                         inbox.syncingThreads
                             ? '正在同步 Twitch 對話…'
-                            : inbox.threadsError ?? inbox.threadsStatus!,
+                            : inbox.threadsError != null
+                            ? '對話同步失敗，請稍後再試。'
+                            : inbox.threadsStatus!,
                       ),
                       style: const TextStyle(fontSize: 12),
                     ),
@@ -1207,10 +1244,41 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                       maxLines: peer.remoteUnreadCount > 0 ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: peer.unreadCount > 0
-                        ? Badge.count(count: peer.unreadCount)
-                        : null,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (peer.unreadCount > 0)
+                          Badge.count(count: peer.unreadCount),
+                        PopupMenuButton<String>(
+                          key: ValueKey('whisper-actions-${peer.userId}'),
+                          tooltip: context.vio.t('對話選單'),
+                          enabled: _canDeleteConversation,
+                          icon: const Icon(Icons.more_vert, size: 20),
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'delete',
+                              enabled: inbox.archiveApi != null,
+                              child: Text(context.vio.t('刪除對話紀錄')),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete-local',
+                              child: Text(context.vio.t('只刪除本機紀錄')),
+                            ),
+                          ],
+                          onSelected: (action) => _deleteConversation(
+                            peer,
+                            localOnly: action == 'delete-local',
+                          ),
+                        ),
+                      ],
+                    ),
                     onTap: () => inbox.selectConversation(peer.userId),
+                    onLongPress: _canDeleteConversation
+                        ? () => _deleteConversation(
+                            peer,
+                            localOnly: inbox.archiveApi == null,
+                          )
+                        : null,
                   ),
                 );
               },
@@ -1317,7 +1385,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
         if (mounted && inbox.historyError != null) {
           showTwitchNotice(
             context,
-            inbox.historyError!,
+            '訊息同步失敗，請稍後再試。',
             tone: TwitchNoticeTone.error,
           );
         }
@@ -1372,7 +1440,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    inbox.historyError!,
+                    context.vio.t('訊息同步失敗，請稍後再試。'),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),

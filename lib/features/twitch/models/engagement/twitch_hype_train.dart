@@ -13,6 +13,7 @@ class TwitchHypeTrainSnapshot {
   final DateTime? cooldownEndsAt;
   final String type;
   final bool isSharedTrain;
+  final bool isGoldenKappa;
   final List<TwitchHypeTrainContribution> topContributions;
   final List<TwitchHypeTrainParticipant> sharedTrainParticipants;
 
@@ -31,6 +32,7 @@ class TwitchHypeTrainSnapshot {
     required this.cooldownEndsAt,
     required this.type,
     required this.isSharedTrain,
+    this.isGoldenKappa = false,
     required this.topContributions,
     required this.sharedTrainParticipants,
   });
@@ -144,6 +146,11 @@ class TwitchHypeTrainSnapshot {
             source['cooldownEndTime'],
       ),
       type: _readString(source['type'] ?? source['trainType']),
+      isGoldenKappa: _readBool(
+        source['isGoldenKappaTrain'] ??
+            source['isGoldenKappa'] ??
+            source['is_golden_kappa'],
+      ),
       isSharedTrain:
           _readBool(
             source['isSharedTrain'] ??
@@ -202,7 +209,11 @@ class TwitchHypeTrainSnapshot {
     return snapshot.copyWith(channelLogin: login);
   }
 
-  TwitchHypeTrainSnapshot copyWith({String? channelLogin, String? channelId}) {
+  TwitchHypeTrainSnapshot copyWith({
+    String? channelLogin,
+    String? channelId,
+    bool? isGoldenKappa,
+  }) {
     return TwitchHypeTrainSnapshot(
       id: id,
       channelId: channelId ?? this.channelId,
@@ -218,6 +229,7 @@ class TwitchHypeTrainSnapshot {
       cooldownEndsAt: cooldownEndsAt,
       type: type,
       isSharedTrain: isSharedTrain,
+      isGoldenKappa: isGoldenKappa ?? this.isGoldenKappa,
       topContributions: topContributions,
       sharedTrainParticipants: sharedTrainParticipants,
     );
@@ -239,6 +251,7 @@ class TwitchHypeTrainSnapshot {
       'cooldownEndsAt': cooldownEndsAt?.toIso8601String(),
       'type': type,
       'isSharedTrain': isSharedTrain,
+      'isGoldenKappa': isGoldenKappa,
       'topContributions': topContributions
           .map((item) => item.toJson())
           .toList(growable: false),
@@ -267,6 +280,7 @@ class TwitchHypeTrainSnapshot {
   }
 
   String get displayTypeLabel {
+    if (isGoldenKappa) return '黃金列車';
     if (isSharedTrain) return '共享列車';
     final normalized = type.trim().toLowerCase();
     if (normalized.contains('golden')) return '黃金列車';

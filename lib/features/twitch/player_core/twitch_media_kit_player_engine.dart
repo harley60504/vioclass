@@ -5,6 +5,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
+import '../services/playback/twitch_audio_settings.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'twitch_player_profile.dart';
@@ -117,7 +118,10 @@ class TwitchMediaKitPlayerEngine {
 
   Future<void> setVolume(double volume) async {
     if (!initialized || _disposed) return;
-    await player.setVolume(volume.clamp(0.0, 100.0).toDouble());
+    await twitchAudioSettings.setPlayerVolume(
+      player,
+      volume.clamp(0.0, 100.0).toDouble(),
+    );
   }
 
   Future<void> dispose() async {

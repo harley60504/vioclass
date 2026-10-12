@@ -13,7 +13,6 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
   final bool loadingEmotes;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
-  final VoidCallback? onOpenSpecialActions;
   final EdgeInsetsGeometry padding;
 
   const TwitchWatchChatUtilityBar({
@@ -22,7 +21,6 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
     required this.loadingEmotes,
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
-    this.onOpenSpecialActions,
     this.padding = const EdgeInsets.fromLTRB(10, 7, 10, 4),
   });
 
@@ -37,18 +35,13 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
       padding: padding,
       child: Row(
         children: [
-          _ChannelPointsCompactButton(
-            balance: balance,
-            iconUrl: pointsIconUrl,
-            hasClaim: hasClaim,
-            onTap: onOpenChannelPoints,
-          ),
-          const SizedBox(width: 3),
-          _UtilityButton(
-            tooltip: l10n.t('聊天身分與互動'),
-            icon: Icons.auto_awesome_rounded,
-            active: false,
-            onTap: onOpenSpecialActions,
+          Flexible(
+            child: _ChannelPointsCompactButton(
+              balance: balance,
+              iconUrl: pointsIconUrl,
+              hasClaim: hasClaim,
+              onTap: onOpenChannelPoints,
+            ),
           ),
           const SizedBox(width: 3),
           _UtilityButton(
@@ -61,6 +54,19 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Personal badge / name-color / chat interactions, next to the send action.
+class TwitchWatchChatIdentityButton extends StatelessWidget {
+  final VoidCallback? onTap;
+  const TwitchWatchChatIdentityButton({super.key, this.onTap});
+
+  @override
+  Widget build(BuildContext context) => _UtilityButton(
+    tooltip: context.vio.t('聊天身分與互動'),
+    icon: Icons.badge_outlined,
+    onTap: onTap,
+  );
 }
 
 class _ChannelPointsCompactButton extends StatelessWidget {
@@ -100,12 +106,16 @@ class _ChannelPointsCompactButton extends StatelessWidget {
           children: [
             _ChannelPointsIcon(iconUrl: iconUrl, hasClaim: hasClaim),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                height: 1,
-                fontWeight: TwitchUiFontWeight.heavy,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  height: 1,
+                  fontWeight: TwitchUiFontWeight.heavy,
+                ),
               ),
             ),
           ],

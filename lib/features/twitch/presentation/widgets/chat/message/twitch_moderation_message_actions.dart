@@ -211,7 +211,11 @@ class _ActionsState extends State<TwitchModerationMessageActions> {
       _failed = false;
     });
     try {
-      if (!canModerate() || widget.message.id != message.id) {
+      if (!canModerate() ||
+          !widget.canModerate() ||
+          !identical(widget.api, api) ||
+          widget.channelName != channelName ||
+          widget.message.id != message.id) {
         throw const TwitchModerationException('管理身分或頻道已變更，未送出操作。');
       }
       if (action == '刪除訊息' &&

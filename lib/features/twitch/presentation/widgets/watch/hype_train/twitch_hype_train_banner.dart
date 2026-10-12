@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show FontFeature;
 
 import 'package:flutter/material.dart';
 
@@ -16,17 +17,28 @@ class TwitchHypeTrainBanner extends StatefulWidget {
 }
 
 class _TwitchHypeTrainBannerState extends State<TwitchHypeTrainBanner>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const Duration _endingDuration = Duration(milliseconds: 1800);
 
   Timer? _timer;
   late final AnimationController _endingController;
   TwitchHypeTrainSnapshot? _visibleSnapshot;
   bool _showEnding = false;
+  late final AnimationController _celebrationController;
+  bool _levelUp = false;
 
   @override
   void initState() {
     super.initState();
+    _celebrationController =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 2600),
+        )..addStatusListener((status) {
+          if (status == AnimationStatus.completed && mounted) {
+            setState(() => _levelUp = false);
+          }
+        });
     _endingController =
         AnimationController(vsync: this, duration: _endingDuration)
           ..addStatusListener((status) {
@@ -44,6 +56,9 @@ class _TwitchHypeTrainBannerState extends State<TwitchHypeTrainBanner>
   void didUpdateWidget(covariant TwitchHypeTrainBanner oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller == widget.controller) return;
+    _visibleSnapshot = null;
+    _levelUp = false;
+    _celebrationController.reset();
     oldWidget.controller.removeListener(_syncTimer);
     widget.controller.addListener(_syncTimer);
     _syncTimer();
@@ -54,12 +69,21 @@ class _TwitchHypeTrainBannerState extends State<TwitchHypeTrainBanner>
     widget.controller.removeListener(_syncTimer);
     _timer?.cancel();
     _endingController.dispose();
+    _celebrationController.dispose();
     super.dispose();
   }
 
   void _syncTimer() {
     final snapshot = widget.controller.snapshot;
     if (snapshot != null && snapshot.isActive) {
+      final previous = _visibleSnapshot;
+      if (previous != null &&
+          previous.id == snapshot.id &&
+          snapshot.level > previous.level &&
+          !MediaQuery.disableAnimationsOf(context)) {
+        _levelUp = true;
+        _celebrationController.forward(from: 0);
+      }
       _visibleSnapshot = snapshot;
       _showEnding = false;
       _endingController.reset();
@@ -151,6 +175,8 @@ class _TwitchHypeTrainBannerState extends State<TwitchHypeTrainBanner>
                 snapshot: snapshot,
                 ending: _showEnding,
                 endingProgress: _endingController.value,
+                levelUp: _levelUp,
+                celebration: _celebrationController,
               ),
             ),
           ),
@@ -164,133 +190,183 @@ class _HypeTrainBannerBody extends StatelessWidget {
   final TwitchHypeTrainSnapshot snapshot;
   final bool ending;
   final double endingProgress;
+  final bool levelUp;
+  final Animation<double> celebration;
 
   const _HypeTrainBannerBody({
     required this.snapshot,
     required this.ending,
     required this.endingProgress,
+    required this.levelUp,
+    required this.celebration,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final l10n = context.vio;
-    final remaining = _formatRemaining(snapshot.remainingDuration);
-    final glow = ending ? (1 - endingProgress).clamp(0.0, 1.0) : 0.0;
-
+    final golden = snapshot.isGoldenKappa;
+    final colors = golden
+        ? const [Color(0xFFE5AC16), Color(0xFFFFDF68)]
+        : const [Color(0xFF805AE0), Color(0xFFCD6DAE), Color(0xFF66B4D8)];
+    final accent = golden ? const Color(0xFFFFDA65) : const Color(0xFFD3B9FF);
+    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final ratio = ending ? 1.0 : snapshot.progressRatio;
+    final remaining = snapshot.remainingDuration;
+    final minutes = remaining.inMinutes.toString().padLeft(2, '0');
+    final seconds = remaining.inSeconds
+        .remainder(60)
+        .toString()
+        .padLeft(2, '0');
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: const Color(
-            0xFFFFB02E,
-          ).withValues(alpha: ending ? 0.18 : 0.13),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: const Color(
-              0xFFFFB02E,
-            ).withValues(alpha: ending ? 0.70 : 0.38),
-          ),
-          boxShadow: [
-            if (ending)
-              BoxShadow(
-                color: const Color(0xFFFFB02E).withValues(alpha: 0.24 * glow),
-                blurRadius: 18 + 8 * glow,
-                spreadRadius: 1 + 2 * glow,
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 3),
+      child: Semantics(
+        label:
+            '${context.vio.t(snapshot.displayTypeLabel)} Lv.${snapshot.level}',
+        value: '${(ratio * 100).round()}%',
+        child: Tooltip(
+          message:
+              '${snapshot.progress} / ${snapshot.goal} · ${context.vio.t(snapshot.displayTypeLabel)}',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFF19191F),
+                border: Border.all(color: accent.withValues(alpha: 0.16)),
+                borderRadius: BorderRadius.circular(10),
               ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
+              child: Stack(
                 children: [
-                  Icon(
-                    ending
-                        ? Icons.celebration_rounded
-                        : Icons.local_fire_department_rounded,
-                    color: const Color(0xFFFFB02E),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: Text(
-                      ending
-                          ? l10n.t('發燒列車結束')
-                          : '${l10n.t('發燒列車')} Lv.${snapshot.level}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                  Positioned.fill(
+                    child: TweenAnimationBuilder<double>(
+                      key: ValueKey('${snapshot.id}-${snapshot.level}'),
+                      tween: Tween(
+                        begin: reducedMotion ? ratio : 0,
+                        end: ratio,
+                      ),
+                      duration: Duration(milliseconds: reducedMotion ? 0 : 550),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) => Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: value,
+                          heightFactor: 1,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: colors
+                                    .map((c) => c.withValues(alpha: 0.72))
+                                    .toList(),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  Text(
-                    ending ? 'Lv.${snapshot.level}' : remaining,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.78),
-                      fontWeight: FontWeight.w700,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          ending || levelUp
+                              ? Icons.celebration_rounded
+                              : golden
+                              ? Icons.auto_awesome_rounded
+                              : Icons.train_rounded,
+                          size: 17,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          'Lv.${snapshot.level}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: AnimatedSwitcher(
+                            duration: Duration(
+                              milliseconds: reducedMotion ? 0 : 200,
+                            ),
+                            child: Text(
+                              ending
+                                  ? context.vio.t('列車結束')
+                                  : levelUp
+                                  ? context.vio.t('升級！')
+                                  : '${(ratio * 100).round()}%',
+                              key: ValueKey(
+                                ending
+                                    ? 'ended'
+                                    : levelUp
+                                    ? 'up'
+                                    : 'progress',
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          ending ? '' : '$minutes:$seconds',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 12,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  minHeight: 5,
-                  value: ending ? 1 : snapshot.progressRatio,
-                  backgroundColor: Colors.white.withValues(alpha: 0.12),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    Color(0xFFFFB02E),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      ending
-                          ? l10n.t('感謝大家的支援')
-                          : '${snapshot.progress} / ${snapshot.goal}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.70),
-                        fontWeight: FontWeight.w700,
+                  if (levelUp && !reducedMotion)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: AnimatedBuilder(
+                          animation: celebration,
+                          builder: (_, _) => CustomPaint(
+                            painter: _TrainCelebrationPainter(
+                              celebration.value,
+                              accent,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  Text(
-                    snapshot.isSharedTrain
-                        ? '${snapshot.displayTypeLabel} · Shared'
-                        : snapshot.displayTypeLabel,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: const Color(0xFFFFD28A),
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  String _formatRemaining(Duration value) {
-    final safe = value.isNegative ? Duration.zero : value;
-    final minutes = safe.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = safe.inSeconds.remainder(60).toString().padLeft(2, '0');
-    if (safe.inHours > 0) {
-      return '${safe.inHours}:$minutes:$seconds';
+class _TrainCelebrationPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  _TrainCelebrationPainter(this.progress, this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: (1 - progress) * 0.8);
+    for (var i = 0; i < 18; i++) {
+      final x = size.width * ((i * 0.137 + progress * 0.13) % 1);
+      final y = size.height * ((i * 0.231 + progress) % 1);
+      canvas.drawCircle(Offset(x, y), 1.3 + (i % 3) * 0.5, paint);
     }
-    return '$minutes:$seconds';
   }
+
+  @override
+  bool shouldRepaint(covariant _TrainCelebrationPainter old) =>
+      old.progress != progress || old.color != color;
 }

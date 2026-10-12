@@ -51,9 +51,7 @@ class TwitchGlassSurface extends StatelessWidget {
         backgroundColor == const Color(0x8F000000);
 
     final requestedBlur = legacyPlayerDock ? TwitchUiGlass.blurSoft : blurSigma;
-    final requestedShadow = legacyPlayerDock
-        ? TwitchUiShadows.soft
-        : boxShadow;
+    final requestedShadow = legacyPlayerDock ? TwitchUiShadows.soft : boxShadow;
     final requestedBackground = legacyPlayerDock
         ? TwitchUiGlass.playerBackground
         : backgroundColor;
@@ -93,6 +91,41 @@ class TwitchGlassSurface extends StatelessWidget {
             ),
     );
   }
+}
+
+/// Real, locally clipped frost for player controls on every Flutter platform.
+/// Other application glass keeps its existing platform fallback policy.
+class TwitchPlayerGlassSurface extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final BorderRadiusGeometry borderRadius;
+  final Color backgroundColor;
+  final BoxBorder? border;
+
+  const TwitchPlayerGlassSurface({
+    super.key,
+    required this.child,
+    this.padding = EdgeInsets.zero,
+    this.borderRadius = const BorderRadius.all(Radius.circular(16)),
+    this.backgroundColor = const Color(0x59171420),
+    this.border,
+  });
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+    borderRadius: borderRadius,
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: borderRadius,
+          border: border,
+        ),
+        child: Padding(padding: padding, child: child),
+      ),
+    ),
+  );
 }
 
 class TwitchGlassPanelShadow {

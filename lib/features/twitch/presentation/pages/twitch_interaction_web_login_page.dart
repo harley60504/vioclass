@@ -12,6 +12,7 @@ import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/auth/twitch_desktop_webview_settings.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_notice.dart';
 import '../widgets/shared/twitch_login_webview_host.dart';
@@ -759,14 +760,16 @@ query ChannelPointsContext($channelLogin: String!) {
             builder: (environment) => InAppWebView(
               webViewEnvironment: environment,
               initialUrlRequest: URLRequest(url: WebUri(url)),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
-                databaseEnabled: true,
-                supportZoom: false,
-                transparentBackground: false,
-                useShouldOverrideUrlLoading: true,
-                mediaPlaybackRequiresUserGesture: false,
+              initialSettings: twitchDesktopWebViewSettings(
+                InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                  databaseEnabled: true,
+                  supportZoom: false,
+                  transparentBackground: false,
+                  useShouldOverrideUrlLoading: true,
+                  mediaPlaybackRequiresUserGesture: false,
+                ),
               ),
               onWebViewCreated: (controller) {
                 _embeddedController = controller;

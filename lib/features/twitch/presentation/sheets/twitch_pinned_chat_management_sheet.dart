@@ -182,21 +182,14 @@ class _PinsState extends State<TwitchPinnedChatManagementPanel> {
     final t = context.vio.t;
     final selected = widget.selectedMessage;
     final enabled = !_busy && !_loading && _current && _pins != null;
-    return Material(
-      color: Colors.transparent,
+    return TwitchUnifiedSheetScaffold(
+      title: t('釘選管理'),
+      subtitle: '@${widget.channelName}',
+      icon: Icons.push_pin_outlined,
+      showRefresh: false,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(child: Text('${t('釘選管理')} · @${widget.channelName}')),
-              IconButton(
-                tooltip: t('關閉'),
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
           if (_loading) const LinearProgressIndicator(),
           if (_error != null)
             Text(t(_error!), style: const TextStyle(color: Colors.redAccent)),

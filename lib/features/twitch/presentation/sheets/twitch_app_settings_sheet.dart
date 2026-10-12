@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/notifications/twitch_system_notification_service.dart';
+import '../widgets/settings/twitch_android_background_settings_card.dart';
 import '../design/twitch_breakpoints.dart';
 import '../design/twitch_typography.dart';
 import '../localization/vioclass_localizations.dart';
@@ -14,8 +15,10 @@ import '../theme/twitch_ui_tokens.dart';
 import '../widgets/chat/appearance/twitch_chat_appearance_sheet_widgets.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import '../widgets/settings/twitch_video_enhancement_settings_card.dart';
+import '../widgets/settings/twitch_audio_settings_card.dart';
 import '../widgets/settings/twitch_chat_keyboard_settings_card.dart';
 import '../widgets/shared/twitch_text_field.dart';
+import '../widgets/shared/twitch_notice.dart';
 
 enum _TwitchSettingsTab { account, chat, player, appearance, updates }
 
@@ -371,6 +374,14 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
     setState(() => _busy = true);
     try {
       await action();
+    } catch (_) {
+      if (mounted) {
+        showTwitchNotice(
+          context,
+          '帳號操作暫時失敗，請稍後再試。',
+          tone: TwitchNoticeTone.error,
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -490,8 +501,30 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
             ],
           ),
         ),
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+          const SizedBox(height: 12),
+          _SettingsSection(
+            title: '通知與背景收件',
+            subtitle: '手機使用 Android 系統通知',
+            child: const TwitchAndroidBackgroundSettingsCard(),
+          ),
+        ],
       ],
     );
+  }
+}
+
+Future<void> _saveChatSetting(
+  BuildContext context,
+  Future<void> Function() save,
+) async {
+  try {
+    await save();
+  } catch (_) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(context.vio.t('設定儲存失敗，請稍後再試。'))));
   }
 }
 
@@ -522,7 +555,7 @@ class _ChatSettingsPane extends StatelessWidget {
               title: l10n.t('聊天室字體'),
               subtitle: l10n.t('直播聊天室與 VOD 聊天回放共用'),
               trailing: TextButton.icon(
-                onPressed: controller.reset,
+                onPressed: () => _saveChatSetting(context, controller.reset),
                 icon: const Icon(Icons.restart_alt_rounded, size: 17),
                 label: Text(l10n.t('重設')),
               ),
@@ -530,7 +563,10 @@ class _ChatSettingsPane extends StatelessWidget {
                 children: [
                   TwitchChatAppearanceSizeControl(
                     scale: scale,
-                    onChanged: controller.setFontScale,
+                    onChanged: (value) => _saveChatSetting(
+                      context,
+                      () => controller.setFontScale(value),
+                    ),
                   ),
                   const SizedBox(height: 10),
                   TwitchChatAppearancePreviewCard(
@@ -543,7 +579,10 @@ class _ChatSettingsPane extends StatelessWidget {
                     title: l10n.t('顯示訊息時間'),
                     subtitle: l10n.t('在每則聊天室訊息前顯示發送時間'),
                     value: controller.messageTimestampsEnabled,
-                    onChanged: controller.setMessageTimestampsEnabled,
+                    onChanged: (value) => _saveChatSetting(
+                      context,
+                      () => controller.setMessageTimestampsEnabled(value),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _TrustedDomainsControl(controller: controller),
@@ -584,8 +623,12 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
   Future<void> _addDomain() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
-    await widget.controller.addTrustedPreviewDomain(text);
-    _textController.clear();
+    await _saveChatSetting(context, () async {
+      await widget.controller.addTrustedPreviewDomain(text);
+      if (mounted && _textController.text.trim() == text) {
+        _textController.clear();
+      }
+    });
   }
 
   @override
@@ -600,7 +643,10 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
           title: l10n.t('自動載入連結預覽'),
           subtitle: l10n.t('只會自動載入內建可信網域和你加入的網域'),
           value: widget.controller.linkPreviewsEnabled,
-          onChanged: widget.controller.setLinkPreviewsEnabled,
+          onChanged: (value) => _saveChatSetting(
+            context,
+            () => widget.controller.setLinkPreviewsEnabled(value),
+          ),
         ),
         const SizedBox(height: 10),
         Row(
@@ -670,7 +716,11 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
                 InputChip(
                   label: Text(domain),
                   onDeleted: () {
-                    widget.controller.removeTrustedPreviewDomain(domain);
+                    _saveChatSetting(
+                      context,
+                      () =>
+                          widget.controller.removeTrustedPreviewDomain(domain),
+                    );
                   },
                   deleteIcon: const Icon(Icons.close_rounded, size: 16),
                   visualDensity: VisualDensity.compact,
@@ -712,7 +762,16 @@ class _PlayerSettingsPane extends StatelessWidget {
               title: l10n.t('播放預設'),
               subtitle: l10n.t('下一次進入直播或 VOD 頁面時套用'),
               trailing: TextButton.icon(
-                onPressed: controller.resetPlayback,
+                onPressed: () async {
+                  try {
+                    await controller.resetPlayback();
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                    );
+                  }
+                },
                 icon: const Icon(Icons.restart_alt_rounded, size: 17),
                 label: Text(l10n.t('重設')),
               ),
@@ -725,37 +784,84 @@ class _PlayerSettingsPane extends StatelessWidget {
                     min: 0,
                     max: 100,
                     divisions: 20,
-                    onChanged: controller.setVolume,
+                    onChanged: (value) async {
+                      try {
+                        await controller.setVolume(value);
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                        );
+                      }
+                    },
                   ),
                   _SettingsSwitchRow(
                     title: l10n.t('開始時靜音'),
                     subtitle: l10n.t('播放器會保留音量值，但進頁面時先以靜音套用'),
                     value: controller.muted,
-                    onChanged: controller.setMuted,
+                    onChanged: (value) async {
+                      try {
+                        await controller.setMuted(value);
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                        );
+                      }
+                    },
                   ),
                   _SettingsSwitchRow(
                     title: l10n.t('預設顯示聊天室'),
                     subtitle: l10n.t('新開觀看頁時先顯示右側聊天欄'),
                     value: controller.chatVisible,
-                    onChanged: controller.setChatVisible,
+                    onChanged: (value) async {
+                      try {
+                        await controller.setChatVisible(value);
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                        );
+                      }
+                    },
                   ),
                   _SettingsSwitchRow(
                     title: l10n.t('允許 Android 子母畫面'),
                     subtitle: l10n.t('離開 App 或手動開啟時，才會進入系統子母畫面'),
                     value: controller.androidPipEnabled,
-                    onChanged: controller.setAndroidPipEnabled,
+                    onChanged: (value) async {
+                      try {
+                        await controller.setAndroidPipEnabled(value);
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                        );
+                      }
+                    },
                   ),
                   _SettingsSwitchRow(
                     title: l10n.t('離開觀看頁保留小窗'),
                     subtitle: l10n.t('從直播、VOD 或片段回主畫面時保留 App 內小窗'),
                     value: controller.homeKeepsMiniPlayer,
-                    onChanged: controller.setHomeKeepsMiniPlayer,
+                    onChanged: (value) async {
+                      try {
+                        await controller.setHomeKeepsMiniPlayer(value);
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
             TwitchVideoEnhancementSettingsCard(controller: controller),
+            const SizedBox(height: 12),
+            const TwitchAudioSettingsCard(),
           ],
         );
       },
@@ -792,7 +898,18 @@ class _AppearanceSettingsPane extends StatelessWidget {
                     _SettingsLanguageChoiceRow(
                       mode: mode,
                       selected: mode == twitchAppLanguageController.mode,
-                      onTap: () => twitchAppLanguageController.select(mode),
+                      onTap: () async {
+                        try {
+                          await twitchAppLanguageController.select(mode);
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(context.vio.t('設定儲存失敗，請稍後再試。')),
+                            ),
+                          );
+                        }
+                      },
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -806,7 +923,18 @@ class _AppearanceSettingsPane extends StatelessWidget {
               trailing: TextButton.icon(
                 onPressed: controller.picking
                     ? null
-                    : controller.pickAndSelectFont,
+                    : () async {
+                        try {
+                          await controller.pickAndSelectFont();
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.t('字體匯入失敗，請選擇有效的字體檔案。')),
+                            ),
+                          );
+                        }
+                      },
                 icon: controller.picking
                     ? const SizedBox(
                         width: 15,
@@ -827,9 +955,33 @@ class _AppearanceSettingsPane extends StatelessWidget {
                     _SettingsFontChoiceRow(
                       choice: choice,
                       selected: choice.id == controller.selectedId,
-                      onTap: () => controller.select(choice),
+                      onTap: () async {
+                        try {
+                          await controller.select(choice);
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(l10n.t('字體切換失敗，請稍後再試或重新匯入。')),
+                            ),
+                          );
+                        }
+                      },
                       onDelete: choice.kind == TwitchAppFontKind.custom
-                          ? () => controller.removeCustomFont(choice.family!)
+                          ? () async {
+                              try {
+                                await controller.removeCustomFont(
+                                  choice.family!,
+                                );
+                              } catch (_) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(l10n.t('設定儲存失敗，請稍後再試。')),
+                                  ),
+                                );
+                              }
+                            }
                           : null,
                     ),
                     const SizedBox(height: 8),

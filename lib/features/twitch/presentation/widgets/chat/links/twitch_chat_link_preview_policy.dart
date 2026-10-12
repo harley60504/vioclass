@@ -89,12 +89,11 @@ List<TwitchChatPreviewUrl> extractTwitchChatPreviewUrls(
     if (output.length >= max) break;
     final uri = normalizeTwitchChatUri(match.group(0) ?? '');
     if (uri == null) continue;
+    if (!isTrustedTwitchChatUri(uri)) continue;
 
     final url = uri.toString();
     if (!seen.add(url)) continue;
-    output.add(
-      TwitchChatPreviewUrl(url: url, trusted: isTrustedTwitchChatUri(uri)),
-    );
+    output.add(TwitchChatPreviewUrl(url: url, trusted: true));
   }
   return output;
 }

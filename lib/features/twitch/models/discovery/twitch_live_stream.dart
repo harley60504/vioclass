@@ -325,6 +325,9 @@ class TwitchChannelVideo {
   }
 
   bool get isLikelyGrowingArchive {
+    if (type.trim().toLowerCase() != 'archive') {
+      return false;
+    }
     final start = createdAt ?? publishedAt;
     final length = parsedDuration;
     if (start == null || length == null) return false;

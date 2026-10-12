@@ -355,6 +355,7 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
   }
 
   Future<void> seekLiveDvrBridgePlaybackAt(Duration target) async {
+    final shouldPlay = playerSession.playerOrNull?.state.playing ?? true;
     final video = activeGrowingVodVideo;
     final timelineDuration = currentLiveTimelineDuration();
     final safeTarget = timelineDuration == null
@@ -377,6 +378,7 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
     await openLiveDvrBridgeMedia(
       playbackUrl,
       startPosition: seekResult.startPosition,
+      play: shouldPlay,
     );
     if (video != null) {
       preferVodReplayChat = true;
@@ -402,10 +404,11 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
   Future<void> openLiveDvrBridgeMedia(
     String playbackUrl, {
     required Duration startPosition,
+    bool play = true,
   }) async {
     await playbackController.openMedia(
       uri: playbackUrl,
-      play: true,
+      play: play,
       forceOpen: true,
       startPosition: startPosition,
     );

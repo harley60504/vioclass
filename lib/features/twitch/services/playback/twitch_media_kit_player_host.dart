@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 
 import 'twitch_video_enhancement.dart';
+import 'twitch_audio_settings.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
@@ -28,10 +29,31 @@ class TwitchMediaKitPlayerHost {
   static VideoController? _videoController;
   static int _refCount = 0;
   static int _generation = 0;
+  static int _mediaOpenRevision = 0;
   static String? _currentMediaUri;
   static String? _keepPlayingWithoutSessionUri;
   static Future<void>? _creatingPlayer;
   static Future<void>? _creatingVideoController;
+  static const bool _observeRestoreOpen = bool.fromEnvironment(
+    'TWITCH_READONLY_OBSERVE_RESTORE_OPEN',
+  );
+  static int _restoreOpenStarted = 0;
+  static int _restoreOpenCompleted = 0;
+  static int _lastCompletedRestoreOpenElapsedUs = 0;
+
+  @visibleForTesting
+  static int get lastCompletedRestoreOpenElapsedUs =>
+      _lastCompletedRestoreOpenElapsedUs;
+
+  @visibleForTesting
+  static int get restoreOpenStarted => _restoreOpenStarted;
+
+  @visibleForTesting
+  static int get restoreOpenCompleted => _restoreOpenCompleted;
+
+  @visibleForTesting
+  static bool get restoreOpenPending =>
+      _restoreOpenStarted > _restoreOpenCompleted;
   static _TwitchHlsCacheProfile _hlsCacheProfile =
       _TwitchHlsCacheProfile.lowLatency;
 
@@ -61,6 +83,19 @@ class TwitchMediaKitPlayerHost {
 
   static String? get currentMediaUri => _currentMediaUri;
   static Player? get playerOrNull => _player;
+
+  @visibleForTesting
+  static void installIsolatedPlayerForTesting(Player player) {
+    if (!kDebugMode ||
+        _player != null ||
+        _refCount != 0 ||
+        _creatingPlayer != null ||
+        _videoController != null) {
+      throw StateError('Isolated player requires an unused debug host.');
+    }
+    _player = player;
+    _generation++;
+  }
 
   static bool get hasKeepAlivePlayback {
     final keepUri = _keepPlayingWithoutSessionUri;
@@ -132,6 +167,12 @@ class TwitchMediaKitPlayerHost {
       );
       _player = player;
       await TwitchVideoEnhancementRuntime.applyStoredToPlayer(player);
+      try {
+        await twitchAudioSettings.attach(TwitchMpvAudioOutput(player));
+      } catch (error) {
+        // Optional sound settings must never prevent opening a stream.
+        debugPrint('[TwitchAudio] initialization failed: $error');
+      }
     }();
 
     try {
@@ -204,18 +245,24 @@ class TwitchMediaKitPlayerHost {
       return;
     }
 
-    await session.ensureReady();
-    if (session._released) return;
-    session._generation = _generation;
-
     final safeUri = uri.trim();
     if (safeUri.isEmpty) {
       throw ArgumentError.value(uri, 'uri', 'uri cannot be empty');
     }
+    if (session._released) return;
+    final openRevision = ++_mediaOpenRevision;
+    await session.ensureReady();
+    if (session._released || openRevision != _mediaOpenRevision) return;
+    session._generation = _generation;
+    final openingPlayer = session.player;
 
     if (!forceOpen && _currentMediaUri == safeUri) {
       if (startPosition != null && !session._released) {
         await session.player.seek(startPosition);
+      }
+      if (openRevision != _mediaOpenRevision ||
+          !identical(_player, openingPlayer)) {
+        return;
       }
       if (play && !session.player.state.playing && !session._released) {
         await session.player.play();
@@ -225,6 +272,10 @@ class TwitchMediaKitPlayerHost {
 
     if (session._released) return;
     await session.player.open(Media(safeUri, start: startPosition), play: play);
+    if (openRevision != _mediaOpenRevision ||
+        !identical(_player, openingPlayer)) {
+      return;
+    }
     if (!session._released) {
       _currentMediaUri = safeUri;
     } else {
@@ -242,6 +293,7 @@ class TwitchMediaKitPlayerHost {
 
     final safeUri = uri.trim();
     if (safeUri.isEmpty) return;
+    final openRevision = ++_mediaOpenRevision;
 
     if (!forceOpen && _currentMediaUri == safeUri) {
       if (play && !player.state.playing) {
@@ -250,13 +302,25 @@ class TwitchMediaKitPlayerHost {
       return;
     }
 
-    await player.open(Media(safeUri), play: play);
-    _currentMediaUri = safeUri;
+    if (_observeRestoreOpen) _restoreOpenStarted++;
+    final openClock = _observeRestoreOpen ? (Stopwatch()..start()) : null;
+    try {
+      await player.open(Media(safeUri), play: play);
+    } finally {
+      if (_observeRestoreOpen) {
+        _restoreOpenCompleted++;
+        _lastCompletedRestoreOpenElapsedUs = openClock!.elapsedMicroseconds;
+      }
+    }
+    if (openRevision == _mediaOpenRevision && identical(_player, player)) {
+      _currentMediaUri = safeUri;
+    }
   }
 
   static Future<void> pauseShared() async {
     final player = _player;
     if (player == null) return;
+    _mediaOpenRevision++;
     await player.pause();
   }
 
@@ -288,7 +352,12 @@ class TwitchMediaKitPlayerHost {
   static Future<void> stopCurrent(TwitchMediaKitPlayerSession session) async {
     await session.ensureReady();
     if (session.generation != _generation) return;
+    final stopRevision = ++_mediaOpenRevision;
     await session.player.stop();
+    if (stopRevision != _mediaOpenRevision ||
+        session.generation != _generation) {
+      return;
+    }
     _currentMediaUri = null;
     _keepPlayingWithoutSessionUri = null;
   }
@@ -319,6 +388,8 @@ class TwitchMediaKitPlayerHost {
 
   static Future<void> _disposeCurrent() async {
     final player = _player;
+    _mediaOpenRevision++;
+    twitchAudioSettings.detach();
     _player = null;
     _videoController = null;
     _creatingVideoController = null;

@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../../services/watch/twitch_watch_services.dart';
+import '../watch/controllers/twitch_watch_chat_controller.dart';
 import '../localization/vioclass_localizations.dart';
 import '../twitch_follow_status_resolver.dart';
 import '../theme/twitch_ui_tokens.dart';
@@ -21,6 +23,8 @@ import '../widgets/shared/twitch_text_field.dart';
 import 'twitch_stream_refresh_reconciler.dart';
 
 class TwitchFollowingPage extends StatefulWidget {
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final TwitchDiscoveryService discoveryService;
   final String searchText;
   final List<TwitchLiveStream> searchedLiveStreams;
@@ -38,6 +42,8 @@ class TwitchFollowingPage extends StatefulWidget {
 
   const TwitchFollowingPage({
     super.key,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     required this.discoveryService,
     required this.searchText,
     required this.searchedLiveStreams,
@@ -78,6 +84,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   bool hasMore = true;
 
   int _refreshGeneration = 0;
+  bool _refreshing = false;
+  TwitchViewerAuthSnapshot? _loadedViewerAuth;
+  late int _observedIdentityRevision;
 
   static const List<Map<String, String>> languageFilters =
       <Map<String, String>>[
@@ -106,6 +115,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   void initState() {
     super.initState();
     scrollController.addListener(_handleScroll);
+    _observedIdentityRevision =
+        widget.discoveryService.viewerSession.identityRevision;
+    widget.discoveryService.viewerSession.addListener(_handleViewerChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(refreshStreams());
     });
@@ -115,16 +127,41 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   void didUpdateWidget(covariant TwitchFollowingPage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.reloadTick != widget.reloadTick) {
+    if (!identical(oldWidget.discoveryService, widget.discoveryService)) {
+      oldWidget.discoveryService.viewerSession.removeListener(
+        _handleViewerChanged,
+      );
+      _observedIdentityRevision =
+          widget.discoveryService.viewerSession.identityRevision;
+      widget.discoveryService.viewerSession.addListener(_handleViewerChanged);
+      unawaited(refreshStreams(clearExisting: true));
+    } else if (oldWidget.reloadTick != widget.reloadTick) {
       unawaited(refreshStreams());
     }
   }
 
   @override
   void dispose() {
+    widget.discoveryService.viewerSession.removeListener(_handleViewerChanged);
     scrollController.removeListener(_handleScroll);
     scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleViewerChanged() {
+    if (!mounted) return;
+    final revision = widget.discoveryService.viewerSession.identityRevision;
+    if (revision != _observedIdentityRevision) {
+      _observedIdentityRevision = revision;
+      unawaited(refreshStreams(clearExisting: true));
+      return;
+    }
+    if (_loadedViewerAuth == null) return;
+    final currentAuth = widget.discoveryService.cachedAuth;
+    if (!identical(_loadedViewerAuth, currentAuth) ||
+        currentAuth?.canReadFollows != true) {
+      unawaited(refreshStreams(clearExisting: true));
+    }
   }
 
   void _handleScroll() {
@@ -141,16 +178,27 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   }) async {
     if (!mounted) return;
 
+    // Keep cards during an ordinary refresh, but never carry one verified
+    // identity's private following window into a new or unverified session.
+    final currentAuth = widget.discoveryService.cachedAuth;
+    if (_loadedViewerAuth != null &&
+        (!identical(_loadedViewerAuth, currentAuth) ||
+            currentAuth?.canReadFollows != true)) {
+      clearExisting = true;
+    }
     final generation = ++_refreshGeneration;
     final hadExistingStreams = loadedStreams.isNotEmpty && !clearExisting;
 
     setState(() {
+      _refreshing = true;
       loadingFirstPage = !hadExistingStreams;
       errorText = null;
       paginationError = null;
       offlineError = null;
+      loadingMore = false;
       loadingOfflineChannels = true;
       if (clearExisting) {
+        _loadedViewerAuth = null;
         nextCursor = null;
         hasMore = true;
         loadedStreams = const <TwitchLiveStream>[];
@@ -173,11 +221,13 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       if (!mounted || generation != _refreshGeneration) return;
 
       setState(() {
+        _loadedViewerAuth = widget.discoveryService.cachedAuth;
         loadedStreams = refreshed.streams;
         offlineFollowedChannels = offline.channels;
         nextCursor = refreshed.cursor;
         hasMore = refreshed.hasMore;
         loadingFirstPage = false;
+        _refreshing = false;
         loadingOfflineChannels = false;
         errorText = null;
         paginationError = null;
@@ -200,6 +250,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           paginationError = error.toString();
         }
         loadingFirstPage = false;
+        _refreshing = false;
         loadingOfflineChannels = false;
       });
     }
@@ -249,9 +300,29 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     List<TwitchLiveStream> liveStreams,
   ) async {
     try {
-      final page = await widget.discoveryService.fetchFollowedChannels(
-        first: _followedPageSize,
-      );
+      final generation = _refreshGeneration;
+      final channels = <TwitchFollowedChannel>[];
+      final cursors = <String>{};
+      String? after;
+      while (true) {
+        if (!mounted || generation != _refreshGeneration) {
+          return const _OfflineFollowedResult(channels: []);
+        }
+        final page = await widget.discoveryService.fetchFollowedChannels(
+          after: after,
+          first: _followedPageSize,
+        );
+        if (!mounted || generation != _refreshGeneration) {
+          return const _OfflineFollowedResult(channels: []);
+        }
+        channels.addAll(page.channels);
+        final cursor = page.cursor?.trim() ?? '';
+        if (cursor.isEmpty) break;
+        if (!cursors.add(cursor)) {
+          throw StateError('離線追隨分頁游標重複，請重新整理。');
+        }
+        after = cursor;
+      }
 
       final liveIds = liveStreams
           .map((stream) => stream.userId.trim())
@@ -262,12 +333,18 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           .where((login) => login.isNotEmpty)
           .toSet();
 
-      final offline = page.channels
+      final seenIds = <String>{};
+      final seenLogins = <String>{};
+      final offline = channels
           .where((channel) {
             final id = channel.broadcasterId.trim();
             final login = channel.channelLogin;
             if (id.isNotEmpty && liveIds.contains(id)) return false;
             if (login.isNotEmpty && liveLogins.contains(login)) return false;
+            if (id.isNotEmpty && seenIds.contains(id)) return false;
+            if (login.isNotEmpty && seenLogins.contains(login)) return false;
+            if (id.isNotEmpty) seenIds.add(id);
+            if (login.isNotEmpty) seenLogins.add(login);
             return true;
           })
           .toList(growable: false);
@@ -282,7 +359,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
   }
 
   Future<void> loadMore() async {
-    if (loadingMore || !hasMore) return;
+    if (_refreshing || loadingFirstPage || loadingMore || !hasMore) return;
+    final generation = _refreshGeneration;
     final cursor = nextCursor;
     if (cursor == null || cursor.trim().isEmpty) {
       setState(() => hasMore = false);
@@ -299,9 +377,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         after: cursor,
         first: _followedPageSize,
       );
+      if (!mounted || generation != _refreshGeneration) return;
       final streamsWithProfiles = await _attachProfileImages(page.streams);
       unawaited(_ensureFollowedGameArtwork(streams: streamsWithProfiles));
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
 
       setState(() {
         loadedStreams = TwitchStreamRefreshReconciler.appendUniquePage(
@@ -318,7 +397,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
         offlineFollowedChannels,
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       setState(() {
         paginationError = error.toString();
         loadingMore = false;
@@ -628,22 +707,25 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
                       final value = item['value'] ?? '';
                       final label = l10n.t(item['label'] ?? value);
                       final selected = currentLanguage == value;
-                      return ListTile(
-                        selected: selected,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      return Material(
+                        type: MaterialType.transparency,
+                        child: ListTile(
+                          selected: selected,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          leading: Icon(
+                            selected
+                                ? Icons.check_circle_rounded
+                                : Icons.language_rounded,
+                            color: selected
+                                ? TwitchUiColors.primary
+                                : Colors.white54,
+                          ),
+                          title: Text(label),
+                          subtitle: value.isEmpty ? null : Text(value),
+                          onTap: () => selectLanguage(value),
                         ),
-                        leading: Icon(
-                          selected
-                              ? Icons.check_circle_rounded
-                              : Icons.language_rounded,
-                          color: selected
-                              ? TwitchUiColors.primary
-                              : Colors.white54,
-                        ),
-                        title: Text(label),
-                        subtitle: value.isEmpty ? null : Text(value),
-                        onTap: () => selectLanguage(value),
                       );
                     },
                   ),
@@ -702,8 +784,14 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
           message.contains('登入') ||
           message.contains('授權');
       if (needsLogin) {
+        final viewer = widget.discoveryService.cachedAuth;
+        final missingPermission = viewer != null && !viewer.canReadFollows;
         return TwitchLoginRequiredView(
-          statusText: l10n.t('需要先完成 Twitch 登入授權，才能讀取追隨直播。'),
+          titleText: missingPermission ? l10n.t('已登入，但缺少追隨權限') : null,
+          loginButtonText: missingPermission ? l10n.t('重新授權') : null,
+          statusText: missingPermission
+              ? l10n.t('目前帳號尚未授權讀取追隨直播，請重新授權。')
+              : l10n.t('需要先完成 Twitch 登入授權，才能讀取追隨直播。'),
           loading: loadingFirstPage,
           onLoginPressed: () => unawaited(widget.onLoginPressed()),
           onRetryPressed: () => unawaited(refreshStreams(clearExisting: true)),
@@ -762,8 +850,10 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       footer: TwitchDiscoveryFooter(
         loadingMore: loadingMore,
         hasMore: hasMore,
-        errorText: paginationError,
-        onLoadMore: loadMore,
+        errorText: paginationError ?? offlineError,
+        onLoadMore: paginationError == null && offlineError != null
+            ? refreshStreams
+            : loadMore,
       ),
     );
 
@@ -771,6 +861,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       color: TwitchUiColors.primary,
       onRefresh: refreshStreams,
       child: TwitchDiscoveryStreamGrid(
+        watchServicesFactory: widget.watchServicesFactory,
+        watchChatRuntimeFactory: widget.watchChatRuntimeFactory,
         controller: scrollController,
         sectionIcon: Icons.favorite_rounded,
         sectionTitle: selectedGameName == null || selectedGameName!.isEmpty
@@ -873,6 +965,8 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     if (searchedLiveStreams.isNotEmpty) {
       slivers.add(
         TwitchDiscoveryStreamSliverSection(
+          watchServicesFactory: widget.watchServicesFactory,
+          watchChatRuntimeFactory: widget.watchChatRuntimeFactory,
           icon: Icons.search_rounded,
           title: l10n.t('搜尋到的直播'),
           streams: searchedLiveStreams,
@@ -913,25 +1007,26 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       ).asSliverBox(),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
-        sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300,
-            mainAxisExtent: 168,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) => SliverGrid(
+            gridDelegate: twitchOfflineChannelGridDelegate(
+              constraints.crossAxisExtent,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              return TwitchOfflineChannelCard(
+                watchServicesFactory: widget.watchServicesFactory,
+                watchChatRuntimeFactory: widget.watchChatRuntimeFactory,
+                channel: channels[index],
+                discoveryService: widget.discoveryService,
+                initialKnownFollowing:
+                    widget.followStatusFor?.call(
+                      broadcasterId: channels[index].broadcasterId,
+                      broadcasterLogin: channels[index].channelLogin,
+                    ) ??
+                    defaultKnownFollowing,
+              );
+            }, childCount: channels.length),
           ),
-          delegate: SliverChildBuilderDelegate((context, index) {
-            return TwitchOfflineChannelCard(
-              channel: channels[index],
-              discoveryService: widget.discoveryService,
-              initialKnownFollowing:
-                  widget.followStatusFor?.call(
-                    broadcasterId: channels[index].broadcasterId,
-                    broadcasterLogin: channels[index].channelLogin,
-                  ) ??
-                  defaultKnownFollowing,
-            );
-          }, childCount: channels.length),
         ),
       ),
     ];

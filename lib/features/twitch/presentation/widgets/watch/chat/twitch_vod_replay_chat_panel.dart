@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../models/chat/twitch_chat_runtime_message.dart';
 
 import '../../../../services/chat/twitch_vod_chat_replay_runtime.dart';
 import '../../../../services/chat/twitch_official_emote_cache_service.dart';
@@ -6,21 +7,26 @@ import '../../../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../settings/twitch_chat_appearance_controller.dart';
 import '../../../sheets/twitch_chat_message_context_sheet.dart';
-import '../../../theme/twitch_ui_tokens.dart';
+import 'twitch_watch_chat_header_bar.dart';
+import 'twitch_watch_chat_layout_metrics.dart';
 import '../../chat/twitch_chat_text_style.dart';
 import '../../chat/twitch_chat_message_list.dart';
 
 class TwitchVodReplayChatPanel extends StatefulWidget {
+  final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final TwitchVodChatReplayRuntime runtime;
   final Widget liveChat;
+  final Widget Function(VoidCallback onToggleMode)? liveChatBuilder;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
   final TwitchOfficialEmoteCacheService? officialEmoteCache;
   final TwitchVodReplayChatMode preferredMode;
 
   const TwitchVodReplayChatPanel({
     super.key,
+    this.onOpenUser,
     required this.runtime,
     required this.liveChat,
+    this.liveChatBuilder,
     this.thirdPartyEmoteCache,
     this.officialEmoteCache,
     this.preferredMode = TwitchVodReplayChatMode.replay,
@@ -57,43 +63,69 @@ class _TwitchVodReplayChatPanelState extends State<TwitchVodReplayChatPanel> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _appearanceController,
-      builder: (context, _) {
-        final fontScale = _appearanceController.fontScale;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = TwitchWatchChatLayoutMetrics.resolve(
+          constraints: constraints,
+          media: MediaQuery.of(context),
+        ).verticalCompact;
+        return AnimatedBuilder(
+          animation: _appearanceController,
+          builder: (context, _) {
+            final fontScale = _appearanceController.fontScale;
+            if (_mode == TwitchVodReplayChatMode.live) {
+              return widget.liveChatBuilder?.call(_toggleMode) ??
+                  Column(
+                    children: [
+                      _VodReplayChatHeader(
+                        mode: _mode,
+                        runtime: widget.runtime,
+                        onToggleMode: _toggleMode,
+                        compact: compact,
+                      ),
+                      Expanded(child: widget.liveChat),
+                    ],
+                  );
+            }
 
-        return Column(
-          children: [
-            _VodReplayChatHeader(
-              mode: _mode,
-              runtime: widget.runtime,
-              onToggleMode: () {
-                final next = _mode == TwitchVodReplayChatMode.replay
-                    ? TwitchVodReplayChatMode.live
-                    : TwitchVodReplayChatMode.replay;
-                setState(() => _mode = next);
-                if (next == TwitchVodReplayChatMode.replay) {
-                  widget.runtime.nudge();
-                }
-              },
-            ),
-            const Divider(height: 1, color: Color(0x223A3A44)),
-            Expanded(
-              child: _mode == TwitchVodReplayChatMode.replay
-                  ? _VodReplayMessageList(
-                      runtime: widget.runtime,
-                      thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
-                      officialEmoteCache: widget.officialEmoteCache,
-                      fontScale: fontScale,
-                      showTimestamp:
-                          _appearanceController.messageTimestampsEnabled,
-                    )
-                  : widget.liveChat,
-            ),
-          ],
+            return Column(
+              children: [
+                _VodReplayChatHeader(
+                  mode: _mode,
+                  runtime: widget.runtime,
+                  onToggleMode: _toggleMode,
+                  compact: compact,
+                ),
+                Expanded(
+                  child: _mode == TwitchVodReplayChatMode.replay
+                      ? _VodReplayMessageList(
+                          onOpenUser: widget.onOpenUser,
+                          runtime: widget.runtime,
+                          thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
+                          officialEmoteCache: widget.officialEmoteCache,
+                          fontScale: fontScale,
+                          showTimestamp:
+                              _appearanceController.messageTimestampsEnabled,
+                        )
+                      : widget.liveChat,
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
+
+  void _toggleMode() {
+    setState(
+      () => _mode = _mode == TwitchVodReplayChatMode.replay
+          ? TwitchVodReplayChatMode.live
+          : TwitchVodReplayChatMode.replay,
+    );
+    if (_mode == TwitchVodReplayChatMode.replay) {
+      widget.runtime.nudge();
+    }
   }
 }
 
@@ -101,107 +133,45 @@ enum TwitchVodReplayChatMode { replay, live }
 
 class _VodReplayChatHeader extends StatelessWidget {
   final TwitchVodReplayChatMode mode;
+  final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final TwitchVodChatReplayRuntime runtime;
   final VoidCallback onToggleMode;
+  final bool compact;
 
   const _VodReplayChatHeader({
     required this.mode,
+    this.onOpenUser,
     required this.runtime,
     required this.onToggleMode,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
-      color: const Color(0xFF18181B),
-      child: Row(
-        children: [
-          _ChatModeBadge(
-            mode: mode,
-            hasError: runtime.error != null,
-            onTap: onToggleMode,
-          ),
-          const Spacer(),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChatModeBadge extends StatelessWidget {
-  final TwitchVodReplayChatMode mode;
-  final bool hasError;
-  final VoidCallback onTap;
-
-  const _ChatModeBadge({
-    required this.mode,
-    required this.hasError,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final live = mode == TwitchVodReplayChatMode.live;
-    final color = hasError
-        ? Colors.redAccent
-        : live
-        ? TwitchUiColors.green
-        : const Color(0xFFC084FC);
-    final label = live ? context.vio.t('直播') : 'VOD';
-
-    return Tooltip(
-      message: context.vio.t(live ? '切換到 VOD 聊天回放' : '切換到直播聊天室'),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        onTap: onTap,
-        child: Container(
-          height: 28,
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(color: color.withValues(alpha: 0.34)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.38),
-                      blurRadius: 6,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: twitchChatTextStyle(
-                  TextStyle(
-                    color: color,
-                    fontSize: 10.5,
-                    fontWeight: TwitchUiFontWeight.heavy,
-                    letterSpacing: 0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    return AnimatedBuilder(
+      animation: runtime,
+      builder: (context, _) => TwitchWatchChatHeaderBar(
+        connected: mode == TwitchVodReplayChatMode.live,
+        compact: compact,
+        replayMode: mode == TwitchVodReplayChatMode.replay,
+        replayHasError:
+            mode == TwitchVodReplayChatMode.replay && runtime.error != null,
+        showToggles: false,
+        showPinned: false,
+        showPrediction: false,
+        predictionVisible: false,
+        hasPinned: false,
+        hasPrediction: false,
+        onTogglePinned: () {},
+        onTogglePrediction: () {},
+        onToggleMode: onToggleMode,
       ),
     );
   }
 }
 
 class _VodReplayMessageList extends StatefulWidget {
+  final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final TwitchVodChatReplayRuntime runtime;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmoteCache;
   final TwitchOfficialEmoteCacheService? officialEmoteCache;
@@ -209,6 +179,7 @@ class _VodReplayMessageList extends StatefulWidget {
   final bool showTimestamp;
 
   const _VodReplayMessageList({
+    this.onOpenUser,
     required this.runtime,
     required this.thirdPartyEmoteCache,
     required this.officialEmoteCache,
@@ -232,6 +203,7 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
         return TwitchChatTextScope(
           child: TwitchChatMessageFeed(
             messages: messages,
+            onOpenUser: widget.onOpenUser,
             thirdPartyEmoteCache: widget.thirdPartyEmoteCache,
             officialEmoteCache: widget.officialEmoteCache,
             showTimestamp: widget.showTimestamp,
@@ -241,6 +213,7 @@ class _VodReplayMessageListState extends State<_VodReplayMessageList> {
                 showTwitchChatMessageContextSheet(
                   context: context,
                   selectedMessage: message,
+                  onOpenUser: widget.onOpenUser,
                   messages: messages,
                   thirdPartyEmotes: widget.thirdPartyEmoteCache,
                   officialEmotes: widget.officialEmoteCache,

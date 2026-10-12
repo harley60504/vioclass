@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../auth/twitch_webview_environment_disposal.dart';
+import '../auth/twitch_desktop_webview_settings.dart';
 
 /// Runs normal Twitch verification in the existing cookie profile, not OAuth
 /// authorization or whisper DOM scraping. Always disposes its browser.
@@ -15,6 +16,7 @@ Future<void> withTwitchWhisperIntegrityBrowser({
       'Background private verification supports Windows/Android only.',
     );
   }
+  await prepareTwitchDesktopWebViewSettings();
   // A desktop_webview_window is visible during native creation, before Dart
   // can hide it. HeadlessInAppWebView creates a non-visible native host instead.
   // Keep the exact existing login profile so changing hosts does not log out.
@@ -38,10 +40,12 @@ Future<void> withTwitchWhisperIntegrityBrowser({
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
         ),
       ]),
-      initialSettings: InAppWebViewSettings(
-        javaScriptEnabled: true,
-        domStorageEnabled: true,
-        databaseEnabled: true,
+      initialSettings: twitchDesktopWebViewSettings(
+        InAppWebViewSettings(
+          javaScriptEnabled: true,
+          domStorageEnabled: true,
+          databaseEnabled: true,
+        ),
       ),
       onWebViewCreated: (value) => controller.complete(value),
     );

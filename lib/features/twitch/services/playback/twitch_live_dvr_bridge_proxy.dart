@@ -28,7 +28,7 @@ class TwitchLiveDvrArchiveHealthSnapshot {
 ///
 /// [seekToPosition] resolves canonical/PDT time to one Twitch archive segment
 /// plus an offset inside that segment. Playback is exposed as one continuous
-/// MPEG-TS HTTP response. Only this proxy chooses which upstream segment is
+/// MPEG-TS or initialized fragmented-MP4 HTTP response. Only this proxy chooses which upstream segment is
 /// downloaded, so mpv/FFmpeg cannot fan out concurrent DVR segment requests.
 ///
 /// The legacy class name is retained because it is used by the playback runtime,
@@ -58,6 +58,7 @@ class TwitchLiveDvrBridgeProxy {
   Duration? _timelinePosition;
   int _streamGeneration = 0;
   int _streamClientGeneration = 0;
+  Completer<bool>? _pendingFlushCancellation;
   int? _dvrSeekStartIndex;
   int? _dvrSeekStartSequence;
   Duration _dvrSeekStartOffset = Duration.zero;
@@ -98,6 +99,7 @@ class TwitchLiveDvrBridgeProxy {
     _dvrPlaylistUri = dvrPlaylistUri;
     _rememberLatestItems(items);
     _resetSeekState();
+    _cancelActiveStream();
     _streamGeneration++;
     _streamClientGeneration++;
     final server = await _ensureServer();
@@ -157,12 +159,15 @@ class TwitchLiveDvrBridgeProxy {
       _dvrSeekStartSequence = null;
       _dvrSeekStartOffset = Duration.zero;
       _dvrSeekTargetProgramDateTime = targetProgramDateTime?.toUtc();
+      _cancelActiveStream();
       _streamGeneration++;
       _streamClientGeneration++;
       return Duration.zero;
     }
 
-    final canonicalPosition = position < Duration.zero ? Duration.zero : position;
+    final canonicalPosition = position < Duration.zero
+        ? Duration.zero
+        : position;
     final targetUtc = targetProgramDateTime?.toUtc();
     final programSeek = targetUtc == null
         ? null
@@ -189,6 +194,7 @@ class TwitchLiveDvrBridgeProxy {
 
     // Every seek owns a new stream generation. Existing /stream.ts readers and
     // their active upstream segment become stale immediately.
+    _cancelActiveStream();
     _streamGeneration++;
     _streamClientGeneration++;
 
@@ -211,12 +217,14 @@ class TwitchLiveDvrBridgeProxy {
   }
 
   void stopStreaming() {
+    _cancelActiveStream();
     _streamGeneration++;
     _streamClientGeneration++;
     _resetSeekState();
   }
 
   Future<void> close() async {
+    _cancelActiveStream();
     final server = _server;
     _server = null;
     _streamGeneration++;
@@ -338,6 +346,7 @@ class TwitchLiveDvrBridgeProxy {
 
     // Only the newest player connection is allowed to own the sequential pump.
     // A reconnect/seek invalidates the previous client before opening upstream.
+    _cancelActiveStream();
     final clientGeneration = ++_streamClientGeneration;
     final response = request.response;
     response.statusCode = HttpStatus.ok;
@@ -351,11 +360,7 @@ class TwitchLiveDvrBridgeProxy {
     );
 
     try {
-      await _streamDvrForRequest(
-        response,
-        generation,
-        clientGeneration,
-      );
+      await _streamDvrForRequest(response, generation, clientGeneration);
     } catch (error) {
       if (_isActiveStream(generation, clientGeneration)) {
         debugPrint(
@@ -396,6 +401,7 @@ class TwitchLiveDvrBridgeProxy {
   ) async {
     var nextSequence = _dvrSeekStartSequence;
     var firstSegment = true;
+    String? emittedMapUrl;
 
     while (_isActiveStream(generation, clientGeneration)) {
       var items = _latestItems;
@@ -440,6 +446,20 @@ class TwitchLiveDvrBridgeProxy {
           );
         }
 
+        // Fragmented media needs its EXT-X-MAP before the first fragment.
+        // Each reconnect/seek starts a fresh decoder input; map ownership must
+        // be per client, never shared with a previous stream generation.
+        final mapUrl = item.mapUrl;
+        if (mapUrl != null && mapUrl != emittedMapUrl) {
+          await _writeSegment(
+            response,
+            Uri.parse(mapUrl),
+            generation,
+            clientGeneration,
+          );
+          if (!_isActiveStream(generation, clientGeneration)) return;
+          emittedMapUrl = mapUrl;
+        }
         await _writeSegment(
           response,
           Uri.parse(item.url),
@@ -486,7 +506,9 @@ class TwitchLiveDvrBridgeProxy {
     debugPrint(
       '[DvrSegment] headers generation=$generation client=$clientGeneration '
       'segment=$segment ms=${stopwatch.elapsedMilliseconds} '
-      'status=${upstream.statusCode}',
+      'status=${upstream.statusCode} '
+      'hasMap=${_latestItems.any((item) => item.url == sourceUri.toString() && item.mapUrl != null)} '
+      'compressed=${upstream.headers.value(HttpHeaders.contentEncodingHeader) != null}',
     );
 
     if (upstream.statusCode < 200 || upstream.statusCode >= 300) {
@@ -495,49 +517,148 @@ class TwitchLiveDvrBridgeProxy {
     }
 
     var firstByteLogged = false;
+    var firstFlushLogged = false;
     var bytes = 0;
     var bytesSinceFlush = 0;
     var lastFlushAt = DateTime.now();
-
-    await for (final chunk in upstream) {
+    var waitingForFlush = false;
+    final progressTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       if (!_isActiveStream(generation, clientGeneration)) return;
+      debugPrint(
+        '[DvrSegment] progress generation=$generation '
+        'client=$clientGeneration bytes=$bytes '
+        'waitingForFlush=$waitingForFlush ms=${stopwatch.elapsedMilliseconds}',
+      );
+    });
 
-      bytes += chunk.length;
-      bytesSinceFlush += chunk.length;
-      if (!firstByteLogged) {
-        firstByteLogged = true;
-        debugPrint(
-          '[DvrSegment] first-byte generation=$generation '
-          'client=$clientGeneration segment=$segment '
-          'ms=${stopwatch.elapsedMilliseconds}',
-        );
+    try {
+      await for (final chunk in upstream) {
+        if (!_isActiveStream(generation, clientGeneration)) return;
+
+        bytes += chunk.length;
+        bytesSinceFlush += chunk.length;
+        if (!firstByteLogged) {
+          firstByteLogged = true;
+          final hasTsSync = List.generate(188, (offset) => offset).any(
+            (offset) =>
+                chunk.length > offset + 376 &&
+                chunk[offset] == 0x47 &&
+                chunk[offset + 188] == 0x47 &&
+                chunk[offset + 376] == 0x47,
+          );
+          final hasMp4Box =
+              chunk.length >= 8 &&
+              const ['ftyp', 'styp', 'moof', 'moov', 'sidx', 'mdat'].any(
+                (box) => List.generate(
+                  4,
+                  (index) => index,
+                ).every((index) => chunk[index + 4] == box.codeUnitAt(index)),
+              );
+          final format = hasTsSync
+              ? 'mpegts'
+              : hasMp4Box
+              ? 'fmp4'
+              : chunk.length >= 2 && chunk[0] == 0x1f && chunk[1] == 0x8b
+              ? 'gzip'
+              : chunk.length >= 3 &&
+                    chunk[0] == 0x49 &&
+                    chunk[1] == 0x44 &&
+                    chunk[2] == 0x33
+              ? 'id3'
+              : 'unknown';
+          debugPrint(
+            '[DvrSegment] first-byte generation=$generation '
+            'client=$clientGeneration segment=$segment '
+            'ms=${stopwatch.elapsedMilliseconds} format=$format',
+          );
+        }
+
+        response.add(chunk);
+        final now = DateTime.now();
+        if (bytesSinceFlush >= _flushByteThreshold ||
+            now.difference(lastFlushAt) >= _flushTimeThreshold) {
+          final logFirstFlush = !firstFlushLogged;
+          if (logFirstFlush) {
+            firstFlushLogged = true;
+            debugPrint(
+              '[DvrSegment] flush-start generation=$generation '
+              'client=$clientGeneration bytes=$bytes',
+            );
+          }
+          waitingForFlush = true;
+          if (!await _flushWhileActive(
+            response,
+            generation,
+            clientGeneration,
+          )) {
+            return;
+          }
+          waitingForFlush = false;
+          if (logFirstFlush) {
+            debugPrint(
+              '[DvrSegment] flush-done generation=$generation '
+              'client=$clientGeneration bytes=$bytes '
+              'ms=${stopwatch.elapsedMilliseconds}',
+            );
+          }
+          bytesSinceFlush = 0;
+          lastFlushAt = now;
+        }
       }
 
-      response.add(chunk);
-      final now = DateTime.now();
-      if (bytesSinceFlush >= _flushByteThreshold ||
-          now.difference(lastFlushAt) >= _flushTimeThreshold) {
-        await response.flush().timeout(const Duration(seconds: 1));
-        bytesSinceFlush = 0;
-        lastFlushAt = now;
+      if (bytesSinceFlush > 0 &&
+          _isActiveStream(generation, clientGeneration)) {
+        waitingForFlush = true;
+        if (!await _flushWhileActive(response, generation, clientGeneration)) {
+          return;
+        }
       }
-    }
 
-    if (bytesSinceFlush > 0 &&
-        _isActiveStream(generation, clientGeneration)) {
-      await response.flush().timeout(const Duration(seconds: 1));
+      debugPrint(
+        '[DvrSegment] done generation=$generation client=$clientGeneration '
+        'segment=$segment totalMs=${stopwatch.elapsedMilliseconds} bytes=$bytes',
+      );
+    } finally {
+      progressTimer.cancel();
     }
-
-    debugPrint(
-      '[DvrSegment] done generation=$generation client=$clientGeneration '
-      'segment=$segment totalMs=${stopwatch.elapsedMilliseconds} bytes=$bytes',
-    );
   }
 
   bool _isActiveStream(int generation, int clientGeneration) =>
       _server != null &&
       generation == _streamGeneration &&
       clientGeneration == _streamClientGeneration;
+
+  void _cancelActiveStream() {
+    final cancellation = _pendingFlushCancellation;
+    _pendingFlushCancellation = null;
+    if (cancellation != null && !cancellation.isCompleted) {
+      cancellation.complete(false);
+    }
+  }
+
+  Future<bool> _flushWhileActive(
+    HttpResponse response,
+    int generation,
+    int clientGeneration,
+  ) async {
+    // A full player buffer is normal backpressure, not a network timeout.
+    // Wait for consumption, but let seek/reconnect/stop release this pump
+    // immediately so an obsolete consumer cannot hold the upstream connection.
+    if (!_isActiveStream(generation, clientGeneration)) return false;
+    final cancellation = Completer<bool>();
+    _pendingFlushCancellation = cancellation;
+    try {
+      final flushed = await Future.any<bool>([
+        response.flush().then((_) => true),
+        cancellation.future,
+      ]);
+      return flushed && _isActiveStream(generation, clientGeneration);
+    } finally {
+      if (identical(_pendingFlushCancellation, cancellation)) {
+        _pendingFlushCancellation = null;
+      }
+    }
+  }
 
   String _segmentName(Uri uri) =>
       uri.pathSegments.isEmpty ? uri.path : uri.pathSegments.last;
@@ -632,5 +753,7 @@ class TwitchLiveDvrBridgeProxy {
   }
 
   String _seconds(Duration value) =>
-      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3);
+      (value.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(
+        3,
+      );
 }

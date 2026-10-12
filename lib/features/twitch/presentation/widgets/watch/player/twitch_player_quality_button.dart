@@ -57,6 +57,7 @@ class QualityButton extends StatelessWidget {
               variant.url == currentVariant?.url;
           return PopupMenuItem<TwitchM3u8Variant>(
             value: variant,
+            enabled: onChanged != null,
             child: Row(
               children: [
                 SizedBox(

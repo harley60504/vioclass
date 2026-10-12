@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../services/playback/twitch_media_kit_player_host.dart';
+import '../../../services/auth/twitch_viewer_session.dart';
 import '../../watch/twitch_playback_session_controller.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
 import '../twitch_watch_page.dart';
@@ -18,29 +19,50 @@ export 'twitch_recorded_watch_playback.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
+final _authLoadVersions = Expando<int>('watchAuthLoadVersions');
+
 extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
   Future<void> loadAuth() async {
+    final loadVersion = (_authLoadVersions[this] ?? 0) + 1;
+    _authLoadVersions[this] = loadVersion;
+    int? identityRevision;
     setState(() => loadingAuth = true);
     try {
       await authService.loadStoredSession();
       await webGqlAuthService.loadStoredSession();
       await dropsAuthService.loadStoredSession();
+      if (!mounted || _authLoadVersions[this] != loadVersion) return;
 
-      final token = await authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        if (mounted) setState(() => loadingAuth = false);
+      final session = TwitchViewerSession.forAuth(authService);
+      identityRevision = session.identityRevision;
+      final resolvedIdentity = await session.resolve(authApi);
+      if (!mounted || _authLoadVersions[this] != loadVersion) return;
+      final identity = resolvedIdentity ?? session.snapshot;
+      if (identity == null) {
+        if (mounted) {
+          setState(() {
+            viewerLogin = null;
+            viewerId = null;
+            loadingAuth = session.status == TwitchViewerStatus.checking;
+          });
+        }
         return;
       }
 
-      final validation = await authApi.validateToken(token);
       if (!mounted) return;
       setState(() {
-        viewerLogin = validation.login;
-        viewerId = validation.userId;
+        viewerLogin = identity.viewerLogin;
+        viewerId = identity.viewerId;
         loadingAuth = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _authLoadVersions[this] != loadVersion) return;
+      if (identityRevision != null &&
+          TwitchViewerSession.forAuth(authService).identityRevision !=
+              identityRevision) {
+        syncViewerIdentity();
+        return;
+      }
       setState(() => loadingAuth = false);
       showSnack('OAuth 暫時載入失敗，請稍後再試。');
     }
@@ -422,6 +444,17 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
 
     await prepareWatchBackgroundSnapshot(generation, channel);
     if (!isCurrentWatchTask(generation, channel)) return;
+
+    if (viewerId == null || viewerId!.trim().isEmpty) {
+      if (mounted) {
+        setState(() {
+          relationshipBootstrapping = false;
+          engagementBootstrapping = false;
+        });
+      }
+      await runDeferredEmoteStartup(generation, channel);
+      return;
+    }
 
     await Future.wait<void>([
       runDeferredRelationshipStartup(generation, channel),

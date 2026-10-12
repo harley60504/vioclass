@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 import '../../api/chat/twitch_whisper_api_service.dart';
+import '../../services/auth/twitch_desktop_webview_settings.dart';
 
 /// Observe only the official page's whisper-list response. Twitch itself owns
 /// the login, integrity SDK, request headers and request execution.
@@ -166,9 +167,11 @@ class _TwitchWhisperBrowserSyncPageState
                   injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
                 ),
               ]),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
+              initialSettings: twitchDesktopWebViewSettings(
+                InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                ),
               ),
               onWebViewCreated: (controller) => _embedded = controller,
             ),

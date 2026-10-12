@@ -12,8 +12,13 @@ import '../watch/twitch_watch_playback_kind.dart';
 class TwitchMiniPlayerEntry {
   final TwitchPlaybackSessionState playback;
   final TwitchPlaylistPlayerRuntime? playerRuntime;
+  final bool playOnOpen;
 
-  const TwitchMiniPlayerEntry({required this.playback, this.playerRuntime});
+  const TwitchMiniPlayerEntry({
+    required this.playback,
+    this.playerRuntime,
+    this.playOnOpen = true,
+  });
 
   int get revision => playback.revision;
   TwitchStreamHeaderMetadata get metadata => playback.metadata;
@@ -41,7 +46,9 @@ class TwitchMiniPlayerController extends ChangeNotifier {
 
   bool isActiveMediaUri(String? uri) {
     final value = uri?.trim();
-    return value != null && value.isNotEmpty && value == _entry?.mediaUri;
+    return value != null &&
+        value.isNotEmpty &&
+        value == _entry?.mediaUri.trim();
   }
 
   void attachSession(TwitchMediaKitPlayerSession session) {
@@ -93,12 +100,14 @@ class TwitchMiniPlayerController extends ChangeNotifier {
   void showPlayback({
     required TwitchPlaybackSessionState playback,
     TwitchPlaylistPlayerRuntime? playerRuntime,
+    bool playOnOpen = true,
   }) {
     final safeUri = playback.mediaUri.trim();
     if (safeUri.isEmpty) return;
     _entry = TwitchMiniPlayerEntry(
       playback: playback,
       playerRuntime: playerRuntime,
+      playOnOpen: playOnOpen,
     );
     debugPrint(
       '[MiniPlayer] show revision=${playback.revision} '
@@ -124,7 +133,10 @@ class TwitchMiniPlayerController extends ChangeNotifier {
         (_activeSession?.playerOrNull?.state.playing ?? false);
   }
 
-  Future<void> recoverAfterNetworkRestored() async {
+  Future<void> recoverAfterNetworkRestored({
+    // Tests can hold recovery before native open without changing OS network.
+    Future<void>? beforeOpenForTesting,
+  }) async {
     final activeEntry = _entry;
     final session = _activeSession;
     final player = session?.playerOrNull;
@@ -138,10 +150,19 @@ class TwitchMiniPlayerController extends ChangeNotifier {
     }
 
     final position = player.state.position;
+    if (beforeOpenForTesting != null) await beforeOpenForTesting;
+    if (!identical(_entry, activeEntry) ||
+        !identical(_activeSession, session)) {
+      return;
+    }
     await TwitchMediaKitPlayerHost.restoreSharedMedia(
       uri: activeEntry.mediaUri,
       forceOpen: true,
     );
+    if (!identical(_entry, activeEntry) ||
+        !identical(_activeSession, session)) {
+      return;
+    }
     if (activeEntry.kind != TwitchWatchPlaybackKind.live &&
         position > Duration.zero) {
       await player.seek(position);

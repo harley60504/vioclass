@@ -10,6 +10,7 @@ import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../../parsers/chat/twitch_recent_message_parser.dart';
 import '../../../services/auth/twitch_auth_service.dart';
+import '../../../services/auth/twitch_viewer_session.dart';
 import '../../../services/auth/twitch_drops_auth_service.dart';
 import '../../../services/chat/twitch_badge_cache_service.dart';
 import '../../../services/chat/twitch_chat_runtime.dart';
@@ -18,7 +19,13 @@ import '../../../services/engagement/twitch_prediction_hermes_runtime_service.da
 import '../../../services/special_actions/twitch_viewer_special_message_runtime.dart';
 import '../twitch_watch_feature_ports.dart';
 
+typedef TwitchWatchChatRuntimeFactory =
+    TwitchChatRuntime Function({required bool authenticated});
+
 class TwitchWatchChatController extends ChangeNotifier {
+  final TwitchWatchChatRuntimeFactory? runtimeFactory;
+  bool _disposed = false;
+  int _connectionGeneration = 0;
   final TwitchAuthService authService;
   final TwitchDropsAuthService dropsAuthService;
   final TwitchAuthApiService authApi;
@@ -38,6 +45,7 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   TwitchChatRuntime? runtime;
   bool connectingChat = false;
+  String? _connectedToken;
   bool sending = false;
   String? viewerLogin;
   String? resolvedViewerId;
@@ -47,7 +55,33 @@ class TwitchWatchChatController extends ChangeNotifier {
   StreamSubscription<TwitchCommunityRedemptionEvent>? _redemptionSubscription;
   StreamSubscription<TwitchChatSendRejection>? _sendRejectionSubscription;
 
+  bool get isReadOnlyGuest =>
+      TwitchViewerSession.forAuth(authService).status ==
+      TwitchViewerStatus.guest;
+
+  bool get _hasConnectedViewer {
+    final identity = TwitchViewerSession.forAuth(authService).snapshot;
+    return !connectingChat &&
+        !_disposed &&
+        identity != null &&
+        identity.accessToken == _connectedToken;
+  }
+
+  bool get hasIrcSendPermission {
+    final identity = TwitchViewerSession.forAuth(authService).snapshot;
+    return identity != null &&
+        identity.scopes.contains('chat:read') &&
+        identity.scopes.contains('chat:edit');
+  }
+
+  bool get canSendForCurrentViewer =>
+      _hasConnectedViewer &&
+      (pendingSpecialMessage != null || hasIrcSendPermission);
+
+  bool get hasCurrentViewer => _hasConnectedViewer;
+
   TwitchWatchChatController({
+    this.runtimeFactory,
     required this.authService,
     required this.dropsAuthService,
     required this.authApi,
@@ -67,61 +101,123 @@ class TwitchWatchChatController extends ChangeNotifier {
   });
 
   Future<void> connectChat(String channel) async {
+    if (_disposed) return;
+    final generation = ++_connectionGeneration;
+    bool isCurrent() => !_disposed && generation == _connectionGeneration;
+    sending = false;
     connectingChat = true;
     notifyListeners();
     try {
       await _sendRejectionSubscription?.cancel();
+      if (!isCurrent()) return;
       _sendRejectionSubscription = null;
       await runtime?.disposeRuntime();
+      if (!isCurrent()) return;
+      runtime = null;
 
-      final token = await authService.getValidAccessToken();
-      if (token == null || token.isEmpty) {
-        throw StateError('Missing OAuth token for chat connection.');
+      final identity = await TwitchViewerSession.forAuth(
+        authService,
+      ).resolve(authApi);
+      if (!isCurrent()) return;
+      if (identity == null &&
+          TwitchViewerSession.forAuth(authService).status !=
+              TwitchViewerStatus.guest) {
+        return;
       }
+      final token = identity?.accessToken;
+      // Account identity is independent from the public IRC read transport.
+      // A token lacking chat:read cannot authenticate that connection.
+      final ircToken = identity?.scopes.contains('chat:read') == true
+          ? token
+          : null;
+      final authenticatedLogin = identity?.viewerLogin;
+      final authenticatedViewerId = identity?.viewerId;
 
-      await dropsAuthService.loadStoredSession();
-      final validation = await authApi.validateToken(token);
+      _connectedToken = token;
+      viewerLogin = authenticatedLogin;
+      resolvedViewerId = authenticatedViewerId;
+      onViewerResolved(viewerLogin, resolvedViewerId);
+
       final startupFuture = _fetchStartupSupplement(channel);
-      final nextRuntime = TwitchChatRuntime(
-        ircApi: TwitchIrcApiService(),
-        writeIrcApi: TwitchIrcApiService(),
-        badgeCache: TwitchBadgeCacheService(),
-        recentMessagesApi: recentMessagesApi,
-        maxMessages: 900,
-      );
+      final nextRuntime =
+          runtimeFactory?.call(authenticated: ircToken != null) ??
+          TwitchChatRuntime(
+            ircApi: TwitchIrcApiService(),
+            writeIrcApi: ircToken == null ? null : TwitchIrcApiService(),
+            badgeCache: TwitchBadgeCacheService(),
+            recentMessagesApi: recentMessagesApi,
+            maxMessages: 900,
+          );
 
       runtime = nextRuntime;
+      Future<bool> discardChangedIdentity() async {
+        final viewer = TwitchViewerSession.forAuth(authService);
+        final sameIdentity = identity == null
+            ? viewer.status == TwitchViewerStatus.guest
+            : identical(viewer.snapshot, identity);
+        if (sameIdentity) return false;
+        if (!isCurrent() || !identical(runtime, nextRuntime)) return true;
+        viewerLogin = null;
+        resolvedViewerId = null;
+        final cleanup = disposeRuntime();
+        // disposeRuntime invalidates this generation synchronously. A newer
+        // connect may already have started from its notification callback.
+        if (!_disposed && _connectionGeneration == generation + 1) {
+          onViewerResolved(null, null);
+        }
+        await cleanup;
+        return true;
+      }
+
       _sendRejectionSubscription = nextRuntime.sendRejections.listen((
         rejection,
       ) {
         showMessage('訊息未送出：${_sendRejectionReason(rejection)}');
       });
-      _ensureRedemptionSubscription();
-      viewerLogin = validation.login;
-      resolvedViewerId = validation.userId;
-      onViewerResolved(viewerLogin, resolvedViewerId);
+      if (token != null) {
+        await dropsAuthService.loadStoredSession();
+        if (!isCurrent()) return;
+        if (await discardChangedIdentity()) return;
+        if (!isCurrent()) return;
+        _ensureRedemptionSubscription();
+      }
       notifyListeners();
+      if (!isCurrent()) return;
+      // A listener can synchronously change the account during notification.
+      final currentViewer = TwitchViewerSession.forAuth(authService);
+      if (identity == null
+          ? currentViewer.status != TwitchViewerStatus.guest
+          : !identical(currentViewer.snapshot, identity)) {
+        await discardChangedIdentity();
+        return;
+      }
 
       await nextRuntime.connect(
         channelLogin: channel,
-        accessToken: token,
-        ircNick: validation.login,
-        viewerLogin: validation.login,
-        viewerDisplayName: validation.login,
-        viewerUserId: validation.userId,
+        accessToken: ircToken,
+        ircNick: ircToken == null ? 'justinfan12345' : authenticatedLogin,
+        viewerLogin: authenticatedLogin,
+        viewerDisplayName: authenticatedLogin,
+        viewerUserId: authenticatedViewerId,
         preloadRecentMessages: true,
         recentMessageLimit: 700,
       );
+      if (!isCurrent()) return;
+      if (await discardChangedIdentity()) return;
+      if (!isCurrent()) return;
       unawaited(
         _applyStartupSupplement(
           runtime: nextRuntime,
           channel: channel,
           startupFuture: startupFuture,
+          expectedIdentity: identity,
         ),
       );
     } finally {
-      connectingChat = false;
-      notifyListeners();
+      if (isCurrent()) {
+        connectingChat = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -155,9 +251,16 @@ class TwitchWatchChatController extends ChangeNotifier {
     required TwitchChatRuntime runtime,
     required String channel,
     required Future<TwitchChatStartupSnapshot?> startupFuture,
+    required TwitchViewerAuthSnapshot? expectedIdentity,
   }) async {
     final startup = await startupFuture;
     if (startup == null || this.runtime != runtime) return;
+    final viewer = TwitchViewerSession.forAuth(authService);
+    if (expectedIdentity == null
+        ? viewer.status != TwitchViewerStatus.guest
+        : !identical(viewer.snapshot, expectedIdentity)) {
+      return;
+    }
 
     final startupRecentMessages = const TwitchRecentMessageParser()
         .parseMessagesField(
@@ -226,67 +329,122 @@ class TwitchWatchChatController extends ChangeNotifier {
     activeRuntime.injectRedemptionMessage(redemption);
   }
 
-  Future<void> sendMessage(String message) async {
-    if (sending) return;
+  Future<bool> sendMessage(String message) async {
+    if (_disposed || sending) return false;
+    if (isReadOnlyGuest) {
+      showMessage('目前是訪客唯讀聊天室，登入 Twitch 後才能發言。');
+      return false;
+    }
+    if (!_hasConnectedViewer) {
+      showMessage('登入狀態或聊天室連線尚未準備完成，請稍後再試。');
+      return false;
+    }
     final activeRuntime = runtime;
     if (activeRuntime == null || !activeRuntime.connected) {
       showMessage('聊天室尚未連線');
-      return;
+      return false;
     }
 
-    if (message.trim().isEmpty) return;
+    if (message.trim().isEmpty) return false;
     final pending = pendingSpecialMessage;
     if (pending != null) {
-      await sendPendingSpecialMessage(pending, message);
-      return;
+      return sendPendingSpecialMessage(pending, message);
+    }
+    if (!hasIrcSendPermission) {
+      showMessage('目前帳號缺少聊天室發言權限，請重新授權。');
+      return false;
     }
 
+    final generation = _connectionGeneration;
+    final identity = TwitchViewerSession.forAuth(authService).snapshot;
+    bool ownsSend() =>
+        !_disposed &&
+        generation == _connectionGeneration &&
+        identical(runtime, activeRuntime);
+    bool sameIdentity() =>
+        identical(TwitchViewerSession.forAuth(authService).snapshot, identity);
     sending = true;
-    notifyListeners();
     try {
+      notifyListeners();
+      if (!ownsSend() || !sameIdentity()) return false;
       await activeRuntime.sendMessage(message);
+      return ownsSend() && sameIdentity();
     } catch (error) {
-      showMessage('聊天室訊息送出失敗，請稍後再試。');
+      if (ownsSend() && sameIdentity()) {
+        showMessage('聊天室訊息送出失敗，請稍後再試。');
+      }
       rethrow;
     } finally {
-      sending = false;
-      notifyListeners();
+      if (ownsSend()) {
+        sending = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<void> sendPendingSpecialMessage(
+  Future<bool> sendPendingSpecialMessage(
     TwitchPendingSpecialMessage pending,
     String message,
   ) async {
+    if (_disposed || sending) return false;
+    if (!_hasConnectedViewer) {
+      showMessage('登入狀態或聊天室連線尚未準備完成，請稍後再試。');
+      return false;
+    }
+    final generation = _connectionGeneration;
+    final activeRuntime = runtime;
+    final identity = TwitchViewerSession.forAuth(authService).snapshot;
+    bool ownsSend() =>
+        !_disposed &&
+        generation == _connectionGeneration &&
+        identical(runtime, activeRuntime);
+    bool isCurrent() =>
+        ownsSend() &&
+        identical(
+          TwitchViewerSession.forAuth(authService).snapshot,
+          identity,
+        ) &&
+        identical(pendingSpecialMessage, pending);
     sending = true;
-    notifyListeners();
     try {
+      notifyListeners();
+      if (!isCurrent()) return false;
       switch (pending.kind) {
         case TwitchPendingSpecialMessageKind.highlightedMessage:
         case TwitchPendingSpecialMessageKind.channelPointRewardMessage:
-          await _sendPendingChannelPointTextReward(pending, message);
+          await _sendPendingChannelPointTextReward(pending, message, isCurrent);
           break;
         case TwitchPendingSpecialMessageKind.watchStreak:
-          await _sendPendingWatchStreak(pending, message);
+          await _sendPendingWatchStreak(pending, message, isCurrent);
           break;
         case TwitchPendingSpecialMessageKind.resub:
-          await _sendPendingResub(pending, message);
+          await _sendPendingResub(pending, message, isCurrent);
           break;
         case TwitchPendingSpecialMessageKind.preview:
         case TwitchPendingSpecialMessageKind.officialSpecialMessage:
           showMessage('預覽訊息：${pending.describeForLog(message: message)}');
           break;
       }
+      if (!isCurrent()) return false;
       clearPendingSpecialMessage();
+      return true;
+    } catch (error) {
+      if (isCurrent()) {
+        showMessage('特殊訊息送出失敗，請稍後再試。');
+      }
+      rethrow;
     } finally {
-      sending = false;
-      notifyListeners();
+      if (ownsSend()) {
+        sending = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> _sendPendingChannelPointTextReward(
     TwitchPendingSpecialMessage pending,
     String message,
+    bool Function() isCurrent,
   ) async {
     final reward = pending.payload['reward'];
     if (reward is! Map<String, dynamic>) {
@@ -307,13 +465,15 @@ class TwitchWatchChatController extends ChangeNotifier {
       textInput: message,
     );
 
+    if (!isCurrent()) return;
     showMessage('已兌換 ${result.title}');
-    await refreshEngagement(showSnackOnError: false);
+    if (isCurrent()) await refreshEngagement(showSnackOnError: false);
   }
 
   Future<void> _sendPendingWatchStreak(
     TwitchPendingSpecialMessage pending,
     String message,
+    bool Function() isCurrent,
   ) async {
     final status = pending.payload['watchStreak'];
     if (status is! TwitchWatchStreakStatusStage251) {
@@ -330,13 +490,15 @@ class TwitchWatchChatController extends ChangeNotifier {
     if (!result.ok) {
       throw StateError(result.error?.toString() ?? '連續觀看分享失敗。');
     }
+    if (!isCurrent()) return;
     showMessage('已分享連續觀看 ${status.streakCount ?? ''}${status.unitLabel}');
-    await refreshSpecialMessages(autoSelectPending: false);
+    if (isCurrent()) await refreshSpecialMessages(autoSelectPending: false);
   }
 
   Future<void> _sendPendingResub(
     TwitchPendingSpecialMessage pending,
     String message,
+    bool Function() isCurrent,
   ) async {
     final resub = pending.payload['resub'];
     if (resub is! TwitchResubNotificationStage251) {
@@ -353,8 +515,9 @@ class TwitchWatchChatController extends ChangeNotifier {
     if (!result.ok) {
       throw StateError(result.error?.toString() ?? '續訂訊息分享失敗。');
     }
+    if (!isCurrent()) return;
     showMessage('已分享訂閱 ${resub.cumulativeMonths ?? ''} 個月');
-    await refreshSpecialMessages(autoSelectPending: false);
+    if (isCurrent()) await refreshSpecialMessages(autoSelectPending: false);
   }
 
   Future<TwitchViewerSpecialMessagesSnapshotStage251?> loadSpecialMessages({
@@ -461,6 +624,7 @@ class TwitchWatchChatController extends ChangeNotifier {
   }
 
   Future<void> reconnectAfterNetworkRestored() async {
+    if (_disposed) return;
     final activeRuntime = runtime;
     if (activeRuntime == null ||
         activeRuntime.connected ||
@@ -469,22 +633,64 @@ class TwitchWatchChatController extends ChangeNotifier {
       return;
     }
 
+    // A runtime retains the identity used for its previous connection. Rebind
+    // through the normal session-aware startup after logout/account changes;
+    // reconnecting it directly would reuse the old account's IRC transport.
+    final viewer = TwitchViewerSession.forAuth(authService);
+    if (viewer.status == TwitchViewerStatus.checking) {
+      return;
+    }
+    final sameViewer = viewer.status == TwitchViewerStatus.guest
+        ? _connectedToken == null
+        : viewer.snapshot != null &&
+            viewer.snapshot!.accessToken == _connectedToken;
+    if (!sameViewer) {
+      await connectChat(channelLogin());
+      return;
+    }
+
+    final generation = ++_connectionGeneration;
+    final recoveryIdentity = viewer.snapshot;
+    final recoveryStatus = viewer.status;
+    final recoveryChannel = channelLogin();
+    bool isCurrentRecovery() =>
+        !_disposed &&
+        generation == _connectionGeneration &&
+        identical(runtime, activeRuntime) &&
+        channelLogin() == recoveryChannel &&
+        viewer.status == recoveryStatus &&
+        identical(viewer.snapshot, recoveryIdentity);
     connectingChat = true;
     notifyListeners();
     try {
       await activeRuntime.reconnect();
+      if (isCurrentRecovery() && activeRuntime.error != null) {
+        showMessage('聊天室暫時連線失敗，稍後再試。');
+      }
+    } catch (_) {
+      if (isCurrentRecovery()) {
+        showMessage('聊天室暫時連線失敗，稍後再試。');
+      }
     } finally {
-      connectingChat = false;
-      notifyListeners();
+      if (!_disposed &&
+          generation == _connectionGeneration &&
+          identical(runtime, activeRuntime)) {
+        connectingChat = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> disposeRuntime() async {
+    _connectionGeneration++;
+    sending = false;
+    connectingChat = false;
+    _connectedToken = null;
     final rejectionSubscription = _sendRejectionSubscription;
     _sendRejectionSubscription = null;
     final activeRuntime = runtime;
     runtime = null;
-    notifyListeners();
+    if (!_disposed) notifyListeners();
     await rejectionSubscription?.cancel();
     if (activeRuntime != null) {
       await activeRuntime.disposeRuntime();
@@ -500,6 +706,7 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     unawaited(disposeRuntime());
     unawaited(_redemptionSubscription?.cancel());
     super.dispose();

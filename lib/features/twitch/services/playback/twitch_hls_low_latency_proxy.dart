@@ -14,3 +14,4 @@ part 'twitch_hls_low_latency_proxy_parts/02_twitch_dart_hls_low_latency_proxy_co
 part 'twitch_hls_low_latency_proxy_parts/03_twitch_hls_low_latency_engine.dart';
 part 'twitch_hls_low_latency_proxy_parts/04_twitch_hls_persistent_writer.dart';
 part 'twitch_hls_low_latency_proxy_parts/05_twitch_hls_byte_sink.dart';
+part 'twitch_hls_low_latency_proxy_parts/twitch_fmp4_timeline.dart';

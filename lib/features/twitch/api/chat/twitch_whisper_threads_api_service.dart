@@ -92,6 +92,8 @@ class TwitchWhisperThreadsApiService {
     required String ownerId,
     String? cursor,
     bool retryIntegrity = true,
+    bool allowWebFallback = true,
+    TwitchWhisperSession? selectedSession,
   }) async {
     if (!RegExp(r'^\d+$').hasMatch(ownerId) ||
         (cursor != null && (cursor.isEmpty || cursor.length > 4096))) {
@@ -100,6 +102,7 @@ class TwitchWhisperThreadsApiService {
     final trace = ++_diagnosticSequence;
     final watch = Stopwatch()..start();
     var phase = 'web-session';
+    TwitchWhisperSession? attemptedSession = selectedSession;
     void log(String summary) {
       if (kDebugMode) {
         debugPrint(
@@ -125,15 +128,21 @@ class TwitchWhisperThreadsApiService {
         log('success conversations=${page.conversations.length}');
         return page;
       }
-      final session = await history.webSession(ownerId);
+      final session = selectedSession ?? await history.readSession(ownerId);
+      attemptedSession = session;
+      final android =
+          session.validation.clientId ==
+          TwitchApiConstants.twitchAndroidPublicClientId;
       log(
         'validated sameOwner=${session.validation.userId == ownerId} '
-        'webClient=${session.validation.clientId == TwitchApiConstants.twitchWebClientId}',
+        'readClient=${android ? 'android' : 'web'}',
       );
       phase = 'integrity';
-      Map<String, String> integrityHeaders;
+      Map<String, String> integrityHeaders = const {};
       final provider = integrityProvider;
-      if (provider != null) {
+      if (android) {
+        log('android read skips web integrity');
+      } else if (provider != null) {
         log('officialSDK acquisition; response is not a whisper list');
         final context = await provider(session);
         integrityHeaders = context.headersFor(session);
@@ -171,7 +180,10 @@ class TwitchWhisperThreadsApiService {
         };
       }
       phase = 'gql';
-      log('POST /gql batch=1 persisted=true integrityHeader=true');
+      log(
+        'POST /gql batch=1 persisted=true '
+        'integrityHeader=${integrityHeaders.containsKey('Client-Integrity')}',
+      );
       final response = await history.client.postJson<dynamic>(
         TwitchApiConstants.gqlEndpoint,
         headers: {
@@ -215,13 +227,31 @@ class TwitchWhisperThreadsApiService {
         'integrityRejected=$integrityRejected serverRequestId=$safeId',
       );
       phase = 'parse';
-      if (integrityRejected && retryIntegrity && integrityInvalidator != null) {
+      if (android && errors is List && errors.isNotEmpty && allowWebFallback) {
+        log('android rejected; fallback to same-owner web once');
+        return await _page(
+          ownerId: ownerId,
+          cursor: cursor,
+          allowWebFallback: false,
+          selectedSession: await history.webSession(ownerId),
+        );
+      }
+      if (!android &&
+          integrityRejected &&
+          retryIntegrity &&
+          integrityInvalidator != null) {
         await integrityInvalidator!(
           session,
           integrityHeaders['Client-Integrity'] ?? '',
         );
         log('refresh rejected verification and retry once');
-        return _page(ownerId: ownerId, cursor: cursor, retryIntegrity: false);
+        return await _page(
+          ownerId: ownerId,
+          cursor: cursor,
+          retryIntegrity: false,
+          allowWebFallback: false,
+          selectedSession: session,
+        );
       }
       final page = parse(
         response,
@@ -239,6 +269,21 @@ class TwitchWhisperThreadsApiService {
       log('failed featureException; no archive write');
       rethrow;
     } on TwitchApiException catch (error) {
+      final session = attemptedSession;
+      final android =
+          session?.validation.clientId ==
+          TwitchApiConstants.twitchAndroidPublicClientId;
+      if (android &&
+          allowWebFallback &&
+          (error.statusCode == 401 || error.statusCode == 403)) {
+        log('android HTTP rejection; fallback to same-owner web once');
+        return await _page(
+          ownerId: ownerId,
+          cursor: cursor,
+          allowWebFallback: false,
+          selectedSession: await history.webSession(ownerId),
+        );
+      }
       log('failed HTTP=${error.statusCode ?? 'unknown'}; no archive write');
       throw TwitchWhisperException(
         'Twitch 對話列表 $phase 請求失敗 '
@@ -329,6 +374,9 @@ class TwitchWhisperThreadsApiService {
             !peers.add(peerId)) {
           throw const FormatException();
         }
+        // Some inbox responses include archived nodes. Retain their pagination
+        // cursor, but do not recreate archived conversations in the local list.
+        if (node['isArchived'] == true) continue;
         stage = 'whisperThreads/edges/profile';
         final login = peer['login'] as String;
         final name = peer['displayName'] as String;

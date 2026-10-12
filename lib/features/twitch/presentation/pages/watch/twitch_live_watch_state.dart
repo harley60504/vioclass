@@ -5,6 +5,7 @@ import '../../watch/twitch_watch_playback_kind.dart';
 import '../twitch_watch_page.dart';
 import 'twitch_live_watch_recovery.dart';
 import 'twitch_watch_page_startup.dart';
+import 'twitch_watch_playback_state.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
@@ -21,6 +22,7 @@ TwitchWatchMode resolveWatchMode(TwitchWatchPageState state) {
 }
 
 void ensureWatchModeRuntime(TwitchWatchPageState state) {
+  if (!state.mounted) return;
   final mode = resolveWatchMode(state);
   var recovery = _liveWatchRecoveryByPage[state];
 
@@ -33,6 +35,14 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
           created.stop();
           return;
         }
+        // Initial startup owns auth resolution and the first playback load.
+        // A recovery poll must not race it by discovering a live generation
+        // and starting playback before the stored session has resolved.
+        if (state.loadingAuth ||
+            state.watchLoadGeneration == 0 ||
+            state.loadingWatch) {
+          return;
+        }
         if (!TwitchPlaybackSessionController.instance.isTopRouteOwner(
           state.playbackRouteOwner,
         )) {
@@ -41,8 +51,15 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
 
         final previousStreamId = state.liveTimelineStreamId?.trim() ?? '';
         final previousStartedAt = state.liveTimelineStartedAt;
+        final loadGeneration = state.watchLoadGeneration;
         final live = await state.refreshLiveStatusForRecovery();
-        if (!state.mounted) return;
+        if (!state.mounted ||
+            state.watchLoadGeneration != loadGeneration ||
+            !TwitchPlaybackSessionController.instance.isTopRouteOwner(
+              state.playbackRouteOwner,
+            )) {
+          return;
+        }
 
         if (live == false) {
           if (!state.showOfflineChannelPlaceholder) {
@@ -63,10 +80,14 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
         final changed =
             nextStreamId != previousStreamId ||
             nextStartedAt != previousStartedAt;
-        if (!changed) return;
+        final endedLive =
+            state.currentPlaybackKind == TwitchWatchPlaybackKind.live &&
+            state.playerSession.playerOrNull?.state.completed == true;
+        if (!changed && !endedLive) return;
 
         debugPrint(
           '[LiveWatch] discovered new live generation '
+          'endedLive=$endedLive '
           'stream=$previousStreamId->$nextStreamId '
           'startedAt=$previousStartedAt->$nextStartedAt; '
           'restarting unified live/DVR startup',
@@ -79,6 +100,11 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
   }
 
   recovery.setMode(mode);
+}
+
+void disposeWatchModeRuntime(TwitchWatchPageState state) {
+  _liveWatchRecoveryByPage[state]?.dispose();
+  _liveWatchRecoveryByPage[state] = null;
 }
 
 extension TwitchLiveWatchStateMethods on TwitchWatchPageState {

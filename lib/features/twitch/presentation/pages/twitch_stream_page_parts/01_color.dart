@@ -2,8 +2,37 @@ part of '../twitch_stream_page.dart';
 
 const Color _kBackground = Colors.transparent;
 
+/// Coherent account/discovery dependencies for an isolated home session.
+/// The page owns the client's lifetime, just as for its default dependencies.
+class TwitchStreamPageServices {
+  final TwitchApiClient apiClient;
+  final TwitchAuthService authService;
+  final TwitchDropsAuthService dropsAuthService;
+  final TwitchWebGqlAuthService webGqlAuthService;
+  final TwitchAuthApiService authApi;
+  final TwitchDiscoveryService discoveryService;
+
+  /// Creates a fresh, coherent watch bundle for each media-card route.
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
+
+  TwitchStreamPageServices({
+    required this.apiClient,
+    required this.authService,
+    required this.dropsAuthService,
+    required this.webGqlAuthService,
+    required this.authApi,
+    required this.discoveryService,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
+  }) : assert(identical(discoveryService.client, apiClient)),
+       assert(identical(discoveryService.authService, authService)),
+       assert(identical(discoveryService.authApi, authApi));
+}
+
 class TwitchStreamPage extends StatefulWidget {
-  const TwitchStreamPage({super.key});
+  final TwitchStreamPageServices? services;
+  const TwitchStreamPage({super.key, this.services});
 
   @override
   State<TwitchStreamPage> createState() => _TwitchStreamPageState();
@@ -11,7 +40,7 @@ class TwitchStreamPage extends StatefulWidget {
 
 class _TwitchStreamPageState extends State<TwitchStreamPage>
     with WidgetsBindingObserver {
-  static const Duration _followedLivePollInterval = Duration(minutes: 2);
+  static const Duration _followedLivePollInterval = Duration(minutes: 1);
 
   final TextEditingController searchController = TextEditingController();
 
@@ -30,8 +59,12 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   late final TwitchPlayerSettingsController playerSettingsController;
   late final VioClassUpdateController updateController;
   late final TwitchWhisperInboxController whisperInbox;
+  late final TwitchAccountNotificationMonitor _accountNotifications;
 
-  TwitchHomeSection selectedSection = TwitchHomeSection.following;
+  // Start on public content while the saved session is being checked. A
+  // verified viewer can still be routed to Following below, but a guest must
+  // never land on an OAuth-only page first.
+  TwitchHomeSection selectedSection = TwitchHomeSection.browse;
 
   String searchText = '';
   String loginStatus = '檢查登入狀態...';
@@ -48,13 +81,20 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   String? channelSearchError;
   int reloadTick = 0;
   bool loadingLoginState = true;
+  bool _hasAuthenticatedViewer = false;
+  bool _canReadFollows = false;
+  bool _homeSectionTouched = false;
   bool loadingChannelSearch = false;
   bool _loginStateLoadRunning = false;
+  int _loginStateLoadId = 0;
+  bool _loginStateReloadPending = false;
+  bool _loggingOut = false;
+  int _loginStateGeneration = 0;
+  String? _observedAccessToken;
   int _channelSearchGeneration = 0;
   Timer? _channelSearchDebounce;
   Timer? _followedLiveNotificationTimer;
-  Set<String> _knownFollowedLiveStreamIds = <String>{};
-  bool _hasFollowedLiveBaseline = false;
+  final _liveNotificationPolicy = TwitchLiveNotificationPolicy();
   bool _checkingFollowedLiveNotifications = false;
   bool _settingsSheetOpen = false;
   StreamSubscription<VioClassConnectivitySnapshot>?
@@ -70,29 +110,72 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     imageCache.maximumSize = 300;
     imageCache.maximumSizeBytes = 64 * 1024 * 1024;
 
-    apiClient = TwitchApiClient();
-    authService = TwitchAuthService(apiClient: apiClient);
-    dropsAuthService = TwitchDropsAuthService(apiClient: apiClient);
-    webGqlAuthService = TwitchWebGqlAuthService(apiClient: apiClient);
-    authApi = TwitchAuthApiService(client: apiClient);
-    discoveryService = TwitchDiscoveryService(
-      client: apiClient,
-      authService: authService,
-      authApi: authApi,
-      webTokenProvider: webGqlAuthService.getToken,
+    final services = widget.services;
+    apiClient = services?.apiClient ?? TwitchApiClient();
+    authService =
+        services?.authService ?? TwitchAuthService(apiClient: apiClient);
+    authService.addListener(_handleAuthSessionChanged);
+    dropsAuthService =
+        services?.dropsAuthService ??
+        TwitchDropsAuthService(apiClient: apiClient);
+    webGqlAuthService =
+        services?.webGqlAuthService ??
+        TwitchWebGqlAuthService(apiClient: apiClient);
+    authApi = services?.authApi ?? TwitchAuthApiService(client: apiClient);
+    final accountNotificationApi = TwitchAccountNotificationApi(apiClient);
+    _accountNotifications = TwitchAccountNotificationMonitor(
+      fetch: (ownerId) async {
+        // Read existing credentials only. Verify every candidate's owner;
+        // never send one account's response to another account's monitor.
+        for (final provider in [
+          webGqlAuthService.getToken,
+          authService.getValidAccessToken,
+        ]) {
+          try {
+            final token = await provider();
+            if (token == null || token.trim().isEmpty) continue;
+            final validation = await authApi.validateToken(token);
+            if (validation.userId != ownerId) continue;
+            return await accountNotificationApi.fetch(
+              token: token,
+              ownerId: ownerId,
+            );
+          } catch (_) {
+            // Try the existing app token, as StreamNook does; no new login.
+          }
+        }
+        throw StateError('Account notification feed unavailable');
+      },
+      notify: twitchSystemNotificationService.showAccountNotification,
     );
+    discoveryService =
+        services?.discoveryService ??
+        TwitchDiscoveryService(
+          client: apiClient,
+          authService: authService,
+          authApi: authApi,
+          webTokenProvider: webGqlAuthService.getToken,
+        );
+    discoveryService.viewerSession.addListener(_handleViewerIdentityChanged);
     chatAppearanceController = twitchChatAppearanceController;
     playerSettingsController = TwitchPlayerSettingsController();
-    updateController = VioClassUpdateController();
+    updateController = VioClassUpdateController(
+      onNewVersion: (info) => twitchSystemNotificationService.showAppUpdate(
+        version: info.release.version,
+        onOpen: openUpdates,
+      ),
+    );
     final whisperHistory = TwitchWhisperHistoryApiService(
       client: apiClient,
       webTokenProviders: [webGqlAuthService.getToken],
+      androidTokenProviders: [dropsAuthService.getToken],
       integrityHeadersProvider:
           TwitchWhisperLoginIntegrityService.instance.headersFor,
       integrityInvalidator:
           TwitchWhisperLoginIntegrityService.instance.invalidateRejected,
     );
     whisperInbox = TwitchWhisperInboxController(
+      archiveApi: TwitchWhisperArchiveApiService(history: whisperHistory),
       historyApi: whisperHistory,
       threadsApi: TwitchWhisperThreadsApiService(
         history: whisperHistory,
@@ -153,17 +236,36 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       twitchAppSettingsLauncher.setNavigationReady(true);
+      unawaited(
+        twitchAppNotificationCenter.loadHistory(
+          onLiveOpen: _openLiveNotification,
+          onUpdateOpen: openUpdates,
+        ),
+      );
       unawaited(twitchSystemNotificationService.initialize());
       unawaited(VioClassConnectivityService.instance.start());
       unawaited(_loadLoginState());
       unawaited(chatAppearanceController.load());
       unawaited(playerSettingsController.load());
       unawaited(_loadUpdateSettingsAndCheck());
+      whisperInbox.addListener(_syncAndroidBackgroundReceiving);
+      _syncAndroidBackgroundReceiving();
+      unawaited(TwitchAndroidBackgroundController.instance.load());
     });
   }
 
   @override
   void dispose() {
+    authService.removeListener(_handleAuthSessionChanged);
+    discoveryService.viewerSession.removeListener(_handleViewerIdentityChanged);
+    _accountNotifications.stop();
+    whisperInbox.removeListener(_syncAndroidBackgroundReceiving);
+    unawaited(
+      TwitchAndroidBackgroundController.instance.setSession(
+        ownerId: null,
+        foreground: false,
+      ),
+    );
     twitchAppSettingsLauncher.detach();
     WidgetsBinding.instance.removeObserver(this);
     playerSettingsController.removeListener(_handleRootPlaybackPolicyChanged);
@@ -201,6 +303,15 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     }
   }
 
+  void _syncAndroidBackgroundReceiving() {
+    unawaited(
+      TwitchAndroidBackgroundController.instance.setSession(
+        ownerId: whisperInbox.ownerId,
+        foreground: whisperInbox.appForeground,
+      ),
+    );
+  }
+
   void _handleRootPlaybackPolicyChanged() {
     if (TwitchAndroidPipController.instance.stoppedOutsidePictureInPicture) {
       unawaited(_suspendPlaybackOutsidePictureInPicture());
@@ -216,10 +327,56 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
         TwitchMiniPlayerController.instance.isActive;
   }
 
-  Future<void> _loadLoginState({bool refreshPages = false}) async {
-    if (!mounted || _loginStateLoadRunning) return;
+  void _handleViewerIdentityChanged() {
+    if (!mounted) return;
+    final identity = discoveryService.viewerSession.snapshot;
+    if (discoveryService.viewerSession.status == TwitchViewerStatus.guest) {
+      _accountNotifications.stop();
+      twitchAppNotificationCenter.retainAccountOwner(null);
+    }
+    setState(() {
+      _hasAuthenticatedViewer = discoveryService.viewerSession.hasAccount;
+      _canReadFollows = identity?.canReadFollows == true;
+      if (discoveryService.viewerSession.status == TwitchViewerStatus.guest) {
+        viewerLabel = '未登入';
+        loginStatus = '未登入 Twitch';
+        selectedSection = TwitchHomeSection.browse;
+      }
+    });
+  }
 
+  void _handleAuthSessionChanged() {
+    final token = authService.accessToken;
+    if (!mounted || token == _observedAccessToken) return;
+    _observedAccessToken = token;
+    _loginStateGeneration++;
+    discoveryService.clearViewerAuthCache();
+    if (_loggingOut) return;
+    setState(() {
+      _hasAuthenticatedViewer = discoveryService.viewerSession.hasAccount;
+      _canReadFollows = false;
+      loadingLoginState = true;
+      if (!_hasAuthenticatedViewer) {
+        viewerLabel = '未登入';
+        selectedSection = TwitchHomeSection.browse;
+      }
+    });
+    unawaited(_loadLoginState(refreshPages: true, replacePending: true));
+  }
+
+  Future<void> _loadLoginState({
+    bool refreshPages = false,
+    bool replacePending = false,
+  }) async {
+    if (!mounted || _loggingOut) return;
+    if (_loginStateLoadRunning && !replacePending) {
+      _loginStateReloadPending = true;
+      return;
+    }
+
+    final loadId = ++_loginStateLoadId;
     _loginStateLoadRunning = true;
+    if (replacePending) _loginStateReloadPending = false;
 
     setState(() {
       loadingLoginState = true;
@@ -234,21 +391,29 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       ]);
 
       final token = await authService.getValidAccessToken();
+      if (!mounted || _loggingOut || loadId != _loginStateLoadId) return;
+      final generation = _loginStateGeneration;
       var nextViewerLabel = '未登入';
       var nextStatus = '未登入 Twitch';
       var canReadFollows = false;
+      String? notificationOwner;
 
       if (token != null && token.trim().isNotEmpty) {
         try {
-          final validation = await authApi.validateToken(token);
-          nextViewerLabel = validation.login.isEmpty
+          final validation = await discoveryService.resolveViewerAuthOrNull();
+          notificationOwner = validation?.viewerId;
+          nextViewerLabel = validation == null
+              ? '未登入'
+              : validation.viewerLogin.isEmpty
               ? '已登入'
-              : '@${validation.login}';
-          final hasFollows = validation.scopes.contains('user:read:follows');
+              : '@${validation.viewerLogin}';
+          final hasFollows = validation?.canReadFollows == true;
           canReadFollows = hasFollows;
-          final hasChatRead = validation.scopes.contains('chat:read');
-          final hasChatEdit = validation.scopes.contains('chat:edit');
-          nextStatus = hasFollows && hasChatRead && hasChatEdit
+          final hasChatRead = validation?.scopes.contains('chat:read') == true;
+          final hasChatEdit = validation?.scopes.contains('chat:edit') == true;
+          nextStatus = validation == null
+              ? '未登入 Twitch'
+              : hasFollows && hasChatRead && hasChatEdit
               ? '完整登入'
               : '已登入，但權限不完整';
         } catch (_) {
@@ -257,8 +422,29 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
         }
       }
 
-      if (!mounted) return;
+      if (!mounted ||
+          _loggingOut ||
+          loadId != _loginStateLoadId ||
+          generation != _loginStateGeneration)
+        return;
+      if (notificationOwner != null) {
+        twitchAppNotificationCenter.retainAccountOwner(notificationOwner);
+        _accountNotifications.start(notificationOwner);
+      } else {
+        _accountNotifications.stop();
+      }
+      if (nextViewerLabel != viewerLabel || !canReadFollows) {
+        discoveryService.clearFollowedLiveRailCache();
+        _stopFollowedLiveNotificationMonitor();
+      }
       setState(() {
+        _hasAuthenticatedViewer = discoveryService.viewerSession.hasAccount;
+        _canReadFollows = canReadFollows;
+        if (!_hasAuthenticatedViewer) {
+          selectedSection = TwitchHomeSection.browse;
+        } else if (!_homeSectionTouched && _canReadFollows) {
+          selectedSection = TwitchHomeSection.following;
+        }
         viewerLabel = nextViewerLabel;
         loginStatus = nextStatus;
         loadingLoginState = false;
@@ -270,16 +456,38 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
         _stopFollowedLiveNotificationMonitor();
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || _loggingOut || loadId != _loginStateLoadId) return;
+      _accountNotifications.stop();
       setState(() {
-        viewerLabel = '未登入';
+        _hasAuthenticatedViewer = discoveryService.viewerSession.hasAccount;
+        _canReadFollows = false;
+        if (!_homeSectionTouched) {
+          selectedSection = TwitchHomeSection.browse;
+        }
+        viewerLabel = _hasAuthenticatedViewer ? '登入狀態待確認' : '未登入';
         loginStatus = '登入狀態讀取失敗：$error';
         loadingLoginState = false;
         if (refreshPages) reloadTick++;
       });
     } finally {
-      _loginStateLoadRunning = false;
-      if (mounted) unawaited(whisperInbox.refreshSession());
+      if (loadId == _loginStateLoadId) {
+        _loginStateLoadRunning = false;
+        if (mounted && !_loggingOut) {
+          if (_loginStateReloadPending) {
+            _loginStateReloadPending = false;
+            unawaited(_loadLoginState(refreshPages: true));
+          } else {
+            unawaited(_refreshWhisperNotificationSession());
+          }
+        }
+      }
+    }
+  }
+
+  Future<void> _refreshWhisperNotificationSession() async {
+    await whisperInbox.refreshSession();
+    if (mounted && whisperInbox.ownerId != null) {
+      twitchAppNotificationCenter.retainWhisperOwner(whisperInbox.ownerId);
     }
   }
 
@@ -322,6 +530,11 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   }
 
   Future<void> logout() async {
+    _loggingOut = true;
+    _loginStateGeneration++;
+    _loginStateReloadPending = false;
+    _accountNotifications.stop();
+    discoveryService.clearViewerAuthCache();
     TwitchWhisperLoginIntegrityService.instance.clear();
     await whisperInbox.flushDrafts();
     whisperInbox.clearSession();
@@ -335,58 +548,71 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       // Best effort.
     }
 
+    _loggingOut = false;
+    discoveryService.clearViewerAuthCache();
     if (!mounted) return;
     setState(() {
+      _hasAuthenticatedViewer = false;
+      loadingLoginState = false;
+      _canReadFollows = false;
+      _homeSectionTouched = false;
+      selectedSection = TwitchHomeSection.browse;
       viewerLabel = '未登入';
       loginStatus = '已登出';
       reloadTick++;
     });
     _stopFollowedLiveNotificationMonitor();
+    twitchSystemNotificationService.clearPendingPointNotifications();
+    twitchAppNotificationCenter.clear();
   }
 
   void _startFollowedLiveNotificationMonitor() {
     if (_followedLiveNotificationTimer != null) return;
-    unawaited(_checkFollowedLiveNotifications());
     _followedLiveNotificationTimer = Timer.periodic(
       _followedLivePollInterval,
       (_) => unawaited(_checkFollowedLiveNotifications()),
     );
+    unawaited(_checkFollowedLiveNotifications());
   }
 
   void _stopFollowedLiveNotificationMonitor() {
     _followedLiveNotificationTimer?.cancel();
     _followedLiveNotificationTimer = null;
-    _knownFollowedLiveStreamIds = <String>{};
-    _hasFollowedLiveBaseline = false;
+    _liveNotificationPolicy.reset();
   }
 
   Future<void> _checkFollowedLiveNotifications() async {
     if (_checkingFollowedLiveNotifications) return;
     _checkingFollowedLiveNotifications = true;
+    final monitor = _followedLiveNotificationTimer;
 
     try {
-      final page = await discoveryService.fetchFollowedStreams(first: 100);
-      if (!mounted || _followedLiveNotificationTimer == null) return;
-
-      final currentIds = <String>{};
-      for (final stream in page.streams) {
-        currentIds.add(_liveNotificationIdentity(stream));
-      }
-
-      if (!_hasFollowedLiveBaseline) {
-        _knownFollowedLiveStreamIds = currentIds;
-        _hasFollowedLiveBaseline = true;
+      final streams = <TwitchLiveStream>[];
+      final cursors = <String>{};
+      String? cursor;
+      do {
+        final page = await discoveryService.fetchFollowedStreams(
+          first: 100,
+          after: cursor,
+        );
+        if (!mounted ||
+            monitor == null ||
+            _followedLiveNotificationTimer != monitor) {
+          return;
+        }
+        streams.addAll(page.streams);
+        cursor = page.cursor;
+        if (cursor != null && cursor.isNotEmpty && !cursors.add(cursor)) {
+          throw StateError('Repeated followed-live cursor');
+        }
+      } while (cursor != null && cursor.isNotEmpty);
+      if (!mounted || _followedLiveNotificationTimer != monitor) {
         return;
       }
-
-      final newlyLive = page.streams
-          .where(
-            (stream) => !_knownFollowedLiveStreamIds.contains(
-              _liveNotificationIdentity(stream),
-            ),
-          )
-          .toList(growable: false);
-      _knownFollowedLiveStreamIds = currentIds;
+      var newlyLive = _liveNotificationPolicy.observe(streams);
+      if (newlyLive.isEmpty) return;
+      newlyLive = await discoveryService.attachNotificationProfiles(newlyLive);
+      if (!mounted || _followedLiveNotificationTimer != monitor) return;
 
       if (newlyLive.length > 3) {
         await twitchSystemNotificationService.showMultipleStreamsLive(
@@ -394,7 +620,10 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
         );
       } else {
         for (final stream in newlyLive) {
-          await twitchSystemNotificationService.showStreamLive(stream);
+          await twitchSystemNotificationService.showStreamLive(
+            stream,
+            onOpen: () => _openLiveNotification(stream),
+          );
         }
       }
     } catch (_) {
@@ -404,10 +633,17 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     }
   }
 
-  String _liveNotificationIdentity(TwitchLiveStream stream) {
-    final streamId = stream.id.trim();
-    if (streamId.isNotEmpty) return streamId;
-    return '${stream.userId.trim()}:${stream.startedAt?.toIso8601String() ?? ''}';
+  Future<void> _openLiveNotification(TwitchLiveStream stream) async {
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => TwitchWatchRouteGuard(
+          initialMetadata: TwitchStreamHeaderMetadata.fromLiveStream(stream),
+          initialDiscoveryService: discoveryService,
+          initialKnownFollowing: true,
+        ),
+      ),
+    );
   }
 
   Future<void> openDropsConnectorPage() async {
@@ -452,7 +688,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   bool _whisperSheetOpen = false;
 
   Future<void> openWhispers() async {
-    if (!mounted || _whisperSheetOpen) return;
+    if (!mounted || !_hasAuthenticatedViewer || _whisperSheetOpen) return;
     _whisperSheetOpen = true;
     try {
       await showTwitchWhisperSheet(
@@ -479,8 +715,14 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   }
 
   void selectSection(TwitchHomeSection section) {
-    if (selectedSection == section) return;
-    setState(() => selectedSection = section);
+    if (selectedSection == section) {
+      _homeSectionTouched = true;
+      return;
+    }
+    setState(() {
+      _homeSectionTouched = true;
+      selectedSection = section;
+    });
   }
 
   void showCurrentGameMenu() {
@@ -583,7 +825,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   Future<void> searchChannels(String keyword, int generation) async {
     try {
       final result = await discoveryService.searchChannels(query: keyword);
+      if (!mounted || generation != _channelSearchGeneration) return;
       final media = await _searchChannelMedia(
+        generation: generation,
         keyword: keyword,
         liveStreams: result.liveStreams,
         offlineChannels: result.offlineChannels,
@@ -684,11 +928,12 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
                           constraints,
                         );
                         return TwitchFollowedLiveRailShell(
-                          key: ValueKey(
-                            'home-live-rail:$viewerLabel:$reloadTick',
-                          ),
+                          key: ValueKey('home-live-rail:$viewerLabel'),
+                          enabled: _canReadFollows,
                           loadStreams:
                               discoveryService.fetchFollowedLiveRailStreams,
+                          initialStreams:
+                              discoveryService.cachedFollowedLiveRailStreams,
                           onSelect: (stream) async {
                             await Navigator.of(context).push<void>(
                               MaterialPageRoute(

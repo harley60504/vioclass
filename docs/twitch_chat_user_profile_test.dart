@@ -18,6 +18,9 @@ import '../lib/features/twitch/presentation/sheets/twitch_chat_message_context_s
 import '../lib/features/twitch/presentation/widgets/chat/twitch_chat_message_list.dart';
 import '../lib/features/twitch/presentation/widgets/chat/twitch_runtime_message_tile.dart';
 import '../lib/features/twitch/presentation/sheets/chat_message_context/twitch_reply_thread_card.dart';
+import '../lib/features/twitch/presentation/sheets/chat_message_context/twitch_reply_thread_builder.dart';
+import '../lib/features/twitch/presentation/widgets/responsive/twitch_responsive_sheet.dart';
+import '../lib/features/twitch/api/chat/twitch_chat_user_public_profile_api_service.dart';
 
 TwitchChatRuntimeMessage message(
   String id, {
@@ -27,6 +30,7 @@ TwitchChatRuntimeMessage message(
   String room = '20',
   String? parentId,
   List<TwitchChatBadge> badges = const [],
+  Map<String, String> extraTags = const {},
 }) {
   final raw = TwitchChatMessage(
     raw: '',
@@ -40,6 +44,7 @@ TwitchChatRuntimeMessage message(
       'user-id': userId,
       'room-id': room,
       'reply-parent-msg-id': ?parentId,
+      ...extraTags,
     },
   );
   return TwitchChatRuntimeMessage(
@@ -63,6 +68,8 @@ class Adapter implements HttpClientAdapter {
   final requests = <RequestOptions>[];
   String owner = '10';
   String targetId = '30';
+  List<String> scopes = [];
+  List<Map<String, dynamic>> followRows = [];
   void Function()? onValidate;
   @override
   Future<ResponseBody> fetch(
@@ -80,9 +87,11 @@ class Adapter implements HttpClientAdapter {
                 'client_id': 'matched-client',
                 'user_id': owner,
                 'login': 'viewer',
-                'scopes': [],
+                'scopes': scopes,
                 'expires_in': 100,
               }
+            : options.uri.path.contains('/channels/')
+            ? {'data': followRows}
             : {
                 'data': [
                   {
@@ -106,6 +115,147 @@ class Adapter implements HttpClientAdapter {
 }
 
 void main() {
+  testWidgets(
+    'profile cache reopens instantly and separates viewer/channel keys',
+    (tester) async {
+      var calls = 0;
+      Future<TwitchUser?> load() async {
+        calls++;
+        return profile;
+      }
+
+      Future<void> open(String key) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TwitchChatUserProfileCard(
+                key: UniqueKey(),
+                cacheKey: key,
+                message: message('cached'),
+                messages: [],
+                canWhisper: false,
+                loadUser: load,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      await open('cache-test-owner1-room1');
+      expect(calls, 1);
+      await open('cache-test-owner1-room1');
+      expect(calls, 1);
+      expect(find.byKey(const ValueKey('profile-loading')), findsNothing);
+      expect(find.text('Peer official'), findsOneWidget);
+      await open('cache-test-owner2-room1');
+      expect(calls, 2);
+      await open('cache-test-owner2-room2');
+      expect(calls, 3);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  for (final width in [320.0, 1000.0]) {
+    testWidgets(
+      'Compact profile aligns facts and separates optional metadata at $width',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: TwitchChatUserProfileCard(
+                message: message(
+                  'facts',
+                  extraTags: {
+                    'badge-info': 'subscriber/49',
+                    'color': '#8a2be2',
+                  },
+                ),
+                messages: const [],
+                canWhisper: false,
+                loadUser: () async => TwitchUser(
+                  id: '30',
+                  login: 'peer',
+                  displayName: 'Peer official',
+                  createdAt: DateTime.utc(2010, 11, 12),
+                ),
+                loadFollowInfo: () async => TwitchChatUserFollowInfo(
+                  known: true,
+                  followedAt: DateTime.utc(2020, 1, 1),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('49 個月'), findsOneWidget);
+        expect(find.byType(TwitchUnifiedSheetScaffold), findsOneWidget);
+        final header = tester.widget<TwitchUnifiedSheetHeader>(
+          find.byType(TwitchUnifiedSheetHeader),
+        );
+        expect(header.title, '使用者資料');
+        expect(header.icon, Icons.person_outline);
+        expect(header.showRefresh, false);
+        expect(header.trailing, hasLength(1));
+        expect(find.textContaining('2020-01-01'), findsOneWidget);
+        expect(find.text('#8A2BE2'), findsOneWidget);
+        expect(
+          tester.getRect(find.byType(CircleAvatar)).center.dy,
+          closeTo(
+            (tester.getRect(find.text('Peer official')).top +
+                    tester.getRect(find.text('@peer')).bottom) /
+                2,
+            2,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+  for (final mode in ['unavailable', 'self', 'moderator', 'stale']) {
+    test('Follow metadata authorization: $mode', () async {
+      final adapter = Adapter()
+        ..scopes = mode == 'self'
+            ? ['user:read:follows']
+            : mode == 'unavailable'
+            ? []
+            : ['moderator:read:followers']
+        ..followRows = [
+          {
+            'user_id': '30',
+            'broadcaster_id': '20',
+            'followed_at': '2020-01-01T00:00:00Z',
+          },
+        ];
+      final dio = Dio()..httpClientAdapter = adapter;
+      var current = true;
+      if (mode == 'stale') adapter.onValidate = () => current = false;
+      final api = TwitchChatUserProfileApiService(
+        client: TwitchApiClient(dio: dio),
+        tokenProviders: [() async => 'fixture'],
+        ownerId: '10',
+        isCurrent: () => current,
+      );
+      final info = await api.getFollowInfo(
+        userId: mode == 'self' ? '10' : '30',
+        broadcasterId: '20',
+        canReadOtherFollowers: true,
+      );
+      expect(info.known, mode == 'self' || mode == 'moderator');
+      expect(
+        info.followedAt,
+        mode == 'self' || mode == 'moderator' ? DateTime.utc(2020) : isNull,
+      );
+      expect(
+        adapter.requests.where((r) => r.uri.path.contains('/channels/')).length,
+        mode == 'self' || mode == 'moderator' ? 1 : 0,
+      );
+      dio.close(force: true);
+    });
+  }
   for (final width in [320.0, 1200.0]) {
     testWidgets('Icon badges beside whisper show names only on tap at $width', (
       tester,
@@ -165,8 +315,11 @@ void main() {
       );
       final identity = tester.getRect(find.text('@peer'));
       expect(last.center.dy, closeTo(first.center.dy, 2));
-      expect(button.left, greaterThan(identity.right));
-      expect(button.center.dy, lessThan(identity.bottom));
+      expect(first.top, greaterThan(identity.bottom));
+      expect(
+        button.bottom,
+        lessThan(tester.getRect(find.byType(CircleAvatar)).top),
+      );
       await tester.tap(badge);
       await tester.pumpAndSettle();
       expect(find.text('Moderator'), findsOneWidget);
@@ -213,21 +366,37 @@ void main() {
         await tester.pumpWidget(
           MaterialApp(
             home: Scaffold(
-              body: TwitchChatUserProfileCard(
-                message: message('copy'),
+              body: TwitchChatMessageContextCard(
+                selectedMessage: message('copy'),
                 messages: [message('copy')],
-                canWhisper: false,
-                loadUser: () async => profile,
+                entries: TwitchReplyThreadBuilder.build(
+                  selectedMessage: message('copy'),
+                  messages: [message('copy')],
+                ),
+                thirdPartyEmotes: null,
+                officialEmotes: null,
+                fontScale: 1,
+                messageActionBuilder: null,
+                onOpenUser: null,
               ),
             ),
           ),
         );
         await tester.pumpAndSettle();
         if (history) {
-          await tester.tap(find.text('個人聊天紀錄'));
+          await tester.tap(find.text('聊天紀錄'));
           await tester.pumpAndSettle();
         }
-        expect(find.byType(TwitchReplyThreadMessageCard), findsNothing);
+        expect(find.byType(TwitchReplyThreadMessageCard), findsOneWidget);
+        final cardText = find
+            .descendant(
+              of: find.byType(TwitchReplyThreadMessageCard),
+              matching: find.byType(RichText),
+            )
+            .evaluate()
+            .map((e) => (e.widget as RichText).text.toPlainText())
+            .join(' ');
+        expect(RegExp(r'\bpeer\b').allMatches(cardText).length, 1);
         final tile = find.byType(TwitchRuntimeMessageTile);
         expect(tile, findsOneWidget);
         expect(
@@ -244,41 +413,59 @@ void main() {
       },
     );
   }
+  testWidgets('profile publishes all sources together without chat history', (
+    tester,
+  ) async {
+    final pending = Completer<TwitchChatUserPublicProfile?>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TwitchChatUserProfileCard(
+            message: message('a'),
+            messages: [message('a')],
+            canWhisper: false,
+            loadUser: () async => profile,
+            loadPublicProfile: () => pending.future,
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('profile-loading')), findsOneWidget);
+    expect(find.text('Peer official'), findsNothing);
+    pending.complete(null);
+    await tester.pumpAndSettle();
+    expect(find.text('Peer official'), findsOneWidget);
+    expect(find.text('聊天串'), findsNothing);
+    expect(find.text('聊天紀錄'), findsNothing);
+    expect(find.byType(TwitchReplyThreadMessageCard), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets(
-    'Shared profile defaults to thread and switches history in place',
+    'slow optional source times out without delaying other profile data forever',
     (tester) async {
-      var loads = 0;
-      final root = message('root', userId: '40', login: 'other');
-      final selected = message('reply', parentId: 'root');
+      final pending = Completer<TwitchChatUserPublicProfile?>();
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
             body: TwitchChatUserProfileCard(
-              message: selected,
-              messages: [root, selected, message('unrelated')],
-              canWhisper: true,
-              loadUser: () async {
-                loads++;
-                return profile;
-              },
+              message: message('a'),
+              messages: [],
+              canWhisper: false,
+              loadUser: () async => profile,
+              loadPublicProfile: () => pending.future,
             ),
           ),
         ),
       );
+      await tester.pump();
+      expect(find.text('Peer official'), findsNothing);
+      await tester.pump(const Duration(seconds: 8));
       await tester.pumpAndSettle();
-      expect(find.text('聊天串'), findsOneWidget);
-      expect(find.textContaining('聊天串 ·'), findsNothing);
       expect(find.text('Peer official'), findsOneWidget);
-      expect(find.textContaining('本機聊天紀錄'), findsNothing);
-      await tester.tap(find.text('個人聊天紀錄'));
-      await tester.pumpAndSettle();
-      expect(find.text('本機聊天紀錄 · 2'), findsOneWidget);
-      expect(find.text('Peer official'), findsOneWidget);
-      expect(loads, 1);
-      await tester.tap(find.text('聊天串'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('本機聊天紀錄'), findsNothing);
-      expect(loads, 1);
+      expect(find.byKey(const ValueKey('profile-loading')), findsNothing);
+      pending.complete(null);
+      await tester.pump();
       expect(tester.takeException(), isNull);
     },
   );
@@ -438,49 +625,61 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
     expect(find.textContaining('回覆串'), findsOneWidget);
-    await tester.tap(find.text('使用者資料'));
+    final author = find
+        .byType(RichText)
+        .evaluate()
+        .firstWhere(
+          (e) => (e.widget as RichText).text.toPlainText().contains('peer'),
+        );
+    final paragraph = author.renderObject! as RenderParagraph;
+    final start = (author.widget as RichText).text.toPlainText().indexOf(
+      'peer',
+    );
+    final box = paragraph
+        .getBoxesForSelection(
+          TextSelection(baseOffset: start, extentOffset: start + 4),
+        )
+        .first;
+    await tester.tapAt(paragraph.localToGlobal(box.toRect().center));
     await tester.pumpAndSettle();
     expect(opened, same(selected));
     expect(find.textContaining('回覆串'), findsOneWidget);
   });
-  testWidgets(
-    'official failure leaves local history available and retry recovers',
-    (tester) async {
-      var fail = true;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: TwitchChatUserProfileCard(
-              message: message('a'),
-              messages: [message('b')],
-              canWhisper: false,
-              loadUser: () async {
-                if (fail) throw StateError('fake');
-                return profile;
-              },
-            ),
+  testWidgets('profile failure has no embedded history and retry recovers', (
+    tester,
+  ) async {
+    var fail = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TwitchChatUserProfileCard(
+            message: message('a'),
+            messages: [message('b')],
+            canWhisper: false,
+            loadUser: () async {
+              if (fail) throw StateError('fake');
+              return profile;
+            },
           ),
         ),
-      );
-      await tester.pumpAndSettle();
-      expect(find.textContaining('官方使用者資料暫時'), findsOneWidget);
-      expect(find.text('聊天串'), findsOneWidget);
-      expect(find.text('本機聊天紀錄 · 2'), findsNothing);
-      await tester.tap(find.text('個人聊天紀錄'));
-      await tester.pumpAndSettle();
-      expect(find.text('本機聊天紀錄 · 2'), findsOneWidget);
-      expect(
-        tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
-        isNull,
-      );
-      fail = false;
-      await tester.tap(find.text('重試'));
-      await tester.pumpAndSettle();
-      expect(find.text('Peer official'), findsOneWidget);
-      expect(find.text('Official bio'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('使用者資料暫時載入失敗'), findsOneWidget);
+    expect(find.text('聊天串'), findsNothing);
+    expect(find.text('聊天紀錄'), findsNothing);
+    expect(find.textContaining('本機聊天紀錄'), findsNothing);
+    expect(
+      tester.widget<OutlinedButton>(find.byType(OutlinedButton)).onPressed,
+      isNull,
+    );
+    fail = false;
+    await tester.tap(find.text('重試'));
+    await tester.pumpAndSettle();
+    expect(find.text('Peer official'), findsOneWidget);
+    expect(find.text('Official bio'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   for (final size in [
     const Size(320, 640),
     const Size(844, 390),
@@ -523,7 +722,14 @@ void main() {
         await tester.tap(find.text('open'));
         await tester.pumpAndSettle();
         expect(result, isNull);
-        await tester.ensureVisible(find.text('私訊'));
+        await tester.scrollUntilVisible(
+          find.text('私訊'),
+          120,
+          scrollable: find.descendant(
+            of: find.byType(TwitchChatUserProfileCard),
+            matching: find.byType(Scrollable),
+          ),
+        );
         await tester.pumpAndSettle();
         await tester.tap(find.text('私訊'));
         await tester.pumpAndSettle();

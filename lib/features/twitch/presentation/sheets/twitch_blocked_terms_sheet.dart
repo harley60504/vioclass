@@ -175,21 +175,14 @@ class _TermsState extends State<TwitchBlockedTermsPanel> {
     final visible = _terms.values
         .where((term) => term.text.toLowerCase().contains(filter))
         .toList();
-    return Material(
-      color: Colors.transparent,
+    return TwitchUnifiedSheetScaffold(
+      title: t('封鎖詞管理'),
+      subtitle: '@${widget.channelName}',
+      icon: Icons.block_rounded,
+      showRefresh: false,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(child: Text('${t('封鎖詞管理')} · @${widget.channelName}')),
-              IconButton(
-                tooltip: t('關閉'),
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
           Text(t('僅顯示 Twitch 提供的非私人封鎖詞；不是完整的 AutoMod 規則。')),
           TextField(
             controller: _input,

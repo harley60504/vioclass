@@ -15,6 +15,8 @@ import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
+import '../../services/watch/twitch_watch_services.dart';
+import '../watch/controllers/twitch_watch_chat_controller.dart';
 import '../navigation/twitch_route_observer.dart';
 import '../mini_player/twitch_mini_player_controller.dart';
 import '../watch/twitch_playback_session_controller.dart';
@@ -42,6 +44,8 @@ class TwitchWatchRouteGuard extends StatefulWidget {
   final bool initialPreferVodReplayChat;
   final bool initialReuseCurrentPlayback;
   final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
+  final TwitchWatchServices? initialServices;
+  final TwitchWatchChatRuntimeFactory? initialChatRuntimeFactory;
   final bool? initialKnownFollowing;
 
   const TwitchWatchRouteGuard({
@@ -66,6 +70,8 @@ class TwitchWatchRouteGuard extends StatefulWidget {
     this.initialPreferVodReplayChat = false,
     this.initialReuseCurrentPlayback = false,
     this.initialPlayerRuntime,
+    this.initialServices,
+    this.initialChatRuntimeFactory,
     this.initialKnownFollowing,
   });
 
@@ -195,6 +201,8 @@ class _TwitchWatchRouteGuardState extends State<TwitchWatchRouteGuard>
         initialPreferVodReplayChat: widget.initialPreferVodReplayChat,
         initialReuseCurrentPlayback: widget.initialReuseCurrentPlayback,
         initialPlayerRuntime: widget.initialPlayerRuntime,
+        initialServices: widget.initialServices,
+        initialChatRuntimeFactory: widget.initialChatRuntimeFactory,
         initialKnownFollowing: widget.initialKnownFollowing,
       ),
     );

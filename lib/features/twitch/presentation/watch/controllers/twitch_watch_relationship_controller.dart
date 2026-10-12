@@ -48,6 +48,8 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
   DateTime? followedAt;
   bool hasResolvedRelationshipStatus = false;
   String? relationshipError;
+  bool _disposed = false;
+  int _generation = 0;
 
   TwitchWatchRelationshipController({
     required this.relationshipPort,
@@ -60,11 +62,24 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
 
   bool get busy => checkingRelationship || followBusy;
 
+  bool _isCurrentContext(
+    int generation,
+    String login,
+    String? targetId,
+    String? viewer,
+  ) =>
+      !_disposed &&
+      generation == _generation &&
+      login == channelLogin().trim().toLowerCase() &&
+      targetId == channelId() &&
+      viewer == viewerId();
+
   void seedKnownFollowStatus(
     bool following, {
     String? resolvedUserId,
     DateTime? followedAt,
   }) {
+    if (_disposed) return;
     final login = channelLogin().trim().toLowerCase();
     if (login.isEmpty) return;
 
@@ -78,8 +93,13 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
   }
 
   Future<void> refreshRelationshipStatus({String? targetChannelLogin}) async {
+    if (_disposed) return;
+    final generation = _generation;
     final login = (targetChannelLogin ?? channelLogin()).trim().toLowerCase();
     if (login.isEmpty || checkingRelationship) return;
+    final targetId = channelId();
+    final viewer = viewerId();
+    if (!_isCurrentContext(generation, login, targetId, viewer)) return;
     final cacheKey = _cacheKey(login);
     final cached = _relationshipCache.remove(cacheKey);
     if (cached != null) _relationshipCache[cacheKey] = cached;
@@ -100,11 +120,13 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
     notifyListeners();
 
     try {
+      if (!_isCurrentContext(generation, login, targetId, viewer)) return;
       final snapshot = await relationshipPort.fetchRelationship(
         channelLogin: login,
-        targetUserId: channelId(),
-        viewerUserId: viewerId(),
+        targetUserId: targetId,
+        viewerUserId: viewer,
       );
+      if (!_isCurrentContext(generation, login, targetId, viewer)) return;
       final following = snapshot.isFollowing == true;
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
       _applySnapshot(
@@ -131,34 +153,42 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       );
       relationshipError = null;
     } catch (error) {
+      if (!_isCurrentContext(generation, login, targetId, viewer)) return;
       relationshipError = error.toString();
     } finally {
-      checkingRelationship = false;
-      notifyListeners();
+      if (!_disposed && generation == _generation) {
+        checkingRelationship = false;
+        notifyListeners();
+      }
     }
   }
 
   Future<void> toggleFollowChannel() async {
-    if (followBusy) return;
+    if (_disposed || followBusy) return;
+    final generation = _generation;
     final login = channelLogin().trim().toLowerCase();
     if (login.isEmpty) return;
+    final targetId = channelId();
+    final viewer = viewerId();
 
     followBusy = true;
     relationshipError = null;
     notifyListeners();
 
     try {
+      if (!_isCurrentContext(generation, login, targetId, viewer)) return;
       final snapshot = isFollowing
           ? await relationshipPort.unfollowChannel(
               channelLogin: login,
-              targetUserId: channelId(),
-              viewerUserId: viewerId(),
+              targetUserId: targetId,
+              viewerUserId: viewer,
             )
           : await relationshipPort.followChannel(
               channelLogin: login,
-              targetUserId: channelId(),
-              viewerUserId: viewerId(),
+              targetUserId: targetId,
+              viewerUserId: viewer,
             );
+      if (!_isCurrentContext(generation, login, targetId, viewer)) return;
       final following = snapshot.isFollowing == true;
       final resolvedUserId = (snapshot.userId as String?)?.trim() ?? '';
       _applySnapshot(
@@ -186,11 +216,14 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
       relationshipError = null;
       showMessage(isFollowing ? '已追隨 $login' : '已取消追隨 $login');
     } catch (error) {
+      if (!_isCurrentContext(generation, login, targetId, viewer)) return;
       relationshipError = error.toString();
       showMessage('追隨狀態更新失敗，請稍後再試。');
     } finally {
-      followBusy = false;
-      notifyListeners();
+      if (!_disposed && generation == _generation) {
+        followBusy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -199,6 +232,8 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
   }
 
   void reset() {
+    if (_disposed) return;
+    _generation++;
     checkingRelationship = false;
     followBusy = false;
     isFollowing = false;
@@ -206,6 +241,13 @@ class TwitchWatchRelationshipController extends ChangeNotifier {
     hasResolvedRelationshipStatus = false;
     relationshipError = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _generation++;
+    super.dispose();
   }
 
   String _cacheKey(String login) {

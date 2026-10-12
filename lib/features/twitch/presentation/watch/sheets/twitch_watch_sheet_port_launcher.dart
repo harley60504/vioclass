@@ -29,6 +29,8 @@ class TwitchWatchSheetPortLauncher {
   final bool Function() emoteBootstrapping;
   final bool Function() loadingEngagement;
   final bool Function() engagementBootstrapping;
+  final bool Function() canPlacePredictionBet;
+  final Object? Function()? channelPointsIdentity;
   final bool enableChannelPointEmoteMenu;
 
   const TwitchWatchSheetPortLauncher({
@@ -47,6 +49,8 @@ class TwitchWatchSheetPortLauncher {
     required this.emoteBootstrapping,
     required this.loadingEngagement,
     required this.engagementBootstrapping,
+    required this.canPlacePredictionBet,
+    this.channelPointsIdentity,
     this.enableChannelPointEmoteMenu = true,
   });
 
@@ -106,14 +110,51 @@ class TwitchWatchSheetPortLauncher {
   }
 
   Future<void> openChannelPointsSheet(BuildContext context) async {
+    final destinationLogin = channelLogin();
+    final destinationId = channelId();
+    final openingSnapshot = channelPointsSnapshot();
+    final openingIdentity = channelPointsIdentity?.call();
+    void requireCurrentDestination() {
+      if (!context.mounted ||
+          (channelPointsIdentity != null &&
+              (openingIdentity == null ||
+                  !identical(openingIdentity, channelPointsIdentity!()))) ||
+          destinationLogin != channelLogin() ||
+          destinationId != channelId() ||
+          openingSnapshot?.channelId != channelPointsSnapshot()?.channelId) {
+        throw StateError('Channel points destination changed');
+      }
+    }
+    bool isCurrentDestination() {
+      try {
+        requireCurrentDestination();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
     await showTwitchChannelPointsSheet(
       context: context,
-      snapshot: channelPointsSnapshot(),
+      snapshot: openingSnapshot,
       loading: loadingEngagement() || engagementBootstrapping(),
       onRefresh: () => refreshEngagement(showSnackOnError: false),
-      onClaim: claimCommunityPoints,
-      onPrepareTextReward: prepareChannelPointTextReward,
-      onRedeemReward: redeemChannelPointReward,
+      onClaim: (claimId) async {
+        try {
+          requireCurrentDestination();
+        } catch (_) {
+          showMessage('領取點數失敗，請稍後再試。');
+          return;
+        }
+        await claimCommunityPoints(claimId, isCurrent: isCurrentDestination);
+      },
+      onPrepareTextReward: (reward) async {
+        requireCurrentDestination();
+        await prepareChannelPointTextReward(reward);
+      },
+      onRedeemReward: (reward, textInput) async {
+        requireCurrentDestination();
+        return redeemChannelPointReward(reward, textInput);
+      },
       onLoadChannelPointEmotes: enableChannelPointEmoteMenu
           ? (_) => loadChannelPointModifiableEmotes()
           : null,
@@ -153,18 +194,25 @@ class TwitchWatchSheetPortLauncher {
     );
   }
 
-  Future<void> claimCommunityPoints(String claimId) async {
+  Future<void> claimCommunityPoints(
+    String claimId, {
+    bool Function()? isCurrent,
+  }) async {
     final resolvedChannelId = channelPointsSnapshot()?.channelId ?? channelId();
     if (resolvedChannelId == null || resolvedChannelId.isEmpty) return;
 
     try {
-      await engagement.claimCommunityPoints(
+      final result = await engagement.claimCommunityPoints(
         channelId: resolvedChannelId,
         claimId: claimId,
       );
+      if (isCurrent?.call() == false) return;
+      if (!result.ok) throw StateError('Channel points claim rejected');
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
-      debugPrint('[ChannelPointsClaim] failed: $error');
+      if (isCurrent?.call() == false) return;
+      showMessage('領取點數失敗，請稍後再試。');
+      debugPrint('[ChannelPointsClaim] failed type=${error.runtimeType}');
     }
   }
 
@@ -187,9 +235,11 @@ class TwitchWatchSheetPortLauncher {
               textInput: textInput,
             );
       await refreshEngagement(showSnackOnError: false);
-      return result.displayResult;
+      return result.displayResult ??
+          TwitchChannelPointRedeemUiResult(title: result.title);
     } catch (error) {
-      debugPrint('[ChannelPointsRedeem] failed: $error');
+      showMessage('兌換失敗，請稍後再試。');
+      debugPrint('[ChannelPointsRedeem] failed type=${error.runtimeType}');
       return null;
     }
   }
@@ -207,13 +257,27 @@ class TwitchWatchSheetPortLauncher {
       showMessage('目前沒有賭盤。');
       return;
     }
+    final destinationLogin = channelLogin();
+    final destinationId = channelId();
+    bool isCurrentDestination() =>
+        context.mounted &&
+        destinationLogin == channelLogin() &&
+        destinationId == channelId() &&
+        predictionSnapshot()?.id == prediction.id;
 
     await showTwitchPredictionBetSheet(
       context: context,
       prediction: prediction,
-      onBet: placePredictionBet,
-      onRefreshPrediction: () =>
-          engagement.refreshPrediction(channelLogin: channelLogin()),
+      onBet: (outcome, points) async {
+        if (!isCurrentDestination()) {
+          throw StateError('Prediction destination changed');
+        }
+        await placePredictionBet(outcome, points);
+      },
+      onRefreshPrediction: () async {
+        if (!isCurrentDestination()) return null;
+        return engagement.refreshPrediction(channelLogin: destinationLogin);
+      },
     );
   }
 
@@ -221,10 +285,29 @@ class TwitchWatchSheetPortLauncher {
     TwitchPredictionOutcome outcome,
     int points,
   ) async {
+    if (!canPlacePredictionBet()) {
+      showMessage('請先完成登入再下注。');
+      throw StateError('Prediction viewer is not ready');
+    }
     final prediction = predictionSnapshot();
     if (prediction == null || !prediction.hasPrediction) {
       showMessage('目前沒有可下注的賭盤。');
-      return;
+      throw StateError('No active prediction');
+    }
+    final balanceSnapshot = channelPointsSnapshot();
+    final context = balanceSnapshot?.context;
+    final login = channelLogin().trim().toLowerCase();
+    if (balanceSnapshot == null ||
+        !balanceSnapshot.contextOk ||
+        context == null ||
+        context.channelLogin.trim().toLowerCase() != login ||
+        context.channelId != channelId()) {
+      showMessage('目前無法確認點數餘額，請重新整理後再試。');
+      throw StateError('Prediction balance is unavailable');
+    }
+    if (points <= 0 || points > context.balance) {
+      showMessage(points <= 0 ? '請輸入有效點數' : '點數餘額不足，未送出下注。');
+      throw StateError('Prediction points exceed available balance');
     }
 
     try {
@@ -234,9 +317,14 @@ class TwitchWatchSheetPortLauncher {
         points: points,
       );
       showMessage('已送出下注：${result.outcomeTitle} · ${result.points} 點');
-      await refreshEngagement(showSnackOnError: false);
     } catch (error) {
       showMessage('下注失敗，稍後再試。');
+      rethrow;
+    }
+    try {
+      await refreshEngagement(showSnackOnError: false);
+    } catch (_) {
+      // A refresh failure must not turn an acknowledged bet into a failed bet.
     }
   }
 }

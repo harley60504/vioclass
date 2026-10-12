@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import '../../services/auth/twitch_desktop_webview_settings.dart';
 import 'dart:io' show Directory, Platform;
 import 'dart:math';
 
@@ -488,16 +489,18 @@ class _TwitchDropsWebViewLoginPageState
                           initialUrlRequest: URLRequest(
                             url: WebUri(initialUri.toString()),
                           ),
-                          initialSettings: InAppWebViewSettings(
-                            javaScriptEnabled: true,
-                            domStorageEnabled: true,
-                            databaseEnabled: true,
-                            supportZoom: false,
-                            transparentBackground: false,
-                            useShouldOverrideUrlLoading: true,
-                            userAgent: Platform.isWindows
-                                ? null
-                                : TwitchApiConstants.browserUserAgent,
+                          initialSettings: twitchDesktopWebViewSettings(
+                            InAppWebViewSettings(
+                              javaScriptEnabled: true,
+                              domStorageEnabled: true,
+                              databaseEnabled: true,
+                              supportZoom: false,
+                              transparentBackground: false,
+                              useShouldOverrideUrlLoading: true,
+                              userAgent: Platform.isWindows
+                                  ? null
+                                  : TwitchApiConstants.browserUserAgent,
+                            ),
                           ),
                           onWebViewCreated: (controller) {
                             _controller = controller;

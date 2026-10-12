@@ -15,10 +15,10 @@ class TwitchChatMessageVisualMetrics {
 
   double get compactFactor => compact ? 0.92 : 1.0;
 
-  double get messageFontSize => 13 * scale * compactFactor;
-  double get compactMessageFontSize => 12.4 * scale * compactFactor;
-  double get nameFontSize => 13 * scale * compactFactor;
-  double get compactNameFontSize => 12.2 * scale * compactFactor;
+  double get messageFontSize => 14 * scale * compactFactor;
+  double get compactMessageFontSize => 13.4 * scale * compactFactor;
+  double get nameFontSize => 14 * scale * compactFactor;
+  double get compactNameFontSize => 13.2 * scale * compactFactor;
   double get metaFontSize => 10.5 * scale * compactFactor;
   double get chipFontSize => 10 * scale * compactFactor;
   double get badgeSize => 18 * scale * compactFactor;

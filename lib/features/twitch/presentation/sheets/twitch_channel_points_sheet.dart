@@ -208,7 +208,16 @@ class _TwitchChannelPointsSheetState extends State<TwitchChannelPointsSheet> {
   ) async {
     if (requiresChannelPointOfficialEmoteSelection(reward) ||
         requiresChannelPointModifiedEmoteSelection(reward)) {
-      await _redeemReward(context, reward);
+      try {
+        final result = await _redeemReward(context, reward);
+        if (!mounted || result == null) return;
+        setState(() => _redeemResult = result);
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.vio.t('兌換失敗，請稍後再試。'))),
+        );
+      }
       return;
     }
     setState(() => _detailReward = reward);

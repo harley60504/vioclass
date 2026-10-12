@@ -17,6 +17,7 @@ import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/special_actions/twitch_pending_special_message.dart';
 import '../../models/special_actions/twitch_viewer_special_message_models.dart';
 import '../../services/auth/twitch_auth_service.dart';
+import '../../services/auth/twitch_viewer_session.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_badge_cache_service.dart';
@@ -31,6 +32,7 @@ import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/engagement/twitch_hype_train_controller.dart';
 import '../../services/engagement/twitch_prediction_hermes_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../../services/playback/twitch_audio_settings.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../../services/playback/twitch_vod_snapshot_playlist_proxy.dart';
@@ -110,6 +112,10 @@ class TwitchWatchPage extends StatefulWidget {
   final bool initialVodPlaybackOnly;
   final bool initialReuseCurrentPlayback;
   final TwitchPlaylistPlayerRuntime? initialPlayerRuntime;
+
+  /// Complete dependency bundle; the watch route owns its client/runtime lifecycle.
+  final TwitchWatchServices? initialServices;
+  final TwitchWatchChatRuntimeFactory? initialChatRuntimeFactory;
   final bool? initialKnownFollowing;
 
   const TwitchWatchPage({
@@ -134,6 +140,8 @@ class TwitchWatchPage extends StatefulWidget {
     this.initialVodPlaybackOnly = false,
     this.initialReuseCurrentPlayback = false,
     this.initialPlayerRuntime,
+    this.initialServices,
+    this.initialChatRuntimeFactory,
     this.initialKnownFollowing,
   });
 
@@ -353,6 +361,15 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         emoteBootstrapping: () => emoteBootstrapping,
         loadingEngagement: () => loadingEngagement,
         engagementBootstrapping: () => engagementBootstrapping,
+        canPlacePredictionBet: () =>
+            mounted &&
+            TwitchViewerSession.forAuth(authService).status ==
+                TwitchViewerStatus.authenticated,
+        channelPointsIdentity: () => mounted &&
+                TwitchViewerSession.forAuth(authService).status ==
+                    TwitchViewerStatus.authenticated
+            ? TwitchViewerSession.forAuth(authService).snapshot
+            : null,
         enableChannelPointEmoteMenu: enableChannelPointEmoteMenu,
       );
 
@@ -367,6 +384,17 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       loadingPlayer ||
       connectingChat ||
       chatBootstrapping;
+
+  void syncViewerIdentity() {
+    if (!mounted) return;
+    final session = TwitchViewerSession.forAuth(authService);
+    final identity = session.snapshot;
+    setState(() {
+      viewerLogin = identity?.viewerLogin;
+      viewerId = identity?.viewerId;
+      loadingAuth = session.status == TwitchViewerStatus.checking;
+    });
+  }
 
   void notifyControllerChanged() {
     if (mounted) setState(() {});
@@ -500,6 +528,19 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   @override
   void initState() {
     super.initState();
+    // A new source replaces the home mini player; mini expansion instead
+    // transfers its active surface through primeReusedPlaybackSurface.
+    if (!widget.initialReuseCurrentPlayback) {
+      final mini = TwitchMiniPlayerController.instance;
+      final previousEntry = mini.entry;
+      if (previousEntry != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && identical(mini.entry, previousEntry)) {
+            mini.close(pausePlayback: false);
+          }
+        });
+      }
+    }
     WidgetsBinding.instance.addObserver(this);
     TwitchPlaybackSessionController.instance.registerRouteOwner(
       playbackRouteOwner,
@@ -519,12 +560,19 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     session = TwitchWatchSessionHandles.create(
       playerTitle: 'Twitch Raw Proxy',
       playerRuntime: widget.initialPlayerRuntime,
+      sharedAuthService: widget.initialDiscoveryService?.authService,
+      suppliedServices: widget.initialServices,
     );
+    final viewerSession = TwitchViewerSession.forAuth(authService);
+    viewerSession.addListener(syncViewerIdentity);
+    viewerLogin = viewerSession.snapshot?.viewerLogin;
+    viewerId = viewerSession.snapshot?.viewerId;
     vodSnapshotPlaylistProxy = TwitchVodSnapshotPlaylistProxy();
     preferencesController = TwitchWatchPreferencesController(
       applyVolume: (volume) async {
         final player = playerSession.playerOrNull;
-        if (player != null) await player.setVolume(volume);
+        if (player != null)
+          await twitchAudioSettings.setPlayerVolume(player, volume);
       },
       minChatPanelWidth: minChatPanelWidth,
       maxEffectiveMinChatPanelWidth: maxEffectiveMinChatPanelWidth,
@@ -534,6 +582,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       maxChatPanelRatio: maxChatPanelRatio,
     )..addListener(notifyControllerChanged);
     chatController = TwitchWatchChatController(
+      runtimeFactory: widget.initialChatRuntimeFactory,
       authService: authService,
       dropsAuthService: dropsAuthService,
       authApi: authApi,
@@ -586,8 +635,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       applyPlayerVolume: applyPlayerVolume,
       waitForInitialPlaybackSettle: waitForInitialPlaybackSettle,
     )..addListener(notifyControllerChanged);
-    playbackTimelineController = TwitchPlaybackTimelineController()
-      ..addListener(notifyControllerChanged);
+    playbackTimelineController = TwitchPlaybackTimelineController();
     vodReplayController = TwitchVodChatReplayRuntime(
       api: TwitchVodCommentsApiService(
         client: watchServices.apiClient,
@@ -1005,6 +1053,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     }
 
     final login = channelLogin;
+    final loadGeneration = watchLoadGeneration;
     try {
       final discoveryService =
           widget.initialDiscoveryService ??
@@ -1017,7 +1066,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       final startedAt = stream?.startedAt;
       final rawStreamId = stream?.id.trim() ?? '';
       final streamId = rawStreamId.isEmpty ? null : rawStreamId;
-      if (!mounted || channelLogin != login) return null;
+      if (!mounted ||
+          channelLogin != login ||
+          watchLoadGeneration != loadGeneration) {
+        return null;
+      }
       if (startedAt == null) {
         if (preserveStateWhenOffline) return false;
         liveTimelineStreamId = null;
@@ -1094,6 +1147,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   @override
   void dispose() {
+    disposeWatchModeRuntime(this);
+    TwitchViewerSession.forAuth(authService).removeListener(syncViewerIdentity);
     watchLoadGeneration++;
     final restoringPreviousRoutePlayback =
         shouldRestorePreviousPlaybackOnPop &&
@@ -1115,7 +1170,6 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       unawaited(watchPorts.player.disposeRuntime());
     }
     playbackController.removeListener(notifyControllerChanged);
-    playbackTimelineController.removeListener(notifyControllerChanged);
     vodReplayController.removeListener(notifyControllerChanged);
     relationshipController.removeListener(notifyControllerChanged);
     engagementController.removeListener(notifyControllerChanged);
@@ -1261,6 +1315,15 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   @override
   Widget build(BuildContext context) {
     final runtime = chatRuntime;
+    final viewerSession = TwitchViewerSession.forAuth(authService);
+    final authPending = viewerSession.status == TwitchViewerStatus.checking;
+    final isGuestViewer = viewerSession.status == TwitchViewerStatus.guest;
+    final initialDiscovery = widget.initialDiscoveryService;
+    final inheritedAuth = initialDiscovery?.cachedAuth;
+    final hasVerifiedInitialViewer =
+        inheritedAuth != null &&
+        inheritedAuth.viewerId.isNotEmpty &&
+        initialDiscovery?.authService.accessToken == inheritedAuth.accessToken;
     final fallbackVideo = offlineVodFallbackVideo;
     final usesLiveTimeline =
         currentPlaybackKind == TwitchWatchPlaybackKind.live ||
@@ -1284,13 +1347,22 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       showOfflinePlaceholder: showOfflineChannelPlaceholder,
       offlineImageUrl: widget.resolvedInitialOfflineChannel?.offlineImageUrl,
       isFollowing: effectiveIsFollowing,
+      followBusy: followBusy,
       relationshipBusy:
           checkingRelationship ||
           followBusy ||
           (relationshipBootstrapping && _initialKnownFollowStatus == null),
       relationshipError: relationshipError,
-      onToggleFollow: toggleFollowChannel,
-      onSubscribe: openSubscribePage,
+      onToggleFollow: authPending
+          ? null
+          : isGuestViewer
+          ? () => unawaited(openGuestLogin())
+          : toggleFollowChannel,
+      onSubscribe: authPending
+          ? null
+          : isGuestViewer
+          ? () => unawaited(openGuestLogin())
+          : openSubscribePage,
       chatVisible: fullscreenMode ? false : chatVisible,
       fullscreenMode: fullscreenMode,
       showFullscreenButton: TwitchFullscreenController.isDesktopPlatform,
@@ -1308,7 +1380,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onBack: () => unawaited(leaveToMiniPlayer()),
       onHome: () => unawaited(returnToHome()),
       onOpenChannel: () => unawaited(openCurrentChannelSheet(metadata)),
-      onCreateClip: () => unawaited(createLiveClip()),
+      onCreateClip: authPending
+          ? null
+          : isGuestViewer
+          ? () => unawaited(openGuestLogin())
+          : () => unawaited(createLiveClip()),
       creatingClip: creatingClip,
       hasDvrReplay: hasDvrReplayPlayback,
       hasFullLiveDvr: hasUsableLiveDvrArchive,
@@ -1353,8 +1429,14 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       onRetry: () => unawaited(loadChannelAboutPanels()),
     );
 
-    Widget buildLiveChatPanel({bool showHeader = true}) {
+    Widget buildLiveChatPanel({VoidCallback? onToggleChatMode}) {
       return TwitchWatchChatPanelPortAdapter(
+        readOnlyGuest: isGuestViewer,
+        canSend: chatController.canSendForCurrentViewer,
+        missingSendPermission:
+            viewerSession.status == TwitchViewerStatus.authenticated &&
+            !chatController.hasIrcSendPermission &&
+            pendingSpecialMessage == null,
         moderationApi: createChatModerationApi(),
         runtime: runtime,
         viewerLogin: viewerLogin,
@@ -1379,22 +1461,24 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         onOpenChannelPoints: openChannelPointsSheet,
         onOpenPrediction: openPredictionBetSheet,
         onOpenSpecialActions: openChatTools,
+        onLoginPressed: () => unawaited(openGuestLogin()),
         onOpenUser: openChatUserProfile,
         messageActionBuilder: canManageChat
             ? buildMessageModerationActions
             : null,
         onCancelPendingSpecialMessage: clearPendingSpecialMessage,
-        showHeader: showHeader,
+        onToggleChatMode: onToggleChatMode,
       );
     }
 
     final liveChatPanel = buildLiveChatPanel();
-    final liveChatPanelWithoutHeader = buildLiveChatPanel(showHeader: false);
     final chatPanel = !shouldShowVodReplayChat
         ? liveChatPanel
         : TwitchVodReplayChatPanel(
+            onOpenUser: openChatUserProfile,
             runtime: vodReplayController,
-            liveChat: liveChatPanelWithoutHeader,
+            liveChat: liveChatPanel,
+            liveChatBuilder: (onToggleMode) => buildLiveChatPanel(onToggleChatMode: onToggleMode),
             thirdPartyEmoteCache: watchPorts.emotes.thirdParty,
             officialEmoteCache: watchPorts.emotes.official,
             preferredMode: preferVodReplayChat
@@ -1415,9 +1499,16 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         // fallback behind every translucent watch control.
         backgroundColor: TwitchUiColors.appBackground,
         body: TwitchFollowedLiveRailShell(
-          enabled: !fullscreenMode,
+          enabled:
+              !fullscreenMode &&
+              viewerSession.snapshot?.viewerId.isNotEmpty == true,
+          reserveSpace:
+              !fullscreenMode && loadingAuth && hasVerifiedInitialViewer,
           selectedLogin: channelLogin,
           loadStreams: _loadFollowedRailStreams,
+          initialStreams:
+              widget.initialDiscoveryService?.cachedFollowedLiveRailStreams ??
+              const [],
           onSelect: _switchFromLiveRail,
           child: Stack(
             children: [

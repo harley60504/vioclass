@@ -397,7 +397,7 @@ class TwitchClipApiService {
       },
     );
     final errors = raw['errors'];
-    if (errors != null) {
+    if (errors != null && (errors is! List || errors.isNotEmpty)) {
       throw TwitchApiException('$operationName GQL 錯誤：$errors');
     }
     return raw;

@@ -18,7 +18,9 @@ class TwitchChatInputBar extends StatelessWidget {
   final String? hintText;
   final Color? hintColor;
   final Widget? leadingActions;
+  final Widget? trailingActions;
   final FutureOr<void> Function() onSend;
+  final Object? sendContext;
 
   const TwitchChatInputBar({
     super.key,
@@ -28,7 +30,9 @@ class TwitchChatInputBar extends StatelessWidget {
     this.hintText,
     this.hintColor,
     this.leadingActions,
+    this.trailingActions,
     required this.onSend,
+    this.sendContext,
   });
 
   static const double _inputRowHeight = 48;
@@ -46,10 +50,16 @@ class TwitchChatInputBar extends StatelessWidget {
     }
     try {
       await Future<void>.sync(onSend);
-    } catch (error, stackTrace) {
-      debugPrint('Twitch chat send failed: $error');
-      debugPrint('$stackTrace');
+    } catch (error) {
+      debugPrint('Twitch chat send failed type=${error.runtimeType}');
       if (!context.mounted) return;
+      final current = context.widget;
+      if (current is! TwitchChatInputBar ||
+          !current.enabled ||
+          !identical(current.controller, controller) ||
+          current.sendContext != sendContext) {
+        return;
+      }
       final message = _formatSendError(error);
       if (message.isEmpty) return;
       showTwitchNotice(
@@ -101,6 +111,10 @@ class TwitchChatInputBar extends StatelessWidget {
             children: [
               Expanded(child: leadingActions ?? const SizedBox.shrink()),
               const SizedBox(width: TwitchUiSpacing.space8),
+              if (trailingActions != null) ...[
+                trailingActions!,
+                const SizedBox(width: TwitchUiSpacing.space4),
+              ],
               _SelfDrawnSendButton(
                 enabled: enabled && !sending,
                 sending: sending,

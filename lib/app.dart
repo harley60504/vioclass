@@ -12,7 +12,8 @@ import 'features/twitch/presentation/widgets/notifications/twitch_app_notificati
 import 'features/twitch/presentation/widgets/shared/twitch_app_scroll_behavior.dart';
 
 class VioClassApp extends StatefulWidget {
-  const VioClassApp({super.key});
+  final TwitchStreamPageServices? homeServices;
+  const VioClassApp({super.key, this.homeServices});
 
   @override
   State<VioClassApp> createState() => _VioClassAppState();
@@ -77,13 +78,14 @@ class _VioClassAppState extends State<VioClassApp> {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      home: const _StartupSafeHome(),
+      home: _StartupSafeHome(services: widget.homeServices),
     );
   }
 }
 
 class _StartupSafeHome extends StatefulWidget {
-  const _StartupSafeHome();
+  final TwitchStreamPageServices? services;
+  const _StartupSafeHome({this.services});
 
   @override
   State<_StartupSafeHome> createState() => _StartupSafeHomeState();
@@ -108,7 +110,7 @@ class _StartupSafeHomeState extends State<_StartupSafeHome> {
   @override
   Widget build(BuildContext context) {
     if (showTwitchHome) {
-      return const TwitchStreamPage();
+      return TwitchStreamPage(services: widget.services);
     }
 
     return Scaffold(

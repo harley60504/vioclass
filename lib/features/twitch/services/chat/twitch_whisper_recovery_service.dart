@@ -105,6 +105,20 @@ class TwitchWhisperRecoveryService {
           );
           check();
           commit(true);
+          if (!page.paginationKnown) {
+            // Keep genuine messages, but do not advance the recovery checkpoint
+            // or label the conversation's unknown boundary as exhausted.
+            await archive.mergeRemotePage(
+              owner,
+              peer,
+              page,
+              recovery: work,
+              canApply: current,
+            );
+            throw const TwitchWhisperException(
+              '已保存收到的私訊；伺服器未提供歷史分頁位置，完整恢復進度保留。',
+            );
+          }
           await archive.mergeRemotePage(
             owner,
             peer,

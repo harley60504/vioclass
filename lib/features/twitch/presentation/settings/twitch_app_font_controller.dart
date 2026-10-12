@@ -29,6 +29,18 @@ class TwitchAppFontChoice {
 }
 
 class TwitchAppFontController extends ChangeNotifier {
+  TwitchAppFontController({
+    Future<void> Function(String family, ByteData bytes)? loadFont,
+  }) : _loadFont = loadFont ?? _loadFontWithEngine;
+
+  final Future<void> Function(String family, ByteData bytes) _loadFont;
+
+  static Future<void> _loadFontWithEngine(String family, ByteData bytes) async {
+    final loader = FontLoader(family);
+    loader.addFont(Future<ByteData>.value(bytes));
+    await loader.load();
+  }
+
   static const String _selectedFontKey = 'twitch_app_font_selected_v1';
   static const String _customFontFamiliesKey =
       'twitch_app_font_custom_families_v1';
@@ -124,13 +136,21 @@ class TwitchAppFontController extends ChangeNotifier {
   Future<void> select(TwitchAppFontChoice choice) async {
     if (choice.id == _selectedId) return;
     if (choice.kind == TwitchAppFontKind.custom) {
-      await _loadCustomFont(choice.family);
+      if (!await _loadCustomFont(choice.family)) {
+        throw StateError('Custom font could not be loaded');
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      if (!await prefs.setString(_selectedFontKey, choice.id)) {
+        throw StateError('Font selection was not saved');
+      }
+    } catch (_) {
+      await prefs.reload();
+      rethrow;
     }
     _selectedId = choice.id;
     notifyListeners();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_selectedFontKey, _selectedId);
   }
 
   Future<void> pickAndSelectFont() async {
@@ -172,10 +192,20 @@ class TwitchAppFontController extends ChangeNotifier {
         path: target.path,
       );
       _customFonts[family] = record;
-      await _loadCustomFont(family);
+      try {
+        if (!await _loadCustomFont(family)) {
+          throw StateError('Imported font could not be loaded');
+        }
+        await _save(selectedId: 'custom:$family', fonts: _customFonts);
+      } catch (_) {
+        _customFonts.remove(family);
+        _loadedCustomFonts.remove(family);
+        // Only remove the copy created by this unsuccessful import.
+        await target.delete();
+        rethrow;
+      }
       _selectedId = 'custom:$family';
       notifyListeners();
-      await _save();
     } finally {
       _picking = false;
       notifyListeners();
@@ -183,11 +213,15 @@ class TwitchAppFontController extends ChangeNotifier {
   }
 
   Future<void> removeCustomFont(String family) async {
-    final record = _customFonts.remove(family);
+    final record = _customFonts[family];
     if (record == null) return;
-    if (_selectedId == 'custom:$family') {
-      _selectedId = vioClass.id;
-    }
+    final nextId = _selectedId == 'custom:$family' ? vioClass.id : _selectedId;
+    final nextFonts = Map<String, _CustomFontRecord>.of(_customFonts)
+      ..remove(family);
+    await _save(selectedId: nextId, fonts: nextFonts);
+    _customFonts.remove(family);
+    _loadedCustomFonts.remove(family);
+    _selectedId = nextId;
     try {
       final file = File(record.path);
       if (await file.exists()) {
@@ -195,7 +229,6 @@ class TwitchAppFontController extends ChangeNotifier {
       }
     } catch (_) {}
     notifyListeners();
-    await _save();
   }
 
   Map<String, _CustomFontRecord> _readCustomFonts(SharedPreferences prefs) {
@@ -218,39 +251,64 @@ class TwitchAppFontController extends ChangeNotifier {
     return records;
   }
 
-  Future<void> _save() async {
+  Future<void> _save({
+    required String selectedId,
+    required Map<String, _CustomFontRecord> fonts,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_selectedFontKey, _selectedId);
-    await prefs.setStringList(
-      _customFontFamiliesKey,
-      _customFonts.keys.toList(),
-    );
-    await prefs.setStringList(
-      _customFontLabelsKey,
-      _customFonts.values.map((font) => font.label).toList(growable: false),
-    );
-    await prefs.setStringList(
-      _customFontPathsKey,
-      _customFonts.values.map((font) => font.path).toList(growable: false),
-    );
+    final values = <String, Object>{
+      _selectedFontKey: selectedId,
+      _customFontFamiliesKey: fonts.keys.toList(),
+      _customFontLabelsKey: fonts.values.map((font) => font.label).toList(),
+      _customFontPathsKey: fonts.values.map((font) => font.path).toList(),
+    };
+    final previous = {for (final key in values.keys) key: prefs.get(key)};
+    Future<bool> write(String key, Object? value) => switch (value) {
+      null => prefs.remove(key),
+      String value => prefs.setString(key, value),
+      List<String> value => prefs.setStringList(key, value),
+      _ => throw StateError('Unsupported font preference'),
+    };
+    try {
+      for (final entry in values.entries) {
+        if (!await write(entry.key, entry.value)) {
+          throw StateError('Font list was not saved');
+        }
+      }
+    } catch (_) {
+      try {
+        for (final entry in previous.entries) {
+          if (!await write(entry.key, entry.value)) {
+            throw StateError('Font preference rollback failed');
+          }
+        }
+      } finally {
+        await prefs.reload();
+      }
+      rethrow;
+    }
   }
 
   Future<void> _loadSelectedCustomFont() async {
     if (!_selectedId.startsWith('custom:')) return;
-    await _loadCustomFont(_selectedId.substring('custom:'.length));
+    if (!await _loadCustomFont(_selectedId.substring('custom:'.length))) {
+      _selectedId = vioClass.id;
+    }
   }
 
-  Future<void> _loadCustomFont(String? family) async {
-    if (family == null || _loadedCustomFonts.contains(family)) return;
+  Future<bool> _loadCustomFont(String? family) async {
+    if (family == null) return false;
+    if (_loadedCustomFonts.contains(family)) return true;
     final record = _customFonts[family];
-    if (record == null) return;
+    if (record == null) return false;
     try {
       final bytes = await File(record.path).readAsBytes();
-      final loader = FontLoader(family);
-      loader.addFont(Future<ByteData>.value(bytes.buffer.asByteData()));
-      await loader.load();
+      await _loadFont(family, bytes.buffer.asByteData());
       _loadedCustomFonts.add(family);
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isKnownId(String id) {

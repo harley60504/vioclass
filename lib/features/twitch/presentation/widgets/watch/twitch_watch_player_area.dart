@@ -144,10 +144,23 @@ class TwitchWatchPlayerArea extends StatelessWidget {
     );
 
     return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[playerRuntime, pip]),
+      animation: Listenable.merge(<Listenable>[
+        playerRuntime,
+        pip,
+        ?playbackTimelineController,
+      ]),
       child: stableVideoStage,
       builder: (context, child) {
         final state = _WatchPlayerAreaState.fromWidget(widget: this, pip: pip);
+        // Timeline ticks refresh controls without rebuilding the chat/sidebar.
+        // Resolve the live duration here, as the parent no longer rebuilds on
+        // every tick. The video stage remains the stable AnimatedBuilder child.
+        final usesLiveTimeline =
+            playbackKind == TwitchWatchPlaybackKind.live ||
+            playbackKind == TwitchWatchPlaybackKind.liveDvr;
+        final effectiveLiveDvrDuration = usesLiveTimeline
+            ? playerRuntime.canonicalLiveTimelineDuration ?? liveDvrDuration
+            : liveDvrDuration;
         final showOfflineControls =
             showOfflinePlaceholder &&
             !state.inPipMode &&
@@ -213,7 +226,7 @@ class TwitchWatchPlayerArea extends StatelessWidget {
                     hasDvrReplay: hasDvrReplay,
                     hasFullLiveDvr: hasFullLiveDvr,
                     showLiveEdgeLabel: showLiveEdgeLabel,
-                    liveDvrDuration: liveDvrDuration,
+                    liveDvrDuration: effectiveLiveDvrDuration,
                     liveDvrStartedAt: liveDvrStartedAt,
                     onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
                     onReturnToLive: onReturnToLive,
@@ -488,12 +501,9 @@ class _WatchOfflineBottomControlBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TwitchGlassSurface(
+    return TwitchPlayerGlassSurface(
       borderRadius: BorderRadius.circular(24),
-      backgroundColor: Colors.black.withValues(alpha: 0.56),
-      borderColor: Colors.white.withValues(alpha: 0.12),
-      blurSigma: 0,
-      boxShadow: const <BoxShadow>[],
+      border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
       child: SizedBox(
         height: 58,
         child: Padding(

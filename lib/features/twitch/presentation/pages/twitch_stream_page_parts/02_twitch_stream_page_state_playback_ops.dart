@@ -98,6 +98,7 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
               onRefresh: refreshCurrentPage,
               onOpenDropsConnector: openDropsConnectorPage,
               onOpenSettings: openSettings,
+              whispersEnabled: _hasAuthenticatedViewer,
             ),
           ),
         ],
@@ -121,10 +122,14 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
               errorText: channelSearchError,
               discoveryService: discoveryService,
               onRefresh: refreshChannelSearch,
+              watchServicesFactory: widget.services?.watchServicesFactory,
+              watchChatRuntimeFactory: widget.services?.watchChatRuntimeFactory,
             )
           : selectedSection == TwitchHomeSection.following
           ? TwitchFollowingPage(
               key: followingPageKey,
+              watchServicesFactory: widget.services?.watchServicesFactory,
+              watchChatRuntimeFactory: widget.services?.watchChatRuntimeFactory,
               discoveryService: discoveryService,
               searchText: searchText,
               searchedLiveStreams: searchedLiveStreams,
@@ -138,6 +143,8 @@ extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {
             )
           : TwitchBrowsePage(
               key: browsePageKey,
+              watchServicesFactory: widget.services?.watchServicesFactory,
+              watchChatRuntimeFactory: widget.services?.watchChatRuntimeFactory,
               discoveryService: discoveryService,
               searchText: searchText,
               searchedLiveStreams: searchedLiveStreams,
@@ -156,21 +163,15 @@ extension _TwitchStreamPageStateSessionOps on _TwitchStreamPageState {
   Future<void> _loadUpdateSettingsAndCheck() async {
     await updateController.load();
     if (!mounted || !updateController.autoCheckEnabled) return;
-    final info = await updateController.checkNow();
-    if (!mounted || info?.updateAvailable != true) return;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) return;
-    unawaited(
-      showVioClassUpdateSheet(
-        context: context,
-        controller: updateController,
-        startupPrompt: true,
-      ),
-    );
+    await Future<void>.delayed(const Duration(seconds: 5));
+    if (!mounted || !updateController.autoCheckEnabled) return;
+    await updateController.checkNow(announce: true);
   }
 }
 
 extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
   Future<_TwitchSearchMediaBundle> _searchChannelMedia({
+    required int generation,
     required String keyword,
     required List<TwitchLiveStream> liveStreams,
     required List<TwitchFollowedChannel> offlineChannels,
@@ -188,12 +189,18 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
     final clipResults = <_TwitchSearchClipResult>[];
 
     for (final channel in candidates.take(8)) {
+      if (!mounted || generation != _channelSearchGeneration) {
+        return const _TwitchSearchMediaBundle.empty();
+      }
       if (videoResults.length < 12) {
         try {
           final page = await discoveryService.fetchChannelVideos(
             userId: channel.broadcasterId,
             first: 8,
           );
+          if (!mounted || generation != _channelSearchGeneration) {
+            return const _TwitchSearchMediaBundle.empty();
+          }
           videoResults.addAll(
             page.videos
                 .where((video) => _matchesSearchMediaVideo(video, cleanKeyword))
@@ -206,12 +213,18 @@ extension _TwitchStreamPageStateSearchOps on _TwitchStreamPageState {
         } catch (_) {}
       }
 
+      if (!mounted || generation != _channelSearchGeneration) {
+        return const _TwitchSearchMediaBundle.empty();
+      }
       if (clipResults.length < 12) {
         try {
           final page = await discoveryService.fetchChannelClips(
             broadcasterId: channel.broadcasterId,
             first: 8,
           );
+          if (!mounted || generation != _channelSearchGeneration) {
+            return const _TwitchSearchMediaBundle.empty();
+          }
           clipResults.addAll(
             page.clips
                 .where((clip) => _matchesSearchMediaClip(clip, cleanKeyword))

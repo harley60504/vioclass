@@ -1,14 +1,61 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../../models/playback/twitch_m3u8_variant.dart';
 import '../../models/playback/twitch_playback.dart';
 import '../core/twitch_api_constants.dart';
+import '../core/twitch_api_exception.dart';
 import '../core/twitch_gql_api_service.dart';
+import 'twitch_playback_viewer_auth.dart';
+
+typedef TwitchPlaybackCachedIntegrityHeaders =
+    Map<String, String>? Function({
+      required String clientId,
+      required TwitchPlaybackViewerAuth? viewerAuth,
+    });
+typedef TwitchPlaybackIntegrityHeadersProvider =
+    Future<Map<String, String>> Function({
+      required String clientId,
+      required String channelLogin,
+      required TwitchPlaybackViewerAuth? viewerAuth,
+    });
+typedef TwitchPlaybackIntegrityInvalidator =
+    void Function({
+      required String clientId,
+      required TwitchPlaybackViewerAuth? viewerAuth,
+      required String rejectedIntegrity,
+    });
+typedef TwitchPlaybackViewerAuthProvider =
+    Future<TwitchPlaybackViewerAuthResolution> Function();
+
+class TwitchPlaybackAuthorizationException implements Exception {
+  final String message;
+
+  const TwitchPlaybackAuthorizationException(this.message);
+
+  @override
+  String toString() => 'TwitchPlaybackAuthorizationException: $message';
+}
 
 class TwitchPlaybackApiService {
   final TwitchGqlApiService gql;
+  final TwitchPlaybackCachedIntegrityHeaders? cachedIntegrityHeaders;
+  final TwitchPlaybackIntegrityHeadersProvider? integrityHeadersProvider;
+  final TwitchPlaybackIntegrityInvalidator? integrityInvalidator;
+  final TwitchPlaybackViewerAuthProvider? viewerAuthProvider;
+  TwitchPlaybackViewerAuthState _lastViewerAuthState =
+      TwitchPlaybackViewerAuthState.anonymous;
 
-  const TwitchPlaybackApiService({required this.gql});
+  TwitchPlaybackApiService({
+    required this.gql,
+    this.cachedIntegrityHeaders,
+    this.integrityHeadersProvider,
+    this.integrityInvalidator,
+    this.viewerAuthProvider,
+  });
+
+  TwitchPlaybackViewerAuthState get lastViewerAuthState => _lastViewerAuthState;
 
   static const String _clipAccessTokenQuery = r'''
     query VideoAccessToken_Clip($slug: ID!) {
@@ -60,7 +107,8 @@ class TwitchPlaybackApiService {
       );
     }
 
-    final data = await gql.request(
+    final response = await _requestLivePlaybackAccessToken(
+      channelLogin: login,
       operationName: 'PlaybackAccessToken',
       query: r'''
         query PlaybackAccessToken(
@@ -104,6 +152,7 @@ class TwitchPlaybackApiService {
         'playerType': cleanPlayerType,
       },
     );
+    final data = response.data;
 
     final raw = data['streamPlaybackAccessToken'];
     if (raw is! Map<String, dynamic>) {
@@ -116,8 +165,158 @@ class TwitchPlaybackApiService {
     if (!token.isValid) {
       throw StateError('Playback token is incomplete.');
     }
+    if (response.auth.hadUnavailableLogin &&
+        _hasRestrictedBitrates(token.value)) {
+      throw const TwitchPlaybackAuthorizationException(
+        'Stored Web login is unavailable and anonymous playback is restricted.',
+      );
+    }
 
     return token;
+  }
+
+  Future<_PlaybackTokenResponse> _requestLivePlaybackAccessToken({
+    required String channelLogin,
+    required String operationName,
+    required String query,
+    required Map<String, dynamic> variables,
+  }) async {
+    final clientId = gql.clientId;
+    final auth = await _resolveViewerAuth();
+    final viewerAuth = auth.auth;
+    var integrityHeaders = cachedIntegrityHeaders?.call(
+      clientId: clientId,
+      viewerAuth: viewerAuth,
+    );
+    try {
+      final data = await _rawPlaybackRequest(
+        operationName: operationName,
+        query: query,
+        variables: variables,
+        integrityHeaders: integrityHeaders,
+        viewerAuth: viewerAuth,
+      );
+      return _PlaybackTokenResponse(data: data, auth: auth);
+    } on TwitchApiException catch (error) {
+      if (!_isExplicitIntegrityRejection(error.details) ||
+          integrityHeadersProvider == null) {
+        rethrow;
+      }
+    }
+
+    final rejected = integrityHeaders?['Client-Integrity'];
+    if (rejected != null && rejected.isNotEmpty) {
+      integrityInvalidator?.call(
+        clientId: clientId,
+        viewerAuth: viewerAuth,
+        rejectedIntegrity: rejected,
+      );
+    }
+    integrityHeaders = await integrityHeadersProvider!(
+      clientId: clientId,
+      channelLogin: channelLogin,
+      viewerAuth: viewerAuth,
+    );
+    try {
+      final data = await _rawPlaybackRequest(
+        operationName: operationName,
+        query: query,
+        variables: variables,
+        integrityHeaders: integrityHeaders,
+        viewerAuth: viewerAuth,
+      );
+      return _PlaybackTokenResponse(data: data, auth: auth);
+    } on TwitchApiException catch (error) {
+      if (_isExplicitIntegrityRejection(error.details)) {
+        final retryProof = integrityHeaders['Client-Integrity'];
+        if (retryProof != null && retryProof.isNotEmpty) {
+          integrityInvalidator?.call(
+            clientId: clientId,
+            viewerAuth: viewerAuth,
+            rejectedIntegrity: retryProof,
+          );
+        }
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _rawPlaybackRequest({
+    required String operationName,
+    required String query,
+    required Map<String, dynamic> variables,
+    Map<String, String>? integrityHeaders,
+    required TwitchPlaybackViewerAuth? viewerAuth,
+  }) async {
+    final body = await gql.client.postJson<dynamic>(
+      TwitchApiConstants.gqlEndpoint,
+      data: <String, dynamic>{
+        'operationName': operationName,
+        'query': query,
+        'variables': variables,
+      },
+      headers: <String, String>{
+        ...TwitchApiConstants.twitchWebHeaders,
+        'Client-ID': gql.clientId,
+        'Content-Type': 'application/json',
+        if (viewerAuth != null)
+          'Authorization': 'OAuth ${viewerAuth.accessToken}',
+        ...?integrityHeaders,
+      },
+    );
+    if (body is! Map<String, dynamic>) {
+      throw TwitchApiException(
+        'Unexpected playback GQL response type: ${body.runtimeType}.',
+        details: body,
+      );
+    }
+    final errors = body['errors'];
+    if (errors is List && errors.isNotEmpty) {
+      throw TwitchApiException(
+        'Twitch playback GQL returned errors.',
+        details: errors,
+      );
+    }
+    final data = body['data'];
+    if (data is Map<String, dynamic>) return data;
+    throw TwitchApiException(
+      'Twitch playback GQL response does not contain data object.',
+      details: body,
+    );
+  }
+
+  static bool _isExplicitIntegrityRejection(Object? value) {
+    if (value is Map) {
+      final message = value['message'];
+      if (message is String &&
+          message.trim().toLowerCase() == 'failed integrity check') {
+        return true;
+      }
+      return value.values.any(_isExplicitIntegrityRejection);
+    }
+    if (value is Iterable) return value.any(_isExplicitIntegrityRejection);
+    return false;
+  }
+
+  static bool _hasRestrictedBitrates(String tokenValue) {
+    try {
+      final decoded = jsonDecode(tokenValue);
+      if (decoded is! Map) return false;
+      final chansub = decoded['chansub'];
+      if (chansub is! Map) return false;
+      final restricted = chansub['restricted_bitrates'];
+      return restricted is Iterable && restricted.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<TwitchPlaybackViewerAuthResolution> _resolveViewerAuth() async {
+    final auth =
+        await viewerAuthProvider?.call() ??
+        const TwitchPlaybackViewerAuthResolution.anonymous();
+    _lastViewerAuthState = auth.state;
+    return auth;
   }
 
   Future<TwitchPlaybackAccessToken> getVodPlaybackAccessToken({
@@ -135,7 +334,8 @@ class TwitchPlaybackApiService {
       throw ArgumentError.value(videoId, 'videoId', 'video id cannot be empty');
     }
 
-    final data = await gql.request(
+    final auth = await _resolveViewerAuth();
+    final data = await _rawPlaybackRequest(
       operationName: 'PlaybackAccessToken',
       query: r'''
         query PlaybackAccessToken(
@@ -178,6 +378,7 @@ class TwitchPlaybackApiService {
         'platform': cleanPlatform,
         'playerType': cleanPlayerType,
       },
+      viewerAuth: auth.auth,
     );
 
     final raw = data['videoPlaybackAccessToken'];
@@ -190,6 +391,11 @@ class TwitchPlaybackApiService {
     final token = TwitchPlaybackAccessToken.fromJson(raw);
     if (!token.isValid) {
       throw StateError('VOD playback token is incomplete.');
+    }
+    if (auth.hadUnavailableLogin && _hasRestrictedBitrates(token.value)) {
+      throw const TwitchPlaybackAuthorizationException(
+        'Stored Web login is unavailable and anonymous VOD playback is restricted.',
+      );
     }
 
     return token;
@@ -295,10 +501,12 @@ class TwitchPlaybackApiService {
       );
     }
 
-    final data = await gql.request(
+    final auth = await _resolveViewerAuth();
+    final data = await _rawPlaybackRequest(
       operationName: 'VideoAccessToken_Clip',
       query: _clipAccessTokenQuery,
       variables: <String, dynamic>{'slug': slug},
+      viewerAuth: auth.auth,
     );
 
     final clip = data['clip'];
@@ -313,6 +521,11 @@ class TwitchPlaybackApiService {
     final token = TwitchPlaybackAccessToken.fromJson(tokenRaw);
     if (!token.isValid) {
       throw StateError('Clip playback token is incomplete.');
+    }
+    if (auth.hadUnavailableLogin && _hasRestrictedBitrates(token.value)) {
+      throw const TwitchPlaybackAuthorizationException(
+        'Stored Web login is unavailable and anonymous clip playback is restricted.',
+      );
     }
 
     final qualitiesRaw = clip['videoQualities'];
@@ -455,4 +668,11 @@ class TwitchPlaybackApiService {
     if (value is num) return value.toDouble();
     return double.tryParse(value?.toString() ?? '');
   }
+}
+
+class _PlaybackTokenResponse {
+  final Map<String, dynamic> data;
+  final TwitchPlaybackViewerAuthResolution auth;
+
+  const _PlaybackTokenResponse({required this.data, required this.auth});
 }

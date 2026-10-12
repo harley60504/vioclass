@@ -33,8 +33,7 @@ extension TwitchVideoEnhancementModeStorage on TwitchVideoEnhancementMode {
     TwitchVideoEnhancementMode.lanczos => 'lanczos',
     TwitchVideoEnhancementMode.ewaLanczos => 'ewa_lanczos',
     TwitchVideoEnhancementMode.ewaLanczosSharp => 'ewa_lanczossharp',
-    TwitchVideoEnhancementMode.ewaLanczos4Sharpest =>
-      'ewa_lanczos4sharpest',
+    TwitchVideoEnhancementMode.ewaLanczos4Sharpest => 'ewa_lanczos4sharpest',
     TwitchVideoEnhancementMode.ssimSuperRes => 'ewa_lanczossharp',
     TwitchVideoEnhancementMode.artCnn => 'ewa_lanczos',
     TwitchVideoEnhancementMode.fsr ||
@@ -169,21 +168,48 @@ class TwitchVideoEnhancementRuntime {
     required bool deband,
     required bool sharpen,
   }) async {
-    _config = TwitchVideoEnhancementConfig(
+    final nextConfig = TwitchVideoEnhancementConfig(
       enabled: enabled,
       mode: mode,
       chromaEnhance: chromaEnhance,
       deband: deband,
       sharpen: sharpen,
     );
-    _loaded = true;
-
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(enabledPreferenceKey, enabled);
-    await prefs.setString(modePreferenceKey, mode.storageValue);
-    await prefs.setBool(chromaEnhancePreferenceKey, chromaEnhance);
-    await prefs.setBool(debandPreferenceKey, deband);
-    await prefs.setBool(sharpenPreferenceKey, sharpen);
+    final values = <String, Object>{
+      enabledPreferenceKey: enabled,
+      modePreferenceKey: mode.storageValue,
+      chromaEnhancePreferenceKey: chromaEnhance,
+      debandPreferenceKey: deband,
+      sharpenPreferenceKey: sharpen,
+    };
+    final previous = {for (final key in values.keys) key: prefs.get(key)};
+    Future<bool> write(String key, Object? value) => switch (value) {
+      null => prefs.remove(key),
+      bool value => prefs.setBool(key, value),
+      String value => prefs.setString(key, value),
+      _ => throw StateError('Unsupported enhancement preference'),
+    };
+    try {
+      for (final entry in values.entries) {
+        if (!await write(entry.key, entry.value)) {
+          throw StateError('Enhancement preference was not saved');
+        }
+      }
+    } catch (_) {
+      try {
+        for (final entry in previous.entries) {
+          if (!await write(entry.key, entry.value)) {
+            throw StateError('Enhancement preference rollback failed');
+          }
+        }
+      } finally {
+        await prefs.reload();
+      }
+      rethrow;
+    }
+    _config = nextConfig;
+    _loaded = true;
 
     if (player != null) {
       await applyToPlayer(player, config: _config);
@@ -278,10 +304,7 @@ class TwitchVideoEnhancementRuntime {
 
   static Future<String?> _downloadShader(_TwitchVideoShaderAsset asset) async {
     final specification = switch (asset) {
-      _TwitchVideoShaderAsset.fsr => (
-        fileName: 'FSR_1_0_2.glsl',
-        url: _fsrUrl,
-      ),
+      _TwitchVideoShaderAsset.fsr => (fileName: 'FSR_1_0_2.glsl', url: _fsrUrl),
       _TwitchVideoShaderAsset.anime4kFast => (
         fileName: 'Anime4K-Ultra.glsl',
         url: '${_anime4kBaseUrl}Anime4K-Ultra.glsl',
@@ -346,7 +369,9 @@ class TwitchVideoEnhancementRuntime {
           try {
             await temporary.delete();
           } catch (_) {}
-          throw StateError('Downloaded shader is unexpectedly small ($size B).');
+          throw StateError(
+            'Downloaded shader is unexpectedly small ($size B).',
+          );
         }
         if (await file.exists()) await file.delete();
         await temporary.rename(file.path);

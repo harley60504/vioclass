@@ -76,7 +76,7 @@ class TwitchChannelPointsSheetBody extends StatelessWidget {
   }
 }
 
-class TwitchChannelPointsClaimButton extends StatelessWidget {
+class TwitchChannelPointsClaimButton extends StatefulWidget {
   final bool loading;
   final String claimId;
   final int claimPoints;
@@ -91,17 +91,36 @@ class TwitchChannelPointsClaimButton extends StatelessWidget {
   });
 
   @override
+  State<TwitchChannelPointsClaimButton> createState() =>
+      _TwitchChannelPointsClaimButtonState();
+}
+
+class _TwitchChannelPointsClaimButtonState
+    extends State<TwitchChannelPointsClaimButton> {
+  bool _claiming = false;
+
+  Future<void> _claim() async {
+    if (_claiming || widget.loading) return;
+    setState(() => _claiming = true);
+    try {
+      await widget.onClaim(widget.claimId);
+    } finally {
+      if (mounted) setState(() => _claiming = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
       child: SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
-          onPressed: loading ? null : () async => onClaim(claimId),
+          onPressed: widget.loading || _claiming ? null : _claim,
           icon: const Icon(Icons.card_giftcard_rounded),
           label: Text(
-            claimPoints > 0
-                ? '${context.vio.t('領取')} $claimPoints ${context.vio.t('點忠誠點數')}'
+            widget.claimPoints > 0
+                ? '${context.vio.t('領取')} ${widget.claimPoints} ${context.vio.t('點忠誠點數')}'
                 : context.vio.t('領取可用忠誠點數獎勵'),
           ),
           style: ElevatedButton.styleFrom(

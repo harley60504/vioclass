@@ -22,6 +22,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   final Map<int, String> _lastNotifiedChannelPointClaimByState =
       <int, String>{};
   final Map<int, int> _lastChannelPointBalanceByState = <int, int>{};
+  final Map<int, int> _notifiedClaimCreditsByState = <int, int>{};
   final Map<int, Timer> _channelPointPollingTimerByState = <int, Timer>{};
   final Map<int, Set<String>> _processingChannelPointBonusByState =
       <int, Set<String>>{};
@@ -35,6 +36,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   TwitchPredictionSnapshot? prediction;
   List<dynamic> pinnedMessages = const <dynamic>[];
   int _pinsRevision = 0;
+  int _engagementRefreshSerial = 0;
 
   void applyModerationPins(
     String targetChannelId,
@@ -76,6 +78,11 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     required String channel,
     required bool Function() engagementBootstrapping,
   }) {
+    hypeTrainController.startPolling(
+      channelLogin: channel,
+      channelId: channelId(),
+      shouldPoll: () => !_disposed && isCurrentWatchTask(generation, channel),
+    );
     final key = hashCode;
     final existing = _channelPointPollingTimerByState[key];
     if (existing != null && existing.isActive) return;
@@ -130,6 +137,8 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     if (_disposed) return;
     final login = channelLogin();
     final currentChannelId = channelId();
+    final currentViewerId = viewerId();
+    final serial = ++_engagementRefreshSerial;
 
     loadingEngagement = true;
     engagementError = null;
@@ -140,14 +149,22 @@ class TwitchWatchEngagementController extends ChangeNotifier {
       channelLogin: login,
       channelId: currentChannelId,
     );
-    if (_disposed) return;
-    if (login != channelLogin()) return;
-    unawaited(
-      hypeTrainController.refresh(
-        channelLogin: login,
-        channelId: currentChannelId,
-      ),
-    );
+    if (_disposed || serial != _engagementRefreshSerial) return;
+    if (login != channelLogin() ||
+        currentChannelId != channelId() ||
+        currentViewerId != viewerId()) {
+      loadingEngagement = false;
+      _notifyListenersIfAlive();
+      return;
+    }
+    if (!hypeTrainController.loading) {
+      unawaited(
+        hypeTrainController.refresh(
+          channelLogin: login,
+          channelId: currentChannelId,
+        ),
+      );
+    }
     final lastError = snapshot.error;
     channelPointsSnapshot = snapshot.channelPoints;
     _applyPrediction(snapshot.prediction, notify: false);
@@ -197,7 +214,7 @@ class TwitchWatchEngagementController extends ChangeNotifier {
         ? channelPoints.channelId!.trim()
         : channelId()?.trim();
     if (resolvedChannelId == null || resolvedChannelId.isEmpty) {
-      _notifyAvailableChannelPointBonus(channelPoints);
+      // A snapshot with an available chest is not an earned-points event.
       return;
     }
 
@@ -234,6 +251,8 @@ class TwitchWatchEngagementController extends ChangeNotifier {
   }) async {
     if (_disposed) return;
     final fallbackPoints = channelPoints.availableClaimPoints;
+    final login = channelLogin();
+    final viewer = viewerId();
     final name = channelPoints.pointsName?.trim();
     final pointName = name == null || name.isEmpty ? 'Channel Points' : name;
 
@@ -242,25 +261,35 @@ class TwitchWatchEngagementController extends ChangeNotifier {
         channelId: channelId,
         claimId: claimId,
       );
-      if (_disposed) return;
+      if (_disposed || login != channelLogin() || viewer != viewerId()) return;
 
       _doneChannelPointBonusByState
           .putIfAbsent(stateKey, () => <String>{})
           .add(bonusKey);
 
-      final earned = result.pointsEarned > 0
-          ? result.pointsEarned
+      final rawEarned = result.pointsEarned;
+      final int earned = rawEarned is num && rawEarned > 0
+          ? rawEarned.toInt()
           : fallbackPoints;
-      unawaited(
-        twitchSystemNotificationService.showChannelPoints(
-          title: '已領取 $pointName',
-          message: '${channelLogin()} +$earned',
-        ),
-      );
+      final rawClaim = result.raw;
+      final confirmed =
+          result.ok == true &&
+          !(rawClaim is Map && rawClaim['bestEffort'] == true);
+      if (confirmed && earned > 0) {
+        _notifiedClaimCreditsByState.update(
+          stateKey,
+          (value) => value + earned,
+          ifAbsent: () => earned,
+        );
+        twitchSystemNotificationService.recordChannelPointsEarned(
+          channel: login,
+          points: earned,
+        );
+      }
 
       await refreshEngagement(showSnackOnError: false);
     } catch (error) {
-      if (_disposed) return;
+      if (_disposed || login != channelLogin() || viewer != viewerId()) return;
       unawaited(
         twitchSystemNotificationService.showChannelPoints(
           title: '$pointName 領取失敗',
@@ -270,37 +299,6 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     } finally {
       _processingChannelPointBonusByState[stateKey]?.remove(bonusKey);
     }
-  }
-
-  void _notifyAvailableChannelPointBonus(
-    TwitchChannelPointsRuntimeSnapshot? channelPoints,
-  ) {
-    if (channelPoints == null || !channelPoints.hasAvailableClaim) {
-      _lastNotifiedChannelPointClaimByState.remove(hashCode);
-      return;
-    }
-
-    final claimId = channelPoints.availableClaimId?.trim();
-    if (claimId == null || claimId.isEmpty) return;
-
-    final memoryKey = '${channelLogin()}:$claimId';
-    if (_lastNotifiedChannelPointClaimByState[hashCode] == memoryKey) {
-      return;
-    }
-
-    _lastNotifiedChannelPointClaimByState[hashCode] = memoryKey;
-
-    final points = channelPoints.availableClaimPoints;
-    final pointsText = points > 0 ? '$points' : 'Channel Points';
-    final name = channelPoints.pointsName?.trim();
-    final pointName = name == null || name.isEmpty ? 'Channel Points' : name;
-
-    unawaited(
-      twitchSystemNotificationService.showChannelPoints(
-        title: '可領取 $pointName',
-        message: '${channelLogin()} 可領取 $pointsText',
-      ),
-    );
   }
 
   void _notifyChannelPointBalanceIncrease(
@@ -314,23 +312,30 @@ class TwitchWatchEngagementController extends ChangeNotifier {
     final previousBalance = _lastChannelPointBalanceByState[key];
     _lastChannelPointBalanceByState[key] = balance;
 
-    if (!notifyBalanceDelta || previousBalance == null) return;
-    final delta = balance - previousBalance;
-    if (delta <= 0) return;
+    if (previousBalance == null) {
+      _notifiedClaimCreditsByState.remove(key);
+      return;
+    }
+    var delta = balance - previousBalance;
+    final credit = _notifiedClaimCreditsByState[key] ?? 0;
+    if (delta > 0 && credit > 0) {
+      final consumed = delta < credit ? delta : credit;
+      delta -= consumed;
+      _notifiedClaimCreditsByState[key] = credit - consumed;
+    }
+    if (!notifyBalanceDelta || delta <= 0) return;
 
-    final name = channelPoints.pointsName?.trim();
-    final pointName = name == null || name.isEmpty ? 'Channel Points' : name;
-
-    unawaited(
-      twitchSystemNotificationService.showChannelPoints(
-        title: '$pointName 增加',
-        message: '${channelLogin()} +$delta，目前 $balance',
-      ),
+    twitchSystemNotificationService.recordChannelPointsEarned(
+      channel: channelLogin(),
+      points: delta,
     );
   }
 
   void reset() {
     if (_disposed) return;
+    _engagementRefreshSerial++;
+    _lastChannelPointBalanceByState.clear();
+    _notifiedClaimCreditsByState.clear();
     _pinsRevision++;
     channelPointsSnapshot = null;
     prediction = null;

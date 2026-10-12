@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../api/engagement/twitch_prediction_api_service.dart';
 import '../../models/engagement/twitch_prediction.dart';
@@ -61,6 +62,10 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   bool _submitting = false;
   bool _refreshingGqlFallback = false;
   bool _showRefreshingGqlFallbackChip = false;
+  String? _selectedOutcomeId;
+  String? _feedback;
+  int _predictionRevision = 0;
+  int _syncFailures = 0;
 
   String? _localViewerOutcomeId;
   int _localViewerPoints = 0;
@@ -76,7 +81,9 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
             return;
           }
           if (!_samePredictionFamily(_visiblePrediction, prediction)) return;
+          _predictionRevision++;
           setState(() {
+            _syncFailures = 0;
             _visiblePrediction = _mergeIncomingPrediction(prediction);
           });
         });
@@ -147,6 +154,10 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   TwitchPredictionSnapshot _mergeIncomingPrediction(
     TwitchPredictionSnapshot incoming,
   ) {
+    if (twitchPredictionStatusRank(incoming) <
+        twitchPredictionStatusRank(_visiblePrediction)) {
+      return _visiblePrediction;
+    }
     _rememberViewerPredictionFrom(_visiblePrediction);
 
     final incomingViewer = incoming.viewerOutcome;
@@ -186,106 +197,236 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
   Widget build(BuildContext context) {
     final l10n = context.vio;
     final prediction = _visiblePrediction;
-    final status = prediction.status.toUpperCase();
-    final isActive = status == 'ACTIVE' || status == 'OPEN';
+    final isActive = twitchPredictionCanBet(prediction);
     final viewerChoiceId = twitchPredictionViewerChoiceId(prediction);
-    final hasViewerChoice = viewerChoiceId.isNotEmpty;
-    final viewerChoice = hasViewerChoice
-        ? twitchPredictionOutcomeByIdentity(prediction.outcomes, viewerChoiceId)
-        : null;
+    final choiceId = viewerChoiceId.isNotEmpty
+        ? viewerChoiceId
+        : _selectedOutcomeId ?? '';
+    final chosen = twitchPredictionOutcomeByIdentity(
+      prediction.outcomes,
+      choiceId,
+    );
     final totalPoints = prediction.totalPoints > 0
         ? prediction.totalPoints
         : prediction.outcomes.fold<int>(0, (sum, item) => sum + item.points);
     final totalUsers = prediction.totalUsers > 0
         ? prediction.totalUsers
         : prediction.outcomes.fold<int>(0, (sum, item) => sum + item.users);
-    final timeLabel = twitchPredictionTimeLabel(prediction, l10n);
-    final helperText = !isActive
-        ? l10n.t('這個賭盤目前不能下注')
-        : hasViewerChoice
-        ? '${l10n.t('已下注')}「${viewerChoice?.title ?? viewerChoiceId}」，${l10n.t('只能繼續加注同一邊，另一邊已鎖住')}'
-        : l10n.t('選擇下方選項送出下注');
-
+    final status =
+        !isActive &&
+            (prediction.normalizedStatus == 'ACTIVE' ||
+                prediction.normalizedStatus == 'OPEN')
+        ? 'LOCKED'
+        : prediction.status;
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
         title: prediction.title.isEmpty ? l10n.t('賭盤預測') : prediction.title,
-        subtitle:
-            '${prediction.status.isEmpty ? 'ACTIVE' : prediction.status.toUpperCase()} · ${twitchPredictionFormatCompact(totalPoints)} ${l10n.t('點')} · ${twitchPredictionFormatCompact(totalUsers)} ${l10n.t('人')}${timeLabel == null ? '' : ' · $timeLabel'}',
         icon: Icons.how_to_vote_rounded,
         showRefresh: false,
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 14,
-            right: 14,
-            top: 10,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 8,
-          ),
-          child: Column(
-            children: [
-              TwitchPredictionBetMetaRow(
-                status: prediction.status,
-                totalPoints: totalPoints,
-                totalUsers: totalUsers,
-                viewerChoice: viewerChoice,
-                timeLabel: timeLabel,
-                refreshingGqlFallback: _showRefreshingGqlFallbackChip,
-              ),
-              const SizedBox(height: 10),
-              TwitchTextField(
-                controller: _pointsController,
-                enabled: !_submitting && isActive,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                ),
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                  labelText: l10n.t('下注點數'),
-                  helperText: helperText,
-                  helperMaxLines: 2,
-                  helperStyle: TextStyle(
-                    color: isActive ? Colors.white38 : Colors.orangeAccent,
-                    fontSize: 11,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 430;
+            final content = Padding(
+              padding: EdgeInsets.fromLTRB(14, 8, 14, 8),
+              child: Column(
+                mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+                children: [
+                  TwitchPredictionBetMetaRow(
+                    status: status,
+                    totalPoints: totalPoints,
+                    totalUsers: totalUsers,
+                    viewerChoice: prediction.viewerOutcome,
+                    winnerTitle: prediction.winningOutcome?.title,
+                    timeLabel: twitchPredictionTimeLabel(prediction, l10n),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Flexible(
+                    fit: compact ? FlexFit.loose : FlexFit.tight,
+                    child: ListView.separated(
+                      shrinkWrap: compact,
+                      physics: compact
+                          ? const NeverScrollableScrollPhysics()
+                          : null,
+                      padding: const EdgeInsets.only(bottom: 12),
+                      itemCount: prediction.outcomes.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final outcome = prediction.outcomes[index];
+                        final identity = twitchPredictionOutcomeIdentity(
+                          outcome,
+                        );
+                        final mine =
+                            viewerChoiceId.isNotEmpty &&
+                            identity == viewerChoiceId;
+                        final locked = viewerChoiceId.isNotEmpty && !mine;
+                        return TwitchPredictionOutcomeBetCard(
+                          key: ValueKey(identity),
+                          outcome: outcome,
+                          totalPoints: totalPoints,
+                          totalUsers: totalUsers,
+                          enabled: isActive && !_submitting && !locked,
+                          submitting: _submitting,
+                          selectedByViewer: mine,
+                          lockedByViewerChoice: locked,
+                          selectedForBet: identity == choiceId,
+                          onTap: () => setState(() {
+                            _selectedOutcomeId = identity;
+                            _feedback = null;
+                          }),
+                        );
+                      },
+                    ),
+                  ),
+                  if (_feedback != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        _feedback!,
+                        style: const TextStyle(
+                          color: Color(0xFFEBA1C9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  if (_syncFailures >= 2)
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_outlined,
+                          size: 15,
+                          color: Colors.white54,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            l10n.t('連線暫時中斷，保留目前結果'),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: l10n.t('重試'),
+                          onPressed: _refreshingGqlFallback
+                              ? null
+                              : () => _refreshPredictionFromGqlFallback(
+                                  showSyncIndicator: true,
+                                ),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                        ),
+                      ],
+                    ),
+                  if (isActive) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.035),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            chosen == null
+                                ? l10n.t('先選擇一個選項')
+                                : '${l10n.t('選擇')}：${chosen.title}',
+                            style: TextStyle(
+                              color: chosen == null
+                                  ? Colors.white54
+                                  : const Color(0xFFBEA6EB),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            l10n.t('快速選擇'),
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              for (final amount in [10, 100, 1000])
+                                ChoiceChip(
+                                  selected:
+                                      int.tryParse(_pointsController.text) ==
+                                      amount,
+                                  onSelected: _submitting
+                                      ? null
+                                      : (_) => setState(() {
+                                          _pointsController.text = '$amount';
+                                          _feedback = null;
+                                        }),
+                                  label: Text('$amount'),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TwitchTextField(
+                                  controller: _pointsController,
+                                  enabled: !_submitting,
+                                  onChanged: (_) => setState(() {}),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    border: const OutlineInputBorder(),
+                                    labelText: l10n.t('下注點數'),
+                                    suffixText: l10n.t('點'),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              FilledButton(
+                                onPressed: !_submitting && chosen != null
+                                    ? () => _submit(context, chosen)
+                                    : null,
+                                child: _submitting
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Text(
+                                        l10n.t(
+                                          viewerChoiceId.isEmpty
+                                              ? '確認下注'
+                                              : '加注',
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_showRefreshingGqlFallbackChip)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                ],
               ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  itemCount: prediction.outcomes.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final outcome = prediction.outcomes[index];
-                    final outcomeIdentity = twitchPredictionOutcomeIdentity(
-                      outcome,
-                    );
-                    final selectedByViewer =
-                        hasViewerChoice &&
-                        outcomeIdentity.isNotEmpty &&
-                        outcomeIdentity == viewerChoiceId;
-                    final lockedByViewerChoice =
-                        isActive && hasViewerChoice && !selectedByViewer;
-                    final enabled =
-                        !_submitting && isActive && !lockedByViewerChoice;
-
-                    return TwitchPredictionOutcomeBetCard(
-                      outcome: outcome,
-                      totalPoints: totalPoints,
-                      totalUsers: totalUsers,
-                      enabled: enabled,
-                      submitting: _submitting,
-                      selectedByViewer: selectedByViewer,
-                      lockedByViewerChoice: lockedByViewerChoice,
-                      onTap: () => _submit(context, outcome),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            );
+            return compact ? SingleChildScrollView(child: content) : content;
+          },
         ),
       ),
     );
@@ -295,20 +436,31 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     BuildContext context,
     TwitchPredictionOutcome outcome,
   ) async {
+    if (_submitting || !twitchPredictionCanBet(_visiblePrediction)) return;
     final points = int.tryParse(_pointsController.text.trim()) ?? 0;
-    if (points <= 0) return;
+    if (points <= 0) {
+      setState(() => _feedback = context.vio.t('請輸入有效點數'));
+      return;
+    }
 
     final outcomeId = twitchPredictionOutcomeIdentity(outcome);
     if (outcomeId.isEmpty) return;
+    final mine = twitchPredictionViewerChoiceId(_visiblePrediction);
+    if (mine.isNotEmpty && mine != outcomeId) return;
+    final confirmedPointsBefore = _localViewerPoints;
 
     setState(() {
       _submitting = true;
-      _localViewerOutcomeId = outcomeId;
-      _localViewerPoints += points;
+      _feedback = null;
     });
 
     try {
       await widget.onBet(outcome, points);
+      if (!mounted) return;
+      _localViewerOutcomeId = outcomeId;
+      final expectedPoints = confirmedPointsBefore + points;
+      if (_localViewerPoints < expectedPoints)
+        _localViewerPoints = expectedPoints;
       final optimistic = _visiblePrediction.withViewerPrediction(
         outcomeId: outcomeId,
         points: _localViewerPoints,
@@ -322,15 +474,10 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         });
       }
 
-      // Only user-triggered post-bet refresh should expose a visible sync chip.
+      // Post-bet reconciliation uses a quiet progress line, not debug text.
       unawaited(_refreshPredictionFromGqlFallback(showSyncIndicator: true));
     } catch (_) {
-      final nextPoints = _localViewerPoints - points;
-      _localViewerPoints = nextPoints < 0 ? 0 : nextPoints;
-      if (_localViewerPoints <= 0) {
-        _localViewerOutcomeId = null;
-      }
-      rethrow;
+      if (mounted) setState(() => _feedback = context.vio.t('下注未成功，請稍後重試'));
     } finally {
       if (mounted) {
         setState(() => _submitting = false);
@@ -345,6 +492,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         widget.onRefreshPrediction ??
         TwitchPredictionApiService.refreshLastPredictionContext;
     if (_refreshingGqlFallback) return;
+    final revision = _predictionRevision;
 
     if (mounted) {
       setState(() {
@@ -356,6 +504,8 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
     try {
       final refreshed = await loader();
       if (!mounted || refreshed == null || !refreshed.hasPrediction) return;
+      // Do not let a slow fallback replace a newer Hermes update.
+      if (revision != _predictionRevision) return;
       if (!_samePredictionFamily(_visiblePrediction, refreshed)) return;
 
       final merged = _mergeIncomingPrediction(refreshed);
@@ -372,10 +522,11 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
       if (mounted) {
         setState(() {
           _visiblePrediction = visible;
+          _syncFailures = 0;
         });
       }
     } catch (_) {
-      // GQL fallback is best-effort. Keep optimistic/local state if it fails.
+      if (mounted) setState(() => _syncFailures++);
     } finally {
       if (mounted) {
         setState(() {

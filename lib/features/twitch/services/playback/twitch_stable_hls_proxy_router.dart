@@ -51,9 +51,50 @@ class TwitchStableHlsProxyRouter {
   bool _starting = false;
   bool _switching = false;
   int _switchGeneration = 0;
+  int _sourceChangeGeneration = 0;
   int _directStreamGeneration = 0;
   int _streamClientGeneration = 0;
   StreamIterator<List<int>>? _activeUpstreamIterator;
+
+  int _streamRequests = 0;
+  int _streamHeadRequests = 0;
+  int _streamAttachments = 0;
+  int _streamReceivedBytes = 0;
+  int _streamFlushedBytes = 0;
+  int _streamUpstreamStatus = 0;
+  int _streamPumpFailures = 0;
+  bool _streamFlushPending = false;
+  final List<int> _streamHeaderPrefix = <int>[];
+
+  /// Counts for the newest native HTTP reader, not proof of native decoding.
+  /// Only fixed header classifications are exposed; never URLs or media bytes.
+  Map<String, Object> get streamReadDiagnostics {
+    bool boxIs(String name) {
+      if (_streamHeaderPrefix.length < 8) return false;
+      for (var index = 0; index < 4; index++) {
+        if (_streamHeaderPrefix[index + 4] != name.codeUnitAt(index)) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    return {
+      'requests': _streamRequests,
+      'headRequests': _streamHeadRequests,
+      'attachments': _streamAttachments,
+      'receivedBytes': _streamReceivedBytes,
+      'flushedBytes': _streamFlushedBytes,
+      'upstreamStatus': _streamUpstreamStatus,
+      'pumpFailures': _streamPumpFailures,
+      'flushPending': _streamFlushPending,
+      'headerBytes': _streamHeaderPrefix.length,
+      'startsWithTsSync':
+          _streamHeaderPrefix.isNotEmpty && _streamHeaderPrefix.first == 0x47,
+      'startsWithMp4Init': boxIs('ftyp') || boxIs('moov'),
+      'startsWithMp4Fragment': boxIs('moof') || boxIs('styp'),
+    };
+  }
 
   int? get port => _server?.port;
 
@@ -132,6 +173,10 @@ class TwitchStableHlsProxyRouter {
       );
     }
 
+    final sourceChangeGeneration = ++_sourceChangeGeneration;
+    bool isCurrentChange() =>
+        _server != null && sourceChangeGeneration == _sourceChangeGeneration;
+
     if (_inner != null &&
         _inner!.isRunning &&
         _replayProxy != null &&
@@ -142,11 +187,16 @@ class TwitchStableHlsProxyRouter {
         _switching = true;
         try {
           await _inner!.reconnectAtSegmentBoundary();
-          _switchGeneration++;
+          if (isCurrentChange()) _switchGeneration++;
         } finally {
-          _switching = false;
-          _switchGeneration++;
+          if (isCurrentChange()) {
+            _switching = false;
+            _switchGeneration++;
+          }
         }
+      } else if (_switching) {
+        _switching = false;
+        _switchGeneration++;
       }
       return;
     }
@@ -154,6 +204,8 @@ class TwitchStableHlsProxyRouter {
     _switching = true;
     final previous = _inner;
     final previousReplay = _replayProxy;
+    final previousDirectStreamUri = _directStreamUri;
+    final previousUpstreamPlaylistUrl = _upstreamPlaylistUrl;
     TwitchDartHlsLowLatencyProxy? next;
     TwitchSequentialLiveReplayProxy? nextReplay;
     _directStreamUri = null;
@@ -181,8 +233,49 @@ class TwitchStableHlsProxyRouter {
       );
 
       await next.start();
+      if (!isCurrentChange()) {
+        await next.close();
+        await nextReplay.close();
+        return;
+      }
       await next.waitUntilPrewarmed();
+      if (!isCurrentChange()) {
+        await next.close();
+        await nextReplay.close();
+        return;
+      }
+      // Best-effort prewarming can time out while the playlist is still being
+      // retried. Do not commit an uninitialized engine and close a usable
+      // previous source merely because its local HTTP server has started.
+      final playlistDeadline = DateTime.now().add(const Duration(seconds: 8));
+      TwitchHlsLiveStatus? candidateStatus;
+      while (true) {
+        candidateStatus = await next.requestLiveStatus();
+        if (!isCurrentChange()) {
+          await next.close();
+          await nextReplay.close();
+          return;
+        }
+        if (candidateStatus != null &&
+            (!candidateStatus.running || candidateStatus.playlistVersion > 0)) {
+          break;
+        }
+        if (DateTime.now().isAfter(playlistDeadline)) {
+          throw TimeoutException('Replacement HLS playlist not ready.');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      // An open isolate/server alone is not a viable playback source. A
+      // terminal playlist failure can stop its engine during prewarming.
+      if (!candidateStatus.running) {
+        throw StateError('Replacement HLS engine stopped before handoff.');
+      }
       await nextReplay.start();
+      if (!isCurrentChange()) {
+        await next.close();
+        await nextReplay.close();
+        return;
+      }
 
       _inner = next;
       _replayProxy = nextReplay;
@@ -195,13 +288,19 @@ class TwitchStableHlsProxyRouter {
     } catch (_) {
       if (!identical(next, previous)) await next?.close();
       if (!identical(nextReplay, previousReplay)) await nextReplay?.close();
-      _inner = previous;
-      _replayProxy = previousReplay;
-      _switchGeneration++;
-      rethrow;
+      if (isCurrentChange()) {
+        _inner = previous;
+        _replayProxy = previousReplay;
+        _directStreamUri = previousDirectStreamUri;
+        _upstreamPlaylistUrl = previousUpstreamPlaylistUrl;
+        _switchGeneration++;
+        rethrow;
+      }
     } finally {
-      _switching = false;
-      _switchGeneration++;
+      if (isCurrentChange()) {
+        _switching = false;
+        _switchGeneration++;
+      }
     }
   }
 
@@ -212,6 +311,7 @@ class TwitchStableHlsProxyRouter {
       throw ArgumentError.value(streamUrl, 'streamUrl', 'cannot be empty');
     }
 
+    final sourceChangeGeneration = ++_sourceChangeGeneration;
     if (_directStreamUri == directUri && _server != null) {
       return;
     }
@@ -231,8 +331,11 @@ class TwitchStableHlsProxyRouter {
       await previous?.close();
       await previousReplay?.close();
     } finally {
-      _switching = false;
-      _switchGeneration++;
+      if (sourceChangeGeneration == _sourceChangeGeneration &&
+          _server != null) {
+        _switching = false;
+        _switchGeneration++;
+      }
     }
   }
 
@@ -241,25 +344,35 @@ class TwitchStableHlsProxyRouter {
   }) async {
     final inner = _inner;
     final replay = _replayProxy;
-    if (inner == null || !inner.isRunning || replay == null || !replay.isRunning) {
+    if (inner == null ||
+        !inner.isRunning ||
+        replay == null ||
+        !replay.isRunning) {
       throw StateError('Live replay source not ready');
     }
     final replayUri = Uri.parse(
       replay.streamUrlForCanonicalTarget(canonicalTarget: canonicalTarget),
     );
+    final sourceChangeGeneration = ++_sourceChangeGeneration;
     _switching = true;
     _directStreamUri = replayUri;
     _directStreamGeneration++;
     _switchGeneration++;
     await _interruptActiveUpstream();
-    _switching = false;
-    _switchGeneration++;
+    if (sourceChangeGeneration == _sourceChangeGeneration && _server != null) {
+      _switching = false;
+      _switchGeneration++;
+    }
   }
 
   /// Stops the currently attached stable stream without tearing down the warm
   /// low-latency/live-replay proxies. Used when playback moves to the separate
   /// DVR TS bridge so a stale near-live pump cannot keep consuming bandwidth.
   Future<void> interruptPlaybackStream() async {
+    _sourceChangeGeneration++;
+    // This operation supersedes a pending source load; its stale finally must
+    // not own the switching flag once the separate DVR bridge takes over.
+    _switching = false;
     _streamClientGeneration++;
     _directStreamUri = null;
     _directStreamGeneration++;
@@ -280,6 +393,7 @@ class TwitchStableHlsProxyRouter {
   }
 
   Future<void> close() async {
+    _sourceChangeGeneration++;
     final server = _server;
     _server = null;
     _switchGeneration++;
@@ -342,9 +456,7 @@ class TwitchStableHlsProxyRouter {
         }
         await _proxyToInner(
           request,
-          Uri.parse(
-            replay.streamUrl(fromLive: _readReplayDuration(request)),
-          ),
+          Uri.parse(replay.streamUrl(fromLive: _readReplayDuration(request))),
         );
         return;
       }
@@ -395,6 +507,7 @@ class TwitchStableHlsProxyRouter {
 
   Future<void> _proxyStreamLoop(HttpRequest request) async {
     if (request.method == 'HEAD') {
+      _streamHeadRequests++;
       request.response.statusCode = HttpStatus.ok;
       _applyStreamHeaders(request.response);
       await request.response.close();
@@ -405,6 +518,14 @@ class TwitchStableHlsProxyRouter {
     // reported the previous socket as closed. Keep only the newest stream pump
     // so stale local clients cannot multiply loopback traffic indefinitely.
     final streamClientGeneration = ++_streamClientGeneration;
+    _streamRequests++;
+    _streamAttachments = 0;
+    _streamReceivedBytes = 0;
+    _streamFlushedBytes = 0;
+    _streamUpstreamStatus = 0;
+    _streamPumpFailures = 0;
+    _streamFlushPending = false;
+    _streamHeaderPrefix.clear();
     await _interruptActiveUpstream();
 
     final response = request.response;
@@ -437,6 +558,23 @@ class TwitchStableHlsProxyRouter {
           upstreamRequest.followRedirects = true;
           upstreamRequest.maxRedirects = 4;
           final upstreamResponse = await upstreamRequest.close();
+          // A switch/new reader can finish while response headers are pending.
+          // Do not let that obsolete response install an active iterator or
+          // splice bytes into the current native stream.
+          if (_server == null ||
+              streamClientGeneration != _streamClientGeneration ||
+              lastGeneration != _switchGeneration) {
+            await StreamIterator<List<int>>(upstreamResponse).cancel();
+            if (directMode &&
+                lastDirectStreamGeneration != _directStreamGeneration) {
+              break;
+            }
+            continue;
+          }
+          if (streamClientGeneration == _streamClientGeneration) {
+            _streamAttachments++;
+            _streamUpstreamStatus = upstreamResponse.statusCode;
+          }
 
           final iterator = StreamIterator<List<int>>(upstreamResponse);
           _activeUpstreamIterator = iterator;
@@ -444,11 +582,27 @@ class TwitchStableHlsProxyRouter {
             while (await iterator.moveNext()) {
               final chunk = iterator.current;
               if (_server == null ||
-                  streamClientGeneration != _streamClientGeneration) {
+                  streamClientGeneration != _streamClientGeneration ||
+                  lastGeneration != _switchGeneration) {
                 break;
               }
               response.add(chunk);
-              await response.flush().timeout(const Duration(seconds: 1));
+              _streamReceivedBytes += chunk.length;
+              for (
+                var index = 0;
+                index < chunk.length && _streamHeaderPrefix.length < 8;
+                index++
+              ) {
+                _streamHeaderPrefix.add(chunk[index]);
+              }
+              _streamFlushPending = true;
+              // Preserve the current stream while the native reader drains.
+              // Socket closure still aborts flush; buffering alone must not.
+              await response.flush();
+              if (streamClientGeneration == _streamClientGeneration) {
+                _streamFlushedBytes += chunk.length;
+                _streamFlushPending = false;
+              }
             }
           } finally {
             if (identical(_activeUpstreamIterator, iterator)) {
@@ -457,6 +611,10 @@ class TwitchStableHlsProxyRouter {
             await iterator.cancel();
           }
         } catch (_) {
+          if (streamClientGeneration == _streamClientGeneration) {
+            _streamPumpFailures++;
+            _streamFlushPending = false;
+          }
           // media_kit closes the old HTTP response when the same stable URL is
           // force-opened for a new seek. End this request instead of looping a
           // dead response and piling up stale stream pumps.
@@ -468,11 +626,12 @@ class TwitchStableHlsProxyRouter {
           break;
         }
 
-        // If the same inner stream simply ended without a router switch, do not
-        // spin aggressively. Give the inner proxy a moment to expose fresh data.
+        // Without an explicit switch, EOF may follow a fatal partial segment.
+        // Propagate it to the native reader. Reattaching a new initialization
+        // to this response would hide EOF and splice into the damaged segment.
         if (lastGeneration == _switchGeneration &&
             lastAttachedInnerStreamUrl == _currentStreamTargetLabel()) {
-          await Future<void>.delayed(const Duration(milliseconds: 80));
+          break;
         }
       }
     } finally {

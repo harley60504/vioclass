@@ -84,6 +84,7 @@ endif()
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
 include(flutter/generated_plugins.cmake)
+include(vioclass_mpv_audio.cmake)
 
 
 # === Installation ===

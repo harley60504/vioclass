@@ -21,11 +21,15 @@ class TwitchWatchChatInputSection extends StatelessWidget {
   final bool compact;
   final bool enabled;
   final bool sending;
+  final bool readOnlyGuest;
+  final bool missingSendPermission;
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenEmotes;
   final VoidCallback? onOpenSpecialActions;
   final VoidCallback? onCancelPendingSpecialMessage;
+  final VoidCallback? onLoginPressed;
   final VoidCallback onSend;
+  final Object? sendContext;
 
   const TwitchWatchChatInputSection({
     super.key,
@@ -39,11 +43,15 @@ class TwitchWatchChatInputSection extends StatelessWidget {
     required this.compact,
     required this.enabled,
     required this.sending,
+    this.readOnlyGuest = false,
+    this.missingSendPermission = false,
     required this.onOpenChannelPoints,
     required this.onOpenEmotes,
     this.onOpenSpecialActions,
     this.onCancelPendingSpecialMessage,
+    this.onLoginPressed,
     required this.onSend,
+    this.sendContext,
   });
 
   @override
@@ -66,11 +74,12 @@ class TwitchWatchChatInputSection extends StatelessWidget {
               onCancel: onCancelPendingSpecialMessage ?? () {},
             ),
           if (activeRuntime == null)
-            _buildComposer()
+            _buildComposer(context)
           else
             AnimatedBuilder(
               animation: activeRuntime,
               builder: (context, _) => _buildComposer(
+                context,
                 roomModeHint: twitchChatRoomModeHint(
                   l10n: context.vio,
                   roomState: activeRuntime.roomState,
@@ -87,7 +96,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
     );
   }
 
-  Widget _buildComposer({String? roomModeHint}) {
+  Widget _buildComposer(BuildContext context, {String? roomModeHint}) {
     return DecoratedBox(
       decoration: const BoxDecoration(
         color: TwitchUiColors.surfaceRaised,
@@ -103,24 +112,62 @@ class TwitchWatchChatInputSection extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TwitchChatInputBar(
-            controller: messageController,
-            enabled: enabled,
-            sending: sending,
-            hintText: roomModeHint,
-            hintColor: roomModeHint == null
-                ? null
-                : Colors.amber.shade200.withValues(alpha: 0.88),
-            leadingActions: TwitchWatchChatUtilityBar(
-              channelPoints: channelPoints,
-              loadingEmotes: loadingEmotes,
-              onOpenChannelPoints: onOpenChannelPoints,
-              onOpenEmotes: onOpenEmotes,
-              onOpenSpecialActions: onOpenSpecialActions,
-              padding: EdgeInsets.zero,
+          if (readOnlyGuest || missingSendPermission)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.visibility_outlined,
+                    color: TwitchUiColors.textSecondary,
+                    size: 19,
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      context.vio.t(
+                        readOnlyGuest
+                            ? '訪客模式可讀取聊天室；登入後才能發言與使用點數。'
+                            : '已登入，但缺少聊天室發言權限。請重新授權後再發言。',
+                      ),
+                      style: const TextStyle(
+                        color: TwitchUiColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: onLoginPressed,
+                    icon: const Icon(Icons.login_rounded, size: 17),
+                    label: Text(context.vio.t(readOnlyGuest ? '登入' : '重新授權')),
+                  ),
+                ],
+              ),
+            )
+          else
+            TwitchChatInputBar(
+              controller: messageController,
+              enabled: enabled,
+              sending: sending,
+              hintText: roomModeHint,
+              hintColor: roomModeHint == null
+                  ? null
+                  : Colors.amber.shade200.withValues(alpha: 0.88),
+              leadingActions: TwitchWatchChatUtilityBar(
+                channelPoints: channelPoints,
+                loadingEmotes: loadingEmotes,
+                onOpenChannelPoints: onOpenChannelPoints,
+                onOpenEmotes: onOpenEmotes,
+                padding: EdgeInsets.zero,
+              ),
+              trailingActions: TwitchWatchChatIdentityButton(
+                onTap: onOpenSpecialActions,
+              ),
+              onSend: onSend,
+              sendContext: sendContext,
             ),
-            onSend: onSend,
-          ),
         ],
       ),
     );

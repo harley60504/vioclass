@@ -12,6 +12,7 @@ import '../widgets/chat/twitch_chat_text_style.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
 import 'chat_message_context/twitch_reply_thread_builder.dart';
 import 'chat_message_context/twitch_reply_thread_card.dart';
+import 'twitch_chat_user_profile_sheet.dart' show twitchChatUserLocalHistory;
 
 Future<void> showTwitchChatMessageContextSheet({
   required BuildContext context,
@@ -31,14 +32,14 @@ Future<void> showTwitchChatMessageContextSheet({
 
   return showTwitchUnifiedSheet<void>(
     context: context,
-    title: '${l10n.t('回覆串')} · ${entries.length}',
-    subtitle: l10n.t('依回覆關係顯示；提及標記不聚集'),
+    title: l10n.t('回覆串'),
     icon: Icons.reply_rounded,
     size: TwitchUnifiedSheetSize.medium,
     showRefresh: false,
-    builder: (_) => _TwitchChatMessageContextSheet(
+    builder: (_) => TwitchChatMessageContextCard(
       selectedMessage: selectedMessage,
       entries: entries,
+      messages: messages,
       thirdPartyEmotes: thirdPartyEmotes,
       officialEmotes: officialEmotes,
       fontScale: fontScale,
@@ -48,7 +49,8 @@ Future<void> showTwitchChatMessageContextSheet({
   );
 }
 
-class _TwitchChatMessageContextSheet extends StatelessWidget {
+class TwitchChatMessageContextCard extends StatefulWidget {
+  final List<TwitchChatRuntimeMessage> messages;
   final TwitchChatRuntimeMessage selectedMessage;
   final List<TwitchReplyThreadEntry> entries;
   final TwitchThirdPartyEmoteCacheService? thirdPartyEmotes;
@@ -58,7 +60,8 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
   messageActionBuilder;
   final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
 
-  const _TwitchChatMessageContextSheet({
+  const TwitchChatMessageContextCard({
+    required this.messages,
     required this.selectedMessage,
     required this.entries,
     required this.thirdPartyEmotes,
@@ -69,39 +72,74 @@ class _TwitchChatMessageContextSheet extends StatelessWidget {
   });
 
   @override
+  State<TwitchChatMessageContextCard> createState() => _MessageContextState();
+}
+
+class _MessageContextState extends State<TwitchChatMessageContextCard> {
+  bool _showHistory = false;
+  @override
   Widget build(BuildContext context) {
+    final history = twitchChatUserLocalHistory(
+      widget.selectedMessage,
+      widget.messages,
+    );
+    final entries = _showHistory
+        ? history
+              .map(
+                (message) => TwitchReplyThreadEntry(
+                  message: message,
+                  kind: TwitchReplyThreadEntryKind.selected,
+                  depth: 0,
+                ),
+              )
+              .toList()
+        : widget.entries;
     return TwitchChatTextScope(
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-        itemCount: entries.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          return TwitchReplyThreadMessageCard(
-            entry: entry,
-            selected: _isSelectedEntry(entry.message),
-            thirdPartyEmotes: thirdPartyEmotes,
-            officialEmotes: officialEmotes,
-            fontScale: fontScale,
-            actions: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (onOpenUser != null && entry.message.userLogin.isNotEmpty)
-                  TextButton.icon(
-                    onPressed: () => onOpenUser!(entry.message),
-                    icon: const Icon(Icons.person_outline),
-                    label: Text(context.vio.t('使用者資料')),
-                  ),
-                ?messageActionBuilder?.call(context, entry.message),
-              ],
+        children: [
+          Wrap(
+            spacing: 8,
+            children: [
+              ChoiceChip(
+                label: Text(context.vio.t('聊天串')),
+                selected: !_showHistory,
+                onSelected: (_) => setState(() => _showHistory = false),
+              ),
+              ChoiceChip(
+                label: Text(context.vio.t('聊天紀錄')),
+                selected: _showHistory,
+                onSelected: (_) => setState(() => _showHistory = true),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (final entry in entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: TwitchReplyThreadMessageCard(
+                entry: entry,
+                selected: _isSelectedEntry(entry.message),
+                showEntryKind: !_showHistory,
+                thirdPartyEmotes: widget.thirdPartyEmotes,
+                officialEmotes: widget.officialEmotes,
+                fontScale: widget.fontScale,
+                onOpenUser: widget.onOpenUser == null
+                    ? null
+                    : () => widget.onOpenUser!(entry.message),
+                actions: widget.messageActionBuilder?.call(
+                  context,
+                  entry.message,
+                ),
+              ),
             ),
-          );
-        },
+        ],
       ),
     );
   }
 
   bool _isSelectedEntry(TwitchChatRuntimeMessage message) {
+    final selectedMessage = widget.selectedMessage;
     final selectedId = selectedMessage.id.trim();
     final messageId = message.id.trim();
 

@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 
 import '../../../api/chat/twitch_chat_identity_api_service.dart';
 import '../../../api/chat/twitch_chat_user_profile_api_service.dart';
+import '../../../api/chat/twitch_chat_user_public_profile_api_service.dart';
+import '../../../api/chat/twitch_chat_user_appearance_api_service.dart';
 import '../../../api/moderation/twitch_moderation_api_service.dart';
 import '../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../models/chat/twitch_moderation_target_policy.dart';
 import '../../../models/special_actions/twitch_pending_special_message.dart';
 import '../../../models/special_actions/twitch_viewer_special_message_models.dart';
+import '../../../services/auth/twitch_viewer_session.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../sheets/twitch_special_message_sheet.dart';
 import '../../sheets/twitch_moderation_sheet.dart';
@@ -18,12 +21,41 @@ import '../../widgets/chat/twitch_chat_input_emote_state.dart';
 import '../../widgets/chat/message/twitch_moderation_message_actions.dart';
 import '../../widgets/chat/message/twitch_user_moderation_controls.dart';
 import '../twitch_watch_page.dart';
+import '../twitch_linked_login_page.dart';
+import 'twitch_watch_page_engagement.dart';
+import 'twitch_watch_page_relationship.dart';
+import 'twitch_watch_page_startup.dart';
 
 // ignore_for_file: invalid_use_of_protected_member
 
 final _chatUserProfileOpen = Expando<bool>('chatUserProfileOpen');
 
 extension TwitchWatchPageChatMethods on TwitchWatchPageState {
+  Future<void> openGuestLogin() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TwitchLinkedLoginPage(
+          mainAuthService: authService,
+          webGqlAuthService: webGqlAuthService,
+          dropsAuthService: dropsAuthService,
+          authApi: authApi,
+          apiClient: watchServices.apiClient,
+          autoCloseOnComplete: true,
+        ),
+      ),
+    );
+    if (!mounted) return;
+
+    await loadAuth();
+    if (!mounted || viewerId == null || viewerId!.isEmpty) return;
+
+    await connectChat(channelLogin);
+    if (!mounted) return;
+    unawaited(refreshRelationshipStatus(channelLogin: channelLogin));
+    unawaited(refreshEngagement(showSnackOnError: false));
+    unawaited(loadThirdPartyEmotes(forceRefresh: true));
+  }
+
   Future<void> openChatUserProfile(TwitchChatRuntimeMessage message) async {
     final runtime = chatRuntime;
     final selectedChannel = channelLogin;
@@ -51,6 +83,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
       final whisper = await showTwitchChatUserProfileSheet(
         context: context,
         message: message,
+        cacheKey: '${identityHashCode(runtime)}:$selectedViewer:$selectedChannel:${message.metadata.sourceRoomId}:${message.source.tags['user-id']}:${message.userLogin}:$canManageChat',
         messages: List.of(runtime.messages),
         viewerLogin: viewerLogin,
         messageActionBuilder: canManageChat
@@ -63,6 +96,43 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
         loadUser: () => api.getUser(
           login: message.userLogin,
           userId: message.source.tags['user-id'],
+        ),
+        loadPublicProfile: () =>
+            const TwitchChatUserPublicProfileApiService().load(
+              login: message.userLogin,
+              userId: message.source.tags['user-id'],
+              channelLogin:
+                  message.source.tags['source-room-id'] != null &&
+                      message.source.tags['source-room-id'] !=
+                          message.source.tags['room-id']
+                  ? message.source.tags['source-room-login'] ?? ''
+                  : selectedChannel,
+              isCurrent: isCurrent,
+            ),
+        loadAppearance: () => const TwitchChatUserAppearanceApiService().load(
+          login: message.userLogin,
+          userId: message.source.tags['user-id'] ?? '',
+          channelLogin:
+              message.source.tags['source-room-id'] != null &&
+                  message.source.tags['source-room-id'] !=
+                      message.source.tags['room-id']
+              ? message.source.tags['source-room-login'] ?? ''
+              : selectedChannel,
+          isCurrent: isCurrent,
+        ),
+        loadFollowInfo: () => !canManageChat && message.source.tags['user-id'] != selectedViewer
+            ? Future.value(const TwitchChatUserFollowInfo.unknown())
+            : api.getFollowInfo(
+          userId: message.source.tags['user-id'] ?? '',
+          broadcasterId:
+              message.metadata.sourceRoomId ??
+              message.source.tags['room-id'] ??
+              '',
+          canReadOtherFollowers:
+              canManageChat &&
+              (message.metadata.sourceRoomId == null ||
+                  message.metadata.sourceRoomId ==
+                      message.source.tags['room-id']),
         ),
         canWhisper:
             selectedViewer != null &&
@@ -117,6 +187,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
   }
 
   bool get canManageChat =>
+      chatController.hasCurrentViewer &&
       chatRuntime != null &&
       (chatRuntime!.viewerIsModerator ||
           (viewerId != null && channelId != null && viewerId == channelId));
@@ -258,16 +329,41 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
   }
 
   Future<void> sendMessage() async {
+    if (!mounted) return;
     final message = TwitchChatInputEmoteState.serialize(
       messageController,
     ).trim();
     if (message.isEmpty) return;
+    final generation = watchLoadGeneration;
+    final channel = channelLogin;
+    final submittedDraft = messageController.text;
+    final sendingRuntime = chatController.runtime;
+    final identity = TwitchViewerSession.forAuth(authService).snapshot;
+    final permitted =
+        chatController.canSendForCurrentViewer &&
+        !chatController.sending &&
+        (sendingRuntime?.connected ?? false);
 
     try {
-      await chatController.sendMessage(message);
+      final submitted = await chatController.sendMessage(message);
+      if (!submitted ||
+          !permitted ||
+          !isCurrentWatchTask(generation, channel)) {
+        return;
+      }
+      if (!identical(chatController.runtime, sendingRuntime) ||
+          !identical(
+            TwitchViewerSession.forAuth(authService).snapshot,
+            identity,
+          ) ||
+          messageController.text != submittedDraft ||
+          TwitchChatInputEmoteState.serialize(messageController).trim() !=
+              message) {
+        return;
+      }
       messageController.clear();
     } catch (error) {
-      debugPrint('watch chat send failed: $error');
+      debugPrint('watch chat send failed type=${error.runtimeType}');
     }
   }
 

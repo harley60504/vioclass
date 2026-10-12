@@ -30,11 +30,17 @@ class TwitchAppLanguageController extends ChangeNotifier {
 
   Future<void> select(TwitchAppLanguageMode mode) async {
     if (mode == _mode) return;
+    final prefs = await SharedPreferences.getInstance();
+    try {
+      if (!await prefs.setString(_selectedLanguageKey, mode.id)) {
+        throw StateError('Language selection was not saved');
+      }
+    } catch (_) {
+      await prefs.reload();
+      rethrow;
+    }
     _mode = mode;
     notifyListeners();
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_selectedLanguageKey, mode.id);
   }
 
   TwitchAppLanguageMode _modeFromId(String? id) {

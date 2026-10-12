@@ -39,6 +39,18 @@ class TwitchHlsLiveByteBus implements TwitchHlsByteSink {
 
   bool _closed = false;
   int _bufferedBytes = 0;
+  Uint8List? _initializationBytes;
+
+  // A fresh fragmented-MP4 reader needs the map even when replay contains only
+  // a later media segment. Keep it separate from the segment replay queue.
+  void setInitializationBytes(List<int>? bytes) {
+    if (_closed) return;
+    _initializationBytes = bytes == null ? null : Uint8List.fromList(bytes);
+    final initialization = _initializationBytes;
+    if (initialization != null && initialization.isNotEmpty) {
+      _sendToClients(initialization);
+    }
+  }
 
   @override
   int get bufferedBytes => _bufferedBytes;
@@ -55,6 +67,11 @@ class TwitchHlsLiveByteBus implements TwitchHlsByteSink {
         }
 
         _clients.add(controller);
+
+        final initialization = _initializationBytes;
+        if (initialization != null && initialization.isNotEmpty) {
+          controller.add(initialization);
+        }
 
         if (includeReplay) {
           for (final chunk in _replayChunks) {
@@ -107,6 +124,10 @@ class TwitchHlsLiveByteBus implements TwitchHlsByteSink {
       _bufferedBytes -= removed.length;
     }
 
+    _sendToClients(safeChunk);
+  }
+
+  void _sendToClients(List<int> safeChunk) {
     final disconnected = <StreamController<List<int>>>[];
 
     for (final client in _clients) {
@@ -141,6 +162,7 @@ class TwitchHlsLiveByteBus implements TwitchHlsByteSink {
 
     _clients.clear();
     _replayChunks.clear();
+    _initializationBytes = null;
     _bufferedBytes = 0;
   }
 }

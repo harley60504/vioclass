@@ -6,6 +6,7 @@ import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_auth_service.dart';
+import '../../services/auth/twitch_viewer_session.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/chat/twitch_whisper_login_integrity_service.dart';
@@ -77,17 +78,15 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
     var mainReady = mainToken != null && mainToken.trim().isNotEmpty;
     var whispersReady = false;
     if (mainReady) {
-      try {
-        final validation = await widget.authApi.validateToken(mainToken);
-        mainReady = validation.userId.isNotEmpty;
-        whispersReady =
-            mainReady &&
-            TwitchOAuthWebViewLoginPage.whisperScopes.every(
-              validation.scopes.contains,
-            );
-      } catch (_) {
-        mainReady = false;
-      }
+      final validation = await TwitchViewerSession.forAuth(
+        widget.mainAuthService,
+      ).resolve(widget.authApi, forceValidate: true);
+      mainReady = validation?.viewerId.isNotEmpty == true;
+      whispersReady =
+          mainReady &&
+          TwitchOAuthWebViewLoginPage.whisperScopes.every(
+            (scope) => validation?.scopes.contains(scope) == true,
+          );
     }
 
     final dropsToken = await widget.dropsAuthService.getToken();
@@ -128,8 +127,8 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _statusText = '尚未登入';
-        _errorText = '無法確認登入狀態，請重新登入。';
+        _statusText = '無法確認登入狀態';
+        _errorText = '無法確認登入狀態，請稍後再試。';
       });
     }
   }

@@ -8,6 +8,7 @@ import '../../../../api/chat/twitch_chat_startup_api_service.dart';
 import '../../../../api/chat/twitch_irc_api_service.dart';
 import '../../../../api/chat/twitch_recent_messages_api_service.dart';
 import '../../../../services/auth/twitch_auth_service.dart';
+import '../../../../services/auth/twitch_viewer_session.dart';
 import '../../../../services/auth/twitch_drops_auth_service.dart';
 import '../../../../services/chat/twitch_badge_cache_service.dart';
 import '../../../../services/chat/twitch_chat_runtime.dart';
@@ -33,13 +34,14 @@ class TwitchWatchChatLoader {
   }) async {
     await previousRuntime?.disposeRuntime();
 
-    final token = await authService.getValidAccessToken();
-    if (token == null || token.isEmpty) {
+    final validation = await TwitchViewerSession.forAuth(
+      authService,
+    ).resolve(authApi);
+    if (validation == null) {
       throw StateError('沒有可用 OAuth，不能連線可發言聊天室。');
     }
 
     await dropsAuthService.loadStoredSession();
-    final validation = await authApi.validateToken(token);
     final startup = await chatStartupApi.fetchParsedStartupSnapshot(
       channelLogin: channelLogin,
     );
@@ -53,11 +55,11 @@ class TwitchWatchChatLoader {
 
     await runtime.connect(
       channelLogin: channelLogin,
-      accessToken: token,
-      ircNick: validation.login,
-      viewerLogin: validation.login,
-      viewerDisplayName: validation.login,
-      viewerUserId: validation.userId,
+      accessToken: validation.accessToken,
+      ircNick: validation.viewerLogin,
+      viewerLogin: validation.viewerLogin,
+      viewerDisplayName: validation.viewerLogin,
+      viewerUserId: validation.viewerId,
       badgeCatalog: startup.badgeCatalog,
       preloadRecentMessages: true,
       recentMessageLimit: 100,
@@ -65,8 +67,8 @@ class TwitchWatchChatLoader {
 
     return TwitchWatchChatLoadResult(
       runtime: runtime,
-      viewerLogin: validation.login,
-      viewerId: validation.userId,
+      viewerLogin: validation.viewerLogin,
+      viewerId: validation.viewerId,
       viewerScopes: validation.scopes,
       channelId: startup.channelId,
     );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +8,10 @@ import '../../services/update/vioclass_update_service.dart';
 
 class VioClassUpdateController extends ChangeNotifier {
   static const String _autoCheckKey = 'vioclass_auto_check_updates_v1';
+  static const String _announcedKey = 'vioclass_announced_update_versions_v1';
+  final Future<void> Function(VioClassUpdateInfo)? onNewVersion;
+  Timer? _autoCheckTimer;
+  bool _disposed = false;
 
   final VioClassUpdateService service;
   final VioClassUpdateInstaller installer;
@@ -22,6 +27,7 @@ class VioClassUpdateController extends ChangeNotifier {
   VioClassUpdateController({
     VioClassUpdateService? service,
     VioClassUpdateInstaller? installer,
+    this.onNewVersion,
   }) : service = service ?? VioClassUpdateService(),
        installer = installer ?? VioClassUpdateInstaller();
 
@@ -37,8 +43,10 @@ class VioClassUpdateController extends ChangeNotifier {
   Future<void> load() async {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
-    _autoCheckEnabled = prefs.getBool(_autoCheckKey) ?? false;
+    _autoCheckEnabled = prefs.getBool(_autoCheckKey) ?? true;
+    if (_disposed) return;
     _loaded = true;
+    _syncAutoCheckTimer();
     notifyListeners();
   }
 
@@ -49,9 +57,21 @@ class VioClassUpdateController extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_autoCheckKey, value);
+    _syncAutoCheckTimer();
   }
 
-  Future<VioClassUpdateInfo?> checkNow() async {
+  void _syncAutoCheckTimer() {
+    _autoCheckTimer?.cancel();
+    _autoCheckTimer = null;
+    if (_disposed || !_autoCheckEnabled) return;
+    _autoCheckTimer = Timer.periodic(
+      const Duration(minutes: 30),
+      (_) => unawaited(checkNow(announce: true)),
+    );
+  }
+
+  Future<VioClassUpdateInfo?> checkNow({bool announce = false}) async {
+    if (_disposed) return null;
     if (_checking) return _latest;
     _checking = true;
     _errorText = null;
@@ -59,14 +79,28 @@ class VioClassUpdateController extends ChangeNotifier {
 
     try {
       final info = await service.checkLatest();
+      if (_disposed) return null;
       _latest = info;
+      if (announce &&
+          _autoCheckEnabled &&
+          info.updateAvailable &&
+          onNewVersion != null) {
+        final prefs = await SharedPreferences.getInstance();
+        if (_disposed || !_autoCheckEnabled) return info;
+        final seen = prefs.getStringList(_announcedKey) ?? [];
+        final version = info.release.tagName;
+        if (version.isNotEmpty && !seen.contains(version)) {
+          await onNewVersion!(info);
+          await prefs.setStringList(_announcedKey, [...seen, version]);
+        }
+      }
       return info;
     } catch (error) {
       _errorText = error.toString();
       return null;
     } finally {
       _checking = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
@@ -82,6 +116,7 @@ class VioClassUpdateController extends ChangeNotifier {
   }
 
   Future<bool> installUpdate() async {
+    if (_disposed) return false;
     final info = _latest;
     if (info == null) return false;
     if (_installing) return false;
@@ -94,10 +129,12 @@ class VioClassUpdateController extends ChangeNotifier {
       final file = await service.downloadPreferredAsset(
         info: info,
         onProgress: (progress) {
+          if (_disposed) return;
           _installProgress = progress;
           notifyListeners();
         },
       );
+      if (_disposed) return false;
       await installer.install(file);
       return true;
     } catch (error) {
@@ -105,12 +142,14 @@ class VioClassUpdateController extends ChangeNotifier {
       return false;
     } finally {
       _installing = false;
-      notifyListeners();
+      if (!_disposed) notifyListeners();
     }
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _autoCheckTimer?.cancel();
     service.dispose();
     super.dispose();
   }

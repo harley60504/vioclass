@@ -9,6 +9,7 @@ import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../localization/vioclass_localizations.dart';
 import '../pages/twitch_watch_route_guard.dart';
 import '../widgets/shared/twitch_notice.dart';
+import '../widgets/shared/twitch_glass.dart';
 import '../widgets/watch/player/twitch_player_only_surface.dart';
 import '../widgets/watch/player/twitch_media_kit_video_surface.dart';
 import '../watch/twitch_watch_playback_kind.dart';
@@ -190,7 +191,12 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard>
 
   Future<void> _restoreCurrentPlayback() async {
     try {
-      await _session.openOrResume(uri: widget.entry.mediaUri, play: true);
+      await _session.openOrResume(
+        uri: widget.entry.mediaUri,
+        play: _ready
+            ? (_session.playerOrNull?.state.playing ?? widget.entry.playOnOpen)
+            : widget.entry.playOnOpen,
+      );
       if (!mounted) return;
       setState(() => _ready = true);
     } catch (_) {
@@ -217,12 +223,14 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard>
         final renderPlayerOnly = pip.shouldRenderPlayerOnly;
         final video = AspectRatio(
           aspectRatio: 16 / 9,
-          child: _ready && videoController != null
-              ? TwitchMediaKitVideoSurface(
-                  controller: videoController,
-                  fit: BoxFit.cover,
-                )
-              : const TwitchMediaKitVideoWaitingSurface(),
+          child: IgnorePointer(
+            child: _ready && videoController != null
+                ? TwitchMediaKitVideoSurface(
+                    controller: videoController,
+                    fit: BoxFit.cover,
+                  )
+                : const TwitchMediaKitVideoWaitingSurface(),
+          ),
         );
 
         if (renderPlayerOnly) {
@@ -235,6 +243,7 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard>
               right: 14 - widget.offset.dx,
               bottom: 14 - widget.offset.dy,
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: _expandToWatchPage,
                 onPanUpdate: widget.onPanUpdate,
                 onPanEnd: widget.onPanEnd,
@@ -243,7 +252,7 @@ class _MiniPlayerCardState extends State<_MiniPlayerCard>
                   child: Container(
                     width: cardWidth,
                     decoration: BoxDecoration(
-                      color: const Color(0xF216161D),
+                      color: Colors.transparent,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: Colors.white.withValues(alpha: 0.14),
@@ -299,7 +308,8 @@ class _MiniPlayerFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.vio;
-    return Padding(
+    return TwitchPlayerGlassSurface(
+      borderRadius: BorderRadius.zero,
       padding: const EdgeInsets.fromLTRB(10, 2, 8, 8),
       child: Row(
         children: [

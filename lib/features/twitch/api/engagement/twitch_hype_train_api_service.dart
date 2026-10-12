@@ -15,6 +15,10 @@ class TwitchHypeTrainApiService {
   static const String _twitchOperationName = 'GetHypeTrainExecution';
   static const String _twitchSha256Hash =
       '8a39e843c94c5109a4cfb9badc641733e2205c60f5ee30e9b55edf0ad9db870a';
+  // Separate official status operation; the execution query stays unchanged.
+  static const String _statusHash =
+      '88e62c2cbd13b7bdce93cc8934727003a5cadd821938538f74848199fbfe84a0';
+  static final Map<String, bool> _goldenByTrain = <String, bool>{};
 
   final Object? client;
   final String? clientId;
@@ -57,12 +61,54 @@ class TwitchHypeTrainApiService {
         debugPrint(
           '[$_twitchOperationName] GQL errors for $login: ${raw.response}',
         );
-        return null;
+        throw StateError('Hype train execution unavailable');
       }
-      final snapshot = TwitchHypeTrainSnapshot.fromDynamic(
+      var snapshot = TwitchHypeTrainSnapshot.fromDynamic(
         raw.response,
         fallbackChannelLogin: login,
       );
+      final id = channelId?.trim().isNotEmpty == true
+          ? channelId!.trim()
+          : snapshot?.channelId ?? '';
+      if (snapshot != null && snapshot.isActive && id.isNotEmpty) {
+        final cacheKey = '$id/${snapshot.id}';
+        final cached = _goldenByTrain[cacheKey];
+        if (cached != null) return snapshot.copyWith(isGoldenKappa: cached);
+        // Failure of optional decoration must not hide a valid progress bar.
+        try {
+          final status = await gql.single(
+            TwitchWebGqlPersistedOperation(
+              operationName: 'BulkAllActiveHypeTrainStatusesQuery',
+              variables: <String, dynamic>{
+                'channelIDs': <String>[id],
+              },
+              sha256Hash: _statusHash,
+            ),
+          );
+          final data = status.data;
+          final nodes = data is Map ? data['allActiveHypeTrainStatuses'] : null;
+          if (!status.hasErrors && nodes is List) {
+            for (final node in nodes) {
+              if (node is Map &&
+                  node['channel'] is Map &&
+                  node['channel']['id']?.toString() == id &&
+                  node['isGoldenKappaTrain'] is bool &&
+                  node['id']?.toString() == snapshot!.id) {
+                snapshot = snapshot.copyWith(
+                  isGoldenKappa: node['isGoldenKappaTrain'] == true,
+                );
+                if (_goldenByTrain.length >= 64) {
+                  _goldenByTrain.remove(_goldenByTrain.keys.first);
+                }
+                _goldenByTrain[cacheKey] = snapshot.isGoldenKappa;
+                break;
+              }
+            }
+          }
+        } catch (_) {
+          // Preserve the execution result on temporary status-query failures.
+        }
+      }
       debugPrint(
         '[$_twitchOperationName] $login -> '
         'active=${snapshot?.isActive ?? false} '

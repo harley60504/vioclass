@@ -1,12 +1,6 @@
-//
-// UI widgets for the prediction bet sheet. Runtime / Hermes / GQL fallback
-// logic stays in twitch_prediction_bet_sheet.dart.
-
 import 'package:flutter/material.dart';
-
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../localization/vioclass_localizations.dart';
-import '../../theme/twitch_ui_tokens.dart';
 import 'twitch_prediction_bet_helpers.dart';
 
 class TwitchPredictionBetMetaRow extends StatelessWidget {
@@ -16,7 +10,7 @@ class TwitchPredictionBetMetaRow extends StatelessWidget {
   final TwitchPredictionOutcome? viewerChoice;
   final String? timeLabel;
   final bool refreshingGqlFallback;
-
+  final String? winnerTitle;
   const TwitchPredictionBetMetaRow({
     super.key,
     required this.status,
@@ -25,52 +19,60 @@ class TwitchPredictionBetMetaRow extends StatelessWidget {
     this.viewerChoice,
     this.timeLabel,
     this.refreshingGqlFallback = false,
+    this.winnerTitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.vio;
-    final choice = viewerChoice;
-
+    final color = status.toUpperCase().contains('RESOLVED')
+        ? const Color(0xFF76D5A3)
+        : const Color(0xFFBEA6EB);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: TwitchUiColors.sheet.cardFill,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: TwitchUiColors.sheet.backplate.border),
+        color: Colors.white.withValues(alpha: 0.035),
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Wrap(
-        spacing: 7,
-        runSpacing: 7,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TwitchPredictionBetChip(
-            label: status.isEmpty ? 'ACTIVE' : status.toUpperCase(),
+          Wrap(
+            spacing: 10,
+            runSpacing: 5,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Icon(
+                status.toUpperCase().contains('RESOLVED')
+                    ? Icons.emoji_events_outlined
+                    : Icons.timelapse_rounded,
+                size: 16,
+                color: color,
+              ),
+              Text(
+                context.vio.t(twitchPredictionStatusLabel(status)),
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
+              ),
+              if (timeLabel != null)
+                Text(
+                  timeLabel!,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+            ],
           ),
-          if (timeLabel != null)
-            TwitchPredictionBetChip(
-              label: timeLabel!,
-              color: Colors.orangeAccent,
-            ),
-          TwitchPredictionBetChip(
-            label:
-                '${twitchPredictionFormatCompact(totalPoints)} ${l10n.t('點')}',
+          const SizedBox(height: 6),
+          Text(
+            '${twitchPredictionFormatCompact(totalUsers)} ${context.vio.t('人')} · '
+            '${twitchPredictionFormatCompact(totalPoints)} ${context.vio.t('點')}',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
           ),
-          TwitchPredictionBetChip(
-            label:
-                '${twitchPredictionFormatCompact(totalUsers)} ${l10n.t('人')}',
-          ),
-          if (choice != null)
-            TwitchPredictionBetChip(
-              label:
-                  '${l10n.t('已下注')} ${choice.title.isEmpty ? l10n.t('此邊') : choice.title}',
-              color: Colors.greenAccent,
+          if (winnerTitle?.isNotEmpty == true) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${context.vio.t('勝出')}：$winnerTitle',
+              style: const TextStyle(color: Color(0xFF76D5A3)),
             ),
-          if (refreshingGqlFallback)
-            TwitchPredictionBetChip(
-              label: l10n.t('同步中'),
-              color: const Color(0xFF8AB4F8),
-            ),
+          ],
         ],
       ),
     );
@@ -85,8 +87,8 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
   final bool submitting;
   final bool selectedByViewer;
   final bool lockedByViewerChoice;
+  final bool selectedForBet;
   final VoidCallback onTap;
-
   const TwitchPredictionOutcomeBetCard({
     super.key,
     required this.outcome,
@@ -96,160 +98,179 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
     required this.submitting,
     required this.selectedByViewer,
     required this.lockedByViewerChoice,
+    this.selectedForBet = false,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.vio;
     final total = totalPoints <= 0 ? outcome.points : totalPoints;
     final percent = total <= 0 ? 0.0 : (outcome.points / total).clamp(0.0, 1.0);
     final odds = outcome.points <= 0 || total <= 0
         ? null
         : total / outcome.points;
-    final accent = outcome.isWinner || selectedByViewer
-        ? Colors.greenAccent
-        : lockedByViewerChoice
-        ? Colors.white38
-        : TwitchUiColors.sheet.backplate.foreground;
-    final borderColor = outcome.isWinner
-        ? Colors.greenAccent.withValues(alpha: 0.58)
-        : selectedByViewer
-        ? Colors.greenAccent.withValues(alpha: 0.58)
-        : lockedByViewerChoice
-        ? Colors.white.withValues(alpha: 0.10)
-        : TwitchUiColors.sheet.backplate.borderActive;
-    final opacity = lockedByViewerChoice ? 0.62 : 1.0;
-
-    return Opacity(
-      opacity: opacity,
+    final accent = outcome.isWinner
+        ? const Color(0xFF76D5A3)
+        : outcome.color.toUpperCase() == 'BLUE'
+        ? const Color(0xFF79B9F7)
+        : outcome.color.toUpperCase() == 'PINK'
+        ? const Color(0xFFEBA1C9)
+        : const Color(0xFFBEA6EB);
+    final selected = selectedByViewer || selectedForBet;
+    return Semantics(
+      selected: selected,
+      button: true,
+      enabled: enabled,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(12),
           onTap: enabled ? onTap : null,
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(13, 11, 13, 12),
+          child: AnimatedContainer(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: <Color>[
-                  selectedByViewer
-                      ? const Color(0xFF162C22).withValues(alpha: 0.98)
-                      : TwitchUiColors.sheet.cardFillActive,
-                  TwitchUiColors.sheet.shellGradientEnd,
-                ],
+              color: const Color(0xFF1B1B23),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: selected || outcome.isWinner
+                    ? accent.withValues(alpha: 0.65)
+                    : Colors.white.withValues(alpha: 0.08),
               ),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: borderColor),
-              boxShadow: <BoxShadow>[
-                BoxShadow(
-                  color: accent.withValues(
-                    alpha: enabled || selectedByViewer ? 0.18 : 0.04,
-                  ),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.26),
-                  blurRadius: 14,
-                  offset: const Offset(0, 8),
-                ),
-              ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        outcome.title.isEmpty ? l10n.t('選項') : outcome.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                Positioned.fill(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: percent, end: percent),
+                    duration: MediaQuery.disableAnimationsOf(context)
+                        ? Duration.zero
+                        : const Duration(milliseconds: 450),
+                    builder: (_, value, _) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: value,
+                        heightFactor: 1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                accent.withValues(
+                                  alpha: selected ? 0.20 : 0.10,
+                                ),
+                                accent.withValues(alpha: 0.035),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    if (outcome.isWinner)
-                      TwitchPredictionBetChip(
-                        label: l10n.t('勝出'),
-                        color: Colors.greenAccent,
-                      ),
-                    if (selectedByViewer)
-                      TwitchPredictionBetChip(
-                        label: l10n.t('已下注'),
-                        color: Colors.greenAccent,
-                      ),
-                    if (lockedByViewerChoice)
-                      TwitchPredictionBetChip(
-                        label: l10n.t('已鎖住'),
-                        color: Colors.white54,
-                      ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      selectedByViewer
-                          ? Icons.check_circle_rounded
-                          : enabled
-                          ? Icons.arrow_forward_ios_rounded
-                          : Icons.lock_rounded,
-                      color: selectedByViewer
-                          ? Colors.greenAccent
-                          : enabled
-                          ? Colors.white60
-                          : Colors.white24,
-                      size: 15,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: percent,
-                    minHeight: 9,
-                    backgroundColor: TwitchUiColors.sheet.cardBorder,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      outcome.isWinner || selectedByViewer
-                          ? Colors.greenAccent
-                          : TwitchUiColors.primary,
-                    ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    TwitchPredictionBetChip(
-                      label: '${(percent * 100).round()}%',
-                    ),
-                    TwitchPredictionBetChip(
-                      label:
-                          '${twitchPredictionFormatCompact(outcome.points)} ${l10n.t('點')}',
-                    ),
-                    TwitchPredictionBetChip(
-                      label:
-                          '${twitchPredictionFormatCompact(outcome.users)} ${l10n.t('人')}',
-                    ),
-                    if (outcome.viewerPoints > 0)
-                      TwitchPredictionBetChip(
-                        label:
-                            '${l10n.t('我的')} ${twitchPredictionFormatCompact(outcome.viewerPoints)} ${l10n.t('點')}',
-                        color: Colors.greenAccent,
+                Padding(
+                  padding: const EdgeInsets.all(13),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            outcome.isWinner
+                                ? Icons.emoji_events_outlined
+                                : selected
+                                ? Icons.check_circle_rounded
+                                : Icons.circle_outlined,
+                            size: 18,
+                            color: accent,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              outcome.title.isEmpty
+                                  ? context.vio.t('選項')
+                                  : outcome.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    if (odds != null)
-                      TwitchPredictionBetChip(
-                        label:
-                            '${odds.toStringAsFixed(odds >= 10 ? 1 : 2)}x ${l10n.t('賠率')}',
-                        color: TwitchUiColors.sheet.backplate.foreground,
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 5,
+                        children: [
+                          Text(
+                            '${context.vio.t('點數占比')} ${(percent * 100).round()}%',
+                            style: TextStyle(
+                              color: accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '${twitchPredictionFormatCompact(outcome.users)} ${context.vio.t('人')}',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            '${twitchPredictionFormatCompact(outcome.points)} ${context.vio.t('點')}',
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (odds != null)
+                            Tooltip(
+                              message: context.vio.t('目前估算賠率，結算前可能變動'),
+                              child: Text(
+                                '${context.vio.t('預估回報')} ${odds.toStringAsFixed(1)}×',
+                                style: TextStyle(color: accent, fontSize: 12),
+                              ),
+                            ),
+                          if (outcome.viewerPoints > 0)
+                            Text(
+                              '${context.vio.t('我的')} ${twitchPredictionFormatCompact(outcome.viewerPoints)}',
+                              style: TextStyle(color: accent, fontSize: 12),
+                            ),
+                          if (outcome.isWinner)
+                            Text(
+                              context.vio.t('勝出'),
+                              style: TextStyle(color: accent, fontSize: 12),
+                            ),
+                          if (selectedByViewer)
+                            Text(
+                              context.vio.t('已下注'),
+                              style: TextStyle(color: accent, fontSize: 12),
+                            ),
+                          if (selectedForBet && !selectedByViewer)
+                            Text(
+                              context.vio.t('已選擇'),
+                              style: TextStyle(
+                                color: accent,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          if (lockedByViewerChoice)
+                            Text(
+                              context.vio.t('已選另一選項'),
+                              style: const TextStyle(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
                       ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -263,33 +284,14 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
 class TwitchPredictionBetChip extends StatelessWidget {
   final String label;
   final Color color;
-
   const TwitchPredictionBetChip({
     super.key,
     required this.label,
-    this.color = TwitchUiColors.primarySoft,
+    this.color = const Color(0xFFBEA6EB),
   });
-
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withValues(alpha: 0.38)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(color: color.withValues(alpha: 0.08), blurRadius: 8),
-        ],
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Text(
+    label,
+    style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w500),
+  );
 }

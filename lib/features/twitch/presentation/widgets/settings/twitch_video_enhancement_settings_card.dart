@@ -18,6 +18,16 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
     final l10n = context.vio;
     final enabled = controller.videoEnhancementEnabled;
     final busy = controller.videoEnhancementBusy;
+    Future<void> save(Future<void> Function() operation) async {
+      try {
+        await operation();
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))));
+      }
+    }
 
     return Container(
       padding: const EdgeInsets.fromLTRB(13, 12, 13, 13),
@@ -69,7 +79,11 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                 ),
               Switch(
                 value: enabled,
-                onChanged: busy ? null : controller.setVideoEnhancementEnabled,
+                onChanged: busy
+                    ? null
+                    : (value) => save(
+                        () => controller.setVideoEnhancementEnabled(value),
+                      ),
               ),
             ],
           ),
@@ -139,7 +153,7 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                     ],
                     onChanged: (mode) {
                       if (mode != null) {
-                        controller.setVideoEnhancementMode(mode);
+                        save(() => controller.setVideoEnhancementMode(mode));
                       }
                     },
                   ),
@@ -209,21 +223,26 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                     subtitle: l10n.t('使用 CfL 重建色度細節，改善彩色文字、HUD 與紅藍邊緣。'),
                     loadLabel: l10n.t('中負載'),
                     value: controller.videoChromaEnhance,
-                    onChanged: controller.setVideoChromaEnhance,
+                    onChanged: (value) =>
+                        save(() => controller.setVideoChromaEnhance(value)),
                   ),
                   _EnhancementToggle(
                     title: l10n.t('Deband'),
-                    subtitle: l10n.t('使用 mpv 內建 deband 減少漸層色帶與直播壓縮造成的 banding。'),
+                    subtitle: l10n.t(
+                      '使用 mpv 內建 deband 減少漸層色帶與直播壓縮造成的 banding。',
+                    ),
                     loadLabel: l10n.t('低～中負載'),
                     value: controller.videoDeband,
-                    onChanged: controller.setVideoDeband,
+                    onChanged: (value) =>
+                        save(() => controller.setVideoDeband(value)),
                   ),
                   _EnhancementToggle(
                     title: l10n.t('Adaptive Sharpen'),
                     subtitle: l10n.t('超分後再做自適應銳化；讓邊緣更清楚，但過強可能放大壓縮雜訊。'),
                     loadLabel: l10n.t('中負載'),
                     value: controller.videoSharpen,
-                    onChanged: controller.setVideoSharpen,
+                    onChanged: (value) =>
+                        save(() => controller.setVideoSharpen(value)),
                   ),
                   if (controller.videoEnhancementUsesShader) ...[
                     const SizedBox(height: 7),
@@ -268,18 +287,15 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
     return switch (mode) {
       TwitchVideoEnhancementMode.lanczos => l10n.t('Lanczos｜最快、最穩'),
       TwitchVideoEnhancementMode.ewaLanczos => l10n.t('EWA Lanczos｜自然平滑'),
-      TwitchVideoEnhancementMode.ewaLanczosSharp =>
-        l10n.t('EWA Sharp｜均衡推薦'),
-      TwitchVideoEnhancementMode.ewaLanczos4Sharpest =>
-        l10n.t('EWA 4 Sharpest｜文字最銳利'),
+      TwitchVideoEnhancementMode.ewaLanczosSharp => l10n.t('EWA Sharp｜均衡推薦'),
+      TwitchVideoEnhancementMode.ewaLanczos4Sharpest => l10n.t(
+        'EWA 4 Sharpest｜文字最銳利',
+      ),
       TwitchVideoEnhancementMode.fsr => l10n.t('AMD FSR 1.0｜低解析放大'),
-      TwitchVideoEnhancementMode.ssimSuperRes =>
-        l10n.t('SSimSuperRes｜自然細節修復'),
+      TwitchVideoEnhancementMode.ssimSuperRes => l10n.t('SSimSuperRes｜自然細節修復'),
       TwitchVideoEnhancementMode.artCnn => l10n.t('ArtCNN C4F16｜AI 細節強化'),
-      TwitchVideoEnhancementMode.anime4kFast =>
-        l10n.t('Anime4K Fast｜動畫輕量'),
-      TwitchVideoEnhancementMode.anime4kHigh =>
-        l10n.t('Anime4K High｜動畫高品質'),
+      TwitchVideoEnhancementMode.anime4kFast => l10n.t('Anime4K Fast｜動畫輕量'),
+      TwitchVideoEnhancementMode.anime4kHigh => l10n.t('Anime4K High｜動畫高品質'),
     };
   }
 

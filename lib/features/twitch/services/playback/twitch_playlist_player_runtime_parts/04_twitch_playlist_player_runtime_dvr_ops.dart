@@ -439,6 +439,8 @@ extension _TwitchPlaylistPlayerRuntimeProxyOps on TwitchPlaylistPlayerRuntime {
         token: token,
         variants: variants,
       );
+    } on TwitchPlaybackAuthorizationException {
+      rethrow;
     } catch (_) {
       return null;
     }

@@ -3,19 +3,37 @@ import 'package:flutter/material.dart';
 import '../../../models/discovery/twitch_stream_header_metadata.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../services/discovery/twitch_discovery_service.dart';
+import '../../../services/watch/twitch_watch_services.dart';
+import '../../watch/controllers/twitch_watch_chat_controller.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_channel_page.dart';
 import '../../pages/twitch_watch_page.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 
+SliverGridDelegate twitchOfflineChannelGridDelegate(double availableWidth) {
+  // MaxCrossAxisExtent rounds column counts up, squeezing narrow cards below
+  // the width required by the two labelled actions. Preserve a minimum width.
+  final columns = ((availableWidth + 14) / 314).floor();
+  return SliverGridDelegateWithFixedCrossAxisCount(
+    crossAxisCount: columns < 1 ? 1 : columns,
+    mainAxisExtent: 168,
+    crossAxisSpacing: 14,
+    mainAxisSpacing: 14,
+  );
+}
+
 class TwitchOfflineChannelCard extends StatelessWidget {
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final TwitchFollowedChannel channel;
   final TwitchDiscoveryService discoveryService;
   final bool? initialKnownFollowing;
 
   const TwitchOfflineChannelCard({
     super.key,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     required this.channel,
     required this.discoveryService,
     this.initialKnownFollowing,
@@ -130,9 +148,12 @@ class TwitchOfflineChannelCard extends StatelessWidget {
   }
 
   void _openMediaWatchPage(BuildContext context) {
+    final watchServices = watchServicesFactory?.call();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => TwitchWatchPage(
+          initialServices: watchServices,
+          initialChatRuntimeFactory: watchChatRuntimeFactory,
           initialMetadata: TwitchStreamHeaderMetadata(
             channelLogin: channel.channelLogin,
             streamTitle: channel.description,

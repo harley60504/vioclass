@@ -1,8 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../models/discovery/twitch_live_stream.dart';
+import 'twitch_notification_history_store.dart';
 
 enum TwitchAppNotificationType { info, success, warning, error }
+
+enum TwitchAppNotificationCategory {
+  general,
+  live,
+  channelPoints,
+  whisper,
+  update,
+  drops,
+  giftSubscription,
+  badge,
+}
 
 @immutable
 class TwitchWhisperNotificationTarget {
@@ -40,6 +53,11 @@ class TwitchAppNotification {
   final DateTime createdAt;
   final Duration duration;
   final TwitchWhisperNotificationTarget? whisperTarget;
+  final TwitchAppNotificationCategory category;
+  final TwitchLiveStream? liveStream;
+  final List<String> avatarUrls;
+  final Future<void> Function()? onOpen;
+  final String? accountOwnerId;
 
   const TwitchAppNotification({
     required this.id,
@@ -49,9 +67,35 @@ class TwitchAppNotification {
     required this.createdAt,
     required this.duration,
     this.whisperTarget,
+    this.category = TwitchAppNotificationCategory.general,
+    this.liveStream,
+    this.avatarUrls = const [],
+    this.onOpen,
+    this.accountOwnerId,
   });
 
   IconData get icon {
+    if (category == TwitchAppNotificationCategory.live) {
+      return Icons.live_tv_rounded;
+    }
+    if (category == TwitchAppNotificationCategory.channelPoints) {
+      return Icons.monetization_on_outlined;
+    }
+    if (category == TwitchAppNotificationCategory.whisper) {
+      return Icons.chat_bubble_outline_rounded;
+    }
+    if (category == TwitchAppNotificationCategory.update) {
+      return Icons.system_update_alt_rounded;
+    }
+    if (category == TwitchAppNotificationCategory.drops) {
+      return Icons.card_giftcard_rounded;
+    }
+    if (category == TwitchAppNotificationCategory.giftSubscription) {
+      return Icons.card_giftcard_rounded;
+    }
+    if (category == TwitchAppNotificationCategory.badge) {
+      return Icons.workspace_premium_outlined;
+    }
     switch (type) {
       case TwitchAppNotificationType.success:
         return Icons.check_circle_rounded;
@@ -79,21 +123,204 @@ class TwitchAppNotification {
 }
 
 class TwitchAppNotificationCenter extends ChangeNotifier {
-  static const int maxStoredNotifications = 30;
+  static const int maxStoredNotifications =
+      TwitchNotificationHistoryStore.capacity;
   static const int maxVisibleNotifications = 1;
-  static const Duration defaultDuration = Duration(seconds: 8);
+  static const Duration defaultDuration = Duration(seconds: 5);
+  static const Duration liveDuration = Duration(seconds: 8);
+
+  final TwitchNotificationHistoryStore? historyStore;
+  TwitchAppNotificationCenter({this.historyStore});
+  bool _historyLoaded = false;
+  bool _disposed = false;
+  int _historyGeneration = 0;
+  Future<void>? _historyLoading;
+  Future<void> _pendingWrite = Future<void>.value();
+  bool _whisperOwnerResolved = false;
+  String? _whisperOwner;
+  bool _accountOwnerResolved = false;
+  String? _accountOwner;
+
+  void retainAccountOwner(String? ownerId) {
+    _accountOwnerResolved = true;
+    _accountOwner = ownerId;
+    _pruneHistory();
+    _saveHistory();
+    notifyListeners();
+  }
+
+  void retainWhisperOwner(String? ownerId) {
+    _whisperOwnerResolved = true;
+    _whisperOwner = ownerId;
+    _pruneHistory();
+    _saveHistory();
+    notifyListeners();
+  }
+
+  Future<void> loadHistory({
+    Future<void> Function(TwitchLiveStream)? onLiveOpen,
+    Future<void> Function()? onUpdateOpen,
+  }) {
+    if (_historyLoaded || historyStore == null) return Future<void>.value();
+    return _historyLoading ??= _restoreHistory(onLiveOpen, onUpdateOpen);
+  }
+
+  Future<void> _restoreHistory(
+    Future<void> Function(TwitchLiveStream)? onLiveOpen,
+    Future<void> Function()? onUpdateOpen,
+  ) async {
+    final generation = _historyGeneration;
+    final saved = await historyStore!.read();
+    if (_disposed) return;
+    _historyLoaded = true;
+    if (generation == _historyGeneration) {
+      for (final entry in saved) {
+        try {
+          final createdAt = DateTime.parse(entry['createdAt'] as String);
+          if (!_withinRetention(createdAt)) continue;
+          final category = TwitchAppNotificationCategory.values.byName(
+            entry['category'] as String,
+          );
+          final streamJson = entry['stream'];
+          final stream = streamJson is Map
+              ? _restoreStream(Map<String, dynamic>.from(streamJson))
+              : null;
+          final id = _nextId++;
+          _items.add(
+            TwitchAppNotification(
+              id: id,
+              title: entry['title'] as String,
+              message: entry['message'] as String,
+              type: TwitchAppNotificationType.values.byName(
+                entry['type'] as String,
+              ),
+              createdAt: createdAt,
+              duration: category == TwitchAppNotificationCategory.live
+                  ? liveDuration
+                  : defaultDuration,
+              category: category,
+              accountOwnerId: entry['accountOwnerId'] as String?,
+              liveStream: stream,
+              avatarUrls:
+                  (entry['avatars'] as List?)
+                      ?.whereType<String>()
+                      .take(3)
+                      .toList() ??
+                  const [],
+              whisperTarget: TwitchWhisperNotificationTarget.fromPayload(
+                entry['whisper'] as String?,
+              ),
+              onOpen: stream != null && onLiveOpen != null
+                  ? () => onLiveOpen(stream)
+                  : category == TwitchAppNotificationCategory.update
+                  ? onUpdateOpen
+                  : null,
+            ),
+          );
+          if (entry['unread'] == true) _unreadIds.add(id);
+        } catch (_) {
+          // A malformed entry must not discard the rest of the history.
+        }
+      }
+      _items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      _pruneHistory();
+    }
+    _saveHistory();
+    notifyListeners();
+    // Restored records never become toasts or system notifications.
+  }
+
+  bool _withinRetention(DateTime date) {
+    final now = DateTime.now();
+    return !date.isAfter(now) &&
+        now.difference(date) < TwitchNotificationHistoryStore.retention;
+  }
+
+  void _pruneHistory() {
+    final removed = _items
+        .where(
+          (item) =>
+              !_withinRetention(item.createdAt) ||
+              (_accountOwnerResolved &&
+                  item.accountOwnerId != null &&
+                  item.accountOwnerId != _accountOwner) ||
+              (_whisperOwnerResolved &&
+                  item.whisperTarget != null &&
+                  item.whisperTarget!.ownerId != _whisperOwner),
+        )
+        .map((item) => item.id)
+        .toSet();
+    if (_items.length > maxStoredNotifications) {
+      removed.addAll(
+        _items.skip(maxStoredNotifications).map((item) => item.id),
+      );
+    }
+    _items.removeWhere((item) => removed.contains(item.id));
+    for (final id in removed) {
+      _unreadIds.remove(id);
+      _visibleToastIds.remove(id);
+      _dismissTimers.remove(id)?.cancel();
+      _dismissDeadlines.remove(id);
+    }
+  }
+
+  void _saveHistory() {
+    if (!_historyLoaded || historyStore == null || _disposed) return;
+    final snapshot = _items
+        .map(
+          (item) => <String, dynamic>{
+            'title': item.title,
+            'message': item.message,
+            'type': item.type.name,
+            'createdAt': item.createdAt.toIso8601String(),
+            'category': item.category.name,
+            'accountOwnerId': item.accountOwnerId,
+            'stream': item.liveStream?.toJson(),
+            'avatars': item.avatarUrls,
+            'whisper': item.whisperTarget?.payload,
+            'unread': _unreadIds.contains(item.id),
+          },
+        )
+        .toList(growable: false);
+    _pendingWrite = _pendingWrite
+        .then((_) => historyStore!.write(snapshot))
+        .catchError((Object error) {
+          debugPrint(
+            'Notification history could not be saved (${error.runtimeType}).',
+          );
+        });
+  }
+
+  Future<void> flushHistory() => _pendingWrite;
+
+  static TwitchLiveStream _restoreStream(Map<String, dynamic> value) =>
+      TwitchLiveStream(
+        id: value['id'] as String,
+        userId: value['userId'] as String,
+        userLogin: value['userLogin'] as String,
+        userName: value['userName'] as String,
+        gameId: value['gameId'] as String,
+        gameName: value['gameName'] as String,
+        title: value['title'] as String,
+        viewerCount: value['viewerCount'] as int,
+        startedAt: DateTime.tryParse(value['startedAt']?.toString() ?? ''),
+        language: value['language'] as String,
+        thumbnailUrl: value['thumbnailUrl'] as String,
+        tags: (value['tags'] as List).whereType<String>().toList(),
+        isMature: value['isMature'] == true,
+        profileImageUrl: value['profileImageUrl'] as String,
+      );
 
   final List<TwitchAppNotification> _items = <TwitchAppNotification>[];
   final List<int> _visibleToastIds = <int>[];
   final Set<int> _unreadIds = <int>{};
   final Map<int, Timer> _dismissTimers = <int, Timer>{};
   final Map<int, DateTime> _dismissDeadlines = <int, DateTime>{};
-  final Map<int, Duration> _pausedDurations = <int, Duration>{};
 
   int _nextId = 1;
-  bool _autoDismissPaused = false;
 
   List<TwitchAppNotification> get items {
+    _pruneHistory();
     return List<TwitchAppNotification>.unmodifiable(_items);
   }
 
@@ -115,6 +342,12 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
     TwitchAppNotificationType type = TwitchAppNotificationType.info,
     Duration duration = defaultDuration,
     TwitchWhisperNotificationTarget? whisperTarget,
+    TwitchAppNotificationCategory category =
+        TwitchAppNotificationCategory.general,
+    TwitchLiveStream? liveStream,
+    List<String> avatarUrls = const [],
+    Future<void> Function()? onOpen,
+    String? accountOwnerId,
   }) {
     final safeTitle = title.trim().isEmpty ? 'VioClass' : title.trim();
     final safeMessage = message.trim();
@@ -128,6 +361,11 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
       createdAt: DateTime.now(),
       duration: duration,
       whisperTarget: whisperTarget,
+      category: category,
+      liveStream: liveStream,
+      avatarUrls: List.unmodifiable(avatarUrls.take(3)),
+      onOpen: onOpen,
+      accountOwnerId: accountOwnerId,
     );
 
     _items.insert(0, item);
@@ -140,18 +378,17 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
       _unreadIds.remove(removed.id);
       _dismissTimers.remove(removed.id)?.cancel();
       _dismissDeadlines.remove(removed.id);
-      _pausedDurations.remove(removed.id);
     }
 
     while (_visibleToastIds.length > maxVisibleNotifications) {
       final hiddenId = _visibleToastIds.removeLast();
       _dismissTimers.remove(hiddenId)?.cancel();
       _dismissDeadlines.remove(hiddenId);
-      _pausedDurations.remove(hiddenId);
     }
 
     _scheduleDismiss(id, duration);
-
+    _pruneHistory();
+    _saveHistory();
     notifyListeners();
     return id;
   }
@@ -198,7 +435,7 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
   int showError({
     required String title,
     required String message,
-    Duration duration = const Duration(seconds: 8),
+    Duration duration = defaultDuration,
   }) {
     return show(
       title: title,
@@ -217,7 +454,7 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
     _unreadIds.remove(id);
     _dismissTimers.remove(id)?.cancel();
     _dismissDeadlines.remove(id);
-    _pausedDurations.remove(id);
+    _saveHistory();
     notifyListeners();
   }
 
@@ -226,44 +463,32 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
 
     _dismissTimers.remove(id)?.cancel();
     _dismissDeadlines.remove(id);
-    _pausedDurations.remove(id);
     notifyListeners();
   }
 
   void markAllRead() {
     if (_unreadIds.isEmpty) return;
     _unreadIds.clear();
+    _saveHistory();
     notifyListeners();
   }
 
   void pauseAutoDismiss() {
-    if (_autoDismissPaused) return;
-    _autoDismissPaused = true;
-    final now = DateTime.now();
-
-    for (final entry in _dismissDeadlines.entries.toList(growable: false)) {
-      final remaining = entry.value.difference(now);
-      _pausedDurations[entry.key] = remaining > Duration.zero
-          ? remaining
-          : const Duration(milliseconds: 200);
-      _dismissTimers.remove(entry.key)?.cancel();
-    }
-    _dismissDeadlines.clear();
+    // Toast lifetime is elapsed time, not foreground viewing time. Inactive
+    // transitions (including native WebView focus) must not cancel its timer.
   }
 
   void resumeAutoDismiss() {
-    if (!_autoDismissPaused) return;
-    _autoDismissPaused = false;
-
-    for (final entry in _pausedDurations.entries.toList(growable: false)) {
-      if (_visibleToastIds.contains(entry.key)) {
-        _scheduleDismiss(entry.key, entry.value);
-      }
+    // If the OS suspended the Dart isolate, reconcile absolute deadlines
+    // before an expired toast can be displayed again after resume.
+    final now = DateTime.now();
+    for (final entry in _dismissDeadlines.entries.toList(growable: false)) {
+      if (!entry.value.isAfter(now)) hideToast(entry.key);
     }
-    _pausedDurations.clear();
   }
 
   void clear() {
+    _historyGeneration++;
     if (_items.isEmpty && _dismissTimers.isEmpty) return;
 
     _items.clear();
@@ -274,17 +499,12 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
     }
     _dismissTimers.clear();
     _dismissDeadlines.clear();
-    _pausedDurations.clear();
+    _saveHistory();
     notifyListeners();
   }
 
   void _scheduleDismiss(int id, Duration duration) {
     if (duration <= Duration.zero) return;
-    if (_autoDismissPaused) {
-      _pausedDurations[id] = duration;
-      return;
-    }
-
     _dismissTimers.remove(id)?.cancel();
     _dismissDeadlines[id] = DateTime.now().add(duration);
     _dismissTimers[id] = Timer(duration, () => hideToast(id));
@@ -292,10 +512,11 @@ class TwitchAppNotificationCenter extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     clear();
     super.dispose();
   }
 }
 
 final TwitchAppNotificationCenter twitchAppNotificationCenter =
-    TwitchAppNotificationCenter();
+    TwitchAppNotificationCenter(historyStore: TwitchNotificationHistoryStore());

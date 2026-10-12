@@ -54,45 +54,50 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
 
   @override
   Widget build(BuildContext context) {
-    final controlHeight = widget.height ??
+    final controlHeight =
+        widget.height ??
         (widget.tiny
             ? TwitchUiControlSize.hitCompact
             : widget.compact
-                ? TwitchUiControlSize.hit
-                : TwitchUiControlSize.hitLarge);
-    final iconSize = widget.iconSize ??
+            ? TwitchUiControlSize.hit
+            : TwitchUiControlSize.hitLarge);
+    final iconSize =
+        widget.iconSize ??
         (widget.tiny
             ? TwitchUiControlSize.iconCompact
             : widget.compact
-                ? TwitchUiControlSize.icon
-                : TwitchUiControlSize.iconLarge);
+            ? TwitchUiControlSize.icon
+            : TwitchUiControlSize.iconLarge);
     final radius = widget.tiny ? TwitchUiRadius.sm : TwitchUiRadius.md;
     final accent = widget.accentColor ?? TwitchUiColors.primarySoft;
 
-    final background = widget.backgroundColor ??
+    final background =
+        widget.backgroundColor ??
         (widget.primary
             ? (_hovered && _enabled
-                ? TwitchUiColors.primaryHover
-                : TwitchUiColors.primary)
+                  ? TwitchUiColors.primaryHover
+                  : TwitchUiColors.primary)
             : widget.selected
-                ? TwitchUiColors.surfaceSelected
-                : _hovered && _enabled
-                    ? TwitchUiColors.surfaceHover
-                    : TwitchUiColors.surfacePlayer);
-    final border = widget.borderColor ??
+            ? TwitchUiColors.surfaceSelected
+            : _hovered && _enabled
+            ? TwitchUiColors.surfaceHover
+            : TwitchUiColors.surfacePlayer);
+    final border =
+        widget.borderColor ??
         (widget.primary
             ? TwitchUiColors.primarySoft.withValues(alpha: 0.42)
             : widget.selected
-                ? accent.withValues(alpha: 0.48)
-                : _hovered && _enabled
-                    ? TwitchUiColors.borderStrong
-                    : TwitchUiColors.border);
-    final foreground = widget.foregroundColor ??
+            ? accent.withValues(alpha: 0.48)
+            : _hovered && _enabled
+            ? TwitchUiColors.borderStrong
+            : TwitchUiColors.border);
+    final foreground =
+        widget.foregroundColor ??
         (widget.primary
             ? TwitchUiColors.textOnAccent
             : widget.selected
-                ? accent
-                : TwitchUiColors.textPrimary);
+            ? accent
+            : TwitchUiColors.textPrimary);
 
     final label = widget.label?.trim();
     final hasLabel = label != null && label.isNotEmpty;
@@ -113,12 +118,10 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: _enabled ? widget.onPressed : null,
-              child: TwitchGlassSurface(
+              child: TwitchPlayerGlassSurface(
                 borderRadius: BorderRadius.circular(radius),
-                backgroundColor: background,
-                borderColor: border,
-                blurSigma: 0,
-                boxShadow: TwitchUiShadows.none,
+                backgroundColor: background.withValues(alpha: 0.35),
+                border: Border.all(color: border),
                 child: AnimatedContainer(
                   duration: TwitchUiMotion.fast,
                   curve: TwitchUiMotion.standardCurve,
@@ -143,27 +146,32 @@ class _PlayerChromeButtonState extends State<PlayerChromeButton> {
                               ),
                             )
                           : hasLabel
-                              ? Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(widget.icon,
-                                        color: foreground, size: iconSize),
-                                    const SizedBox(
-                                        width: TwitchUiSpacing.space8),
-                                    Text(
-                                      displayLabel,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: foreground,
-                                        fontSize: TwitchUiFontSize.bodyCompact,
-                                        fontWeight: TwitchUiFontWeight.strong,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                              : Icon(widget.icon,
-                                  color: foreground, size: iconSize),
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  widget.icon,
+                                  color: foreground,
+                                  size: iconSize,
+                                ),
+                                const SizedBox(width: TwitchUiSpacing.space8),
+                                Text(
+                                  displayLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontSize: TwitchUiFontSize.bodyCompact,
+                                    fontWeight: TwitchUiFontWeight.strong,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Icon(
+                              widget.icon,
+                              color: foreground,
+                              size: iconSize,
+                            ),
                     ),
                   ),
                 ),

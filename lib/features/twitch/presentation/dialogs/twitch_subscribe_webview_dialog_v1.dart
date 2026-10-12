@@ -5,6 +5,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/auth/twitch_desktop_webview_settings.dart';
 import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
@@ -13,6 +14,10 @@ Future<void> showTwitchSubscribeWebViewDialogV1({
   required BuildContext context,
   required Uri initialUri,
   required String channelLogin,
+  Future<void> Function()? prepareAuthCookies,
+  WidgetBuilder? webViewBuilder,
+  Listenable? sessionChanges,
+  bool Function()? isCurrentSession,
 }) async {
   await showTwitchResponsiveSheet<void>(
     context: context,
@@ -25,6 +30,10 @@ Future<void> showTwitchSubscribeWebViewDialogV1({
       child: _TwitchSubscribeWebViewDialogBody(
         initialUri: initialUri,
         channelLogin: channelLogin,
+        prepareAuthCookies: prepareAuthCookies,
+        webViewBuilder: webViewBuilder,
+        sessionChanges: sessionChanges,
+        isCurrentSession: isCurrentSession,
       ),
     ),
   );
@@ -33,10 +42,18 @@ Future<void> showTwitchSubscribeWebViewDialogV1({
 class _TwitchSubscribeWebViewDialogBody extends StatefulWidget {
   final Uri initialUri;
   final String channelLogin;
+  final Future<void> Function()? prepareAuthCookies;
+  final WidgetBuilder? webViewBuilder;
+  final Listenable? sessionChanges;
+  final bool Function()? isCurrentSession;
 
   const _TwitchSubscribeWebViewDialogBody({
     required this.initialUri,
     required this.channelLogin,
+    this.prepareAuthCookies,
+    this.webViewBuilder,
+    this.sessionChanges,
+    this.isCurrentSession,
   });
 
   @override
@@ -51,13 +68,30 @@ class _TwitchSubscribeWebViewDialogBodyState
   String _currentUrl = '';
   String? _errorText;
   bool _cookiesPrimed = false;
+  bool _sessionValid = true;
   late final Future<void> _cookiePrimeFuture;
 
   @override
   void initState() {
     super.initState();
     _currentUrl = widget.initialUri.toString();
-    _cookiePrimeFuture = _primeTwitchAuthCookie();
+    _sessionValid = widget.isCurrentSession?.call() ?? true;
+    widget.sessionChanges?.addListener(_checkSession);
+    _cookiePrimeFuture =
+        widget.prepareAuthCookies?.call() ?? _primeTwitchAuthCookie();
+  }
+
+  void _checkSession() {
+    if (!mounted || !_sessionValid || widget.isCurrentSession?.call() != false) {
+      return;
+    }
+    setState(() => _sessionValid = false);
+  }
+
+  @override
+  void dispose() {
+    widget.sessionChanges?.removeListener(_checkSession);
+    super.dispose();
   }
 
   Future<void> _primeTwitchAuthCookie() async {
@@ -101,6 +135,7 @@ class _TwitchSubscribeWebViewDialogBodyState
   }
 
   Future<void> _reload() async {
+    if (!_sessionValid || widget.isCurrentSession?.call() == false) return;
     await _controller?.reload();
   }
 
@@ -123,7 +158,7 @@ class _TwitchSubscribeWebViewDialogBodyState
             children: [
               IconButton(
                 tooltip: null,
-                onPressed: _reload,
+                onPressed: _sessionValid ? _reload : null,
                 icon: const Icon(Icons.refresh, color: Colors.white70),
               ),
               const SizedBox(width: 8),
@@ -198,6 +233,19 @@ class _TwitchSubscribeWebViewDialogBodyState
             child: FutureBuilder<void>(
               future: _cookiePrimeFuture,
               builder: (context, snapshot) {
+                if (!_sessionValid ||
+                    widget.isCurrentSession?.call() == false) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        context.vio.t('登入狀態已變更，請關閉後重新開啟訂閱頁。'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  );
+                }
                 if (snapshot.connectionState != ConnectionState.done) {
                   return const Center(
                     child: CircularProgressIndicator(
@@ -206,22 +254,38 @@ class _TwitchSubscribeWebViewDialogBodyState
                   );
                 }
 
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        context.vio.t('訂閱頁暫時無法開啟，請稍後再試。'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  );
+                }
+                final builder = widget.webViewBuilder;
+                if (builder != null) return builder(context);
                 return InAppWebView(
                   initialUrlRequest: URLRequest(
                     url: WebUri(widget.initialUri.toString()),
                   ),
-                  initialSettings: InAppWebViewSettings(
-                    javaScriptEnabled: true,
-                    javaScriptCanOpenWindowsAutomatically: true,
-                    supportMultipleWindows: true,
-                    thirdPartyCookiesEnabled: true,
-                    sharedCookiesEnabled: true,
-                    domStorageEnabled: true,
-                    databaseEnabled: true,
-                    mediaPlaybackRequiresUserGesture: false,
-                    allowsInlineMediaPlayback: true,
-                    transparentBackground: false,
-                    useShouldOverrideUrlLoading: true,
+                  initialSettings: twitchDesktopWebViewSettings(
+                    InAppWebViewSettings(
+                      javaScriptEnabled: true,
+                      javaScriptCanOpenWindowsAutomatically: true,
+                      supportMultipleWindows: true,
+                      thirdPartyCookiesEnabled: true,
+                      sharedCookiesEnabled: true,
+                      domStorageEnabled: true,
+                      databaseEnabled: true,
+                      mediaPlaybackRequiresUserGesture: false,
+                      allowsInlineMediaPlayback: true,
+                      transparentBackground: false,
+                      useShouldOverrideUrlLoading: true,
+                    ),
                   ),
                   onWebViewCreated: (controller) {
                     _controller = controller;

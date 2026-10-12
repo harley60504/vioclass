@@ -101,6 +101,7 @@ extension TwitchWatchPageNavigationMethods on TwitchWatchPageState {
     TwitchMiniPlayerController.instance.showPlayback(
       playback: snapshot,
       playerRuntime: watchPorts.player.runtime,
+      playOnOpen: playerSession.playerOrNull?.state.playing ?? false,
     );
     popWatchPage(popToRoot: popToRoot);
   }

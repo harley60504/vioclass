@@ -10,6 +10,7 @@ class _TwitchHlsPersistentWriter {
   int _lastWrittenSequence;
   int? _startupInitialLatestSequence;
   String? _lastMapUrl;
+  TwitchFmp4Timeline? _fmp4Timeline;
   Duration _writtenOutputDuration = Duration.zero;
   Duration _lastWrittenDuration = Duration.zero;
   bool _lastWrittenWasPrefetch = false;
@@ -19,6 +20,7 @@ class _TwitchHlsPersistentWriter {
   final Set<String> _sessionWrittenUrls = <String>{};
 
   bool _writingItem = false;
+  bool _itemOutputStarted = false;
   Completer<int>? _stopAtBoundaryCompleter;
 
   _TwitchHlsPersistentWriter({
@@ -53,7 +55,14 @@ class _TwitchHlsPersistentWriter {
         await _writeItemAtBoundary(next);
       }
     } catch (_) {
-      // Silent by design.
+      // A fatal segment error can leave partial media in existing readers.
+      // End those streams instead of silently restarting into the same byte
+      // bus or leaving native playback waiting forever for missing bytes.
+      // The next client request creates a fresh engine and initialization.
+      if (_itemOutputStarted &&
+          (_fmp4Timeline != null || output.bufferedBytes > 0)) {
+        engine.stop();
+      }
     } finally {
       stop();
     }
@@ -81,6 +90,7 @@ class _TwitchHlsPersistentWriter {
 
   Future<void> _writeItemAtBoundary(TwitchHlsSegmentItem item) async {
     _writingItem = true;
+    _itemOutputStarted = false;
     try {
       await _writeItem(item);
     } finally {
@@ -582,6 +592,18 @@ class _TwitchHlsPersistentWriter {
       }
     }
 
+    // Preserve the previous playable replay while a replacement map is still
+    // downloading. Clearing it first leaves reconnecting readers with only
+    // the old initialization and no fragment until that network wait ends.
+    List<int>? nextInitialization;
+    if (item.mapUrl != null && item.mapUrl != _lastMapUrl) {
+      nextInitialization = await engine.owner._loadInitMapBytes(item.mapUrl!);
+      if (_stopped) return;
+    }
+
+    // Map acquisition can fail without having emitted any bytes of this item.
+    // Retained replay from the previous segment is not partial failed output.
+    _itemOutputStarted = true;
     final liveOutput = output;
     if (liveOutput is TwitchHlsLiveByteBus) {
       // Keep replay aligned to a media-segment boundary.
@@ -590,20 +612,48 @@ class _TwitchHlsPersistentWriter {
       liveOutput.beginSegment();
     }
 
-    if (item.mapUrl != null && item.mapUrl != _lastMapUrl) {
+    if (item.mapUrl == null && liveOutput is TwitchHlsLiveByteBus) {
+      liveOutput.setInitializationBytes(null);
+      _lastMapUrl = null;
+      _fmp4Timeline = null;
+    }
+    if (nextInitialization != null) {
+      // Keep unsupported initialization formats on their existing byte path.
+      // Only a parsed fMP4 track table can authorize timestamp rewriting.
+      final timeline = _fmp4Timeline ?? TwitchFmp4Timeline();
+      try {
+        timeline.setInitialization(nextInitialization);
+        _fmp4Timeline = timeline.hasTrackTimescales ? timeline : null;
+      } on FormatException {
+        _fmp4Timeline = null;
+      }
+      if (liveOutput is TwitchHlsLiveByteBus) {
+        liveOutput.setInitializationBytes(nextInitialization);
+      } else {
+        await output.addStream(Stream<List<int>>.value(nextInitialization));
+      }
       _lastMapUrl = item.mapUrl;
-
-      final mapBytes = await engine.owner._loadInitMapBytes(item.mapUrl!);
-      await output.addStream(Stream<List<int>>.value(mapBytes));
     }
 
     final prefetchJob = engine.takePrefetchJob(item.url);
+    final segmentOutput =
+        _fmp4Timeline?.segmentSink(
+          output,
+          epoch: item.discontinuitySequence,
+          writtenDuration: _writtenOutputDuration,
+        ) ??
+        output;
 
-    await engine.owner._pipeSegmentToOutputBuffer(
-      output: output,
-      item: item,
-      prefetchJob: prefetchJob,
-    );
+    try {
+      await engine.owner._pipeSegmentToOutputBuffer(
+        output: segmentOutput,
+        item: item,
+        prefetchJob: prefetchJob,
+      );
+      if (segmentOutput is _Fmp4TimelineSink) segmentOutput.finish();
+    } finally {
+      engine.releasePrefetchClaim(item.url);
+    }
 
     _sessionWrittenUrls.add(item.url);
     _sessionWrittenSequences.add(item.sequence);

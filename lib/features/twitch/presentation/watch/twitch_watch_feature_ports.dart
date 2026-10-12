@@ -80,7 +80,7 @@ class TwitchWatchPlayerPort {
 
     await services.playerSession.openOrResume(
       uri: uri.toString(),
-      play: wasPlaying || play,
+      play: wasPlaying,
       forceOpen: true,
     );
   }

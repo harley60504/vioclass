@@ -31,12 +31,9 @@ class WatchCompactAvatarTile extends StatelessWidget {
 
     return Tooltip(
       message: data.channelLabel,
-      child: TwitchGlassSurface(
+      child: TwitchPlayerGlassSurface(
         borderRadius: BorderRadius.circular(radius),
-        backgroundColor: TwitchUiColors.surfacePlayer,
-        borderColor: TwitchUiColors.border,
-        blurSigma: 0,
-        boxShadow: TwitchUiShadows.none,
+        border: Border.all(color: TwitchUiColors.border),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
@@ -79,12 +76,9 @@ class WatchStreamHeaderCard extends StatelessWidget {
     final data = _WatchStreamHeaderData.fromMetadata(metadata);
     final avatarSize = math.min(compact ? 30.0 : 34.0, height - 12.0);
 
-    return TwitchGlassSurface(
+    return TwitchPlayerGlassSurface(
       borderRadius: BorderRadius.circular(TwitchUiRadius.md),
-      backgroundColor: TwitchUiColors.surfacePlayer,
-      borderColor: TwitchUiColors.border,
-      blurSigma: 0,
-      boxShadow: TwitchUiShadows.none,
+      border: Border.all(color: TwitchUiColors.border),
       child: SizedBox(
         height: height,
         child: Padding(
@@ -187,9 +181,8 @@ class _WatchStreamHeaderSingleRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final showViewer = width >= 310 &&
-            data.viewerCount != null &&
-            data.viewerCount! > 0;
+        final showViewer =
+            width >= 310 && data.viewerCount != null && data.viewerCount! > 0;
         final showGame = width >= 500 && data.gameName.isNotEmpty;
         final showLanguage = width >= 650 && data.languageLabel.isNotEmpty;
 
@@ -276,9 +269,7 @@ class _WatchChannelNameText extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           color: TwitchUiColors.textPrimary,
-          fontSize: compact
-              ? TwitchUiFontSize.body
-              : TwitchUiFontSize.heading,
+          fontSize: compact ? TwitchUiFontSize.body : TwitchUiFontSize.heading,
           fontWeight: TwitchUiFontWeight.strong,
           height: 1.0,
         ),
@@ -480,7 +471,9 @@ class _WatchInfoPill extends StatelessWidget {
           borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
           onTap: canCopy
               ? () async {
-                  await Clipboard.setData(ClipboardData(text: copyText!.trim()));
+                  await Clipboard.setData(
+                    ClipboardData(text: copyText!.trim()),
+                  );
                   if (!context.mounted) return;
                   showTwitchNotice(
                     context,

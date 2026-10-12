@@ -536,10 +536,16 @@ class _TwitchDartHlsLowLatencyProxyCore {
     TwitchHlsSegmentPrefetchJob? prefetchJob,
   }) async {
     final job = prefetchJob;
+    final deliveredPrefix = <List<int>>[];
 
     if (job != null) {
       try {
-        await output.addStream(job.controller.stream);
+        await output.addStream(
+          job.controller.stream.map((chunk) {
+            if (chunk.isNotEmpty) deliveredPrefix.add(chunk);
+            return chunk;
+          }),
+        );
         return;
       } catch (_) {}
     }
@@ -552,7 +558,43 @@ class _TwitchDartHlsLowLatencyProxyCore {
       label: 'segment',
     );
 
-    await output.addStream(upstreamResponse);
+    // Replacement GET begins at byte zero. Validate and skip the prefix that
+    // the failed prefetch already emitted, instead of duplicating media bytes.
+    Stream<List<int>> remainingSegment() async* {
+      var prefixIndex = 0;
+      var prefixOffset = 0;
+      await for (final chunk in upstreamResponse) {
+        var offset = 0;
+        while (prefixIndex < deliveredPrefix.length && offset < chunk.length) {
+          final prefix = deliveredPrefix[prefixIndex];
+          final count = math.min(
+            prefix.length - prefixOffset,
+            chunk.length - offset,
+          );
+          for (var i = 0; i < count; i++) {
+            if (prefix[prefixOffset + i] != chunk[offset + i]) {
+              throw const HttpException('Segment prefix changed during retry.');
+            }
+          }
+          offset += count;
+          prefixOffset += count;
+          if (prefixOffset == prefix.length) {
+            prefixIndex++;
+            prefixOffset = 0;
+          }
+        }
+        if (offset < chunk.length) {
+          yield offset == 0 ? chunk : chunk.sublist(offset);
+        }
+      }
+      if (prefixIndex < deliveredPrefix.length) {
+        throw const HttpException(
+          'Replacement segment is shorter than its prefix.',
+        );
+      }
+    }
+
+    await output.addStream(remainingSegment());
   }
 
   Future<HttpClientResponse> _openSuccessfulUpstream({
@@ -794,6 +836,11 @@ class _TwitchDartHlsLowLatencyProxyCore {
     );
 
     final bytes = List<int>.unmodifiable(await _readAll(response));
+    // HTTP success alone is not a usable initialization. Caching an empty map
+    // would make every subsequent fragment start without its required header.
+    if (bytes.isEmpty) {
+      throw const HttpException('Empty HLS initialization map.');
+    }
     _initMapBytesCache[url] = bytes;
 
     while (_initMapBytesCache.length > 8) {

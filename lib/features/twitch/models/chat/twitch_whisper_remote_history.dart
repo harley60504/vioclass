@@ -6,13 +6,17 @@ class TwitchWhisperRemotePage {
   final List<TwitchWhisperMessage> messages;
   final String? requestedCursor;
   final String? nextCursor;
-  bool get exhausted => nextCursor == null;
+
+  /// False when messages are valid but the server supplied no page boundary.
+  final bool paginationKnown;
+  bool get exhausted => paginationKnown && nextCursor == null;
   TwitchWhisperRemotePage({
     required this.ownerId,
     required this.peerId,
     required Iterable<TwitchWhisperMessage> messages,
     this.requestedCursor,
     this.nextCursor,
+    this.paginationKnown = true,
   }) : messages = List.unmodifiable(messages);
 }
 

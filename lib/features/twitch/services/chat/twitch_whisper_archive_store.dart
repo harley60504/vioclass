@@ -550,6 +550,36 @@ class TwitchWhisperArchiveStore {
     return List.unmodifiable(current);
   });
 
+  /// Reconcile only after a complete, validated enumeration of official peers.
+  /// The baseline protects messages and conversations created during that read.
+  Future<void> reconcileThreadsSnapshot(
+    String ownerId, {
+    required Set<String> officialPeerIds,
+    required Map<String, Set<String>> baselineMessageIds,
+    required Set<String> protectedPeerIds,
+    required bool Function() canApply,
+  }) => _serialized(() async {
+    final current = await _load(ownerId);
+    if (!canApply()) return;
+    final kept = current.where((peer) {
+      final baseline = baselineMessageIds[peer.userId];
+      return officialPeerIds.contains(peer.userId) ||
+          protectedPeerIds.contains(peer.userId) ||
+          peer.draft.isNotEmpty ||
+          baseline == null ||
+          peer.messages.any(
+            (message) =>
+                !baseline.contains(message.id) ||
+                message.state == TwitchWhisperMessageState.sending ||
+                message.state == TwitchWhisperMessageState.failed ||
+                message.state == TwitchWhisperMessageState.unconfirmed,
+          );
+    }).toList();
+    if (kept.length != current.length && canApply()) {
+      await _save(ownerId, kept);
+    }
+  });
+
   /// Messages and pagination checkpoint commit in the same account archive write.
   /// Historical rows never create unread alerts or unlock live-receipt send limits.
   Future<TwitchWhisperConversation> mergeRemotePage(
@@ -569,7 +599,9 @@ class TwitchWhisperArchiveStore {
     );
     final current = index < 0 ? peer : conversations[index];
     if (canApply?.call() == false) return current;
-    final nextRecovery = recovery?.afterHistory(page);
+    final nextRecovery = page.paginationKnown
+        ? recovery?.afterHistory(page)
+        : recovery;
     if (recovery != null) {
       final raw = await read(_key(ownerId));
       _checkRecovery(raw == null ? const {} : jsonDecode(raw) as Map, recovery);
@@ -612,8 +644,10 @@ class TwitchWhisperArchiveStore {
     final updated = current.copyWith(
       messages: byId.values,
       remoteHistoryCursor: page.nextCursor,
-      replaceRemoteHistoryCursor: !refreshOnly && recovery == null,
-      remoteHistoryComplete: refreshOnly || recovery != null
+      replaceRemoteHistoryCursor:
+          page.paginationKnown && !refreshOnly && recovery == null,
+      remoteHistoryComplete:
+          !page.paginationKnown || refreshOnly || recovery != null
           ? current.remoteHistoryComplete
           : page.exhausted,
     );

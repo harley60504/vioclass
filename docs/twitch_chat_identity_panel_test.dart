@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import '../lib/features/twitch/api/chat/twitch_chat_identity_api_service.dart';
 import '../lib/features/twitch/models/special_actions/twitch_viewer_special_message_models.dart';
 import '../lib/features/twitch/presentation/sheets/twitch_special_message_sheet.dart';
+import '../lib/features/twitch/presentation/widgets/responsive/twitch_responsive_sheet.dart';
+import '../lib/features/twitch/presentation/widgets/watch/chat/twitch_watch_chat_utility_bar.dart';
 
 const _badge = TwitchChatIdentityBadgeStage251(
   id: 'fixture:1',
@@ -33,6 +35,23 @@ TwitchViewerSpecialMessagesSnapshotStage251 _snapshot({
 );
 
 void main() {
+  testWidgets('identity entry and sheet header use the same icon', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: TwitchWatchChatIdentityButton(onTap: () {})),
+      ),
+    );
+    expect(find.byIcon(Icons.badge_outlined), findsOneWidget);
+    await _openIdentity(tester, color: (_) async {});
+    final header = tester.widget<TwitchUnifiedSheetHeader>(
+      find.byType(TwitchUnifiedSheetHeader),
+    );
+    expect(header.title, '聊天身分與互動');
+    expect(header.icon, Icons.badge_outlined);
+    expect(tester.takeException(), isNull);
+  });
   for (final size in [const Size(320, 640), const Size(844, 290)]) {
     testWidgets(
       'Identity color remains operable with keyboard and enlarged text at $size',

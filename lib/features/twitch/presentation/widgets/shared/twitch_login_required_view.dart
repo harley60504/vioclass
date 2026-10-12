@@ -5,6 +5,8 @@ import '../../theme/twitch_ui_tokens.dart';
 
 class TwitchLoginRequiredView extends StatelessWidget {
   final String statusText;
+  final String? titleText;
+  final String? loginButtonText;
   final bool loading;
   final VoidCallback onLoginPressed;
   final VoidCallback onRetryPressed;
@@ -12,6 +14,8 @@ class TwitchLoginRequiredView extends StatelessWidget {
   const TwitchLoginRequiredView({
     super.key,
     required this.statusText,
+    this.titleText,
+    this.loginButtonText,
     required this.loading,
     required this.onLoginPressed,
     required this.onRetryPressed,
@@ -58,7 +62,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             Text(
-              l10n.t('需要登入 Twitch'),
+              titleText ?? l10n.t('需要登入 Twitch'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 22,
@@ -99,7 +103,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
                   ),
                   icon: const Icon(Icons.open_in_browser_rounded),
                   label: Text(
-                    l10n.t('用 WebView 登入'),
+                    loginButtonText ?? l10n.t('用 WebView 登入'),
                     style: const TextStyle(fontWeight: FontWeight.w900),
                   ),
                 ),

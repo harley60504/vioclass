@@ -18,6 +18,65 @@ class TwitchChatUserProfileApiService {
     required this.isCurrent,
   });
 
+  /// Unknown is distinct from not following: Helix can return no rows when
+  /// the caller lacks permission to inspect another viewer's relationship.
+  Future<TwitchChatUserFollowInfo> getFollowInfo({
+    required String userId,
+    required String broadcasterId,
+    bool canReadOtherFollowers = false,
+  }) async {
+    if (!RegExp(r'^\d+$').hasMatch(userId) ||
+        !RegExp(r'^\d+$').hasMatch(broadcasterId)) {
+      return const TwitchChatUserFollowInfo.unknown();
+    }
+    for (final provider in tokenProviders) {
+      try {
+        final token = (await provider())?.trim();
+        if (token == null || token.isEmpty) continue;
+        final validation = await TwitchAuthApiService(
+          client: client,
+        ).validateToken(token);
+        if (!isCurrent()) return const TwitchChatUserFollowInfo.unknown();
+        if (validation.clientId.isEmpty ||
+            (ownerId != null && validation.userId != ownerId)) {
+          continue;
+        }
+        final self =
+            validation.userId == userId &&
+            validation.scopes.contains('user:read:follows');
+        final authorized =
+            validation.scopes.contains('moderator:read:followers') &&
+            (validation.userId == broadcasterId || canReadOtherFollowers);
+        if (!self && !authorized) continue;
+        final result = await client.getJson<Map<String, dynamic>>(
+          '${TwitchApiConstants.helixBaseUrl}/channels/${self ? 'followed' : 'followers'}',
+          queryParameters: {'user_id': userId, 'broadcaster_id': broadcasterId},
+          headers: {
+            'Client-ID': validation.clientId,
+            'Authorization': 'Bearer $token',
+          },
+        );
+        if (!isCurrent()) return const TwitchChatUserFollowInfo.unknown();
+        final rows = result['data'];
+        if (rows is! List) continue;
+        if (rows.isEmpty) return const TwitchChatUserFollowInfo(known: true);
+        if (rows.first is! Map) continue;
+        final row = rows.first as Map;
+        if (row[self ? 'broadcaster_id' : 'user_id']?.toString() !=
+            (self ? broadcasterId : userId)) {
+          continue;
+        }
+        final date = DateTime.tryParse(row['followed_at']?.toString() ?? '');
+        if (date != null) {
+          return TwitchChatUserFollowInfo(known: true, followedAt: date);
+        }
+      } catch (_) {
+        // Optional metadata must not prevent the basic profile from opening.
+      }
+    }
+    return const TwitchChatUserFollowInfo.unknown();
+  }
+
   Future<TwitchUser?> getUser({required String login, String? userId}) async {
     final id = userId?.trim() ?? '';
     final clean = login.trim().toLowerCase();
@@ -71,6 +130,13 @@ class TwitchChatUserProfileApiService {
     }
     throw const TwitchChatUserProfileException('請先登入 Twitch 載入官方使用者資料。');
   }
+}
+
+class TwitchChatUserFollowInfo {
+  final bool known;
+  final DateTime? followedAt;
+  const TwitchChatUserFollowInfo({required this.known, this.followedAt});
+  const TwitchChatUserFollowInfo.unknown() : known = false, followedAt = null;
 }
 
 class TwitchChatUserProfileException implements Exception {

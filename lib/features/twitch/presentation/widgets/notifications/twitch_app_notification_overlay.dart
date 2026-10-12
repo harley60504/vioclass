@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../settings/twitch_app_settings_launcher.dart';
 import '../../../services/notifications/twitch_app_notification_service.dart';
+import 'twitch_notification_card.dart';
 
 class TwitchAppNotificationOverlay extends StatefulWidget {
   final Widget child;
@@ -73,8 +74,35 @@ class _TwitchAppNotificationOverlayState
   }
 
   bool _openingWhisper = false;
+  final Set<int> _openingLiveNotifications = <int>{};
 
   Future<void> _openNotification(TwitchAppNotification item) async {
+    bool isCurrentNotification() =>
+        mounted &&
+        twitchAppNotificationCenter.items.any((current) => identical(current, item));
+    // A card can still receive a click before an owner-change rebuild. History
+    // pruning is authoritative, not the callback captured by the old frame.
+    if (!isCurrentNotification()) {
+      return;
+    }
+    final action = item.onOpen;
+    if (action != null) {
+      if (!_openingLiveNotifications.add(item.id)) return;
+      _closeNotificationPanel();
+      twitchAppNotificationCenter.hideToast(item.id);
+      try {
+        await action();
+      } catch (_) {
+        if (!isCurrentNotification()) return;
+        twitchAppNotificationCenter.showWarning(
+          title: '無法開啟通知',
+          message: '請從對應的直播頁或設定入口開啟。',
+        );
+      } finally {
+        _openingLiveNotifications.remove(item.id);
+      }
+      return;
+    }
     final target = item.whisperTarget;
     if (target == null || _openingWhisper) return;
     _openingWhisper = true;
@@ -86,11 +114,13 @@ class _TwitchAppNotificationOverlayState
         peerId: target.peerId,
       );
     } on StateError catch (error) {
+      if (!isCurrentNotification()) return;
       twitchAppNotificationCenter.showWarning(
         title: '無法開啟私訊',
         message: error.message.toString(),
       );
     } catch (_) {
+      if (!isCurrentNotification()) return;
       twitchAppNotificationCenter.showWarning(
         title: '無法開啟私訊',
         message: '請開啟私訊列表查看。',
@@ -138,6 +168,10 @@ class _TwitchAppNotificationOverlayState
 
   @override
   Widget build(BuildContext context) {
+    // Android events use system notifications, not a second in-app inbox.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return widget.child;
+    }
     return AnimatedBuilder(
       animation: Listenable.merge([
         twitchAppNotificationCenter,
@@ -155,7 +189,7 @@ class _TwitchAppNotificationOverlayState
           480.0,
           math.max(0.0, screenSize.height - panelTop - 12),
         );
-        final toastWidth = math.min(390.0, math.max(0.0, screenWidth - 24));
+        final toastWidth = math.min(380.0, math.max(0.0, screenWidth - 24));
         final content = hasWindowsFrame
             ? Column(
                 children: <Widget>[
@@ -652,160 +686,6 @@ class _TwitchAppNotificationCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final accent = item.accentColor;
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      builder: (context, value, child) {
-        return Opacity(
-          opacity: value,
-          child: Transform.translate(
-            offset: Offset((1 - value) * 28, 0),
-            child: child,
-          ),
-        );
-      },
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 78),
-          decoration: BoxDecoration(
-            color: const Color(0xC216111F),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: accent.withValues(alpha: 0.34)),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.38),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-              BoxShadow(
-                color: accent.withValues(alpha: 0.16),
-                blurRadius: 18,
-                offset: const Offset(0, 0),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(15),
-            child: Stack(
-              children: <Widget>[
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  child: Container(width: 5, color: accent),
-                ),
-                InkWell(
-                  onTap: item.whisperTarget == null ? null : onOpen,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: accent.withValues(alpha: 0.14),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: accent.withValues(alpha: 0.32),
-                            ),
-                          ),
-                          child: Icon(item.icon, color: accent, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Row(
-                                children: <Widget>[
-                                  Expanded(
-                                    child: Text(
-                                      item.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        height: 1.16,
-                                        fontWeight: FontWeight.w900,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    MaterialLocalizations.of(
-                                      context,
-                                    ).formatTimeOfDay(
-                                      TimeOfDay.fromDateTime(item.createdAt),
-                                      alwaysUse24HourFormat: true,
-                                    ),
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.38,
-                                      ),
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              if (item.message.trim().isNotEmpty) ...<Widget>[
-                                const SizedBox(height: 5),
-                                Text(
-                                  item.message,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.70),
-                                    fontSize: 12.5,
-                                    height: 1.28,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Semantics(
-                          button: true,
-                          label: context.vio.t('關閉通知'),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(999),
-                            onTap: onDismiss,
-                            child: Container(
-                              width: 34,
-                              height: 34,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.close_rounded,
-                                color: Colors.white.withValues(alpha: 0.58),
-                                size: 19,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      TwitchNotificationCard(item: item, onDismiss: onDismiss, onOpen: onOpen);
 }

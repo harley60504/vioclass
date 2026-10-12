@@ -28,12 +28,25 @@ class TwitchHlsPlaylistParser {
     var hasEndList = false;
     var mediaSequence = 0;
     var segmentIndex = 0;
+    var discontinuitySequence = 0;
 
     final lines = playlistText.split(RegExp(r'\r?\n'));
 
     for (final rawLine in lines) {
       final line = rawLine.trim();
       if (line.isEmpty) continue;
+
+      if (line.startsWith('#EXT-X-DISCONTINUITY-SEQUENCE:')) {
+        final value = int.tryParse(
+          line.substring('#EXT-X-DISCONTINUITY-SEQUENCE:'.length).trim(),
+        );
+        if (value != null && value >= 0) discontinuitySequence = value;
+        continue;
+      }
+      if (line == '#EXT-X-DISCONTINUITY') {
+        discontinuitySequence++;
+        continue;
+      }
 
       if (line.startsWith('#EXT-X-MEDIA-SEQUENCE:')) {
         mediaSequence =
@@ -132,6 +145,7 @@ class TwitchHlsPlaylistParser {
                 label:
                     "TWITCH-PREFETCH ${_lastPathSegment(absoluteUrl, fallback: 'future')}",
                 sequence: mediaSequence + segmentIndex,
+                discontinuitySequence: discontinuitySequence,
                 isPrefetch: true,
                 duration: _durationForFutureSegment(
                   lastSegmentDuration,
@@ -158,6 +172,7 @@ class TwitchHlsPlaylistParser {
                 label:
                     "PREFETCH ${_lastPathSegment(absoluteUrl, fallback: 'future')}",
                 sequence: mediaSequence + segmentIndex,
+                discontinuitySequence: discontinuitySequence,
                 isPrefetch: true,
                 duration: _durationForFutureSegment(
                   lastSegmentDuration,
@@ -187,6 +202,7 @@ class TwitchHlsPlaylistParser {
                 label:
                     "PRELOAD-HINT ${_lastPathSegment(absoluteUrl, fallback: 'future')}",
                 sequence: mediaSequence + segmentIndex,
+                discontinuitySequence: discontinuitySequence,
                 isPrefetch: true,
                 duration: _durationForFutureSegment(
                   lastSegmentDuration,
@@ -215,6 +231,7 @@ class TwitchHlsPlaylistParser {
                 pendingLabel ??
                 _lastPathSegment(absoluteUrl, fallback: 'segment'),
             sequence: mediaSequence + segmentIndex,
+            discontinuitySequence: discontinuitySequence,
             isPrefetch: false,
             duration: pendingDuration,
             programDateTime: programDateTime,
@@ -364,7 +381,9 @@ class TwitchHlsPlaylistParser {
     final raw = _firstTagValue(lines, prefix);
     final seconds = double.tryParse(raw ?? '');
     if (seconds == null || seconds < 0 || !seconds.isFinite) return null;
-    return Duration(microseconds: (seconds * Duration.microsecondsPerSecond).round());
+    return Duration(
+      microseconds: (seconds * Duration.microsecondsPerSecond).round(),
+    );
   }
 
   static String? _firstTagValue(List<String> lines, String prefix) {
@@ -380,7 +399,8 @@ class TwitchHlsPlaylistParser {
 
   static String _shortPlaylistUrl(String value) {
     final uri = Uri.tryParse(value);
-    if (uri == null) return value.length <= 80 ? value : '${value.substring(0, 77)}...';
+    if (uri == null)
+      return value.length <= 80 ? value : '${value.substring(0, 77)}...';
     final segments = uri.pathSegments;
     if (segments.isEmpty) return uri.host;
     final last = segments.last;

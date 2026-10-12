@@ -49,6 +49,9 @@ class TwitchPredictionApiService {
       channelLogin: login,
       count: count,
     );
+    if (raw.hasErrors) {
+      throw StateError('Prediction context unavailable');
+    }
 
     final snapshot = TwitchPredictionSnapshot.fromRawResponse(raw.response);
     if (snapshot.hasPrediction) {

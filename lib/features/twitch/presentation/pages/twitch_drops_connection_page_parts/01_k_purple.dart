@@ -34,6 +34,7 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
   late final TwitchDropsChannelPointsLeaderboardService leaderboardService;
 
   TwitchDropsConnectionCheck? result;
+  final ValueNotifier<int> campaignRevision = ValueNotifier<int>(0);
   final Set<String> claimingDropInstanceIds = <String>{};
   List<TwitchDropsChannelPointsLeaderboardEntry> channelPointsLeaderboard =
       const <TwitchDropsChannelPointsLeaderboardEntry>[];
@@ -62,6 +63,12 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
     });
   }
 
+  @override
+  void dispose() {
+    campaignRevision.dispose();
+    super.dispose();
+  }
+
   Future<void> runCheck({bool showToast = true}) async {
     if (checking) return;
 
@@ -79,6 +86,7 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
       checking = false;
       statusText = next.title;
     });
+    campaignRevision.value++;
 
     final snapshot = next.snapshot;
     if (next.connected) {
@@ -113,14 +121,10 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
     bool force = false,
   }) async {
     if (loadingChannelPointsLeaderboard) return;
-    if (showLoading) {
-      setState(() {
-        loadingChannelPointsLeaderboard = true;
-        channelPointsLeaderboardError = null;
-      });
-    } else {
+    setState(() {
+      loadingChannelPointsLeaderboard = true;
       channelPointsLeaderboardError = null;
-    }
+    });
 
     try {
       final ranked = await leaderboardService.load(force: force);
@@ -158,6 +162,7 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
     setState(() {
       claimingDropInstanceIds.add(dropInstanceId);
     });
+    campaignRevision.value++;
 
     final claimResult = await service.collectDrop(
       dropInstanceId: dropInstanceId,
@@ -165,22 +170,28 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
 
     if (!mounted) return;
 
-    setState(() {
-      claimingDropInstanceIds.remove(dropInstanceId);
-    });
-
-    if (claimResult.ok) {
-      twitchAppNotificationCenter.showSuccess(
-        title: 'Drops 獎勵領取成功',
-        message: drop.displayRewardName,
-      );
-      await runCheck(showToast: false);
-    } else {
-      twitchAppNotificationCenter.showWarning(
-        title: 'Drops 獎勵領取失敗',
-        message: claimResult.message,
-        duration: const Duration(seconds: 8),
-      );
+    try {
+      if (claimResult.ok) {
+        await twitchSystemNotificationService.showDropClaim(
+          reward: drop.displayRewardName,
+          succeeded: true,
+        );
+        if (!mounted) return;
+        await runCheck(showToast: false);
+      } else {
+        await twitchSystemNotificationService.showDropClaim(
+          reward: drop.displayRewardName,
+          succeeded: false,
+          error: claimResult.message,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          claimingDropInstanceIds.remove(dropInstanceId);
+        });
+        campaignRevision.value++;
+      }
     }
   }
 
@@ -211,9 +222,13 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
               child: const Icon(Icons.card_giftcard_rounded, size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
-              'Drops 與 Channel Points',
-              style: TextStyle(fontWeight: FontWeight.w900),
+            const Expanded(
+              child: Text(
+                'Drops 與 Channel Points',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ],
         ),
@@ -271,6 +286,8 @@ class _TwitchDropsConnectionPageState extends State<TwitchDropsConnectionPage> {
               else
                 _DropsCampaignsPage(
                   snapshot: snapshot,
+                  campaignRevision: campaignRevision,
+                  readSnapshot: () => result?.snapshot,
                   claimingDropInstanceIds: claimingDropInstanceIds,
                   onClaimDrop: claimDrop,
                 ),
@@ -438,11 +455,15 @@ class _DropsTabButton extends StatelessWidget {
 
 class _DropsCampaignsPage extends StatelessWidget {
   final TwitchDropsSnapshot snapshot;
+  final ValueNotifier<int> campaignRevision;
+  final ValueGetter<TwitchDropsSnapshot?> readSnapshot;
   final Set<String> claimingDropInstanceIds;
   final ValueChanged<TwitchDrop> onClaimDrop;
 
   const _DropsCampaignsPage({
     required this.snapshot,
+    required this.campaignRevision,
+    required this.readSnapshot,
     required this.claimingDropInstanceIds,
     required this.onClaimDrop,
   });
@@ -469,6 +490,8 @@ class _DropsCampaignsPage extends StatelessWidget {
         else
           _CampaignGamesTable(
             groups: groups,
+            campaignRevision: campaignRevision,
+            readSnapshot: readSnapshot,
             claimingDropInstanceIds: claimingDropInstanceIds,
             onClaimDrop: onClaimDrop,
           ),
@@ -513,8 +536,9 @@ class _CampaignGameGroup {
     final groups = grouped.entries.map((entry) {
       final campaigns = List<TwitchDropCampaign>.from(entry.value)
         ..sort((a, b) {
-          final statusCompare = _campaignStatusPriority(a.status)
-              .compareTo(_campaignStatusPriority(b.status));
+          final statusCompare = _campaignStatusPriority(
+            a.status,
+          ).compareTo(_campaignStatusPriority(b.status));
           if (statusCompare != 0) return statusCompare;
           final startCompare =
               (b.startAt ?? DateTime.fromMillisecondsSinceEpoch(0)).compareTo(

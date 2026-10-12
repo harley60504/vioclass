@@ -22,6 +22,9 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
   final TwitchOfficialEmoteCacheService? officialEmotes;
   final double fontScale;
   final Widget? actions;
+  final bool showEntryKind;
+  final VoidCallback? onCopy;
+  final VoidCallback? onOpenUser;
 
   const TwitchReplyThreadMessageCard({
     super.key,
@@ -31,6 +34,9 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
     this.officialEmotes,
     this.fontScale = 1.0,
     this.actions,
+    this.showEntryKind = true,
+    this.onCopy,
+    this.onOpenUser,
   });
 
   @override
@@ -49,7 +55,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(13),
-            onTap: () => _copyMessage(context, message),
+            onTap: onCopy ?? () => _copyMessage(context, message),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),
@@ -67,21 +73,20 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ReplyThreadCardHeader(
-                    entry: entry,
-                    selected: selected,
-                    fontScale: safeFontScale,
-                  ),
+                  if (showEntryKind)
+                    _EntryKindChip(kind: entry.kind, fontScale: safeFontScale),
                   if (_hasRelation(message)) ...[
                     const SizedBox(height: 7),
                     _RelationLine(message: message, fontScale: safeFontScale),
                   ],
-                  const SizedBox(height: 7),
+                  if (showEntryKind || _hasRelation(message))
+                    const SizedBox(height: 7),
                   TwitchRuntimeMessageTile(
                     message: message,
+                    onOpenUser: onOpenUser,
                     thirdPartyEmotes: thirdPartyEmotes,
                     officialEmotes: officialEmotes,
-                    showTimestamp: false,
+                    showTimestamp: true,
                     fontScale: compactBodyScale,
                     compact: true,
                   ),
@@ -116,58 +121,6 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
     if (name.isEmpty) return body;
     if (body.isEmpty) return name;
     return '$name: $body';
-  }
-}
-
-class _ReplyThreadCardHeader extends StatelessWidget {
-  final TwitchReplyThreadEntry entry;
-  final bool selected;
-  final double fontScale;
-
-  const _ReplyThreadCardHeader({
-    required this.entry,
-    required this.selected,
-    required this.fontScale,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final message = entry.message;
-    final safeFontScale = fontScale.clamp(0.82, 1.45).toDouble();
-
-    return Row(
-      children: [
-        _EntryKindChip(kind: entry.kind, fontScale: safeFontScale),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            formatContextMessageDisplayName(message),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: twitchChatTextStyle(
-              TextStyle(
-                color: selected
-                    ? TwitchUiColors.textPrimary
-                    : TwitchUiColors.sheet.backplate.foreground,
-                fontSize: 12.5 * safeFontScale,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          formatContextMessageTime(message.receivedAt),
-          style: twitchChatTextStyle(
-            TextStyle(
-              color: Colors.white54,
-              fontSize: 10.5 * safeFontScale,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-      ],
-    );
   }
 }
 

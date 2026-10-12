@@ -84,18 +84,16 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
     final metaFontSize = metrics.metaFontSize;
     final bodyFontSize = metrics.messageFontSize;
     final hintFontSize = 10.8 * scale;
-    final iconSize = (12.0 * scale).clamp(12.0, 16.0).toDouble();
-    final pinBoxSize = (20.0 * scale).clamp(20.0, 26.0).toDouble();
-    final avatarSize = (33.0 * scale).clamp(33.0, 43.0).toDouble();
+    final avatarSize = (22.0 * scale).clamp(20.0, 28.0).toDouble();
 
     return Material(
       color: Colors.transparent,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      borderRadius: BorderRadius.circular(19),
+      borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(19),
+        borderRadius: BorderRadius.circular(18),
         splashColor: TwitchUiColors.primary.withValues(alpha: 0.10),
         highlightColor: TwitchUiColors.primary.withValues(alpha: 0.06),
         onTap: () => setState(() => _expanded = !_expanded),
@@ -107,29 +105,62 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: <Color>[
-                const Color(0xFF241538).withValues(alpha: 0.96),
-                const Color(0xFF15131D).withValues(alpha: 0.98),
+                const Color(0xFF242031).withValues(alpha: 0.85),
+                const Color(0xFF17171E).withValues(alpha: 0.90),
               ],
             ),
-            borderRadius: BorderRadius.circular(19),
-            border: Border.all(
-              color: TwitchUiColors.primarySoft.withValues(alpha: 0.28),
-            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.09)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.10),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.32),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Padding(
-            padding: EdgeInsets.fromLTRB(10, 8 * scale, 10, 8 * scale),
+            padding: EdgeInsets.fromLTRB(11, 10 * scale, 11, 11 * scale),
             child: Row(
-              crossAxisAlignment: _expanded
-                  ? CrossAxisAlignment.start
-                  : CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                TwitchUiAvatar(
-                  imageUrl: avatarUrl,
-                  displayName: sender,
-                  size: avatarSize,
-                  accentColor: senderColor,
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: TwitchUiColors.primary.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: TwitchUiColors.primarySoft.withValues(
+                            alpha: 0.38,
+                          ),
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.push_pin_rounded,
+                        color: TwitchUiColors.primarySoft,
+                        size: 15,
+                      ),
+                    ),
+                    SizedBox(height: 7 * scale),
+                    TwitchUiAvatar(
+                      imageUrl: avatarUrl,
+                      displayName: sender,
+                      size: avatarSize,
+                      accentColor: senderColor,
+                    ),
+                  ],
                 ),
-                SizedBox(width: 10 * scale),
+                const SizedBox(width: 9),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,28 +168,6 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                     children: [
                       Row(
                         children: [
-                          Container(
-                            width: pinBoxSize,
-                            height: pinBoxSize,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: TwitchUiColors.primary.withValues(
-                                alpha: 0.18,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: TwitchUiColors.primarySoft.withValues(
-                                  alpha: 0.28,
-                                ),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.push_pin_rounded,
-                              color: TwitchUiColors.primarySoft,
-                              size: iconSize,
-                            ),
-                          ),
-                          SizedBox(width: 7 * scale),
                           Flexible(
                             child: Text(
                               sender,
@@ -169,7 +178,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                                   color: senderColor,
                                   fontSize: nameFontSize,
                                   height: 1.1,
-                                  fontWeight: TwitchUiFontWeight.heavy,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -185,7 +194,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                                   color: TwitchUiColors.textMuted,
                                   fontSize: metaFontSize,
                                   height: 1.1,
-                                  fontWeight: TwitchUiFontWeight.heavy,
+                                  fontWeight: FontWeight.w600,
                                   letterSpacing: 0,
                                 ),
                               ),
@@ -217,7 +226,7 @@ class _TwitchPinnedMessageBannerState extends State<TwitchPinnedMessageBanner> {
                               text: cleanText,
                               textStyle: twitchChatTextStyle(
                                 TextStyle(
-                                  color: const Color(0xFFF5F0FF),
+                                  color: const Color(0xFFF3EAFE),
                                   fontSize: bodyFontSize,
                                   height: 1.24,
                                   fontWeight: TwitchUiFontWeight.body,

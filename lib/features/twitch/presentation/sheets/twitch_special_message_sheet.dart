@@ -115,7 +115,7 @@ class _TwitchSpecialMessageSheetStage251State
     return TwitchUnifiedSheetScaffold(
       title: l10n.t('聊天身分與互動'),
       subtitle: l10n.t('ID 顏色、徽章、續訂與連續觀看'),
-      icon: Icons.auto_awesome_rounded,
+      icon: Icons.badge_outlined,
       loading: _loading,
       onRefresh: _loading || _selectingBadgeId != null || _applyingColor
           ? null
@@ -185,19 +185,22 @@ class _TwitchSpecialMessageSheetStage251State
                             _Section(
                               title: l10n.t('聊天室管理'),
                               children: [
-                                ListTile(
-                                  contentPadding: EdgeInsets.zero,
-                                  leading: const Icon(Icons.shield_outlined),
-                                  title: Text(l10n.t('管理員與台主工具')),
-                                  trailing: const Icon(
-                                    Icons.chevron_right_rounded,
+                                Material(
+                                  color: Colors.transparent,
+                                  child: ListTile(
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.shield_outlined),
+                                    title: Text(l10n.t('管理員與台主工具')),
+                                    trailing: const Icon(
+                                      Icons.chevron_right_rounded,
+                                    ),
+                                    onTap:
+                                        _loading ||
+                                            _selectingBadgeId != null ||
+                                            _applyingColor
+                                        ? null
+                                        : widget.onOpenModeration,
                                   ),
-                                  onTap:
-                                      _loading ||
-                                          _selectingBadgeId != null ||
-                                          _applyingColor
-                                      ? null
-                                      : widget.onOpenModeration,
                                 ),
                               ],
                             ),

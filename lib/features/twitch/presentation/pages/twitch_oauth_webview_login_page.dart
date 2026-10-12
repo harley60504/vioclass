@@ -17,6 +17,7 @@ import '../../models/auth/twitch_auth_token.dart';
 import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
+import '../../services/auth/twitch_desktop_webview_settings.dart';
 import '../../services/chat/twitch_whisper_login_integrity_service.dart';
 import '../../api/chat/twitch_whisper_api_service.dart';
 import '../theme/twitch_ui_tokens.dart';
@@ -868,14 +869,16 @@ query ChannelPointsContext($channelLogin: String!) {
         initialUrlRequest: URLRequest(
           url: WebUri(_buildAuthorizationUri().toString()),
         ),
-        initialSettings: InAppWebViewSettings(
-          javaScriptEnabled: true,
-          domStorageEnabled: true,
-          databaseEnabled: true,
-          supportZoom: false,
-          transparentBackground: false,
-          useShouldOverrideUrlLoading: true,
-          mediaPlaybackRequiresUserGesture: false,
+        initialSettings: twitchDesktopWebViewSettings(
+          InAppWebViewSettings(
+            javaScriptEnabled: true,
+            domStorageEnabled: true,
+            databaseEnabled: true,
+            supportZoom: false,
+            transparentBackground: false,
+            useShouldOverrideUrlLoading: true,
+            mediaPlaybackRequiresUserGesture: false,
+          ),
         ),
         onWebViewCreated: (controller) {
           _embeddedController = controller;

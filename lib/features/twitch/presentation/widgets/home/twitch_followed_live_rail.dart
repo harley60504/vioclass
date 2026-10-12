@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../api/core/twitch_api_exception.dart';
 
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../theme/twitch_ui_tokens.dart';
@@ -15,6 +16,10 @@ class TwitchFollowedLiveRailShell extends StatefulWidget {
   final Future<void> Function(TwitchLiveStream) onSelect;
   final String? selectedLogin;
   final bool enabled;
+  // Keep route geometry while a previously verified viewer is revalidated.
+  // This does not enable authenticated fetching.
+  final bool reserveSpace;
+  final List<TwitchLiveStream> initialStreams;
   const TwitchFollowedLiveRailShell({
     super.key,
     required this.child,
@@ -22,6 +27,8 @@ class TwitchFollowedLiveRailShell extends StatefulWidget {
     required this.onSelect,
     this.selectedLogin,
     this.enabled = true,
+    this.reserveSpace = false,
+    this.initialStreams = const [],
   });
 
   @override
@@ -37,6 +44,12 @@ class _RailShellState extends State<TwitchFollowedLiveRailShell> {
   bool failed = false;
   bool expanded = false;
   int generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    streams = List.unmodifiable(widget.initialStreams);
+  }
 
   void _setVisible(bool value) {
     if (visible == value) return;
@@ -70,11 +83,15 @@ class _RailShellState extends State<TwitchFollowedLiveRailShell> {
         streams = result;
         failed = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted || request != generation) return;
-      // Don't display another account's old follows after auth fails.
+      final transient =
+          error is TwitchApiException &&
+          ((error.statusCode != null && error.statusCode! >= 500) ||
+              (error.statusCode == null && error.uri != null));
+      // Retain this source's snapshot on network/server failure, not auth failure.
       setState(() {
-        streams = const [];
+        if (!transient) streams = const [];
         failed = true;
       });
     } finally {
@@ -119,10 +136,9 @@ class _RailShellState extends State<TwitchFollowedLiveRailShell> {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       final layout = TwitchResponsiveLayout.fromConstraints(constraints);
-      final show =
-          widget.enabled &&
-          (layout.isDesktop || (layout.isTablet && layout.width >= 760));
-      _setVisible(show);
+      final wide = layout.isDesktop || (layout.isTablet && layout.width >= 760);
+      final show = wide && (widget.enabled || widget.reserveSpace);
+      _setVisible(wide && widget.enabled);
       if (!show) return widget.child;
       return Stack(
         children: [
@@ -141,7 +157,7 @@ class _RailShellState extends State<TwitchFollowedLiveRailShell> {
                   color: TwitchUiColors.surfacePanel.withValues(alpha: .85),
                   child: Column(
                     children: [
-                      if (failed)
+                      if (failed && streams.isEmpty)
                         SizedBox(
                           height: 48,
                           child: IconButton(
@@ -150,9 +166,10 @@ class _RailShellState extends State<TwitchFollowedLiveRailShell> {
                             icon: const Icon(Icons.refresh, size: 20),
                           ),
                         ),
-                      if (loading) const LinearProgressIndicator(minHeight: 2),
                       Expanded(
-                        child: streams.isEmpty
+                        child: streams.isEmpty && loading
+                            ? const SizedBox.shrink()
+                            : streams.isEmpty
                             ? const Tooltip(
                                 message: '目前沒有追隨中的直播',
                                 child: Center(

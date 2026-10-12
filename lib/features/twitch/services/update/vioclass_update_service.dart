@@ -142,7 +142,49 @@ class VioClassUpdateService {
       if (left > right) return VioClassVersionComparison.newer;
       if (left < right) return VioClassVersionComparison.older;
     }
+    final leftPrerelease = _prereleaseParts(latest);
+    final rightPrerelease = _prereleaseParts(current);
+    if (leftPrerelease.isEmpty && rightPrerelease.isNotEmpty) {
+      return VioClassVersionComparison.newer;
+    }
+    if (leftPrerelease.isNotEmpty && rightPrerelease.isEmpty) {
+      return VioClassVersionComparison.older;
+    }
+    final sharedLength = leftPrerelease.length < rightPrerelease.length
+        ? leftPrerelease.length
+        : rightPrerelease.length;
+    for (var index = 0; index < sharedLength; index++) {
+      final left = leftPrerelease[index];
+      final right = rightPrerelease[index];
+      final leftNumber = RegExp(r'^\d+$').hasMatch(left)
+          ? BigInt.parse(left)
+          : null;
+      final rightNumber = RegExp(r'^\d+$').hasMatch(right)
+          ? BigInt.parse(right)
+          : null;
+      final comparison = leftNumber != null && rightNumber != null
+          ? leftNumber.compareTo(rightNumber)
+          : leftNumber != null
+          ? -1
+          : rightNumber != null
+          ? 1
+          : left.compareTo(right);
+      if (comparison > 0) return VioClassVersionComparison.newer;
+      if (comparison < 0) return VioClassVersionComparison.older;
+    }
+    if (leftPrerelease.length > rightPrerelease.length) {
+      return VioClassVersionComparison.newer;
+    }
+    if (leftPrerelease.length < rightPrerelease.length) {
+      return VioClassVersionComparison.older;
+    }
     return VioClassVersionComparison.same;
+  }
+
+  List<String> _prereleaseParts(String value) {
+    final clean = value.trim().split('+').first;
+    final separator = clean.indexOf('-');
+    return separator < 0 ? const [] : clean.substring(separator + 1).split('.');
   }
 
   List<int> _versionParts(String value) {

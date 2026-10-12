@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../api/chat/twitch_whisper_api_service.dart';
+import '../../api/chat/twitch_whisper_archive_api_service.dart';
 import '../../api/chat/twitch_whisper_history_api_service.dart';
 import '../../api/chat/twitch_whisper_threads_api_service.dart';
 import '../../models/chat/twitch_whisper_conversation.dart';
@@ -32,6 +33,7 @@ class _PendingWhisperIncoming {
 /// Owned by the app's home lifetime, not by the private-message panel.
 class TwitchWhisperInboxController extends ChangeNotifier {
   final TwitchWhisperApiService api;
+  final TwitchWhisperArchiveApiService? archiveApi;
   final TwitchWhisperHistoryApiService? historyApi;
   late final TwitchWhisperThreadsApiService? threadsApi;
   bool syncingThreads = false;
@@ -45,6 +47,19 @@ class TwitchWhisperInboxController extends ChangeNotifier {
   String? threadsStatus;
   String? _threadsCursor;
   bool threadsComplete = false;
+  int? _threadsSnapshotGeneration;
+  String? _threadsSnapshotOwner;
+  String? _threadsSnapshotCursor;
+  final _threadsSnapshotPeers = <String>{};
+  final _threadsSnapshotBaseline = <String, Set<String>>{};
+  void _clearThreadsSnapshot() {
+    _threadsSnapshotGeneration = null;
+    _threadsSnapshotOwner = null;
+    _threadsSnapshotCursor = null;
+    _threadsSnapshotPeers.clear();
+    _threadsSnapshotBaseline.clear();
+  }
+
   bool syncingHistory = false;
   final Duration historySyncTimeout;
   final Duration recoverySyncTimeout;
@@ -124,6 +139,10 @@ class TwitchWhisperInboxController extends ChangeNotifier {
 
   Future<void> _incomingQueue = Future<void>.value();
   List<TwitchWhisperConversation> _conversations = const [];
+  // An explicitly opened, unsent peer may not exist in Twitch's inbox yet.
+  // Keep that compose intent until observed remotely or explicitly removed.
+  final Set<String> _locallyOpenedPeerIds = <String>{};
+  final Set<String> _closedComposePeerIds = <String>{};
   String? _ownerId;
   String? _activePeerId;
   String ownerName = '';
@@ -319,6 +338,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
 
   TwitchWhisperInboxController({
     required this.api,
+    this.archiveApi,
     this.historyApi,
     TwitchWhisperThreadsApiService? threadsApi,
     TwitchWhisperArchiveStore? store,
@@ -457,6 +477,8 @@ class TwitchWhisperInboxController extends ChangeNotifier {
       if (_disposed || generation != _generation) return;
       final owner = auth.validation.userId;
       if (_ownerId != owner) {
+        _locallyOpenedPeerIds.clear();
+        _closedComposePeerIds.clear();
         _activePeerId = null;
         _conversations = const [];
         _pendingDrafts.clear();
@@ -644,7 +666,13 @@ class TwitchWhisperInboxController extends ChangeNotifier {
               ? peer.copyWith(draft: _pendingDrafts[peer.userId])
               : peer,
         )
+        .where((peer) => !_closedComposePeerIds.contains(peer.userId) ||
+            peer.messages.isNotEmpty || peer.draft.isNotEmpty ||
+            _pendingDrafts.containsKey(peer.userId))
         .toList();
+    if (_activePeerId != null && !_conversations.any((peer) => peer.userId == _activePeerId)) {
+      _activePeerId = null;
+    }
     _overlaySubmitted(owner);
     _refreshHistoricalIds();
     _notify();
@@ -785,6 +813,21 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     try {
       await flushDrafts();
       if (!current()) return;
+      if (!more) {
+        _clearThreadsSnapshot();
+        _threadsSnapshotGeneration = generation;
+        _threadsSnapshotOwner = owner;
+        _threadsSnapshotBaseline.addAll({
+          for (final peer in await archive.load(owner))
+            peer.userId: peer.messages.map((message) => message.id).toSet(),
+        });
+        if (!current()) return;
+      } else if (_threadsSnapshotGeneration != generation ||
+          _threadsSnapshotOwner != owner ||
+          _threadsSnapshotCursor != _threadsCursor) {
+        // A persisted cursor alone is not proof of a full current snapshot.
+        _clearThreadsSnapshot();
+      }
       final cancellation = Completer<TwitchWhisperThreadsPage>();
       _threadsCancellation = cancellation;
       final response = remote.page(
@@ -812,7 +855,45 @@ class TwitchWhisperInboxController extends ChangeNotifier {
       );
       traceThreads('archive merge returned current=${current()}');
       if (!current()) return;
+      if (_threadsSnapshotGeneration == generation &&
+          _threadsSnapshotOwner == owner) {
+        _locallyOpenedPeerIds.removeAll(
+          page.conversations.map((peer) => peer.userId),
+        );
+        _closedComposePeerIds.removeAll(page.conversations.map((peer) => peer.userId));
+        _threadsSnapshotPeers.addAll(
+          page.conversations.map((peer) => peer.userId),
+        );
+        _threadsSnapshotCursor = page.nextCursor;
+        if (page.nextCursor == null) {
+          // Include drafts typed and receipts queued while the request ran.
+          await flushDrafts();
+          if (!current()) return;
+          await archive.reconcileThreadsSnapshot(
+            owner,
+            officialPeerIds: Set.of(_threadsSnapshotPeers),
+            baselineMessageIds: Map.of(_threadsSnapshotBaseline),
+            protectedPeerIds: {
+              ..._locallyOpenedPeerIds,
+              ..._pendingDrafts.entries
+                  .where((entry) => entry.value.isNotEmpty)
+                  .map((entry) => entry.key),
+              ...?_pendingIncoming[owner]?.values.map(
+                (entry) => entry.peer.userId,
+              ),
+            },
+            canApply: current,
+          );
+          if (!current()) return;
+          _clearThreadsSnapshot();
+        }
+      }
       await _reload(owner, generation);
+      if (current() &&
+          _activePeerId != null &&
+          !_conversations.any((peer) => peer.userId == _activePeerId)) {
+        _activePeerId = null;
+      }
       traceThreads(
         'reload localCount=${_conversations.length} current=${current()}',
       );
@@ -856,6 +937,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     final cancellation = _threadsCancellation!;
     _threadsCancellation = null;
     ++_threadsRequest;
+    _clearThreadsSnapshot();
     syncingThreads = false;
     threadsError = null;
     threadsStatus = '已取消對話同步，原對話與分頁位置已保留。';
@@ -952,6 +1034,10 @@ class TwitchWhisperInboxController extends ChangeNotifier {
       final peer = await api.findUser(login, owner);
       if (!_current(generation, owner)) return;
       final existing = _conversations.where((c) => c.userId == peer.userId);
+      if (existing.isEmpty || existing.first.messages.isEmpty) {
+        _closedComposePeerIds.remove(peer.userId);
+        _locallyOpenedPeerIds.add(peer.userId);
+      }
       if (existing.isEmpty) await archive.saveDraft(owner, peer, '');
       await _reload(owner, generation);
       if (_current(generation, owner)) await selectConversation(peer.userId);
@@ -1126,7 +1212,23 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     }
   }
 
+  /// Finish local draft writes and filter retired blank compose rows before
+  /// building the modal. No remote request is needed for this preparation.
+  Future<void> preparePanelOpen() async {
+    final owner = _ownerId;
+    if (owner == null || _disposed || panelVisible) return;
+    final generation = _generation;
+    await flushDrafts();
+    if (_current(generation, owner)) await _reload(owner, generation);
+  }
+
   void setPanelVisible(bool visible) {
+    if (panelVisible && !visible) {
+      // Empty compose intents are protected only for this sheet opening.
+      // Persisted non-empty drafts remain protected by snapshot reconciliation.
+      _closedComposePeerIds.addAll(_locallyOpenedPeerIds);
+      _locallyOpenedPeerIds.clear();
+    }
     panelVisible = visible;
     if (!visible) _readingLatest = true;
     if (!visible) unawaited(flushDrafts());
@@ -1191,7 +1293,16 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     }
   }
 
-  Future<void> removeConversation(String peerId) async {
+  Future<void> removeConversation(String peerId) =>
+      _removeConversation(peerId, archiveRemote: false);
+
+  Future<void> archiveConversation(String peerId) =>
+      _removeConversation(peerId, archiveRemote: true);
+
+  Future<void> _removeConversation(
+    String peerId, {
+    required bool archiveRemote,
+  }) async {
     final owner = _ownerId;
     if (owner == null ||
         _disposed ||
@@ -1204,6 +1315,12 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     }
     final generation = _generation;
     var removed = false;
+    var remoteArchived = false;
+    if (archiveRemote && archiveApi == null) {
+      errorText = '尚未提供 Twitch 封存功能，原紀錄已保留。';
+      _notify();
+      return;
+    }
     final deletionKey = (owner, peerId);
     final deletionToken = Object();
     void releaseIncoming() {
@@ -1224,10 +1341,20 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     try {
       await flushDrafts();
       if (!_current(generation, owner)) return;
+      if (archiveRemote) {
+        await archiveApi!.archive(
+          ownerId: owner,
+          peerId: peerId,
+          canApply: () => _current(generation, owner),
+        );
+        remoteArchived = true;
+      }
       removed = await archive.removeConversation(
         owner,
         peerId,
-        canApply: () => _current(generation, owner),
+        // A confirmed remote commit belongs to this captured owner even if
+        // login changes while waiting for its acknowledgement.
+        canApply: () => remoteArchived || _current(generation, owner),
       );
       if (!removed) return;
       // Remove only arrivals already pending when deletion began, after commit.
@@ -1240,6 +1367,8 @@ class TwitchWhisperInboxController extends ChangeNotifier {
       }
       releaseIncoming();
       if (_current(generation, owner)) {
+        _locallyOpenedPeerIds.remove(peerId);
+        _closedComposePeerIds.remove(peerId);
         _conversations = _conversations
             .where((peer) => peer.userId != peerId)
             .toList();
@@ -1251,9 +1380,13 @@ class TwitchWhisperInboxController extends ChangeNotifier {
         _activePeerId = null;
       }
       await _reload(owner, generation);
-    } catch (_) {
+    } catch (error) {
       if (_current(generation, owner)) {
-        errorText = removed
+        errorText = error is TwitchWhisperException
+            ? error.message
+            : remoteArchived && !removed
+            ? 'Twitch 已封存對話，但本機清理失敗；本機紀錄已保留，請稍後重試。'
+            : removed
             ? '本機對話已刪除，但列表重新載入失敗；請重新載入確認，不必重複刪除。'
             : '本機對話刪除未完成，原資料已保留；請恢復儲存後再試。';
       }
@@ -1267,6 +1400,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
   }
 
   void clearSession() {
+    _clearThreadsSnapshot();
     cancelRecovery();
     _recoveryGeneration = null;
     recoveryProgress = null;
@@ -1292,6 +1426,8 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     _receiver?.stop();
     receiveStatus = '私訊收件尚未連線';
     _ownerId = null;
+    _locallyOpenedPeerIds.clear();
+    _closedComposePeerIds.clear();
     _activePeerId = null;
     ownerName = '';
     _conversations = const [];

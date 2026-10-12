@@ -25,6 +25,9 @@ import '../../services/chat/twitch_official_emote_cache_service.dart';
 import '../../services/chat/twitch_third_party_emote_cache_service.dart';
 import '../../services/engagement/twitch_channel_points_runtime_service.dart';
 import '../../services/playback/twitch_media_kit_player_host.dart';
+import '../../services/playback/twitch_playback_integrity_browser.dart';
+import '../../services/playback/twitch_playback_integrity_manager.dart';
+import '../../services/playback/twitch_playback_viewer_auth.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../../services/special_actions/twitch_viewer_special_message_runtime.dart';
 import 'twitch_watch_feature_services.dart';
@@ -104,9 +107,11 @@ class TwitchWatchServices {
   factory TwitchWatchServices.create({
     String playerTitle = 'Twitch Raw Proxy',
     TwitchPlaylistPlayerRuntime? playerRuntime,
+    TwitchAuthService? sharedAuthService,
   }) {
     final apiClient = TwitchApiClient();
-    final authService = TwitchAuthService(apiClient: apiClient);
+    final authService =
+        sharedAuthService ?? TwitchAuthService(apiClient: apiClient);
     final dropsAuthService = TwitchDropsAuthService(apiClient: apiClient);
     final webGqlAuthService = TwitchWebGqlAuthService(apiClient: apiClient);
 
@@ -131,7 +136,24 @@ class TwitchWatchServices {
           : TwitchApiConstants.twitchDefaultDropsClientId,
       accessTokenProvider: dropsAuthService.getToken,
     );
-    final playbackApi = TwitchPlaybackApiService(gql: publicGqlApi);
+    final playbackIntegrity = TwitchPlaybackIntegrityManager(
+      acquire: const TwitchPlaybackIntegrityBrowserAcquirer().acquire,
+    );
+    final playbackViewerAuth = TwitchPlaybackViewerAuthResolver(
+      expectedClientId: TwitchApiConstants.twitchWebClientId,
+      tokenProvider: webGqlAuthService.getToken,
+      ownerTokenProvider: authService.getValidAccessToken,
+      clientIdProvider: () => webGqlAuthService.clientId,
+      validate: webGqlAuthService.authApi.validateToken,
+      validateOwner: authService.authApi.validateToken,
+    );
+    final playbackApi = TwitchPlaybackApiService(
+      gql: publicGqlApi,
+      cachedIntegrityHeaders: playbackIntegrity.cachedHeadersFor,
+      integrityHeadersProvider: playbackIntegrity.headersFor,
+      integrityInvalidator: playbackIntegrity.invalidateRejected,
+      viewerAuthProvider: playbackViewerAuth.resolve,
+    );
     final clipApi = TwitchClipApiService(
       client: apiClient,
       accessTokenProvider: authService.getValidAccessToken,

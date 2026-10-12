@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
+import '../auth/twitch_desktop_webview_settings.dart';
 import 'twitch_whisper_integrity_browser.dart';
 
 import '../../api/chat/twitch_whisper_api_service.dart';
@@ -142,6 +144,15 @@ class TwitchWhisperLoginIntegrityService {
     }
     var context = _context;
     final renew = browser;
+    if (defaultTargetPlatform == TargetPlatform.android &&
+        renew != null &&
+        twitchAndroidDesktopUserAgent != null) {
+      if (context?.userAgent != twitchAndroidDesktopUserAgent) {
+        // Renew only private proof made with a different browser fingerprint.
+        // Keep OAuth, Cookies, history and the existing storage schema intact.
+        context = null;
+      }
+    }
     if (renew != null &&
         (context == null ||
             _sessionToken != session.token ||

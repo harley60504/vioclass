@@ -279,9 +279,10 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
       playbackController.setError(null);
       if (clip != null && video == null) {
         final position = playerSession.player.state.position;
+        final wasPlaying = playerSession.player.state.playing;
         await playbackController.openMedia(
           uri: variant.url,
-          play: true,
+          play: wasPlaying,
           forceOpen: true,
           startPosition: position,
         );
@@ -315,6 +316,7 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
 
       final duration = playerSession.player.state.duration;
       final position = playerSession.player.state.position;
+      final wasPlaying = playerSession.player.state.playing;
       final startPosition = duration.inMilliseconds > 500
           ? Duration(
               milliseconds: position.inMilliseconds.clamp(
@@ -325,7 +327,7 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
           : Duration.zero;
       await playbackController.openMedia(
         uri: variant.url,
-        play: true,
+        play: wasPlaying,
         forceOpen: true,
         startPosition: startPosition,
       );

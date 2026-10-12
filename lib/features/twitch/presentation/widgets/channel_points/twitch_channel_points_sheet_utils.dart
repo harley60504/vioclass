@@ -34,7 +34,7 @@ bool isChannelPointRewardAvailable(
   if (readChannelPointBool(reward['isPaused'])) return false;
   if (!readChannelPointBool(reward['isInStock'], fallback: true)) return false;
   if (_isCoolingDown(reward)) return false;
-  if (balance != null && balance < readChannelPointInt(reward['cost'])) {
+  if (balance == null || balance < readChannelPointInt(reward['cost'])) {
     return false;
   }
 

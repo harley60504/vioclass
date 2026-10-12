@@ -8,6 +8,7 @@
 // state lives in TwitchWatchChatPanel.
 
 import 'package:flutter/material.dart';
+import 'twitch_watch_chat_header_bar.dart';
 
 class TwitchWatchChatLayoutMetrics {
   final bool keyboardVisible;
@@ -47,10 +48,12 @@ class TwitchWatchChatLayoutMetrics {
         ? (constraints.maxHeight * 0.38).clamp(130.0, 230.0).toDouble()
         : (constraints.maxHeight * 0.42).clamp(160.0, 320.0).toDouble();
 
-    final headerHeight = verticalCompact ? 42.0 : 54.0;
-    const utilityBarHeight = 41.0;
-    const inputBarHeight = 48.0;
-    final fixedChromeHeight = headerHeight + utilityBarHeight + inputBarHeight;
+    final headerHeight = verticalCompact
+        ? TwitchWatchChatHeaderBar.compactHeight
+        : TwitchWatchChatHeaderBar.regularHeight;
+    // Input 48 + action row 36 + row gap 8 + vertical padding 16.
+    const composerHeight = 108.0;
+    final fixedChromeHeight = headerHeight + composerHeight;
     final minMessageListHeight = keyboardVisible ? 84.0 : 56.0;
     final maxUsableEngagementHeight =
         (constraints.maxHeight - fixedChromeHeight - minMessageListHeight)

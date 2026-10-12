@@ -157,12 +157,13 @@ class TwitchChatLinkPreviewColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) return const SizedBox.shrink();
+    final visibleItems = items.where((item) => item.trusted).toList();
+    if (visibleItems.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final item in items)
+        for (final item in visibleItems)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: TwitchChatLinkPreviewCard(item: item, fontScale: fontScale),
@@ -184,26 +185,8 @@ class TwitchChatLinkPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uri = normalizeTwitchChatUri(item.url);
-    final host =
-        uri?.host.replaceFirst(RegExp(r'^www\.'), '') ?? context.vio.t('連結');
-    final iconColor = item.trusted
-        ? TwitchUiColors.primarySoft
-        : const Color(0xFFFFC857);
-    final label = context.vio.t(item.trusted ? '連結預覽' : '不自動載入的連結');
-
-    if (item.trusted) {
-      return _TrustedLinkPreviewCard(item: item, fontScale: fontScale);
-    }
-
-    return _LinkPreviewShell(
-      item: item,
-      fontScale: fontScale,
-      icon: Icons.security_rounded,
-      iconColor: iconColor,
-      title: host,
-      subtitle: '$label · ${prettyTwitchChatUrlLabel(item.url)}',
-    );
+    if (!item.trusted) return const SizedBox.shrink();
+    return _TrustedLinkPreviewCard(item: item, fontScale: fontScale);
   }
 }
 

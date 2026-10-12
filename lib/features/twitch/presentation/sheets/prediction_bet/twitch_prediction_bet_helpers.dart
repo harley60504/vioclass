@@ -4,6 +4,32 @@
 import '../../../models/engagement/twitch_prediction.dart';
 import '../../localization/vioclass_localizations.dart';
 
+bool twitchPredictionCanBet(
+  TwitchPredictionSnapshot prediction, {
+  DateTime? now,
+}) {
+  final status = prediction.normalizedStatus;
+  if (status != 'ACTIVE' && status != 'OPEN') return false;
+  final locksAt = twitchPredictionEffectiveLocksAt(prediction);
+  return locksAt == null || locksAt.isAfter(now ?? DateTime.now());
+}
+
+int twitchPredictionStatusRank(TwitchPredictionSnapshot prediction) {
+  if (prediction.isResolvedLike) return 3;
+  if (prediction.isLockedLike) return 2;
+  return 1;
+}
+
+String twitchPredictionStatusLabel(String status) {
+  final value = status.trim().toUpperCase();
+  if (value.contains('CANCEL') || value.contains('REFUND')) return '點數已退還';
+  if (value.contains('RESOLVED') || value.contains('ENDED')) return '已結算';
+  if (value.contains('RESOLVE_PENDING')) return '結算中';
+  if (value.contains('LOCKED')) return '已關盤';
+  if (value == 'ACTIVE' || value == 'OPEN' || value.isEmpty) return '開放預測';
+  return '等待更新';
+}
+
 String twitchPredictionViewerChoiceId(TwitchPredictionSnapshot prediction) {
   final direct = prediction.viewerOutcomeId?.trim();
   if (direct != null && direct.isNotEmpty) return direct;

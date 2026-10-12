@@ -2,11 +2,15 @@ part of '../twitch_drops_connection_page.dart';
 
 class _CampaignGamesTable extends StatelessWidget {
   final List<_CampaignGameGroup> groups;
+  final ValueNotifier<int> campaignRevision;
+  final ValueGetter<TwitchDropsSnapshot?> readSnapshot;
   final Set<String> claimingDropInstanceIds;
   final ValueChanged<TwitchDrop> onClaimDrop;
 
   const _CampaignGamesTable({
     required this.groups,
+    required this.campaignRevision,
+    required this.readSnapshot,
     required this.claimingDropInstanceIds,
     required this.onClaimDrop,
   });
@@ -59,10 +63,29 @@ class _CampaignGamesTable extends StatelessWidget {
           insetPadding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 980, maxHeight: 760),
-            child: _CampaignGameDialog(
-              group: group,
-              claimingDropInstanceIds: claimingDropInstanceIds,
-              onClaimDrop: onClaimDrop,
+            child: ValueListenableBuilder<int>(
+              valueListenable: campaignRevision,
+              builder: (context, _, child) {
+                final currentGroups = _CampaignGameGroup.fromCampaigns(
+                  readSnapshot()?.activeCampaigns ??
+                      const <TwitchDropCampaign>[],
+                );
+                _CampaignGameGroup? current;
+                for (final candidate in currentGroups) {
+                  if (candidate.key == group.key) {
+                    current = candidate;
+                    break;
+                  }
+                }
+                if (current == null) {
+                  return const _SimpleInfoCard(text: '目前沒有可顯示的 Drops 活動。');
+                }
+                return _CampaignGameDialog(
+                  group: current,
+                  claimingDropInstanceIds: claimingDropInstanceIds,
+                  onClaimDrop: onClaimDrop,
+                );
+              },
             ),
           ),
         );

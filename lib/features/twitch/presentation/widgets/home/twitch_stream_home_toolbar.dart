@@ -20,6 +20,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final Future<void> Function() onOpenDropsConnector;
   final Future<void> Function() onOpenSettings;
+  final bool whispersEnabled;
   final bool forceTwoRows;
   final bool showSectionSwitcher;
 
@@ -35,6 +36,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
     required this.onRefresh,
     required this.onOpenDropsConnector,
     required this.onOpenSettings,
+    this.whispersEnabled = true,
     this.forceTwoRows = false,
     this.showSectionSwitcher = true,
   });
@@ -108,7 +110,25 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
   List<Widget> _buildActions(BuildContext context, {bool compact = false}) {
     final l10n = context.vio;
     return <Widget>[
-      if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) ...[
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+        if (whispersEnabled) ...[
+          AnimatedBuilder(
+            animation: twitchAppSettingsLauncher,
+            builder: (context, _) => Badge(
+              isLabelVisible: twitchAppSettingsLauncher.whisperUnreadCount > 0,
+              label: Text('${twitchAppSettingsLauncher.whisperUnreadCount}'),
+              child: TwitchStreamHomeToolbarIconButton(
+                key: const ValueKey('mobile-whispers'),
+                tooltip: l10n.t('Twitch 私訊'),
+                icon: Icons.chat_bubble_outline_rounded,
+                compact: compact,
+                onPressed: () => twitchAppSettingsLauncher.openWhispers(),
+              ),
+            ),
+          ),
+          const SizedBox(width: TwitchUiSpacing.space8),
+        ],
+      ] else if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) ...[
         PopupMenuButton<String>(
           tooltip: l10n.t('私訊與更新'),
           icon: AnimatedBuilder(
@@ -120,28 +140,29 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
             ),
           ),
           onSelected: (value) {
-            if (value == 'whispers') {
+            if (value == 'whispers' && whispersEnabled) {
               twitchAppSettingsLauncher.openWhispers();
             } else {
               twitchAppSettingsLauncher.openUpdate();
             }
           },
           itemBuilder: (_) => [
-            PopupMenuItem(
-              value: 'whispers',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(l10n.t('Twitch 私訊')),
-                  if (twitchAppSettingsLauncher.whisperUnreadCount > 0) ...[
-                    const SizedBox(width: 8),
-                    Badge.count(
-                      count: twitchAppSettingsLauncher.whisperUnreadCount,
-                    ),
+            if (whispersEnabled)
+              PopupMenuItem(
+                value: 'whispers',
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(l10n.t('Twitch 私訊')),
+                    if (twitchAppSettingsLauncher.whisperUnreadCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Badge.count(
+                        count: twitchAppSettingsLauncher.whisperUnreadCount,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
             PopupMenuItem(value: 'updates', child: Text(l10n.t('App 更新'))),
           ],
         ),

@@ -172,6 +172,9 @@ class TwitchWatchPlayerAreaPortAdapter extends StatelessWidget {
 }
 
 class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
+  final bool readOnlyGuest;
+  final bool canSend;
+  final bool missingSendPermission;
   final TwitchModerationApiService? moderationApi;
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
@@ -196,14 +199,19 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
   final VoidCallback? onOpenSpecialActions;
+  final VoidCallback? onLoginPressed;
   final Widget Function(BuildContext, TwitchChatRuntimeMessage)?
   messageActionBuilder;
   final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final VoidCallback? onCancelPendingSpecialMessage;
   final bool showHeader;
+  final VoidCallback? onToggleChatMode;
 
   const TwitchWatchChatPanelPortAdapter({
     super.key,
+    required this.readOnlyGuest,
+    required this.canSend,
+    this.missingSendPermission = false,
     this.moderationApi,
     required this.runtime,
     required this.viewerLogin,
@@ -228,10 +236,12 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
     this.onOpenSpecialActions,
+    this.onLoginPressed,
     this.messageActionBuilder,
     this.onOpenUser,
     this.onCancelPendingSpecialMessage,
     this.showHeader = true,
+    this.onToggleChatMode,
   });
 
   @override
@@ -239,6 +249,9 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
     final emotes = TwitchWatchPortScope.emotesOf(context);
     final openAction = onOpenSpecialActions;
     return TwitchWatchChatPanel(
+      readOnlyGuest: readOnlyGuest,
+      canSend: canSend,
+      missingSendPermission: missingSendPermission,
       moderationApi: moderationApi,
       runtime: runtime,
       viewerLogin: viewerLogin,
@@ -270,10 +283,12 @@ class TwitchWatchChatPanelPortAdapter extends StatelessWidget {
       onOpenChannelPoints: onOpenChannelPoints,
       onOpenPrediction: onOpenPrediction,
       onOpenSpecialActions: openAction,
+      onLoginPressed: onLoginPressed,
       messageActionBuilder: messageActionBuilder,
       onOpenUser: onOpenUser,
       onCancelPendingSpecialMessage: onCancelPendingSpecialMessage,
       showHeader: showHeader,
+      onToggleChatMode: onToggleChatMode,
     );
   }
 }

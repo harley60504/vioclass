@@ -405,28 +405,69 @@ void main() {
       await tester.scrollUntilVisible(
         result,
         80,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       expect(result, findsOneWidget);
       expect(find.textContaining('fixture reason 10'), findsOneWidget);
       final category = find.byType(DropdownButton<TwitchModerationLogCategory>);
       FocusManager.instance.primaryFocus?.unfocus();
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        category,
+        -80,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       await tester.ensureVisible(category);
       await tester.pumpAndSettle();
       await tester.tap(category);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('聊天室').last);
       await tester.tap(find.text('聊天室').last);
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('沒有符合條件的本機管理紀錄。'),
+        80,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       expect(find.text('沒有符合條件的本機管理紀錄。'), findsOneWidget);
-      await tester.ensureVisible(search);
+      await tester.scrollUntilVisible(
+        search,
+        -80,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
       await tester.enterText(search, '');
       await tester.pumpAndSettle();
       final room = find.text('清除聊天室').first;
       await tester.scrollUntilVisible(
         room,
         80,
-        scrollable: find.byType(Scrollable).last,
+        scrollable: find
+            .descendant(
+              of: find.byType(CustomScrollView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
       );
       expect(room, findsOneWidget);
       expect(find.textContaining('封鎖 · Target'), findsNothing);

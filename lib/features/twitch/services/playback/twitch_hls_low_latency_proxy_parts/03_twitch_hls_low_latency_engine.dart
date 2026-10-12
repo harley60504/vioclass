@@ -13,6 +13,7 @@ class _TwitchHlsLowLatencyEngine {
 
   final Set<int> _writtenSequences = <int>{};
   final Set<String> _writtenUrls = <String>{};
+  final Set<String> _claimedPrefetchUrls = <String>{};
 
   final LinkedHashMap<String, TwitchHlsSegmentPrefetchJob> _prefetches =
       LinkedHashMap<String, TwitchHlsSegmentPrefetchJob>();
@@ -132,6 +133,7 @@ class _TwitchHlsLowLatencyEngine {
     }
 
     _prefetches.clear();
+    _claimedPrefetchUrls.clear();
 
     final waiter = _playlistUpdateWaiter;
     _playlistUpdateWaiter = null;
@@ -307,6 +309,9 @@ class _TwitchHlsLowLatencyEngine {
       while (!_stopped && owner.server != null) {
         final loopStartedAt = DateTime.now();
         final media = await owner._loadMediaPlaylist(playlistUrl);
+        // A fatal writer error or source switch can stop this engine while
+        // the request is pending. Do not schedule work from its late response.
+        if (_stopped || owner.server == null) break;
         final allItems = media.items;
         final playlistChanged = _updatePlaylistChangeState(allItems);
 
@@ -369,8 +374,12 @@ class _TwitchHlsLowLatencyEngine {
 
         owner._schedulePrefetches(
           items: <TwitchHlsSegmentItem>[
-            ...futureItems,
-            ...normalItems.skip(normalPrefetchStart),
+            ...futureItems.where(
+              (item) => !_claimedPrefetchUrls.contains(item.url),
+            ),
+            ...normalItems
+                .skip(normalPrefetchStart)
+                .where((item) => !_claimedPrefetchUrls.contains(item.url)),
           ],
           servedUrls: _writtenUrls,
           prefetches: _prefetches,
@@ -496,7 +505,14 @@ class _TwitchHlsLowLatencyEngine {
   }
 
   TwitchHlsSegmentPrefetchJob? takePrefetchJob(String url) {
+    // The writer owns this URL until its stream/fallback finishes. Removing
+    // the queued job must not make playlist reloads schedule it again.
+    _claimedPrefetchUrls.add(url);
     return _prefetches.remove(url);
+  }
+
+  void releasePrefetchClaim(String url) {
+    _claimedPrefetchUrls.remove(url);
   }
 
   TwitchHlsSegmentPrefetchJob? peekPrefetchJob(String url) {

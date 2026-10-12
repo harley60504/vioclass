@@ -12,6 +12,9 @@ import 'twitch_time_jump_sheet.dart';
 class TwitchVodPlaybackStrip extends StatefulWidget {
   final Player player;
   final bool compact;
+  final bool fullWidthTimeline;
+  final Widget Function(Widget slider, Widget timeControls)?
+  timelineLayoutBuilder;
   final bool showLiveEdgeLabel;
   final bool forceLiveEdge;
   final Duration? liveTimelineDuration;
@@ -28,6 +31,8 @@ class TwitchVodPlaybackStrip extends StatefulWidget {
     super.key,
     required this.player,
     this.compact = false,
+    this.fullWidthTimeline = false,
+    this.timelineLayoutBuilder,
     this.showLiveEdgeLabel = false,
     this.forceLiveEdge = false,
     this.liveTimelineDuration,
@@ -49,6 +54,7 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
   bool _dragging = false;
   double? _dragValue;
   double? _scrubbedTimelineValue;
+  Duration? _dragTimelineDuration;
 
   Player get player => widget.player;
   bool get compact => widget.compact;
@@ -86,12 +92,21 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                 final liveDuration = _effectiveLiveTimelineDuration();
                 final isLiveTimeline =
                     widget.forceLiveEdge || widget.showLiveEdgeLabel;
-                final displayDuration =
+                final sourceDisplayDuration =
                     liveDuration != null && liveDuration.inMilliseconds > 500
                     ? liveDuration
                     : isLiveTimeline
                     ? Duration.zero
                     : duration;
+                final clockDuration = isLiveTimeline
+                    ? widget.timelineController?.displayDurationFor(
+                            sourceDisplayDuration,
+                          ) ??
+                          sourceDisplayDuration
+                    : sourceDisplayDuration;
+                final displayDuration = _dragging
+                    ? _dragTimelineDuration ?? clockDuration
+                    : clockDuration;
                 final hasDuration = displayDuration.inMilliseconds > 500;
                 final canScrubTimeline = widget.timelineEnabled && hasDuration;
                 final requestedSeekWindow = widget.liveSeekWindowDuration;
@@ -152,7 +167,12 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                     ? 1.0
                     : streamValue;
                 final value = baseValue;
-                final previewPosition = hasDuration
+                final previewPosition =
+                    !_dragging &&
+                        advancedExternalPosition != null &&
+                        isLiveTimeline
+                    ? advancedExternalPosition
+                    : hasDuration
                     ? positionForSliderValue(value)
                     : position;
                 final liveTailActive =
@@ -224,153 +244,199 @@ class _TwitchVodPlaybackStripState extends State<TwitchVodPlaybackStrip> {
                   jumpToTarget(target);
                 }
 
-                return Row(
-                  children: [
-                    Expanded(
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: compact ? 4 : 5,
-                          thumbShape: RoundSliderThumbShape(
+                final slider = SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: widget.fullWidthTimeline
+                        ? 2
+                        : compact
+                        ? 4
+                        : 5,
+                    activeTrackColor: widget.fullWidthTimeline
+                        ? Theme.of(context).colorScheme.primary
+                        : null,
+                    thumbShape: widget.fullWidthTimeline
+                        ? SliderComponentShape.noThumb
+                        : RoundSliderThumbShape(
                             enabledThumbRadius: compact ? 6 : 7,
                           ),
-                        ),
-                        child: Slider(
-                          value: value,
-                          min: 0,
-                          max: 1,
-                          onChangeStart: canScrubTimeline
-                              ? (next) {
-                                  setState(() {
-                                    _dragging = true;
-                                    _dragValue = next;
-                                  });
-                                  widget.timelineController?.beginDrag(
-                                    positionForSliderValue(next),
-                                  );
-                                }
-                              : null,
-                          onChanged: canScrubTimeline
-                              ? (next) {
-                                  setState(() => _dragValue = next);
-                                  widget.timelineController?.updateDrag(
-                                    positionForSliderValue(next),
-                                  );
-                                }
-                              : null,
-                          onChangeEnd: canScrubTimeline
-                              ? (next) {
-                                  final exactLiveEdge =
-                                      isLiveTimeline &&
-                                      widget.onReturnToLive != null &&
-                                      next >= 1.0;
-                                  if (exactLiveEdge) {
-                                    setState(() {
-                                      _dragging = false;
-                                      _dragValue = null;
-                                      _scrubbedTimelineValue = null;
-                                    });
-                                    widget.timelineController?.returnToLive();
-                                    widget.onReturnToLive!();
-                                    return;
-                                  }
+                    overlayShape: widget.fullWidthTimeline
+                        ? SliderComponentShape.noOverlay
+                        : null,
+                  ),
+                  child: Slider(
+                    value: value,
+                    min: 0,
+                    max: 1,
+                    onChangeStart: canScrubTimeline
+                        ? (next) {
+                            setState(() {
+                              _dragging = true;
+                              _dragTimelineDuration = displayDuration;
+                              _dragValue = next;
+                            });
+                            widget.timelineController?.beginDrag(
+                              positionForSliderValue(next),
+                            );
+                          }
+                        : null,
+                    onChanged: canScrubTimeline
+                        ? (next) {
+                            setState(() => _dragValue = next);
+                            widget.timelineController?.updateDrag(
+                              positionForSliderValue(next),
+                            );
+                          }
+                        : null,
+                    onChangeEnd: canScrubTimeline
+                        ? (next) {
+                            final exactLiveEdge =
+                                isLiveTimeline &&
+                                widget.onReturnToLive != null &&
+                                next >= 1.0;
+                            if (exactLiveEdge) {
+                              setState(() {
+                                _dragging = false;
+                                _dragValue = null;
+                                _scrubbedTimelineValue = null;
+                              });
+                              widget.timelineController?.returnToLive();
+                              widget.onReturnToLive!();
+                              return;
+                            }
 
-                                  setState(() {
-                                    _dragging = false;
-                                    _dragValue = null;
-                                    _scrubbedTimelineValue = next;
-                                  });
-                                  final target = positionForSliderValue(next);
-                                  widget.timelineController?.commitPosition(
-                                    target,
-                                  );
+                            setState(() {
+                              _dragging = false;
+                              _dragValue = null;
+                              _scrubbedTimelineValue = next;
+                            });
+                            final target = positionForSliderValue(next);
+                            widget.timelineController?.commitPosition(target);
 
-                                  if (isLiveTimeline &&
-                                      widget.onOpenDvrReplayAtPosition !=
-                                          null) {
-                                    widget.onOpenDvrReplayAtPosition!(target);
-                                    return;
-                                  }
+                            if (isLiveTimeline &&
+                                widget.onOpenDvrReplayAtPosition != null) {
+                              widget.onOpenDvrReplayAtPosition!(target);
+                              return;
+                            }
 
-                                  unawaited(player.seek(target));
-                                }
-                              : null,
-                        ),
-                      ),
-                    ),
-                    if (limitedLiveReplay) ...[
-                      SizedBox(width: compact ? 5 : 7),
-                      const _LimitedReplayBadge(),
-                    ],
+                            unawaited(player.seek(target));
+                          }
+                        : null,
+                  ),
+                );
+                final labels = <Widget>[
+                  if (limitedLiveReplay) ...[
+                    SizedBox(width: compact ? 5 : 7),
+                    const _LimitedReplayBadge(),
+                  ],
+                  if (!widget.fullWidthTimeline)
                     SizedBox(width: compact ? 6 : 8),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minWidth: widget.showLiveEdgeLabel
-                            ? compact
-                                  ? 132
-                                  : 154
-                            : compact
-                            ? 82
-                            : 108,
-                        maxWidth: widget.showLiveEdgeLabel
-                            ? compact
-                                  ? 178
-                                  : useInlineTimeJump
-                                  ? 340
-                                  : 220
-                            : compact
-                            ? 104
-                            : useInlineTimeJump
-                            ? 260
-                            : 136,
-                      ),
-                      child: useInlineTimeJump
-                          ? _InlineTimelineTimeControls(
-                              current: previewPosition,
-                              duration: displayDuration,
-                              liveText: widget.showLiveEdgeLabel
-                                  ? context.vio.t('直播')
-                                  : null,
-                              liveActive: liveTailActive,
-                              canReturnToLive: canTapLiveTail,
-                              timelineController: widget.timelineController,
-                              onJump: jumpToTarget,
-                              onReturnToLive: () {
-                                setState(() {
-                                  _dragging = false;
-                                  _dragValue = null;
-                                  _scrubbedTimelineValue = null;
-                                });
-                                widget.timelineController?.returnToLive();
-                                widget.onReturnToLive!();
-                              },
-                            )
-                          : widget.showLiveEdgeLabel
-                          ? _LiveTimelineTimeControls(
-                              positionText: positionText,
-                              durationText: durationText,
-                              liveText: tailText,
-                              liveActive: liveTailActive,
-                              compact: compact,
-                              canJumpByTime: canJumpByTime,
-                              canReturnToLive: canTapLiveTail,
-                              onOpenTimeJump: openTimeJumpSheet,
-                              onReturnToLive: () {
-                                setState(() {
-                                  _dragging = false;
-                                  _dragValue = null;
-                                  _scrubbedTimelineValue = null;
-                                });
-                                widget.onReturnToLive!();
-                              },
-                            )
-                          : _VodTimelineTimeControls(
-                              positionText: positionText,
-                              tailText: tailText,
-                              compact: compact,
-                              canJumpByTime: canJumpByTime,
-                              onOpenTimeJump: openTimeJumpSheet,
-                            ),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: widget.showLiveEdgeLabel
+                          ? compact
+                                ? 132
+                                : 154
+                          : compact
+                          ? 82
+                          : 108,
+                      maxWidth: widget.showLiveEdgeLabel
+                          ? compact
+                                ? 178
+                                : useInlineTimeJump
+                                ? 340
+                                : 220
+                          : compact
+                          ? 104
+                          : useInlineTimeJump
+                          ? 260
+                          : 136,
                     ),
+                    child: useInlineTimeJump
+                        ? _InlineTimelineTimeControls(
+                            current: previewPosition,
+                            duration: displayDuration,
+                            liveText: widget.showLiveEdgeLabel
+                                ? context.vio.t('直播')
+                                : null,
+                            liveActive: liveTailActive,
+                            canReturnToLive: canTapLiveTail,
+                            timelineController: widget.timelineController,
+                            onJump: jumpToTarget,
+                            onReturnToLive: () {
+                              setState(() {
+                                _dragging = false;
+                                _dragValue = null;
+                                _scrubbedTimelineValue = null;
+                              });
+                              widget.timelineController?.returnToLive();
+                              widget.onReturnToLive!();
+                            },
+                          )
+                        : widget.showLiveEdgeLabel
+                        ? _LiveTimelineTimeControls(
+                            positionText: positionText,
+                            durationText: durationText,
+                            liveText: tailText,
+                            liveActive: liveTailActive,
+                            compact: compact,
+                            canJumpByTime: canJumpByTime,
+                            canReturnToLive: canTapLiveTail,
+                            onOpenTimeJump: openTimeJumpSheet,
+                            onReturnToLive: () {
+                              setState(() {
+                                _dragging = false;
+                                _dragValue = null;
+                                _scrubbedTimelineValue = null;
+                              });
+                              widget.onReturnToLive!();
+                            },
+                          )
+                        : _VodTimelineTimeControls(
+                            positionText: positionText,
+                            tailText: tailText,
+                            compact: compact,
+                            canJumpByTime: canJumpByTime,
+                            onOpenTimeJump: openTimeJumpSheet,
+                          ),
+                  ),
+                ];
+                if (widget.fullWidthTimeline) {
+                  final timeControls = IntrinsicWidth(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: labels,
+                    ),
+                  );
+                  final layoutBuilder = widget.timelineLayoutBuilder;
+                  if (layoutBuilder != null) {
+                    return layoutBuilder(
+                      SizedBox(height: 40, child: slider),
+                      timeControls,
+                    );
+                  }
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(height: 40, child: slider),
+                      SizedBox(
+                        height: 28,
+                        child: Center(
+                          child: IntrinsicWidth(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: labels,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: slider),
+                    ...labels,
                   ],
                 );
               },

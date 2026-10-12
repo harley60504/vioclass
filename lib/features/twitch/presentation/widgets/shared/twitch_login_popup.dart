@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../../../services/auth/twitch_desktop_webview_settings.dart';
 
 /// Attach the native popup by windowId, rather than navigating the opener to
 /// about:blank. The caller retains ownership of the shared cookie environment.
@@ -82,10 +83,12 @@ class _LoginPopupState extends State<_LoginPopup> {
             webViewEnvironment: widget.environment,
             // No initialUrlRequest: WebView2 must attach the actual opener/popup
             // relationship before the website sends its next navigation.
-            initialSettings: InAppWebViewSettings(
-              javaScriptEnabled: true,
-              domStorageEnabled: true,
-              useShouldOverrideUrlLoading: true,
+            initialSettings: twitchDesktopWebViewSettings(
+              InAppWebViewSettings(
+                javaScriptEnabled: true,
+                domStorageEnabled: true,
+                useShouldOverrideUrlLoading: true,
+              ),
             ),
             shouldOverrideUrlLoading: (_, action) async {
               if (_handleRedirect(action.request.url)) {

@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import '../../api/auth/twitch_device_auth_api_service.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
+import '../../services/auth/twitch_desktop_webview_settings.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_notice.dart';
 
@@ -606,14 +607,16 @@ class _TwitchDropsDeviceLoginPageState
           Expanded(
             child: InAppWebView(
               initialUrlRequest: URLRequest(url: WebUri(url)),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
-                databaseEnabled: true,
-                supportZoom: false,
-                transparentBackground: false,
-                useShouldOverrideUrlLoading: true,
-                mediaPlaybackRequiresUserGesture: false,
+              initialSettings: twitchDesktopWebViewSettings(
+                InAppWebViewSettings(
+                  javaScriptEnabled: true,
+                  domStorageEnabled: true,
+                  databaseEnabled: true,
+                  supportZoom: false,
+                  transparentBackground: false,
+                  useShouldOverrideUrlLoading: true,
+                  mediaPlaybackRequiresUserGesture: false,
+                ),
               ),
               onWebViewCreated: (controller) {
                 _embeddedController = controller;

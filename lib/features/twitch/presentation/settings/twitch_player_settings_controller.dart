@@ -24,6 +24,7 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool _videoSharpen = false;
   bool _videoEnhancementBusy = false;
   bool _loaded = false;
+  Future<void> _playbackWrites = Future<void>.value();
 
   double get volume => _volume;
   bool get muted => _muted;
@@ -31,15 +32,12 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool get androidPipEnabled => _androidPipEnabled;
   bool get homeKeepsMiniPlayer => _homeKeepsMiniPlayer;
   bool get videoEnhancementEnabled => _videoEnhancementEnabled;
-  TwitchVideoEnhancementMode get videoEnhancementMode =>
-      _videoEnhancementMode;
+  TwitchVideoEnhancementMode get videoEnhancementMode => _videoEnhancementMode;
   bool get videoChromaEnhance => _videoChromaEnhance;
   bool get videoDeband => _videoDeband;
   bool get videoSharpen => _videoSharpen;
   bool get videoEnhancementUsesShader =>
-      _videoEnhancementMode.usesShader ||
-      _videoChromaEnhance ||
-      _videoSharpen;
+      _videoEnhancementMode.usesShader || _videoChromaEnhance || _videoSharpen;
   bool get videoEnhancementBusy => _videoEnhancementBusy;
   bool get loaded => _loaded;
 
@@ -85,47 +83,64 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setVolume(double value) async {
+  Future<void> setVolume(double value) => _queuePlaybackWrite(() async {
     final next = value.clamp(0.0, 100.0).toDouble();
     if ((_volume - next).abs() < 0.1) return;
+    final nextMuted = next <= 0.0 ? true : _muted;
+    await _savePlayback(volume: next, muted: nextMuted);
     _volume = next;
-    if (next <= 0.0) _muted = true;
+    _muted = nextMuted;
     notifyListeners();
-    await _savePlayback();
-  }
+  });
 
-  Future<void> setMuted(bool value) async {
+  Future<void> setMuted(bool value) => _queuePlaybackWrite(() async {
     if (_muted == value) return;
+    await _savePlayback(muted: value);
     _muted = value;
     notifyListeners();
-    await _savePlayback();
+  });
+
+  Future<void> _queuePlaybackWrite(Future<void> Function() write) {
+    final result = _playbackWrites.then((_) => write());
+    _playbackWrites = result.catchError((Object _) {});
+    return result;
   }
 
   Future<void> setChatVisible(bool value) async {
     if (_chatVisible == value) return;
+    await _saveBoolPreference(
+      TwitchWatchPreferencesController.chatVisiblePreferenceKey,
+      value,
+    );
     _chatVisible = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(
-      TwitchWatchPreferencesController.chatVisiblePreferenceKey,
-      _chatVisible,
-    );
   }
 
   Future<void> setAndroidPipEnabled(bool value) async {
     if (_androidPipEnabled == value) return;
+    await _saveBoolPreference(androidPipEnabledPreferenceKey, value);
     _androidPipEnabled = value;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(androidPipEnabledPreferenceKey, _androidPipEnabled);
   }
 
   Future<void> setHomeKeepsMiniPlayer(bool value) async {
     if (_homeKeepsMiniPlayer == value) return;
+    await _saveBoolPreference(homeKeepsMiniPlayerPreferenceKey, value);
     _homeKeepsMiniPlayer = value;
     notifyListeners();
+  }
+
+  Future<void> _saveBoolPreference(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(homeKeepsMiniPlayerPreferenceKey, _homeKeepsMiniPlayer);
+    try {
+      if (!await prefs.setBool(key, value)) {
+        throw StateError('Player preference was not saved');
+      }
+    } catch (_) {
+      // SharedPreferences updates its cache before the platform write finishes.
+      await prefs.reload();
+      rethrow;
+    }
   }
 
   Future<void> setVideoEnhancementEnabled(bool value) async {
@@ -175,34 +190,90 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
         deband: _videoDeband,
         sharpen: _videoSharpen,
       );
+    } catch (_) {
+      final saved = TwitchVideoEnhancementRuntime.config;
+      _videoEnhancementEnabled = saved.enabled;
+      _videoEnhancementMode = saved.mode;
+      _videoChromaEnhance = saved.chromaEnhance;
+      _videoDeband = saved.deband;
+      _videoSharpen = saved.sharpen;
+      rethrow;
     } finally {
       _videoEnhancementBusy = false;
       notifyListeners();
     }
   }
 
-  Future<void> resetPlayback() async {
-    _volume = 100.0;
-    _muted = false;
+  Future<void> resetPlayback() => _queuePlaybackWrite(() async {
+    if (_videoEnhancementBusy) return;
+    final prefs = await SharedPreferences.getInstance();
+    const volumeKey =
+        TwitchWatchPreferencesController.playerVolumePreferenceKey;
+    const mutedKey = TwitchWatchPreferencesController.playerMutedPreferenceKey;
+    final previousVolume = prefs.getDouble(volumeKey);
+    final previousMuted = prefs.getBool(mutedKey);
+    await _savePlayback(volume: 100, muted: false);
     _videoEnhancementEnabled = false;
     _videoEnhancementMode = TwitchVideoEnhancementMode.ewaLanczosSharp;
     _videoChromaEnhance = false;
     _videoDeband = false;
     _videoSharpen = false;
+    try {
+      await _saveAndApplyVideoEnhancement();
+    } catch (_) {
+      try {
+        final restoredVolume = previousVolume == null
+            ? await prefs.remove(volumeKey)
+            : await prefs.setDouble(volumeKey, previousVolume);
+        final restoredMuted = previousMuted == null
+            ? await prefs.remove(mutedKey)
+            : await prefs.setBool(mutedKey, previousMuted);
+        if (!restoredVolume || !restoredMuted) {
+          throw StateError('Playback reset rollback failed');
+        }
+      } finally {
+        await prefs.reload();
+      }
+      rethrow;
+    }
+    _volume = 100;
+    _muted = false;
     notifyListeners();
-    await _savePlayback();
-    await _saveAndApplyVideoEnhancement();
-  }
+  });
 
-  Future<void> _savePlayback() async {
+  Future<void> _savePlayback({double? volume, bool? muted}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(
-      TwitchWatchPreferencesController.playerVolumePreferenceKey,
-      _volume.clamp(0.0, 100.0).toDouble(),
-    );
-    await prefs.setBool(
-      TwitchWatchPreferencesController.playerMutedPreferenceKey,
-      _muted,
-    );
+    const volumeKey =
+        TwitchWatchPreferencesController.playerVolumePreferenceKey;
+    const mutedKey = TwitchWatchPreferencesController.playerMutedPreferenceKey;
+    final previousVolume = prefs.getDouble(volumeKey);
+    final previousMuted = prefs.getBool(mutedKey);
+    try {
+      if (!await prefs.setDouble(
+        volumeKey,
+        (volume ?? _volume).clamp(0.0, 100.0).toDouble(),
+      )) {
+        throw StateError('Player volume was not saved');
+      }
+      if (!await prefs.setBool(mutedKey, muted ?? _muted)) {
+        throw StateError('Player mute preference was not saved');
+      }
+    } catch (_) {
+      // The two preference writes are not atomic; restore a partial write.
+      try {
+        final restoredVolume = previousVolume == null
+            ? await prefs.remove(volumeKey)
+            : await prefs.setDouble(volumeKey, previousVolume);
+        final restoredMuted = previousMuted == null
+            ? await prefs.remove(mutedKey)
+            : await prefs.setBool(mutedKey, previousMuted);
+        if (!restoredVolume || !restoredMuted) {
+          throw StateError('Playback preference rollback failed');
+        }
+      } finally {
+        await prefs.reload();
+      }
+      rethrow;
+    }
   }
 }

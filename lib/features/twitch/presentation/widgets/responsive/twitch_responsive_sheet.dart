@@ -282,7 +282,9 @@ class TwitchUnifiedSheetScaffold extends StatelessWidget {
               showClose: showClose,
               trailing: trailing,
             ),
-            Expanded(child: child),
+            Expanded(
+              child: Material(type: MaterialType.transparency, child: child),
+            ),
           ],
         ),
       ),

@@ -7,6 +7,8 @@ const Color _softAccent = Color(0xFF8F7CC0);
 const Color _softAccentText = Color(0xFFC9BDEC);
 
 class TwitchWatchChatHeaderBar extends StatelessWidget {
+  static const double compactHeight = 40;
+  static const double regularHeight = 44;
   final bool connected;
   final bool showPinned;
   final bool showPrediction;
@@ -16,6 +18,10 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
   final bool compact;
   final VoidCallback onTogglePinned;
   final VoidCallback onTogglePrediction;
+  final VoidCallback? onToggleMode;
+  final bool replayMode;
+  final bool replayHasError;
+  final bool showToggles;
 
   const TwitchWatchChatHeaderBar({
     super.key,
@@ -28,52 +34,55 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
     required this.compact,
     required this.onTogglePinned,
     required this.onTogglePrediction,
+    this.onToggleMode,
+    this.replayMode = false,
+    this.replayHasError = false,
+    this.showToggles = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final l10n = context.vio;
-    final headerHeight = compact ? 44.0 : 56.0;
+    final headerHeight = compact ? compactHeight : regularHeight;
 
     return Container(
       height: headerHeight,
-      padding: EdgeInsets.fromLTRB(12, compact ? 5 : 8, 10, compact ? 5 : 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: const BoxDecoration(
         color: TwitchUiColors.surfaceRaised,
-        border: Border(
-          bottom: BorderSide(color: TwitchUiColors.borderSubtle),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x52000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
+        border: Border(bottom: BorderSide(color: TwitchUiColors.borderSubtle)),
       ),
       child: Row(
         children: [
-          _ConnectionBadge(connected: connected, compact: compact),
+          _ConnectionBadge(
+            connected: connected,
+            compact: compact,
+            replayMode: replayMode,
+            hasError: replayHasError,
+            onToggleMode: onToggleMode,
+          ),
           const Spacer(),
-          _HeaderToggleButton(
-            tooltip: l10n.t(showPinned ? '隱藏置頂留言' : '顯示置頂留言'),
-            icon: Icons.push_pin_rounded,
-            active: showPinned && hasPinned,
-            enabled: hasPinned,
-            onTap: onTogglePinned,
-          ),
-          const SizedBox(width: 5),
-          _HeaderToggleButton(
-            tooltip: predictionVisible
-                ? l10n.t('隱藏賭盤通知')
-                : hasPrediction
-                ? l10n.t('顯示賭盤通知')
-                : l10n.t('沒有賭盤'),
-            icon: Icons.how_to_vote_rounded,
-            active: predictionVisible,
-            enabled: hasPrediction,
-            onTap: onTogglePrediction,
-          ),
+          if (showToggles) ...[
+            _HeaderToggleButton(
+              tooltip: l10n.t(showPinned ? '隱藏置頂留言' : '顯示置頂留言'),
+              icon: Icons.push_pin_rounded,
+              active: showPinned && hasPinned,
+              enabled: hasPinned,
+              onTap: onTogglePinned,
+            ),
+            const SizedBox(width: 5),
+            _HeaderToggleButton(
+              tooltip: predictionVisible
+                  ? l10n.t('隱藏賭盤通知')
+                  : hasPrediction
+                  ? l10n.t('顯示賭盤通知')
+                  : l10n.t('沒有賭盤'),
+              icon: Icons.how_to_vote_rounded,
+              active: predictionVisible,
+              enabled: hasPrediction,
+              onTap: onTogglePrediction,
+            ),
+          ],
         ],
       ),
     );
@@ -83,58 +92,74 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
 class _ConnectionBadge extends StatelessWidget {
   final bool connected;
   final bool compact;
+  final bool replayMode;
+  final bool hasError;
+  final VoidCallback? onToggleMode;
 
-  const _ConnectionBadge({required this.connected, required this.compact});
+  const _ConnectionBadge({
+    required this.connected,
+    required this.compact,
+    required this.replayMode,
+    required this.hasError,
+    this.onToggleMode,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = connected ? TwitchUiColors.green : Colors.white38;
-    final label = context.vio.t(connected ? '直播' : '離線');
+    final color = replayMode
+        ? (hasError ? Colors.redAccent : _softAccentText)
+        : connected
+        ? TwitchUiColors.green
+        : Colors.white38;
+    final label = replayMode ? 'VOD' : context.vio.t(connected ? '直播' : '離線');
 
-    return Container(
-      height: compact ? 25 : 28,
-      padding: EdgeInsets.symmetric(horizontal: compact ? 7 : 8),
-      decoration: BoxDecoration(
-        color: connected
-            ? color.withValues(alpha: 0.10)
-            : Colors.white.withValues(alpha: 0.042),
+    return Tooltip(
+      message: onToggleMode == null
+          ? label
+          : context.vio.t(replayMode ? '切換到直播聊天室' : '切換到 VOD 聊天回放'),
+      child: InkWell(
+        onTap: onToggleMode,
         borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        border: Border.all(
-          color: color.withValues(alpha: connected ? 0.30 : 0.16),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              boxShadow: connected
-                  ? <BoxShadow>[
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.38),
-                        blurRadius: 6,
-                      ),
-                    ]
-                  : const <BoxShadow>[],
-            ),
-          ),
-          if (!compact) ...[
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10.5,
-                fontWeight: TwitchUiFontWeight.heavy,
-                letterSpacing: 0,
+        child: SizedBox(
+          height: compact ? 40 : 44,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  boxShadow: connected
+                      ? <BoxShadow>[
+                          BoxShadow(
+                            color: color.withValues(alpha: 0.38),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : const <BoxShadow>[],
+                ),
               ),
-            ),
-          ],
-        ],
+              if (!compact || onToggleMode != null) ...[
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ],
+              if (onToggleMode != null) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.swap_horiz_rounded, size: 14, color: color),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -161,25 +186,40 @@ class _HeaderToggleButton extends StatelessWidget {
 
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-        onTap: enabled ? onTap : null,
-        child: Container(
-          width: 32,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active
-                ? _softAccent.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.052),
-            borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
-            border: Border.all(
-              color: active
-                  ? _softAccentText.withValues(alpha: 0.28)
-                  : Colors.white.withValues(alpha: 0.080),
+      child: Semantics(
+        button: true,
+        enabled: enabled,
+        label: tooltip,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+          onTap: enabled ? onTap : null,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: active
+                      ? _softAccent.withValues(alpha: 0.18)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(TwitchUiRadius.pill),
+                  border: Border.all(
+                    color: active
+                        ? _softAccentText.withValues(alpha: 0.28)
+                        : Colors.transparent,
+                  ),
+                ),
+                child: Icon(
+                  icon,
+                  size: 16,
+                  color: enabled ? color : Colors.white24,
+                ),
+              ),
             ),
           ),
-          child: Icon(icon, size: 16, color: enabled ? color : Colors.white24),
         ),
       ),
     );

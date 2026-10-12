@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 
 import '../../models/discovery/twitch_live_stream.dart';
 import '../../services/discovery/twitch_discovery_service.dart';
+import '../../services/watch/twitch_watch_services.dart';
+import '../watch/controllers/twitch_watch_chat_controller.dart';
 import '../localization/vioclass_localizations.dart';
 import '../twitch_follow_status_resolver.dart';
 import '../theme/twitch_ui_tokens.dart';
@@ -21,6 +23,8 @@ import '../widgets/shared/twitch_text_field.dart';
 import 'twitch_stream_refresh_reconciler.dart';
 
 class TwitchBrowsePage extends StatefulWidget {
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final TwitchDiscoveryService discoveryService;
   final String searchText;
   final List<TwitchLiveStream> searchedLiveStreams;
@@ -33,6 +37,8 @@ class TwitchBrowsePage extends StatefulWidget {
 
   const TwitchBrowsePage({
     super.key,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     required this.discoveryService,
     required this.searchText,
     required this.searchedLiveStreams,
@@ -81,6 +87,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   bool loadingTagSuggestions = false;
 
   int _refreshGeneration = 0;
+  bool _refreshing = false;
   int _tagSuggestionGeneration = 0;
   Timer? _tagSuggestionDebounce;
 
@@ -124,8 +131,12 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   void didUpdateWidget(covariant TwitchBrowsePage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.reloadTick != widget.reloadTick) {
-      unawaited(refreshStreams());
+    final sourceChanged = !identical(
+      oldWidget.discoveryService,
+      widget.discoveryService,
+    );
+    if (oldWidget.reloadTick != widget.reloadTick || sourceChanged) {
+      unawaited(refreshStreams(clearExisting: sourceChanged));
       if (games.isEmpty) unawaited(loadGames());
     }
   }
@@ -157,6 +168,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     final hadExistingStreams = loadedStreams.isNotEmpty && !clearExisting;
 
     setState(() {
+      _refreshing = true;
+      loadingMore = false;
       loadingFirstPage = !hadExistingStreams;
       errorText = null;
       paginationError = null;
@@ -183,6 +196,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         nextCursor = refreshed.cursor;
         hasMore = refreshed.hasMore;
         loadingFirstPage = false;
+        _refreshing = false;
         errorText = null;
         paginationError = null;
       });
@@ -199,6 +213,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           paginationError = error.toString();
         }
         loadingFirstPage = false;
+        _refreshing = false;
       });
     }
   }
@@ -250,7 +265,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
   }
 
   Future<void> loadMore() async {
-    if (loadingMore || !hasMore) return;
+    if (!mounted || _refreshing || loadingMore || !hasMore) return;
+    final generation = _refreshGeneration;
     final cursor = nextCursor;
     if (cursor == null || cursor.trim().isEmpty) {
       setState(() => hasMore = false);
@@ -269,6 +285,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         gameId: selectedGameId,
         language: currentLanguage,
       );
+      if (!mounted || generation != _refreshGeneration) return;
       final matchedStreams = <TwitchLiveStream>[
         ..._applySelectedTags(page.streams),
       ];
@@ -287,6 +304,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
           gameId: selectedGameId,
           language: currentLanguage,
         );
+        if (!mounted || generation != _refreshGeneration) return;
         matchedStreams.addAll(_applySelectedTags(page.streams));
         nextPageCursor = page.cursor;
         nextPageHasMore = page.hasMore;
@@ -294,7 +312,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       }
 
       final streamsWithProfiles = await _attachProfileImages(matchedStreams);
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
 
       setState(() {
         loadedStreams = TwitchStreamRefreshReconciler.appendUniquePage(
@@ -307,7 +325,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
         loadingMore = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _refreshGeneration) return;
       setState(() {
         paginationError = error.toString();
         loadingMore = false;
@@ -813,7 +831,7 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       selectedGameName: selectedGameName,
       loading: loadingGames,
       loadingProvider: () => loadingGames,
-      onLoadMore: loadMoreGames,
+      onLoadMore: () => games.isEmpty ? loadGames() : loadMoreGames(),
       loadingMore: loadingMoreGames,
       loadingMoreProvider: () => loadingMoreGames,
       hasMore: hasMoreGames,
@@ -901,22 +919,25 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
                       final value = item['value'] ?? '';
                       final label = l10n.t(item['label'] ?? value);
                       final selected = currentLanguage == value;
-                      return ListTile(
-                        selected: selected,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                      return Material(
+                        type: MaterialType.transparency,
+                        child: ListTile(
+                          selected: selected,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          leading: Icon(
+                            selected
+                                ? Icons.check_circle_rounded
+                                : Icons.language_rounded,
+                            color: selected
+                                ? TwitchUiColors.primary
+                                : Colors.white54,
+                          ),
+                          title: Text(label),
+                          subtitle: value.isEmpty ? null : Text(value),
+                          onTap: () => selectLanguage(value),
                         ),
-                        leading: Icon(
-                          selected
-                              ? Icons.check_circle_rounded
-                              : Icons.language_rounded,
-                          color: selected
-                              ? TwitchUiColors.primary
-                              : Colors.white54,
-                        ),
-                        title: Text(label),
-                        subtitle: value.isEmpty ? null : Text(value),
-                        onTap: () => selectLanguage(value),
                       );
                     },
                   ),
@@ -1035,6 +1056,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       color: TwitchUiColors.primary,
       onRefresh: refreshStreams,
       child: TwitchDiscoveryStreamGrid(
+        watchServicesFactory: widget.watchServicesFactory,
+        watchChatRuntimeFactory: widget.watchChatRuntimeFactory,
         controller: scrollController,
         sectionIcon: Icons.explore_rounded,
         sectionTitle: _sectionTitle(),
@@ -1093,6 +1116,8 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
     if (liveStreams.isNotEmpty) {
       slivers.add(
         TwitchDiscoveryStreamSliverSection(
+          watchServicesFactory: widget.watchServicesFactory,
+          watchChatRuntimeFactory: widget.watchChatRuntimeFactory,
           icon: Icons.search_rounded,
           title: l10n.t('搜尋到的直播'),
           streams: liveStreams,
@@ -1134,23 +1159,24 @@ class TwitchBrowsePageState extends State<TwitchBrowsePage> {
       ),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
-        sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300,
-            mainAxisExtent: 168,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) => SliverGrid(
+            gridDelegate: twitchOfflineChannelGridDelegate(
+              constraints.crossAxisExtent,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              return TwitchOfflineChannelCard(
+                watchServicesFactory: widget.watchServicesFactory,
+                watchChatRuntimeFactory: widget.watchChatRuntimeFactory,
+                channel: channels[index],
+                discoveryService: widget.discoveryService,
+                initialKnownFollowing: widget.followStatusFor?.call(
+                  broadcasterId: channels[index].broadcasterId,
+                  broadcasterLogin: channels[index].channelLogin,
+                ),
+              );
+            }, childCount: channels.length),
           ),
-          delegate: SliverChildBuilderDelegate((context, index) {
-            return TwitchOfflineChannelCard(
-              channel: channels[index],
-              discoveryService: widget.discoveryService,
-              initialKnownFollowing: widget.followStatusFor?.call(
-                broadcasterId: channels[index].broadcasterId,
-                broadcasterLogin: channels[index].channelLogin,
-              ),
-            );
-          }, childCount: channels.length),
         ),
       ),
     ];

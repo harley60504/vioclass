@@ -38,11 +38,25 @@ class TwitchWatchSessionHandles {
   factory TwitchWatchSessionHandles.create({
     required String playerTitle,
     TwitchPlaylistPlayerRuntime? playerRuntime,
+    TwitchAuthService? sharedAuthService,
+    TwitchWatchServices? suppliedServices,
   }) {
-    final services = TwitchWatchServices.create(
-      playerTitle: playerTitle,
-      playerRuntime: playerRuntime,
-    );
+    if (suppliedServices != null &&
+        ((sharedAuthService != null &&
+                !identical(sharedAuthService, suppliedServices.authService)) ||
+            (playerRuntime != null &&
+                !identical(playerRuntime, suppliedServices.playerRuntime)))) {
+      throw ArgumentError(
+        'Supplied watch services must match shared dependencies',
+      );
+    }
+    final services =
+        suppliedServices ??
+        TwitchWatchServices.create(
+          playerTitle: playerTitle,
+          playerRuntime: playerRuntime,
+          sharedAuthService: sharedAuthService,
+        );
     final ports = TwitchWatchFeaturePorts.fromServices(services);
 
     return TwitchWatchSessionHandles._(

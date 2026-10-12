@@ -33,6 +33,9 @@ import 'chat/twitch_watch_chat_message_area.dart';
 import 'hype_train/twitch_hype_train_banner.dart';
 
 class TwitchWatchChatPanel extends StatefulWidget {
+  final bool? readOnlyGuest;
+  final bool? canSend;
+  final bool missingSendPermission;
   final TwitchChatRuntime? runtime;
   final String? viewerLogin;
   final String? viewerId;
@@ -62,15 +65,20 @@ class TwitchWatchChatPanel extends StatefulWidget {
   final VoidCallback onOpenChannelPoints;
   final VoidCallback onOpenPrediction;
   final VoidCallback? onOpenSpecialActions;
+  final VoidCallback? onLoginPressed;
   final Widget Function(BuildContext, TwitchChatRuntimeMessage)?
   messageActionBuilder;
   final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final VoidCallback? onCancelPendingSpecialMessage;
   final bool showHeader;
+  final VoidCallback? onToggleChatMode;
   final TwitchModerationApiService? moderationApi;
 
   const TwitchWatchChatPanel({
     super.key,
+    this.readOnlyGuest,
+    this.canSend,
+    this.missingSendPermission = false,
     required this.runtime,
     required this.viewerLogin,
     required this.viewerId,
@@ -100,10 +108,12 @@ class TwitchWatchChatPanel extends StatefulWidget {
     required this.onOpenChannelPoints,
     required this.onOpenPrediction,
     this.onOpenSpecialActions,
+    this.onLoginPressed,
     this.messageActionBuilder,
     this.onOpenUser,
     this.onCancelPendingSpecialMessage,
     this.showHeader = true,
+    this.onToggleChatMode,
     this.moderationApi,
   });
 
@@ -561,6 +571,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                 children: [
                   if (widget.showHeader)
                     TwitchWatchChatHeaderBar(
+                      onToggleMode: widget.onToggleChatMode,
                       connected: currentRuntime?.connected ?? false,
                       showPinned: effectiveShowPinned,
                       showPrediction: showPrediction,
@@ -601,6 +612,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                         if (api == null || currentRuntime == null) return;
                         bool eligible() {
                           if (!mounted ||
+                              widget.readOnlyGuest == true ||
                               widget.moderationApi != api ||
                               widget.runtime != currentRuntime ||
                               api.canModerate?.call() != true) {
@@ -647,6 +659,7 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                         );
                       },
                       canStartKeyboardModeration: () =>
+                          widget.readOnlyGuest != true &&
                           widget.moderationApi?.canModerate?.call() == true,
                       onOpenUser: widget.onOpenUser == null
                           ? null
@@ -660,10 +673,6 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                           _appearanceController.messageTimestampsEnabled,
                       compact: metrics.verticalCompact,
                       onOpenMessageContext: (message) {
-                        if (widget.onOpenUser != null) {
-                          unawaited(widget.onOpenUser!(message));
-                          return;
-                        }
                         showTwitchChatMessageContextSheet(
                           context: context,
                           selectedMessage: message,
@@ -677,7 +686,8 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                       },
                     ),
                   ),
-                  if (widget.moderationApi != null)
+                  if (widget.readOnlyGuest != true &&
+                      widget.moderationApi != null)
                     TwitchAutomodQueueStrip(
                       key: ValueKey((
                         widget.runtime,
@@ -700,14 +710,26 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                     messageController: widget.messageController,
                     loadingEmotes: widget.loadingEmotes,
                     compact: metrics.compactUtilityBar,
-                    enabled: currentRuntime?.connected ?? false,
+                    enabled:
+                        (currentRuntime?.connected ?? false) &&
+                        (widget.canSend ?? true),
                     sending: widget.sending,
+                    missingSendPermission:
+                        widget.missingSendPermission &&
+                        widget.pendingSpecialMessage == null,
+                    readOnlyGuest:
+                        widget.readOnlyGuest ??
+                        (currentRuntime?.connected ?? false) &&
+                            (widget.viewerId == null ||
+                                widget.viewerId!.isEmpty),
                     onOpenChannelPoints: widget.onOpenChannelPoints,
                     onOpenEmotes: _toggleEmotes,
                     onOpenSpecialActions: widget.onOpenSpecialActions,
+                    onLoginPressed: widget.onLoginPressed,
                     onCancelPendingSpecialMessage:
                         widget.onCancelPendingSpecialMessage,
                     onSend: widget.onSend,
+                    sendContext: (currentRuntime, widget.viewerId),
                   ),
                   if (_showEmotes)
                     SizedBox(

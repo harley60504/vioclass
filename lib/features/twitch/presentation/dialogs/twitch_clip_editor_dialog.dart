@@ -23,6 +23,7 @@ Future<void> showTwitchClipEditorDialog({
   String? broadcastId,
   required double offsetSeconds,
   required String channelName,
+  Future<Player> Function(PlayerConfiguration configuration)? createPlayer,
 }) async {
   await showTwitchResponsiveSheet<void>(
     context: context,
@@ -38,6 +39,7 @@ Future<void> showTwitchClipEditorDialog({
         broadcastId: broadcastId,
         offsetSeconds: offsetSeconds,
         channelName: channelName,
+        createPlayer: createPlayer,
       ),
     ),
   );
@@ -50,6 +52,8 @@ class _TwitchClipEditorDialogBody extends StatefulWidget {
   final String? broadcastId;
   final double offsetSeconds;
   final String channelName;
+  final Future<Player> Function(PlayerConfiguration configuration)?
+  createPlayer;
 
   const _TwitchClipEditorDialogBody({
     required this.clipApi,
@@ -58,6 +62,7 @@ class _TwitchClipEditorDialogBody extends StatefulWidget {
     required this.broadcastId,
     required this.offsetSeconds,
     required this.channelName,
+    this.createPlayer,
   });
 
   @override
@@ -87,39 +92,70 @@ class _TwitchClipEditorDialogBodyState
   @override
   void initState() {
     super.initState();
-    MediaKit.ensureInitialized();
+    if (widget.createPlayer == null) MediaKit.ensureInitialized();
     unawaited(_initialize());
   }
 
   Future<void> _initialize() async {
-    final player = await Player.create(
-      configuration: const PlayerConfiguration(title: '片段剪輯器'),
-    );
-    final controller = await VideoController.create(
-      player,
-      configuration: const VideoControllerConfiguration(
-        enableHardwareAcceleration: true,
-        androidAttachSurfaceAfterVideoParameters: false,
-        hwdec: 'auto-safe',
-      ),
-    );
-    if (!mounted) {
-      await player.dispose();
-      return;
-    }
-    _player = player;
-    _videoController = controller;
-    _positionSubscription = player.stream.position.listen((position) {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _errorText = null;
+    });
+    Player? initializingPlayer;
+    try {
+      final player = await _createPlayer(
+        const PlayerConfiguration(title: '片段剪輯器'),
+      );
+      initializingPlayer = player;
+      if (!mounted) {
+        await player.dispose();
+        return;
+      }
+      final controller = await VideoController.create(
+        player,
+        configuration: const VideoControllerConfiguration(
+          enableHardwareAcceleration: true,
+          androidAttachSurfaceAfterVideoParameters: false,
+          hwdec: 'auto-safe',
+        ),
+      );
+      if (!mounted) {
+        await player.dispose();
+        return;
+      }
+      _player = player;
+      _videoController = controller;
+      _positionSubscription = player.stream.position.listen((position) {
+        if (!mounted) return;
+        setState(() {
+          _position = position.inMilliseconds / 1000;
+        });
+        if (_createdClip == null && _end > _start && _position >= _end) {
+          unawaited(player.pause());
+        }
+      });
+      await _begin();
+    } catch (error) {
+      final player = initializingPlayer;
+      if (player != null && !identical(player, _player)) {
+        try {
+          await player.dispose();
+        } catch (_) {
+          // Preserve the initialization failure without an unhandled cleanup error.
+        }
+      }
       if (!mounted) return;
       setState(() {
-        _position = position.inMilliseconds / 1000;
+        _loading = false;
+        _errorText = _clipEditorErrorText(context, error);
       });
-      if (_createdClip == null && _end > _start && _position >= _end) {
-        unawaited(player.pause());
-      }
-    });
-    await _begin();
+    }
   }
+
+  Future<Player> _createPlayer(PlayerConfiguration configuration) =>
+      widget.createPlayer?.call(configuration) ??
+      Player.create(configuration: configuration);
 
   @override
   void dispose() {
@@ -368,7 +404,10 @@ class _TwitchClipEditorDialogBodyState
       );
     }
     if (_session == null) {
-      return _ErrorView(errorText: _errorText, onRetry: _begin);
+      return _ErrorView(
+        errorText: _errorText,
+        onRetry: _player == null ? _initialize : _begin,
+      );
     }
     final createdClip = _createdClip;
     final controller = _videoController;

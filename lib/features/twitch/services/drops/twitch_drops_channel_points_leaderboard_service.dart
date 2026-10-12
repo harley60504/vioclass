@@ -24,15 +24,20 @@ query ChannelPointsContext($channelLogin: String!) {
 }
 ''';
 
-  static DateTime? _cachedAt;
-  static List<TwitchDropsChannelPointsLeaderboardEntry> _cachedEntries =
+  DateTime? _cachedAt;
+  String? _cachedViewerToken;
+  String? _cachedDropsToken;
+  String? _cachedClientId;
+  int? _cachedFollowedLimit;
+  int? _cachedBalanceLimit;
+  List<TwitchDropsChannelPointsLeaderboardEntry> _cachedEntries =
       const <TwitchDropsChannelPointsLeaderboardEntry>[];
 
   final TwitchDiscoveryService discoveryService;
   final TwitchApiClient apiClient;
   final TwitchDropsAuthService dropsAuthService;
 
-  const TwitchDropsChannelPointsLeaderboardService({
+  TwitchDropsChannelPointsLeaderboardService({
     required this.discoveryService,
     required this.apiClient,
     required this.dropsAuthService,
@@ -60,8 +65,24 @@ query ChannelPointsContext($channelLogin: String!) {
     int balanceLimit = 100,
     bool force = false,
   }) async {
+    await dropsAuthService.loadStoredSession();
+    final token = await dropsAuthService.getToken();
+    final clientId = dropsAuthService.dropsClientId.trim();
+    final viewerToken = discoveryService.authService.accessToken;
+    if (token == null || token.trim().isEmpty || clientId.isEmpty) {
+      _cachedAt = null;
+      _cachedEntries = const <TwitchDropsChannelPointsLeaderboardEntry>[];
+      _cachedViewerToken = null;
+      _cachedDropsToken = null;
+      return const <TwitchDropsChannelPointsLeaderboardEntry>[];
+    }
     final cachedAt = _cachedAt;
     if (!force &&
+        _cachedViewerToken == viewerToken &&
+        _cachedDropsToken == token &&
+        _cachedClientId == clientId &&
+        _cachedFollowedLimit == followedLimit.clamp(1, 100) &&
+        _cachedBalanceLimit == balanceLimit.clamp(1, 100) &&
         cachedAt != null &&
         DateTime.now().difference(cachedAt) < _cacheDuration) {
       return _cachedEntries;
@@ -71,13 +92,6 @@ query ChannelPointsContext($channelLogin: String!) {
       first: followedLimit.clamp(1, 100),
       attachProfiles: true,
     );
-
-    await dropsAuthService.loadStoredSession();
-    final token = await dropsAuthService.getToken();
-    final clientId = dropsAuthService.dropsClientId.trim();
-    if (token == null || token.trim().isEmpty || clientId.isEmpty) {
-      return const <TwitchDropsChannelPointsLeaderboardEntry>[];
-    }
 
     final entries = <TwitchDropsChannelPointsLeaderboardEntry>[];
     final channels = followed.channels
@@ -135,6 +149,17 @@ query ChannelPointsContext($channelLogin: String!) {
     final ranked = <TwitchDropsChannelPointsLeaderboardEntry>[
       for (var i = 0; i < entries.length; i++) entries[i].copyWith(rank: i + 1),
     ];
+    final currentDropsToken = await dropsAuthService.getToken();
+    if (discoveryService.authService.accessToken != viewerToken ||
+        currentDropsToken != token ||
+        dropsAuthService.dropsClientId.trim() != clientId) {
+      return const <TwitchDropsChannelPointsLeaderboardEntry>[];
+    }
+    _cachedViewerToken = viewerToken;
+    _cachedDropsToken = token;
+    _cachedClientId = clientId;
+    _cachedFollowedLimit = followedLimit.clamp(1, 100);
+    _cachedBalanceLimit = balanceLimit.clamp(1, 100);
     _cachedEntries = ranked;
     _cachedAt = DateTime.now();
     return ranked;

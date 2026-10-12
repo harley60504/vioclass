@@ -11,6 +11,8 @@ class _TwitchChannelSearchPage extends StatelessWidget {
   final String? errorText;
   final TwitchDiscoveryService discoveryService;
   final Future<void> Function() onRefresh;
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
 
   const _TwitchChannelSearchPage({
     super.key,
@@ -24,6 +26,8 @@ class _TwitchChannelSearchPage extends StatelessWidget {
     required this.errorText,
     required this.discoveryService,
     required this.onRefresh,
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
   });
 
   @override
@@ -49,138 +53,142 @@ class _TwitchChannelSearchPage extends StatelessWidget {
         followedLiveStreams.length + followedOfflineChannels.length;
 
     if (!loading && !hasResults) {
-      return TwitchDiscoveryEmptyState(
-        icon: Icons.search_off_rounded,
-        title: '找不到符合條件的頻道',
-        message: errorText?.trim().isNotEmpty == true
-            ? 'Twitch 頻道搜尋暫時失敗，稍後再試。'
-            : '可以換個實況主名稱或登入名稱搜尋。',
-        onRetry: onRefresh,
+      return TwitchDiscoveryScrollSurface(
+        scrollViewKey: const PageStorageKey<String>(
+          'twitch_channel_search_page',
+        ),
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: TwitchDiscoveryEmptyState(
+              icon: Icons.search_off_rounded,
+              title: '找不到符合條件的頻道',
+              message: errorText?.trim().isNotEmpty == true
+                  ? 'Twitch 頻道搜尋暫時失敗，稍後再試。'
+                  : '可以換個實況主名稱或登入名稱搜尋。',
+              onRetry: onRefresh,
+            ),
+          ),
+        ],
       );
     }
 
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment(-0.72, -0.92),
-          radius: 1.35,
-          colors: <Color>[
-            Color(0xFF24133A),
-            Color(0xFF14121E),
-            Color(0xFF0A0A0F),
-          ],
-          stops: <double>[0.0, 0.46, 1.0],
+    return RefreshIndicator(
+      color: TwitchUiColors.primary,
+      onRefresh: onRefresh,
+      child: TwitchDiscoveryScrollSurface(
+        scrollViewKey: const PageStorageKey<String>(
+          'twitch_channel_search_page',
         ),
-      ),
-      child: RefreshIndicator(
-        color: TwitchUiColors.primary,
-        onRefresh: onRefresh,
-        child: CustomScrollView(
-          key: const PageStorageKey<String>('twitch_channel_search_page'),
-          physics: const AlwaysScrollableScrollPhysics(),
-          scrollCacheExtent: const ScrollCacheExtent.pixels(840),
-          slivers: <Widget>[
-            SliverToBoxAdapter(
-              child: TwitchDiscoverySectionHeader(
-                icon: Icons.search_rounded,
-                title: '搜尋結果',
-                count:
-                    liveStreams.length +
-                    offlineChannels.length +
-                    videos.length +
-                    clips.length,
+        slivers: <Widget>[
+          SliverToBoxAdapter(
+            child: TwitchDiscoverySectionHeader(
+              icon: Icons.search_rounded,
+              title: '搜尋結果',
+              count:
+                  liveStreams.length +
+                  offlineChannels.length +
+                  videos.length +
+                  clips.length,
+            ),
+          ),
+          if (loading)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(26, 0, 26, 20),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: TwitchUiColors.primary,
+                        strokeWidth: 2.4,
+                      ),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      '正在搜尋...',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (loading)
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(26, 0, 26, 20),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          color: TwitchUiColors.primary,
-                          strokeWidth: 2.4,
-                        ),
-                      ),
-                      SizedBox(width: 10),
-                      Text(
-                        '正在搜尋...',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (followedCount > 0) ...[
-              if (followedLiveStreams.isNotEmpty)
-                TwitchDiscoveryStreamSliverSection(
-                  icon: Icons.favorite_rounded,
-                  title: '已追隨 · 直播中',
-                  streams: followedLiveStreams,
-                  discoveryService: discoveryService,
-                  onReturnFromStream: onRefresh,
-                  followStatusFor: followStatusFor,
-                  streamKnownFollowing: true,
-                ),
-              if (followedOfflineChannels.isNotEmpty)
-                ..._offlineChannelSlivers(
-                  icon: Icons.favorite_border_rounded,
-                  title: '已追隨 · 未開台',
-                  channels: followedOfflineChannels,
-                  knownFollowing: true,
-                ),
-            ],
-            if (otherLiveStreams.isNotEmpty)
+          if (followedCount > 0) ...[
+            if (followedLiveStreams.isNotEmpty)
               TwitchDiscoveryStreamSliverSection(
-                icon: Icons.live_tv_rounded,
-                title: '其他頻道 · 直播中',
-                streams: otherLiveStreams,
+                watchServicesFactory: watchServicesFactory,
+                watchChatRuntimeFactory: watchChatRuntimeFactory,
+                icon: Icons.favorite_rounded,
+                title: '已追隨 · 直播中',
+                streams: followedLiveStreams,
                 discoveryService: discoveryService,
                 onReturnFromStream: onRefresh,
                 followStatusFor: followStatusFor,
+                streamKnownFollowing: true,
               ),
-            if (otherOfflineChannels.isNotEmpty)
+            if (followedOfflineChannels.isNotEmpty)
               ..._offlineChannelSlivers(
-                icon: Icons.tv_off_rounded,
-                title: '其他頻道 · 未開台',
-                channels: otherOfflineChannels,
+                icon: Icons.favorite_border_rounded,
+                title: '已追隨 · 未開台',
+                channels: followedOfflineChannels,
+                knownFollowing: true,
               ),
-            if (videos.isNotEmpty)
-              _mediaSliverSection<_TwitchSearchVideoResult>(
-                icon: Icons.video_library_outlined,
-                title: '影片',
-                items: videos,
-                itemBuilder: (context, result) {
-                  return _SearchVodCard(
-                    discoveryService: discoveryService,
-                    result: result,
-                    followStatusFor: followStatusFor,
-                  );
-                },
-              ),
-            if (clips.isNotEmpty)
-              _mediaSliverSection<_TwitchSearchClipResult>(
-                icon: Icons.movie_filter_outlined,
-                title: '片段',
-                items: clips,
-                itemBuilder: (context, result) {
-                  return _SearchClipCard(
-                    discoveryService: discoveryService,
-                    result: result,
-                    followStatusFor: followStatusFor,
-                  );
-                },
-              ),
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
-        ),
+          if (otherLiveStreams.isNotEmpty)
+            TwitchDiscoveryStreamSliverSection(
+              icon: Icons.live_tv_rounded,
+              watchServicesFactory: watchServicesFactory,
+              watchChatRuntimeFactory: watchChatRuntimeFactory,
+              title: '其他頻道 · 直播中',
+              streams: otherLiveStreams,
+              discoveryService: discoveryService,
+              onReturnFromStream: onRefresh,
+              followStatusFor: followStatusFor,
+            ),
+          if (otherOfflineChannels.isNotEmpty)
+            ..._offlineChannelSlivers(
+              icon: Icons.tv_off_rounded,
+              title: '其他頻道 · 未開台',
+              channels: otherOfflineChannels,
+            ),
+          if (videos.isNotEmpty)
+            _mediaSliverSection<_TwitchSearchVideoResult>(
+              icon: Icons.video_library_outlined,
+              title: '影片',
+              items: videos,
+              itemBuilder: (context, result) {
+                return _SearchVodCard(
+                  watchServicesFactory: watchServicesFactory,
+                  watchChatRuntimeFactory: watchChatRuntimeFactory,
+                  discoveryService: discoveryService,
+                  result: result,
+                  followStatusFor: followStatusFor,
+                );
+              },
+            ),
+          if (clips.isNotEmpty)
+            _mediaSliverSection<_TwitchSearchClipResult>(
+              icon: Icons.movie_filter_outlined,
+              title: '片段',
+              items: clips,
+              itemBuilder: (context, result) {
+                return _SearchClipCard(
+                  watchServicesFactory: watchServicesFactory,
+                  watchChatRuntimeFactory: watchChatRuntimeFactory,
+                  discoveryService: discoveryService,
+                  result: result,
+                  followStatusFor: followStatusFor,
+                );
+              },
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 32)),
+        ],
       ),
     );
   }
@@ -213,25 +221,26 @@ class _TwitchChannelSearchPage extends StatelessWidget {
       ),
       SliverPadding(
         padding: const EdgeInsets.fromLTRB(22, 6, 22, 24),
-        sliver: SliverGrid(
-          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-            maxCrossAxisExtent: 300,
-            mainAxisExtent: 168,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
+        sliver: SliverLayoutBuilder(
+          builder: (context, constraints) => SliverGrid(
+            gridDelegate: twitchOfflineChannelGridDelegate(
+              constraints.crossAxisExtent,
+            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              return TwitchOfflineChannelCard(
+                watchServicesFactory: watchServicesFactory,
+                watchChatRuntimeFactory: watchChatRuntimeFactory,
+                channel: channels[index],
+                discoveryService: discoveryService,
+                initialKnownFollowing:
+                    knownFollowing ??
+                    followStatusFor(
+                      broadcasterId: channels[index].broadcasterId,
+                      broadcasterLogin: channels[index].channelLogin,
+                    ),
+              );
+            }, childCount: channels.length),
           ),
-          delegate: SliverChildBuilderDelegate((context, index) {
-            return TwitchOfflineChannelCard(
-              channel: channels[index],
-              discoveryService: discoveryService,
-              initialKnownFollowing:
-                  knownFollowing ??
-                  followStatusFor(
-                    broadcasterId: channels[index].broadcasterId,
-                    broadcasterLogin: channels[index].channelLogin,
-                  ),
-            );
-          }, childCount: channels.length),
         ),
       ),
     ];
@@ -297,11 +306,15 @@ class _TwitchSearchClipResult {
 }
 
 class _SearchVodCard extends StatelessWidget {
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final TwitchDiscoveryService discoveryService;
   final _TwitchSearchVideoResult result;
   final TwitchFollowStatusResolver followStatusFor;
 
   const _SearchVodCard({
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     required this.discoveryService,
     required this.result,
     required this.followStatusFor,
@@ -322,6 +335,7 @@ class _SearchVodCard extends StatelessWidget {
       subtitle: '${channel.displayName} · ${_formatCount(video.viewCount)} 次觀看',
       avatarUrl: channel.profileImageUrl,
       onTap: () {
+        final watchServices = watchServicesFactory?.call();
         Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
             builder: (_) => TwitchWatchRouteGuard(
@@ -333,6 +347,8 @@ class _SearchVodCard extends StatelessWidget {
               ),
               initialOfflineChannel: channel,
               initialDiscoveryService: discoveryService,
+              initialServices: watchServices,
+              initialChatRuntimeFactory: watchChatRuntimeFactory,
               initialActiveDvrVideo: isGrowingArchive ? video : null,
               initialVodVideo: isGrowingArchive ? null : video,
               initialVodPlaybackOnly: !isGrowingArchive,
@@ -349,11 +365,15 @@ class _SearchVodCard extends StatelessWidget {
 }
 
 class _SearchClipCard extends StatelessWidget {
+  final TwitchWatchServices Function()? watchServicesFactory;
+  final TwitchWatchChatRuntimeFactory? watchChatRuntimeFactory;
   final TwitchDiscoveryService discoveryService;
   final _TwitchSearchClipResult result;
   final TwitchFollowStatusResolver followStatusFor;
 
   const _SearchClipCard({
+    this.watchServicesFactory,
+    this.watchChatRuntimeFactory,
     required this.discoveryService,
     required this.result,
     required this.followStatusFor,
@@ -373,6 +393,7 @@ class _SearchClipCard extends StatelessWidget {
       subtitle: '${channel.displayName} · ${_formatCount(clip.viewCount)} 次觀看',
       avatarUrl: channel.profileImageUrl,
       onTap: () {
+        final watchServices = watchServicesFactory?.call();
         Navigator.of(context, rootNavigator: true).push(
           MaterialPageRoute<void>(
             builder: (_) => TwitchWatchRouteGuard(
@@ -385,6 +406,8 @@ class _SearchClipCard extends StatelessWidget {
               initialOfflineChannel: channel,
               initialDiscoveryService: discoveryService,
               initialClip: clip,
+              initialServices: watchServices,
+              initialChatRuntimeFactory: watchChatRuntimeFactory,
               initialKnownFollowing: followStatusFor(
                 broadcasterId: channel.broadcasterId,
                 broadcasterLogin: channel.channelLogin,

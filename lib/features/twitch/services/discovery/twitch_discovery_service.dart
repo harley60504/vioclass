@@ -4,78 +4,81 @@ import '../../api/core/twitch_api_constants.dart';
 import '../../api/core/twitch_api_exception.dart';
 import '../../models/discovery/twitch_live_stream.dart';
 import '../auth/twitch_auth_service.dart';
+import '../auth/twitch_viewer_session.dart';
+export '../auth/twitch_viewer_session.dart' show TwitchViewerAuthSnapshot;
 import 'twitch_channel_snapshot_cache.dart';
+import 'twitch_guest_discovery_service.dart';
 
 typedef TwitchWebTokenProvider = Future<String?> Function();
-
-class TwitchViewerAuthSnapshot {
-  final String accessToken;
-  final String clientId;
-  final String viewerId;
-  final String viewerLogin;
-  final List<String> scopes;
-
-  const TwitchViewerAuthSnapshot({
-    required this.accessToken,
-    required this.clientId,
-    required this.viewerId,
-    required this.viewerLogin,
-    required this.scopes,
-  });
-
-  bool get canReadFollows => scopes.contains('user:read:follows');
-}
 
 class TwitchDiscoveryService {
   final TwitchApiClient client;
   final TwitchAuthService authService;
   final TwitchAuthApiService authApi;
   final TwitchWebTokenProvider? webTokenProvider;
+  final TwitchGuestDiscoveryService guestDiscoveryService;
 
-  TwitchViewerAuthSnapshot? _cachedAuth;
+  TwitchViewerSession get viewerSession =>
+      TwitchViewerSession.forAuth(authService);
+  TwitchViewerAuthSnapshot? get _cachedAuth => viewerSession.snapshot;
+  List<TwitchLiveStream> _cachedFollowedLiveRailStreams = const [];
+  int _railCacheGeneration = 0;
+  List<TwitchLiveStream> get cachedFollowedLiveRailStreams =>
+      _cachedFollowedLiveRailStreams;
+  void clearFollowedLiveRailCache() {
+    _railCacheGeneration++;
+    _cachedFollowedLiveRailStreams = const [];
+  }
 
   TwitchDiscoveryService({
     required this.client,
     required this.authService,
     required this.authApi,
     this.webTokenProvider,
-  });
+    TwitchGuestDiscoveryService? guestDiscoveryService,
+  }) : guestDiscoveryService =
+           guestDiscoveryService ?? TwitchGuestDiscoveryService(client: client);
 
   TwitchViewerAuthSnapshot? get cachedAuth => _cachedAuth;
+
+  // Public discovery must not wait for OAuth validation. A matching verified
+  // snapshot can use Helix; otherwise use the public guest endpoint.
+  TwitchViewerAuthSnapshot? get _publicViewerAuth {
+    final token = authService.accessToken;
+    return token != null && token == _cachedAuth?.accessToken
+        ? _cachedAuth
+        : null;
+  }
+
+  void clearViewerAuthCache() {
+    viewerSession.invalidate();
+    clearFollowedLiveRailCache();
+  }
 
   Future<TwitchViewerAuthSnapshot> resolveViewerAuth({
     bool forceValidate = false,
   }) async {
-    final cached = _cachedAuth;
-    if (!forceValidate &&
-        cached != null &&
-        cached.accessToken.trim().isNotEmpty) {
-      return cached;
-    }
-
-    await authService.loadStoredSession();
-
-    final token = await authService.getValidAccessToken();
-    if (token == null || token.trim().isEmpty) {
+    final snapshot = await resolveViewerAuthOrNull(
+      forceValidate: forceValidate,
+    );
+    if (snapshot == null) {
       throw const TwitchApiException('沒有可用 OAuth，請先登入 Twitch。');
     }
+    return snapshot;
+  }
 
-    final validation = await authApi.validateToken(token);
-    final storedClientId = authService.clientId?.trim();
-
-    final snapshot = TwitchViewerAuthSnapshot(
-      accessToken: token,
-      clientId: validation.clientId.trim().isNotEmpty
-          ? validation.clientId.trim()
-          : (storedClientId != null && storedClientId.isNotEmpty
-                ? storedClientId
-                : TwitchApiConstants.twitchWebClientId),
-      viewerId: validation.userId,
-      viewerLogin: validation.login,
-      scopes: validation.scopes,
+  Future<TwitchViewerAuthSnapshot?> resolveViewerAuthOrNull({
+    bool forceValidate = false,
+  }) async {
+    final previous = _cachedAuth;
+    final snapshot = await viewerSession.resolve(
+      authApi,
+      forceValidate: forceValidate,
     );
-
-    _cachedAuth = snapshot;
+    if ((snapshot != null || viewerSession.snapshot == null) &&
+        (previous?.viewerId != snapshot?.viewerId || snapshot == null)) {
+      clearFollowedLiveRailCache();
+    }
     return snapshot;
   }
 
@@ -109,10 +112,26 @@ class TwitchDiscoveryService {
     return page;
   }
 
+  /// Reuse the existing batched user lookup only for newly-live notifications.
+  Future<List<TwitchLiveStream>> attachNotificationProfiles(
+    List<TwitchLiveStream> streams,
+  ) async {
+    if (streams.isEmpty) return streams;
+    try {
+      return await _attachLiveStreamProfiles(
+        auth: await resolveViewerAuth(),
+        streams: streams,
+      );
+    } catch (_) {
+      return streams; // A missing picture is not a missing live notification.
+    }
+  }
+
   /// Complete followed-live snapshot in the same order as the follows API.
   /// Rail data is transient; no new account/token or disk storage is used.
   Future<List<TwitchLiveStream>> fetchFollowedLiveRailStreams() async {
-    await resolveViewerAuth(forceValidate: true);
+    final viewer = await resolveViewerAuth(forceValidate: true);
+    final generation = _railCacheGeneration;
     final streams = <TwitchLiveStream>[];
     final ids = <String>{};
     final cursors = <String>{};
@@ -127,7 +146,12 @@ class TwitchDiscoveryService {
         throw const TwitchApiException('追隨直播分頁重複，請稍後再試。');
       }
     } while (cursor != null && cursor.isNotEmpty);
-    if (streams.isEmpty) return streams;
+    if (streams.isEmpty) {
+      if (generation == _railCacheGeneration) {
+        _cachedFollowedLiveRailStreams = const [];
+      }
+      return streams;
+    }
     final auth = await resolveViewerAuth();
     final result = await _attachLiveStreamProfiles(
       auth: auth,
@@ -137,6 +161,10 @@ class TwitchDiscoveryService {
       result,
       isFollowed: true,
     );
+    if (generation == _railCacheGeneration &&
+        (_cachedAuth == null || _cachedAuth?.viewerId == viewer.viewerId)) {
+      _cachedFollowedLiveRailStreams = List.unmodifiable(result);
+    }
     return result;
   }
 
@@ -190,7 +218,17 @@ class TwitchDiscoveryService {
     String? language,
     int first = 100,
   }) async {
-    final auth = await resolveViewerAuth();
+    final auth = _publicViewerAuth;
+    if (auth == null) {
+      final page = await guestDiscoveryService.fetchBrowseStreams(
+        after: after,
+        gameId: gameId,
+        language: language,
+        first: first,
+      );
+      TwitchChannelSnapshotCache.instance.rememberLiveStreams(page.streams);
+      return page;
+    }
 
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/streams',
@@ -214,7 +252,16 @@ class TwitchDiscoveryService {
     final cleanLogin = login.trim().toLowerCase();
     if (cleanLogin.isEmpty) return null;
 
-    final auth = await resolveViewerAuth();
+    final auth = _publicViewerAuth;
+    if (auth == null) {
+      final stream = await guestDiscoveryService.fetchLiveStream(login: login);
+      if (stream != null) {
+        TwitchChannelSnapshotCache.instance.rememberLiveStreams(
+          <TwitchLiveStream>[stream],
+        );
+      }
+      return stream;
+    }
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/streams',
       queryParameters: <String, dynamic>{'user_login': cleanLogin, 'first': 1},
@@ -239,7 +286,20 @@ class TwitchDiscoveryService {
       );
     }
 
-    final auth = await resolveViewerAuth();
+    final auth = _publicViewerAuth;
+    if (auth == null) {
+      final result = await guestDiscoveryService.searchChannels(
+        query: cleanQuery,
+        first: first,
+      );
+      TwitchChannelSnapshotCache.instance.rememberLiveStreams(
+        result.liveStreams,
+      );
+      TwitchChannelSnapshotCache.instance.rememberFollowedChannels(
+        result.offlineChannels,
+      );
+      return result;
+    }
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/search/channels',
       queryParameters: <String, dynamic>{
@@ -411,7 +471,10 @@ query SearchFreeformTags(
     String? after,
     int first = 50,
   }) async {
-    final auth = await resolveViewerAuth();
+    final auth = _publicViewerAuth;
+    if (auth == null) {
+      return guestDiscoveryService.fetchTopGames(after: after, first: first);
+    }
 
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/games/top',
@@ -452,10 +515,18 @@ query SearchFreeformTags(
     int first = 20,
     String type = 'archive',
   }) async {
-    final auth = await resolveViewerAuth();
     final cleanUserId = userId.trim();
     if (cleanUserId.isEmpty) {
       throw const TwitchApiException('缺少頻道 user id，無法讀取 VOD。');
+    }
+    final auth = _publicViewerAuth;
+    if (auth == null) {
+      return guestDiscoveryService.fetchChannelVideos(
+        userId: cleanUserId,
+        after: after,
+        first: first,
+        type: type,
+      );
     }
 
     final raw = await client.getJson<Map<String, dynamic>>(
@@ -477,10 +548,17 @@ query SearchFreeformTags(
     String? after,
     int first = 30,
   }) async {
-    final auth = await resolveViewerAuth();
     final cleanBroadcasterId = broadcasterId.trim();
     if (cleanBroadcasterId.isEmpty) {
       throw const TwitchApiException('缺少頻道 user id，無法讀取 Clips。');
+    }
+    final auth = _publicViewerAuth;
+    if (auth == null) {
+      return guestDiscoveryService.fetchChannelClips(
+        broadcasterId: cleanBroadcasterId,
+        after: after,
+        first: first,
+      );
     }
 
     final raw = await client.getJson<Map<String, dynamic>>(
@@ -658,7 +736,7 @@ query ChannelPanels(\$login: String!) {
   Future<Map<String, String>> fetchProfileImagesForLogins(
     Iterable<String> logins,
   ) async {
-    final auth = await resolveViewerAuth();
+    final auth = _publicViewerAuth;
     final cleanLogins = logins
         .map((login) => login.trim().toLowerCase())
         .where((login) => login.isNotEmpty)
@@ -666,6 +744,18 @@ query ChannelPanels(\$login: String!) {
         .toList(growable: false);
 
     if (cleanLogins.isEmpty) return const <String, String>{};
+    if (auth == null) {
+      final images = await guestDiscoveryService.fetchProfileImagesForLogins(
+        cleanLogins,
+      );
+      for (final entry in images.entries) {
+        TwitchChannelSnapshotCache.instance.rememberProfileImage(
+          login: entry.key,
+          profileImageUrl: entry.value,
+        );
+      }
+      return images;
+    }
 
     final output = <String, String>{};
 

@@ -598,14 +598,16 @@ class TwitchSequentialLiveReplayProxy {
       if (firstChunk ||
           bytesSinceFlush >= 16 * 1024 ||
           now.difference(lastFlushAt) >= const Duration(milliseconds: 15)) {
-        await output.flush().timeout(const Duration(seconds: 1));
+        // Native decoding applies backpressure. A slow reader is not an
+        // upstream failure and must not cause partial segments to be replayed.
+        await output.flush();
         firstChunk = false;
         bytesSinceFlush = 0;
         lastFlushAt = now;
       }
     }
     if (bytesSinceFlush > 0) {
-      await output.flush().timeout(const Duration(seconds: 1));
+      await output.flush();
     }
   }
 

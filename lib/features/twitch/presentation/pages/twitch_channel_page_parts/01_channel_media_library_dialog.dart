@@ -20,7 +20,7 @@ Future<void> showTwitchChannelSheet({
               media.padding.top -
               media.padding.bottom -
               (layout.isPhone ? 8.0 : 24.0))
-          .clamp(360.0, viewport.height);
+          .clamp(0.0, viewport.height);
 
   return showGeneralDialog<void>(
     context: context,
@@ -167,6 +167,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
   bool videosLoaded = false;
   bool clipsLoaded = false;
   bool panelsLoaded = false;
+  int _sourceGeneration = 0;
 
   @override
   void initState() {
@@ -176,6 +177,26 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
       initialIndex: widget.initialTabIndex.clamp(0, 2),
       vsync: this,
     )..addListener(_loadActiveTab);
+    _loadActiveTab();
+  }
+
+  @override
+  void didUpdateWidget(covariant TwitchChannelPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.discoveryService, widget.discoveryService) &&
+        oldWidget.channel.broadcasterId == widget.channel.broadcasterId &&
+        oldWidget.channel.channelLogin == widget.channel.channelLogin)
+      return;
+    _sourceGeneration++;
+    videos = const [];
+    clips = const [];
+    panels = const [];
+    socialLinks = const [];
+    nextCursor = clipsNextCursor = null;
+    errorText = clipsErrorText = panelsErrorText = null;
+    loadingFirstPage = loadingClipsFirstPage = loadingPanels = false;
+    loadingMore = loadingMoreClips = false;
+    videosLoaded = clipsLoaded = panelsLoaded = false;
     _loadActiveTab();
   }
 
@@ -207,6 +228,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
   }
 
   Future<void> _loadPanels() async {
+    final generation = _sourceGeneration;
     setState(() {
       loadingPanels = true;
       panelsErrorText = null;
@@ -216,7 +238,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
       final loaded = await widget.discoveryService.fetchChannelAbout(
         login: widget.channel.channelLogin,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _sourceGeneration) return;
       setState(() {
         panels = loaded.panels;
         socialLinks = loaded.socialLinks;
@@ -224,7 +246,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
         panelsLoaded = true;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _sourceGeneration) return;
       setState(() {
         panelsErrorText = error.toString();
         loadingPanels = false;
@@ -235,6 +257,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
 
   Future<void> _loadVideos({bool clearExisting = false}) async {
     if (loadingMore) return;
+    final generation = _sourceGeneration;
     final loadingMorePage = !clearExisting && videos.isNotEmpty;
     setState(() {
       loadingFirstPage = clearExisting && videos.isEmpty;
@@ -251,18 +274,23 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
         userId: widget.channel.broadcasterId,
         after: clearExisting ? null : nextCursor,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _sourceGeneration) return;
       setState(() {
-        videos = clearExisting
-            ? page.videos
-            : <TwitchChannelVideo>[...videos, ...page.videos];
+        final ids = <String>{};
+        videos = <TwitchChannelVideo>[
+          for (final video in [
+            ...(clearExisting ? <TwitchChannelVideo>[] : videos),
+            ...page.videos,
+          ])
+            if (ids.add(video.id)) video,
+        ];
         nextCursor = page.cursor;
         loadingFirstPage = false;
         loadingMore = false;
         videosLoaded = true;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _sourceGeneration) return;
       setState(() {
         errorText = error.toString();
         loadingFirstPage = false;
@@ -274,6 +302,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
 
   Future<void> _loadClips({bool clearExisting = false}) async {
     if (loadingMoreClips) return;
+    final generation = _sourceGeneration;
     final loadingMorePage = !clearExisting && clips.isNotEmpty;
     setState(() {
       loadingClipsFirstPage = clearExisting && clips.isEmpty;
@@ -290,18 +319,23 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
         broadcasterId: widget.channel.broadcasterId,
         after: clearExisting ? null : clipsNextCursor,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _sourceGeneration) return;
       setState(() {
-        clips = clearExisting
-            ? page.clips
-            : <TwitchChannelClip>[...clips, ...page.clips];
+        final ids = <String>{};
+        clips = <TwitchChannelClip>[
+          for (final clip in [
+            ...(clearExisting ? <TwitchChannelClip>[] : clips),
+            ...page.clips,
+          ])
+            if (ids.add(clip.id)) clip,
+        ];
         clipsNextCursor = page.cursor;
         loadingClipsFirstPage = false;
         loadingMoreClips = false;
         clipsLoaded = true;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _sourceGeneration) return;
       setState(() {
         clipsErrorText = error.toString();
         loadingClipsFirstPage = false;

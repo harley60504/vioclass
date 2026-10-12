@@ -5,6 +5,7 @@ class TwitchHlsSegmentItem {
   final String? mapUrl;
   final String label;
   final int sequence;
+  final int discontinuitySequence;
   final bool isPrefetch;
   final Duration duration;
   final DateTime? programDateTime;
@@ -14,6 +15,7 @@ class TwitchHlsSegmentItem {
     required this.mapUrl,
     required this.label,
     required this.sequence,
+    this.discontinuitySequence = 0,
     this.isPrefetch = false,
     this.duration = const Duration(seconds: 2),
     this.programDateTime,

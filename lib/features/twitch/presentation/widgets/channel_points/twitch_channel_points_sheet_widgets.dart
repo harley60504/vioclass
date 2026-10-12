@@ -571,6 +571,12 @@ class _ChannelPointsRewardDetailPaneState
                           setState(() => _redeeming = true);
                           try {
                             await widget.onRedeem();
+                          } catch (_) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                                SnackBar(content: Text(l10n.t('兌換失敗，請稍後再試。'))),
+                              );
+                            }
                           } finally {
                             if (mounted) setState(() => _redeeming = false);
                           }
