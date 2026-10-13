@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_relative_lib_imports, invalid_use_of_visible_for_testing_member
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../lib/features/twitch/presentation/watch/controllers/twitch_playback_timeline_controller.dart';
@@ -167,6 +168,63 @@ void main() {
     expect(targets.length, 1);
     await tester.pump(const Duration(seconds: 1));
   });
+  testWidgets(
+    'volume hover bridges to popup, stays in bounds and closes on exit',
+    (tester) async {
+      tester.view.physicalSize = const Size(320, 280);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomRight,
+              child: PlayerVolumeButton(
+                muted: false,
+                volume: 50,
+                onVolumeChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(10, 10));
+      await mouse.moveTo(tester.getCenter(find.byTooltip('音量')));
+      await tester.pumpAndSettle();
+      final popup = find.byKey(const ValueKey('player-volume-popover'));
+      expect(popup, findsOneWidget);
+      final popupRect = tester.getRect(popup);
+      expect(popupRect.left, greaterThanOrEqualTo(0));
+      expect(popupRect.right, lessThanOrEqualTo(320));
+      expect(popupRect.top, greaterThanOrEqualTo(0));
+      expect(
+        popupRect.bottom,
+        lessThan(tester.getRect(find.byTooltip('音量')).top),
+      );
+      await mouse.moveTo(popupRect.center);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(popup, findsOneWidget);
+      // Hover the popup's mute button long enough for a tooltip to activate.
+      // Unlike the anchor, this button lives under a composited follower.
+      await mouse.moveTo(
+        tester.getCenter(
+          find.descendant(of: popup, matching: find.byType(IconButton)),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+      expect(popup, findsOneWidget);
+      await mouse.moveTo(const Offset(10, 10));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(popup, findsNothing);
+      await mouse.removePointer();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.takeException(), isNull);
+    },
+  );
   testWidgets('volume is a single button and slider opens on demand', (
     tester,
   ) async {
@@ -187,9 +245,16 @@ void main() {
     await tester.tap(find.byTooltip('音量'));
     await tester.pumpAndSettle();
     expect(find.byType(Slider), findsOneWidget);
-    await tester.drag(find.byType(Slider), const Offset(50, 0));
+    final popup = find.byKey(const ValueKey('player-volume-popover'));
+    expect(tester.getRect(popup).width, 52);
+    expect(tester.getRect(popup).height, lessThanOrEqualTo(180));
+    await tester.drag(find.byType(Slider), const Offset(0, -35));
     await tester.pumpAndSettle();
     expect(values, isNotEmpty);
+    expect(values.last, greaterThan(50));
+    await tester.tapAt(const Offset(250, 300));
+    await tester.pumpAndSettle();
+    expect(find.byType(Slider), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

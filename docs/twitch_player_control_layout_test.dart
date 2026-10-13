@@ -317,6 +317,8 @@ void main() {
         ),
       );
       expect(slider, findsOneWidget);
+      expect(find.byTooltip('打開播放進度'), findsNothing);
+      expect(find.byIcon(Icons.timeline_rounded), findsNothing);
       final theme = tester.widget<SliderTheme>(
         find.ancestor(of: slider, matching: find.byType(SliderTheme)).first,
       );
@@ -335,12 +337,33 @@ void main() {
       );
       expect(timeLabel, findsOneWidget);
       expect(tester.getRect(find.byTooltip('音量')).width, 36);
-      expect(
-        tester.getRect(timeLabel).center.dx,
-        closeTo(tester.getRect(strip).center.dx, 0.1),
-      );
+      if (width >= 620) {
+        expect(
+          tester.getRect(timeLabel).center.dx,
+          closeTo(tester.getRect(strip).center.dx, 0.1),
+        );
+      } else {
+        expect(
+          tester.getRect(timeLabel).center.dx,
+          lessThan(tester.getRect(strip).center.dx),
+        );
+      }
       final leftZone = find.byKey(const ValueKey('player-control-left'));
       final rightZone = find.byKey(const ValueKey('player-control-right'));
+      if (width == 240) {
+        expect(
+          tester.getRect(timeLabel).left - tester.getRect(leftZone).right,
+          closeTo(6, 0.1),
+          reason: 'Crowded controls should reuse the empty space after play.',
+        );
+      }
+      if (width == 390) {
+        expect(
+          tester.getRect(find.byTooltip('音量')).left,
+          greaterThanOrEqualTo(tester.getRect(rightZone).left),
+          reason: 'Shifting time frees room for the volume button.',
+        );
+      }
       expect(
         tester.getRect(leftZone).right,
         lessThanOrEqualTo(tester.getRect(timeLabel).left),

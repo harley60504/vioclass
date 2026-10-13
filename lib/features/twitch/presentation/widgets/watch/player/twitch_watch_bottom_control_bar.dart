@@ -406,23 +406,6 @@ class _CompactWatchBottomControls extends StatelessWidget {
                 right: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (veryNarrow) ...[
-                      _LivePlaybackSheetButton(
-                        player: player,
-                        playerRuntime: playerRuntime,
-                        hasDvrReplay: hasDvrReplay,
-                        hasFullLiveDvr: hasFullLiveDvr,
-                        showLiveEdgeLabel: showLiveEdgeLabel,
-                        liveDvrDuration: liveDvrDuration,
-                        liveDvrStartedAt: liveDvrStartedAt,
-                        onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
-                        onReturnToLive: onReturnToLive,
-                        playbackKind: playbackKind,
-                        timelineEnabled: timelineEnabled,
-                        playbackTimelineController: playbackTimelineController,
-                      ),
-                    ],
-                    SizedBox(width: veryNarrow ? 2 : 6),
                     PlayerVolumeButton(
                       muted: muted,
                       volume: volume,
@@ -784,152 +767,7 @@ class _FullscreenToggleButton extends StatelessWidget {
   }
 }
 
-class _LivePlaybackSheetButton extends StatelessWidget {
-  final Player player;
-  final TwitchPlaylistPlayerRuntime playerRuntime;
-  final bool hasDvrReplay;
-  final bool hasFullLiveDvr;
-  final bool showLiveEdgeLabel;
-  final Duration? liveDvrDuration;
-  final DateTime? liveDvrStartedAt;
-  final ValueChanged<Duration>? onOpenDvrReplayAtPosition;
-  final VoidCallback? onReturnToLive;
-  final TwitchWatchPlaybackKind playbackKind;
-  final bool timelineEnabled;
-  final TwitchPlaybackTimelineController? playbackTimelineController;
-
-  const _LivePlaybackSheetButton({
-    required this.player,
-    required this.playerRuntime,
-    required this.hasDvrReplay,
-    required this.hasFullLiveDvr,
-    required this.showLiveEdgeLabel,
-    required this.liveDvrDuration,
-    required this.liveDvrStartedAt,
-    required this.onOpenDvrReplayAtPosition,
-    required this.onReturnToLive,
-    required this.playbackKind,
-    required this.timelineEnabled,
-    required this.playbackTimelineController,
-  });
-
-  void _showPlaybackSheet(BuildContext context) {
-    final l10n = context.vio;
-    showModalBottomSheet<void>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: false,
-      useSafeArea: true,
-      enableDrag: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.black54,
-      builder: (sheetContext) {
-        final screenWidth = MediaQuery.of(sheetContext).size.width;
-        final sheetWidth = screenWidth.clamp(280.0, 520.0).toDouble();
-
-        return SafeArea(
-          top: false,
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: TwitchGlassSurface(
-              borderRadius: BorderRadius.circular(22),
-              backgroundColor: Colors.black.withValues(alpha: 0.56),
-              borderColor: Colors.white.withValues(alpha: 0.13),
-              blurSigma: 0,
-              boxShadow: const <BoxShadow>[],
-              child: SizedBox(
-                width: sheetWidth,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 36,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white24,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.timeline_rounded,
-                            color: TwitchUiColors.primarySoft,
-                            size: 17,
-                          ),
-                          const SizedBox(width: 7),
-                          Expanded(
-                            child: Text(
-                              l10n.t('播放進度'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          InkWell(
-                            borderRadius: BorderRadius.circular(999),
-                            onTap: () => Navigator.of(sheetContext).maybePop(),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4),
-                              child: Icon(
-                                Icons.close_rounded,
-                                color: Colors.white54,
-                                size: 19,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      _WatchPlaybackStrip(
-                        player: player,
-                        playerRuntime: playerRuntime,
-                        hasDvrReplay: hasDvrReplay,
-                        hasFullLiveDvr: hasFullLiveDvr,
-                        showLiveEdgeLabel: showLiveEdgeLabel,
-                        liveDvrDuration: liveDvrDuration,
-                        liveDvrStartedAt: liveDvrStartedAt,
-                        onOpenDvrReplayAtPosition: onOpenDvrReplayAtPosition,
-                        onReturnToLive: onReturnToLive,
-                        playbackKind: playbackKind,
-                        timelineEnabled: timelineEnabled,
-                        playbackTimelineController: playbackTimelineController,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PlainIconButton(
-      controlSize: 36,
-      tooltip: context.vio.t('打開播放進度'),
-      icon: Icons.timeline_rounded,
-      size: 22,
-      dense: true,
-      onPressed: timelineEnabled ? () => _showPlaybackSheet(context) : null,
-    );
-  }
-}
-
-/// Keeps the time label geometrically centered regardless of side-group width.
+/// Centers the time when possible, shifting it left before clipping controls.
 class _WatchControlZones extends StatelessWidget {
   final Widget left;
   final Widget center;
@@ -941,37 +779,88 @@ class _WatchControlZones extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Row(
-      children: [
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: SingleChildScrollView(
-              key: const ValueKey('player-control-left'),
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.hardEdge,
-              child: left,
-            ),
-          ),
+  Widget build(BuildContext context) => CustomMultiChildLayout(
+    delegate: _WatchControlZoneLayout(),
+    children: [
+      LayoutId(
+        id: _ControlZone.left,
+        child: SingleChildScrollView(
+          key: const ValueKey('player-control-left'),
+          scrollDirection: Axis.horizontal,
+          clipBehavior: Clip.hardEdge,
+          child: left,
         ),
-        ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: constraints.maxWidth * 0.5),
-          child: FittedBox(fit: BoxFit.scaleDown, child: center),
+      ),
+      LayoutId(
+        id: _ControlZone.center,
+        child: FittedBox(fit: BoxFit.scaleDown, child: center),
+      ),
+      LayoutId(
+        id: _ControlZone.right,
+        child: SingleChildScrollView(
+          key: const ValueKey('player-control-right'),
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          clipBehavior: Clip.hardEdge,
+          child: right,
         ),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: SingleChildScrollView(
-              key: const ValueKey('player-control-right'),
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              clipBehavior: Clip.hardEdge,
-              child: right,
-            ),
-          ),
-        ),
-      ],
-    ),
+      ),
+    ],
   );
+}
+
+enum _ControlZone { left, center, right }
+
+class _WatchControlZoneLayout extends MultiChildLayoutDelegate {
+  @override
+  void performLayout(Size size) {
+    final left = layoutChild(
+      _ControlZone.left,
+      BoxConstraints(maxWidth: size.width * 0.25, maxHeight: size.height),
+    );
+    // Reserve readable time space on small screens; only clip side controls
+    // once their combined natural widths genuinely exceed the whole dock.
+    final timeReserve = size.width < 256 ? size.width * 0.25 : 64.0;
+    final right = layoutChild(
+      _ControlZone.right,
+      BoxConstraints(
+        maxWidth: (size.width - left.width - 18 - timeReserve).clamp(
+          0.0,
+          size.width,
+        ),
+        maxHeight: size.height,
+      ),
+    );
+    final center = layoutChild(
+      _ControlZone.center,
+      BoxConstraints(
+        maxWidth: (size.width - left.width - right.width - 18).clamp(
+          0.0,
+          size.width,
+        ),
+        maxHeight: size.height,
+      ),
+    );
+    final minimumX = left.width + 6;
+    final maximumX = (size.width - right.width - 12 - center.width).clamp(
+      minimumX,
+      size.width,
+    );
+    final centerX = ((size.width - center.width) / 2).clamp(minimumX, maximumX);
+    positionChild(
+      _ControlZone.left,
+      Offset(0, (size.height - left.height) / 2),
+    );
+    positionChild(
+      _ControlZone.center,
+      Offset(centerX, (size.height - center.height) / 2),
+    );
+    positionChild(
+      _ControlZone.right,
+      Offset(size.width - right.width, (size.height - right.height) / 2),
+    );
+  }
+
+  @override
+  bool shouldRelayout(covariant _WatchControlZoneLayout oldDelegate) => false;
 }
