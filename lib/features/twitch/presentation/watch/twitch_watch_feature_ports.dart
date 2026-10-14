@@ -108,11 +108,22 @@ class TwitchWatchChatPort {
 
   const TwitchWatchChatPort({required this.services});
 
+  Future<List<Map<String, dynamic>>> fetchOfficialHistory({
+    required String channelLogin,
+    required String channelId,
+  }) => services.chatStartupApi.fetchParsedMessageHistory(
+    channelLogin: channelLogin,
+    channelId: channelId,
+  );
+
   Future<TwitchChatStartupSnapshot> fetchStartupSnapshot({
     required String channelLogin,
   }) {
     return services.chatStartupApi.fetchParsedStartupSnapshot(
       channelLogin: channelLogin,
+      // The chat runtime already loads recent history independently. Do not
+      // hold its badge catalog behind a second history lookup.
+      includeMessageHistory: false,
     );
   }
 

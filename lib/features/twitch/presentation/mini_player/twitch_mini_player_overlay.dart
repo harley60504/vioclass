@@ -73,9 +73,6 @@ class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
         offset: _offset,
         onClose: widget.controller.close,
         onExpand: () async {
-          final initialVodVideo = entry.kind == TwitchWatchPlaybackKind.liveDvr
-              ? null
-              : entry.resumeVodVideo;
           final route = PageRouteBuilder<void>(
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
@@ -83,7 +80,7 @@ class _TwitchMiniPlayerOverlayState extends State<TwitchMiniPlayerOverlay> {
               initialMetadata: entry.metadata,
               initialDiscoveryService: widget.discoveryService,
               initialActiveDvrVideo: entry.activeDvrVideo,
-              initialVodVideo: initialVodVideo,
+              initialVodVideo: entry.watchPageVodVideo,
               initialClip: entry.resumeClip,
               initialVodReplayRatio: entry.resumeVodRatio,
               initialPreferVodReplayChat: entry.resumeVodReplayChat,

@@ -26,6 +26,10 @@ class TwitchMiniPlayerEntry {
   TwitchWatchPlaybackKind get kind => playback.kind;
   TwitchChannelVideo? get activeDvrVideo => playback.activeDvrVideo;
   TwitchChannelVideo? get resumeVodVideo => playback.resumeVodVideo;
+  // Live snapshots may retain a VOD as their DVR archive, but that must not
+  // select the recorded-watch route when expanding the mini player.
+  TwitchChannelVideo? get watchPageVodVideo =>
+      kind == TwitchWatchPlaybackKind.vod ? resumeVodVideo : null;
   TwitchChannelClip? get resumeClip => playback.resumeClip;
   double? get resumeVodRatio => playback.resumeVodRatio;
   bool get resumeVodReplayChat => playback.resumeVodReplayChat;

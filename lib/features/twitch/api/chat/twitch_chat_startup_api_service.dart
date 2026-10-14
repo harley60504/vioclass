@@ -9,6 +9,7 @@ class TwitchChatStartupApiService {
 
   Future<TwitchChatStartupSnapshot> fetchParsedStartupSnapshot({
     required String channelLogin,
+    bool includeMessageHistory = true,
   }) async {
     final results = await fetchStartupBatch(channelLogin: channelLogin);
     final byName = <String, TwitchWebGqlPersistedResult>{
@@ -25,7 +26,7 @@ class TwitchChatStartupApiService {
       globalBadgesData['badges'],
     );
     final channelId = user['id']?.toString() ?? '';
-    final officialHistory = channelId.isEmpty
+    final officialHistory = !includeMessageHistory || channelId.isEmpty
         ? null
         : await _tryFetchMessageBufferChatHistory(
             channelLogin: channelLogin,
@@ -192,6 +193,17 @@ class TwitchChatStartupApiService {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchParsedMessageHistory({
+    required String channelLogin,
+    required String channelId,
+  }) async {
+    final result = await fetchMessageBufferChatHistory(
+      channelLogin: channelLogin,
+      channelId: channelId,
+    );
+    return _extractRecentMessages(result.response);
   }
 }
 

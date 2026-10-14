@@ -80,6 +80,18 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   bool get hasCurrentViewer => _hasConnectedViewer;
 
+  bool _sameViewer(TwitchViewerAuthSnapshot? expected, int revision) {
+    final viewer = TwitchViewerSession.forAuth(authService);
+    if (expected == null) return viewer.status == TwitchViewerStatus.guest;
+    final current = viewer.snapshot;
+    return viewer.identityRevision == revision &&
+        current != null &&
+        current.accessToken == expected.accessToken &&
+        current.viewerId == expected.viewerId &&
+        current.clientId == expected.clientId &&
+        setEquals(current.scopes.toSet(), expected.scopes.toSet());
+  }
+
   TwitchWatchChatController({
     this.runtimeFactory,
     required this.authService,
@@ -125,6 +137,9 @@ class TwitchWatchChatController extends ChangeNotifier {
         return;
       }
       final token = identity?.accessToken;
+      final identityRevision = TwitchViewerSession.forAuth(
+        authService,
+      ).identityRevision;
       // Account identity is independent from the public IRC read transport.
       // A token lacking chat:read cannot authenticate that connection.
       final ircToken = identity?.scopes.contains('chat:read') == true
@@ -151,10 +166,7 @@ class TwitchWatchChatController extends ChangeNotifier {
 
       runtime = nextRuntime;
       Future<bool> discardChangedIdentity() async {
-        final viewer = TwitchViewerSession.forAuth(authService);
-        final sameIdentity = identity == null
-            ? viewer.status == TwitchViewerStatus.guest
-            : identical(viewer.snapshot, identity);
+        final sameIdentity = _sameViewer(identity, identityRevision);
         if (sameIdentity) return false;
         if (!isCurrent() || !identical(runtime, nextRuntime)) return true;
         viewerLogin = null;
@@ -184,10 +196,7 @@ class TwitchWatchChatController extends ChangeNotifier {
       notifyListeners();
       if (!isCurrent()) return;
       // A listener can synchronously change the account during notification.
-      final currentViewer = TwitchViewerSession.forAuth(authService);
-      if (identity == null
-          ? currentViewer.status != TwitchViewerStatus.guest
-          : !identical(currentViewer.snapshot, identity)) {
+      if (!_sameViewer(identity, identityRevision)) {
         await discardChangedIdentity();
         return;
       }
@@ -211,6 +220,7 @@ class TwitchWatchChatController extends ChangeNotifier {
           channel: channel,
           startupFuture: startupFuture,
           expectedIdentity: identity,
+          expectedRevision: identityRevision,
         ),
       );
     } finally {
@@ -252,13 +262,11 @@ class TwitchWatchChatController extends ChangeNotifier {
     required String channel,
     required Future<TwitchChatStartupSnapshot?> startupFuture,
     required TwitchViewerAuthSnapshot? expectedIdentity,
+    required int expectedRevision,
   }) async {
     final startup = await startupFuture;
     if (startup == null || this.runtime != runtime) return;
-    final viewer = TwitchViewerSession.forAuth(authService);
-    if (expectedIdentity == null
-        ? viewer.status != TwitchViewerStatus.guest
-        : !identical(viewer.snapshot, expectedIdentity)) {
+    if (!_sameViewer(expectedIdentity, expectedRevision)) {
       return;
     }
 
@@ -275,6 +283,43 @@ class TwitchWatchChatController extends ChangeNotifier {
     final resolvedChannelId = startup.channelId.trim();
     if (resolvedChannelId.isNotEmpty) {
       onChannelIdResolved(resolvedChannelId);
+      unawaited(
+        _applyOfficialHistory(
+          runtime: runtime,
+          channel: channel,
+          channelId: resolvedChannelId,
+          expectedIdentity: expectedIdentity,
+          expectedRevision: expectedRevision,
+        ),
+      );
+    }
+  }
+
+  Future<void> _applyOfficialHistory({
+    required TwitchChatRuntime runtime,
+    required String channel,
+    required String channelId,
+    required TwitchViewerAuthSnapshot? expectedIdentity,
+    required int expectedRevision,
+  }) async {
+    try {
+      final history = await chatPort
+          .fetchOfficialHistory(channelLogin: channel, channelId: channelId)
+          .timeout(const Duration(seconds: 15));
+      if (_disposed ||
+          !identical(this.runtime, runtime) ||
+          channelLogin() != channel ||
+          !_sameViewer(expectedIdentity, expectedRevision)) {
+        return;
+      }
+      if (history.isEmpty) return;
+      final parsed = const TwitchRecentMessageParser().parseMessagesField(
+        messagesField: history,
+        channelLogin: channel,
+      );
+      runtime.applyRecentHistory(parsed.messages);
+    } catch (error) {
+      debugPrint('Official chat history unavailable (${error.runtimeType})');
     }
   }
 
@@ -643,7 +688,7 @@ class TwitchWatchChatController extends ChangeNotifier {
     final sameViewer = viewer.status == TwitchViewerStatus.guest
         ? _connectedToken == null
         : viewer.snapshot != null &&
-            viewer.snapshot!.accessToken == _connectedToken;
+              viewer.snapshot!.accessToken == _connectedToken;
     if (!sameViewer) {
       await connectChat(channelLogin());
       return;

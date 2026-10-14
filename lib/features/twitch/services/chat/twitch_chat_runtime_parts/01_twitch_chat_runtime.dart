@@ -65,6 +65,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   String? _ircNick;
   bool _connecting = false;
   bool _connected = false;
+  int _connectionGeneration = 0;
   Object? _error;
   int _rawEventCount = 0;
   int _recentMessageCount = 0;
@@ -137,6 +138,10 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
   }
 
+  void applyRecentHistory(Iterable<TwitchChatMessage> messages) {
+    _loadInitialRecentMessages(startupMessages: messages, recentMessages: null);
+  }
+
   Future<void> connect({
     required String channelLogin,
     String? accessToken,
@@ -165,6 +170,8 @@ class TwitchChatRuntime extends ChangeNotifier {
     }
 
     await disconnect();
+
+    final generation = _connectionGeneration;
 
     _channelLogin = login;
     _viewerLogin = (viewerLogin ?? ircNick ?? '').trim().toLowerCase();
@@ -198,8 +205,21 @@ class TwitchChatRuntime extends ChangeNotifier {
 
     final recentMessagesFuture =
         preloadRecentMessages && recentMessagesApi != null
-        ? _fetchRecentMessages(channelLogin: login, limit: recentMessageLimit)
+        ? _fetchRecentMessages(
+            channelLogin: login,
+            limit: recentMessageLimit,
+            generation: generation,
+          )
         : Future<TwitchRecentMessagesResult?>.value();
+    unawaited(
+      recentMessagesFuture.then((recentMessages) {
+        if (generation != _connectionGeneration) return;
+        _loadInitialRecentMessages(
+          startupMessages: startupRecentMessages,
+          recentMessages: recentMessages,
+        );
+      }),
+    );
 
     _messageSubscription = ircApi.messages.listen(
       _handleReadConnectionMessage,
@@ -255,23 +275,17 @@ class TwitchChatRuntime extends ChangeNotifier {
         _ownUserStateTags.addAll(writeUserState);
       }
 
-      final recentMessages = await recentMessagesFuture;
-      _loadInitialRecentMessages(
-        startupMessages: startupRecentMessages,
-        recentMessages: recentMessages,
-      );
+      if (generation != _connectionGeneration) return;
       _connected = true;
     } catch (e) {
-      final recentMessages = await recentMessagesFuture;
-      _loadInitialRecentMessages(
-        startupMessages: startupRecentMessages,
-        recentMessages: recentMessages,
-      );
+      if (generation != _connectionGeneration) return;
       _error = e;
       _connected = false;
     } finally {
-      _connecting = false;
-      notifyListeners();
+      if (generation == _connectionGeneration) {
+        _connecting = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -400,6 +414,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   Future<TwitchRecentMessagesResult?> _fetchRecentMessages({
     required String channelLogin,
     required int limit,
+    required int generation,
   }) async {
     final api = recentMessagesApi;
     if (api == null) return null;
@@ -411,7 +426,7 @@ class TwitchChatRuntime extends ChangeNotifier {
       );
     } catch (e) {
       // Recent messages 是輔助資料，失敗不應該阻止 IRC 連線。
-      _error ??= e;
+      if (generation == _connectionGeneration) _error ??= e;
       return null;
     }
   }
@@ -499,6 +514,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _connectionGeneration++;
     _notifyBatcher.cancel();
     await _messageSubscription?.cancel();
     await _writeMessageSubscription?.cancel();
