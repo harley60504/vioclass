@@ -26,6 +26,8 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
   Timer? _ticker;
   Timer? _seekTimer;
   Player? _player;
+  Duration? Function()? _timelinePositionProvider;
+  int _generation = 0;
   String _videoId = '';
   String _channelLogin = '';
   double _timelineOffsetBaseSeconds = 0;
@@ -47,17 +49,20 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
   bool get fetching => _fetching;
   Object? get error => _error;
   String get channelLogin => _channelLogin;
+  double get playbackTimeSeconds => _playerTimeSeconds();
 
   Future<void> start({
     required String videoId,
     required String channelLogin,
     required Player player,
     double? timelineOffsetSeconds,
+    Duration? Function()? timelinePositionProvider,
   }) async {
     stop();
     _videoId = videoId.trim();
     _channelLogin = channelLogin.trim().toLowerCase();
     _player = player;
+    _timelinePositionProvider = timelinePositionProvider;
     final currentPlayerSeconds = player.state.position.inMilliseconds / 1000;
     _playerPositionBaseSeconds = currentPlayerSeconds;
     _timelineOffsetBaseSeconds = (timelineOffsetSeconds ?? currentPlayerSeconds)
@@ -76,11 +81,13 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
   }
 
   void stop() {
+    _generation++;
     _ticker?.cancel();
     _seekTimer?.cancel();
     _ticker = null;
     _seekTimer = null;
     _player = null;
+    _timelinePositionProvider = null;
     _videoId = '';
     _channelLogin = '';
     _timelineOffsetBaseSeconds = 0;
@@ -109,13 +116,14 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
     _notifyIfAlive();
 
     final requestVideoId = _videoId;
+    final generation = _generation;
     try {
       final page = await api.fetchComments(
         videoId: requestVideoId,
         channelLogin: _channelLogin,
         offsetSeconds: offset,
       );
-      if (!_active || _videoId != requestVideoId) return;
+      if (!_active || generation != _generation) return;
 
       var added = 0;
       var maxOffset = _nextFetchOffset;
@@ -137,10 +145,12 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
       _nextFetchOffset = maxOffset;
       _reachedFrontier = added == 0;
     } catch (error) {
-      _error = error;
+      if (generation == _generation) _error = error;
     } finally {
-      _fetching = false;
-      _notifyIfAlive();
+      if (generation == _generation) {
+        _fetching = false;
+        _notifyIfAlive();
+      }
     }
   }
 
@@ -191,6 +201,7 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
   bool _reseekFromBuffer(double timeSeconds) {
     if (_buffer.isEmpty) return false;
     if (timeSeconds < _buffer.first.contentOffsetSeconds - 1) return false;
+    if (timeSeconds > _buffer.last.contentOffsetSeconds + 1) return false;
     _ptr = 0;
     _messages.clear();
     while (_ptr < _buffer.length &&
@@ -209,6 +220,8 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
     _seekTimer?.cancel();
     _seekTimer = Timer(seekSettleDelay, () {
       _seekTimer = null;
+      _generation++;
+      _fetching = false;
       _buffer.clear();
       _messages.clear();
       _seen.clear();
@@ -224,6 +237,10 @@ class TwitchVodChatReplayRuntime extends ChangeNotifier {
   }
 
   double _playerTimeSeconds() {
+    final timelinePosition = _timelinePositionProvider?.call();
+    if (timelinePosition != null) {
+      return (timelinePosition.inMilliseconds / 1000).clamp(0, double.infinity);
+    }
     final player = _player;
     if (player == null) return 0;
     final playerSeconds = player.state.position.inMilliseconds / 1000;

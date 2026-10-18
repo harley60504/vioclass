@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../../localization/vioclass_localizations.dart';
+import '../../navigation/twitch_route_observer.dart';
 import '../../settings/twitch_app_settings_launcher.dart';
 import '../../../services/notifications/twitch_app_notification_service.dart';
 import 'twitch_notification_card.dart';
@@ -79,7 +80,9 @@ class _TwitchAppNotificationOverlayState
   Future<void> _openNotification(TwitchAppNotification item) async {
     bool isCurrentNotification() =>
         mounted &&
-        twitchAppNotificationCenter.items.any((current) => identical(current, item));
+        twitchAppNotificationCenter.items.any(
+          (current) => identical(current, item),
+        );
     // A card can still receive a click before an owner-change rebuild. History
     // pruning is authoritative, not the callback captured by the old frame.
     if (!isCurrentNotification()) {
@@ -176,6 +179,7 @@ class _TwitchAppNotificationOverlayState
       animation: Listenable.merge([
         twitchAppNotificationCenter,
         twitchAppSettingsLauncher,
+        twitchRouteObserver.watchNavigation,
       ]),
       builder: (context, _) {
         final center = twitchAppNotificationCenter;
@@ -195,6 +199,7 @@ class _TwitchAppNotificationOverlayState
                 children: <Widget>[
                   _TwitchWindowsTitleBar(
                     height: _windowsTitleBarHeight,
+                    navigation: twitchRouteObserver.watchNavigation.value,
                     isMaximized: _isWindowMaximized,
                     unreadCount: center.unreadCount,
                     isNotificationPanelOpen: _isNotificationPanelOpen,
@@ -266,6 +271,7 @@ class _TwitchAppNotificationOverlayState
 }
 
 class _TwitchWindowsTitleBar extends StatelessWidget {
+  final TwitchWatchFrameNavigation? navigation;
   final double height;
   final bool isMaximized;
   final int unreadCount;
@@ -279,6 +285,7 @@ class _TwitchWindowsTitleBar extends StatelessWidget {
   final VoidCallback onClose;
 
   const _TwitchWindowsTitleBar({
+    required this.navigation,
     required this.height,
     required this.isMaximized,
     required this.unreadCount,
@@ -316,7 +323,34 @@ class _TwitchWindowsTitleBar extends StatelessWidget {
                 onPanStart: (_) => windowManager.startDragging(),
                 onDoubleTap: onToggleMaximize,
               ),
-              if (MediaQuery.sizeOf(context).width >= 520)
+              if (navigation != null)
+                Positioned(
+                  left: 4,
+                  top: 0,
+                  bottom: 0,
+                  child: Row(
+                    children: [
+                      // This frame lives above the Navigator's Overlay.
+                      Semantics(
+                        label: context.vio.t('返回'),
+                        button: true,
+                        child: _WindowFrameButton(
+                          icon: Icons.arrow_back_rounded,
+                          onPressed: navigation!.onBack,
+                        ),
+                      ),
+                      Semantics(
+                        label: context.vio.t('回主畫面'),
+                        button: true,
+                        child: _WindowFrameButton(
+                          icon: Icons.home_rounded,
+                          onPressed: navigation!.onHome,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (navigation == null && MediaQuery.sizeOf(context).width >= 520)
                 const Positioned(
                   left: 12,
                   top: 0,
@@ -349,7 +383,7 @@ class _TwitchWindowsTitleBar extends StatelessWidget {
                 child: Padding(
                   padding: EdgeInsets.only(
                     left: MediaQuery.sizeOf(context).width < 520
-                        ? 8
+                        ? (navigation == null ? 8 : 68)
                         : MediaQuery.sizeOf(context).width < 720
                         ? 135
                         : 0,
@@ -465,7 +499,7 @@ class _WindowFrameButton extends StatelessWidget {
             ? const Color(0xFFE81123)
             : Colors.white.withValues(alpha: 0.09),
         child: SizedBox(
-          width: 46,
+          width: MediaQuery.sizeOf(context).width < 520 ? 28 : 46,
           height: double.infinity,
           child: Center(
             child: Badge(

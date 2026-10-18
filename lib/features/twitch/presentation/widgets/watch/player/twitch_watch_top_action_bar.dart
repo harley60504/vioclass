@@ -18,6 +18,7 @@ class WatchTopActionBar extends StatelessWidget {
   final VoidCallback? onOpenChannel;
   final VoidCallback? onCreateClip;
   final bool creatingClip;
+  final bool showNavigation;
 
   const WatchTopActionBar({
     super.key,
@@ -31,6 +32,7 @@ class WatchTopActionBar extends StatelessWidget {
     this.onOpenChannel,
     this.onCreateClip,
     this.creatingClip = false,
+    this.showNavigation = true,
   });
 
   @override
@@ -51,6 +53,7 @@ class WatchTopActionBar extends StatelessWidget {
           onOpenChannel: onOpenChannel,
           onCreateClip: onCreateClip,
           creatingClip: creatingClip,
+          showNavigation: showNavigation,
         );
 
         final content = metrics.compact
@@ -117,6 +120,7 @@ class _WatchTopActionBarMetrics {
 }
 
 class _WatchTopActionButtons {
+  final bool showNavigation;
   final bool isFollowing;
   final bool followBusy;
   final _WatchTopActionBarMetrics metrics;
@@ -139,6 +143,7 @@ class _WatchTopActionButtons {
     required this.onOpenChannel,
     required this.onCreateClip,
     required this.creatingClip,
+    required this.showNavigation,
   });
 
   Widget buildBackButton(BuildContext context) {
@@ -217,10 +222,12 @@ class _CompactWatchTopActionContent extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        actions.buildBackButton(context),
-        SizedBox(width: metrics.actionGap),
-        actions.buildHomeButton(context),
-        SizedBox(width: metrics.actionGap),
+        if (actions.showNavigation) ...[
+          actions.buildBackButton(context),
+          SizedBox(width: metrics.actionGap),
+          actions.buildHomeButton(context),
+          SizedBox(width: metrics.actionGap),
+        ],
         WatchCompactAvatarTile(
           metadata: metadata,
           tiny: metrics.tiny,
@@ -253,10 +260,12 @@ class _WideWatchTopActionContent extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        actions.buildBackButton(context),
-        const SizedBox(width: TwitchUiSpacing.space8),
-        actions.buildHomeButton(context),
-        const SizedBox(width: TwitchUiSpacing.space8),
+        if (actions.showNavigation) ...[
+          actions.buildBackButton(context),
+          const SizedBox(width: TwitchUiSpacing.space8),
+          actions.buildHomeButton(context),
+          const SizedBox(width: TwitchUiSpacing.space8),
+        ],
         Expanded(
           child: WatchStreamHeaderCard(
             metadata: metadata,

@@ -24,6 +24,55 @@ class _Clock extends TwitchPlaybackTimelineController {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('double-tap feedback accumulates and resets after a pause', (
+    tester,
+  ) async {
+    final clock = _Clock();
+    addTearDown(clock.dispose);
+    final jumps = <int>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 400,
+            height: 300,
+            child: PlayerSeekGestures(
+              controller: clock,
+              doubleTapEnabled: true,
+              dragEnabled: false,
+              limitToLiveBuffer: false,
+              enabled: true,
+              onJump: (seconds) {
+                jumps.add(seconds);
+                return true;
+              },
+              onSeek: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    Future<void> twice(Offset point) async {
+      await tester.tapAt(point);
+      await tester.pump(const Duration(milliseconds: 70));
+      await tester.tapAt(point);
+      await tester.pump(const Duration(milliseconds: 80));
+    }
+
+    await twice(const Offset(300, 100));
+    expect(find.text('+10s'), findsOneWidget);
+    await twice(const Offset(300, 100));
+    expect(find.text('+20s'), findsOneWidget);
+    await twice(const Offset(300, 100));
+    expect(find.text('+30s'), findsOneWidget);
+    await twice(const Offset(100, 100));
+    expect(find.text('-10s'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 800));
+    await twice(const Offset(300, 100));
+    expect(find.text('+10s'), findsOneWidget);
+    expect(jumps, [10, 10, 10, -10, 10]);
+    await tester.pump(const Duration(seconds: 1));
+  });
   test(
     'all seeking preferences default on and persist independently',
     () async {

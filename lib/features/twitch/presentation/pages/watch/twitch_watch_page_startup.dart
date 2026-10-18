@@ -182,6 +182,10 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           channelLogin: channel,
           player: playerSession.player,
           timelineOffsetSeconds: timelineOffsetSeconds,
+          timelinePositionProvider:
+              state.kind == TwitchWatchPlaybackKind.liveDvr
+              ? liveDvrChatPosition
+              : null,
         ),
       );
     }

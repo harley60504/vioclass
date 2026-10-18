@@ -40,11 +40,13 @@ double twitchStreamCardGridMainAxisExtent(double viewportWidth) {
 class TwitchStreamCard extends StatelessWidget {
   final TwitchLiveStream stream;
   final VoidCallback onTap;
+  final VoidCallback? onOpenChannel;
 
   const TwitchStreamCard({
     super.key,
     required this.stream,
     required this.onTap,
+    this.onOpenChannel,
   });
 
   @override
@@ -59,7 +61,7 @@ class TwitchStreamCard extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: _StreamInfo(stream: stream),
+              child: _StreamInfo(stream: stream, onOpenChannel: onOpenChannel),
             ),
           ),
         ],
@@ -93,7 +95,10 @@ class _StreamThumbnail extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               TwitchCachedImageLayer(
-                imageUrl: stream.thumbnail(width: imageWidth, height: imageHeight),
+                imageUrl: stream.thumbnail(
+                  width: imageWidth,
+                  height: imageHeight,
+                ),
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
                 cacheWidth: imageWidth,
@@ -189,8 +194,9 @@ class _ViewerBadge extends StatelessWidget {
 
 class _StreamInfo extends StatelessWidget {
   final TwitchLiveStream stream;
+  final VoidCallback? onOpenChannel;
 
-  const _StreamInfo({required this.stream});
+  const _StreamInfo({required this.stream, this.onOpenChannel});
 
   @override
   Widget build(BuildContext context) {
@@ -245,7 +251,7 @@ class _StreamInfo extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        _StreamerFooter(stream: stream),
+        _StreamerFooter(stream: stream, onOpenChannel: onOpenChannel),
       ],
     );
   }
@@ -253,63 +259,70 @@ class _StreamInfo extends StatelessWidget {
 
 class _StreamerFooter extends StatelessWidget {
   final TwitchLiveStream stream;
+  final VoidCallback? onOpenChannel;
 
-  const _StreamerFooter({required this.stream});
+  const _StreamerFooter({required this.stream, this.onOpenChannel});
 
   @override
   Widget build(BuildContext context) {
     const avatarSize = 30.0;
-    return Row(
-      children: [
-        Container(
-          width: avatarSize,
-          height: avatarSize,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: TwitchUiColors.border),
+    return GestureDetector(
+      key: ValueKey('channel-about-${stream.channelLogin}'),
+      behavior: HitTestBehavior.opaque,
+      onTap: onOpenChannel,
+      child: Row(
+        children: [
+          Container(
+            key: ValueKey('channel-avatar-${stream.channelLogin}'),
+            width: avatarSize,
+            height: avatarSize,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: TwitchUiColors.border),
+            ),
+            child: TwitchCachedImageLayer.avatar(
+              imageUrl: stream.profileImageUrl,
+              size: avatarSize,
+              cacheWidth: 64,
+              cacheHeight: 64,
+              fallbackColor: TwitchUiColors.surfaceRaised,
+              fallbackIconColor: TwitchUiColors.textFaint,
+              fallbackIconSize: 18,
+            ),
           ),
-          child: TwitchCachedImageLayer.avatar(
-            imageUrl: stream.profileImageUrl,
-            size: avatarSize,
-            cacheWidth: 64,
-            cacheHeight: 64,
-            fallbackColor: TwitchUiColors.surfaceRaised,
-            fallbackIconColor: TwitchUiColors.textFaint,
-            fallbackIconSize: 18,
-          ),
-        ),
-        const SizedBox(width: TwitchUiSpacing.space8),
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                stream.displayName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: TwitchUiColors.textSecondary,
-                  fontSize: TwitchUiFontSize.bodyCompact,
-                  fontWeight: TwitchUiFontWeight.strong,
-                ),
-              ),
-              if (stream.channelLogin.isNotEmpty)
+          const SizedBox(width: TwitchUiSpacing.space8),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  stream.channelLogin,
+                  stream.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: TwitchUiColors.textFaint,
-                    fontSize: TwitchUiFontSize.micro,
-                    fontWeight: TwitchUiFontWeight.regular,
+                    color: TwitchUiColors.textSecondary,
+                    fontSize: TwitchUiFontSize.bodyCompact,
+                    fontWeight: TwitchUiFontWeight.strong,
                   ),
                 ),
-            ],
+                if (stream.channelLogin.isNotEmpty)
+                  Text(
+                    stream.channelLogin,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: TwitchUiColors.textFaint,
+                      fontSize: TwitchUiFontSize.micro,
+                      fontWeight: TwitchUiFontWeight.regular,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -318,7 +331,7 @@ String _formatViewerCount(BuildContext context, int value) {
   final compact = value >= 1000000
       ? '${(value / 1000000).toStringAsFixed(value >= 10000000 ? 0 : 1).replaceFirst(RegExp(r'\.0$'), '')}M'
       : value >= 1000
-          ? '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1).replaceFirst(RegExp(r'\.0$'), '')}K'
-          : '$value';
+      ? '${(value / 1000).toStringAsFixed(value >= 10000 ? 0 : 1).replaceFirst(RegExp(r'\.0$'), '')}K'
+      : '$value';
   return context.vio.isEnglish ? '$compact viewers' : '$compact 人';
 }

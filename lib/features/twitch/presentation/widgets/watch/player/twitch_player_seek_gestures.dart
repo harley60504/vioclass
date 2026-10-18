@@ -34,6 +34,7 @@ class _SeekGestureState extends State<PlayerSeekGestures> {
   TwitchPlaybackTimelineMode? _mode;
   String? _feedback;
   Timer? _feedbackTimer;
+  int _feedbackSeconds = 0;
   @override
   void dispose() {
     _feedbackTimer?.cancel();
@@ -78,8 +79,13 @@ class _SeekGestureState extends State<PlayerSeekGestures> {
                   final seconds = _tapX < constraints.maxWidth / 2 ? -10 : 10;
                   if (!widget.onJump(seconds)) return;
                   _feedbackTimer?.cancel();
+                  _feedbackSeconds =
+                      _feedback != null && _feedbackSeconds.sign == seconds.sign
+                      ? _feedbackSeconds + seconds
+                      : seconds;
                   setState(
-                    () => _feedback = '${seconds > 0 ? '+' : ''}${seconds}s',
+                    () => _feedback =
+                        '${_feedbackSeconds > 0 ? '+' : ''}${_feedbackSeconds}s',
                   );
                   _feedbackTimer = Timer(const Duration(milliseconds: 700), () {
                     if (mounted) setState(() => _feedback = null);

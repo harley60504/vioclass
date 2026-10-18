@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../models/discovery/twitch_live_stream.dart';
 import '../../../services/playback/twitch_media_kit_player_host.dart';
 import '../../watch/twitch_watch_playback_kind.dart';
+import '../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../twitch_watch_page.dart';
 import 'twitch_watch_page_startup.dart';
 import 'twitch_watch_playback_state.dart';
@@ -361,10 +362,6 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
     final safeTarget = timelineDuration == null
         ? target
         : clampLiveTimelinePosition(target, timelineDuration);
-    final timelineOffsetSeconds =
-        timelineDuration == null || timelineDuration.inMilliseconds <= 0
-        ? null
-        : safeTarget.inMilliseconds / 1000;
     final timelineOrigin = watchPorts.player.runtime.canonicalTimelineOrigin;
     final targetProgramDateTime = timelineOrigin?.add(safeTarget);
     final seekResult = await watchPorts.player.runtime
@@ -380,6 +377,9 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
       startPosition: seekResult.startPosition,
       play: shouldPlay,
     );
+    playbackTimelineController.commitPosition(
+      watchPorts.player.runtime.liveDvrBridgeTimelinePosition ?? safeTarget,
+    );
     if (video != null) {
       preferVodReplayChat = true;
       markOwnedPlayback(
@@ -390,7 +390,7 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
         videoId: video.id,
         channelLogin: channelLogin,
         player: playerSession.player,
-        timelineOffsetSeconds: timelineOffsetSeconds,
+        timelinePositionProvider: liveDvrChatPosition,
       );
     } else {
       markOwnedPlayback(
@@ -399,6 +399,18 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
       );
     }
     if (mounted) setState(() {});
+  }
+
+  Duration? liveDvrChatPosition() {
+    final clock = playbackTimelineController;
+    final snapshot = clock.snapshot;
+    if (snapshot.mode != TwitchPlaybackTimelineMode.liveDvr) {
+      return watchPorts.player.runtime.liveDvrBridgeTimelinePosition;
+    }
+    final duration = clock.displayDurationFor(
+      snapshot.duration ?? currentLiveTimelineDuration() ?? Duration.zero,
+    );
+    return clock.positionFor(duration);
   }
 
   Future<void> openLiveDvrBridgeMedia(

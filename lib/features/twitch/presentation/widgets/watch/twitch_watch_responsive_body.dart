@@ -220,7 +220,7 @@ class _BottomChatLayout extends StatelessWidget {
             SizedBox(
               height: playerHeight,
               width: double.infinity,
-              child: _PlayerSurface(child: player),
+              child: _PlayerColumn(player: player, belowPlayer: belowPlayer),
             )
           else
             Expanded(
@@ -319,6 +319,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
   late final PageController _pageController;
   late final ScrollController _aboutScrollController;
   bool _switchingPage = false;
+  double _aboutOverscroll = 0;
 
   @override
   void initState() {
@@ -355,7 +356,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
 
     return PageView(
       controller: _pageController,
-      physics: const NeverScrollableScrollPhysics(),
+      physics: const PageScrollPhysics(),
       scrollDirection: Axis.vertical,
       children: <Widget>[
         Listener(
@@ -376,10 +377,31 @@ class _PlayerColumnState extends State<_PlayerColumn> {
                 _showPage(0);
               }
             },
-            child: SingleChildScrollView(
-              controller: _aboutScrollController,
-              padding: EdgeInsets.zero,
-              child: content,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (event) {
+                if (event is ScrollStartNotification) {
+                  _aboutOverscroll = 0;
+                }
+                if (event is OverscrollNotification &&
+                    event.dragDetails != null &&
+                    event.overscroll < 0 &&
+                    event.metrics.pixels <= event.metrics.minScrollExtent) {
+                  _aboutOverscroll += event.overscroll.abs();
+                }
+                final pulledPastTop =
+                    event is ScrollUpdateNotification &&
+                    event.dragDetails != null &&
+                    event.metrics.pixels < event.metrics.minScrollExtent - 48;
+                if (_aboutOverscroll >= 48 || pulledPastTop) {
+                  _showPage(0);
+                }
+                return false;
+              },
+              child: SingleChildScrollView(
+                controller: _aboutScrollController,
+                padding: EdgeInsets.zero,
+                child: content,
+              ),
             ),
           ),
         ),

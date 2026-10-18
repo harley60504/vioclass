@@ -12,12 +12,32 @@ import '../../../services/watch/twitch_watch_services.dart';
 import '../../watch/controllers/twitch_watch_chat_controller.dart';
 import '../../localization/vioclass_localizations.dart';
 import '../../pages/twitch_watch_route_guard.dart';
+import '../../pages/twitch_channel_page.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../../twitch_follow_status_resolver.dart';
 import '../responsive/twitch_responsive_layout.dart';
 import 'twitch_stream_card.dart';
 
 /// Shared home content surface, including space below the floating toolbar.
+void _openStreamAbout(
+  BuildContext context,
+  TwitchDiscoveryService service,
+  TwitchLiveStream stream,
+) {
+  showTwitchChannelSheet(
+    context: context,
+    discoveryService: service,
+    channel: TwitchFollowedChannel(
+      broadcasterId: stream.userId,
+      broadcasterLogin: stream.channelLogin,
+      broadcasterName: stream.displayName,
+      followedAt: null,
+      profileImageUrl: stream.profileImageUrl,
+    ),
+    initialTabIndex: 0,
+  );
+}
+
 class TwitchDiscoveryScrollSurface extends StatelessWidget {
   final List<Widget> slivers;
   final ScrollController? controller;
@@ -126,6 +146,13 @@ class TwitchDiscoveryStreamGrid extends StatelessWidget {
                       child: TwitchStreamCard(
                         stream: stream,
                         onTap: () => _openStreamTarget(context, stream),
+                        onOpenChannel: discoveryService == null
+                            ? null
+                            : () => _openStreamAbout(
+                                context,
+                                discoveryService!,
+                                stream,
+                              ),
                       ),
                     );
                   },
@@ -240,6 +267,13 @@ class TwitchDiscoveryStreamSliverSection extends StatelessWidget {
                       child: TwitchStreamCard(
                         stream: stream,
                         onTap: () => _openStreamTarget(context, stream),
+                        onOpenChannel: discoveryService == null
+                            ? null
+                            : () => _openStreamAbout(
+                                context,
+                                discoveryService!,
+                                stream,
+                              ),
                       ),
                     );
                   },

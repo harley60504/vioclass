@@ -1,6 +1,7 @@
 library;
 
 import 'dart:async';
+import '../navigation/twitch_route_observer.dart';
 
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
@@ -229,6 +230,26 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   );
 
   final Object playbackRouteOwner = Object();
+  Route<dynamic>? _frameNavigationRoute;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == null || identical(route, _frameNavigationRoute)) return;
+    final previous = _frameNavigationRoute;
+    if (previous != null) {
+      twitchRouteObserver.unregisterWatch(previous);
+    }
+    _frameNavigationRoute = route;
+    twitchRouteObserver.registerWatch(
+      route,
+      TwitchWatchFrameNavigation(
+        onBack: () => unawaited(leaveToMiniPlayer()),
+        onHome: () => unawaited(returnToHome()),
+      ),
+    );
+  }
 
   late final TextEditingController channelController;
   late final TextEditingController messageController;
@@ -365,7 +386,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
             mounted &&
             TwitchViewerSession.forAuth(authService).status ==
                 TwitchViewerStatus.authenticated,
-        channelPointsIdentity: () => mounted &&
+        channelPointsIdentity: () =>
+            mounted &&
                 TwitchViewerSession.forAuth(authService).status ==
                     TwitchViewerStatus.authenticated
             ? TwitchViewerSession.forAuth(authService).snapshot
@@ -1147,6 +1169,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   @override
   void dispose() {
+    final frameRoute = _frameNavigationRoute;
+    if (frameRoute != null) {
+      twitchRouteObserver.unregisterWatch(frameRoute);
+    }
     disposeWatchModeRuntime(this);
     TwitchViewerSession.forAuth(authService).removeListener(syncViewerIdentity);
     watchLoadGeneration++;
@@ -1478,7 +1504,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
             onOpenUser: openChatUserProfile,
             runtime: vodReplayController,
             liveChat: liveChatPanel,
-            liveChatBuilder: (onToggleMode) => buildLiveChatPanel(onToggleChatMode: onToggleMode),
+            liveChatBuilder: (onToggleMode) =>
+                buildLiveChatPanel(onToggleChatMode: onToggleMode),
             thirdPartyEmoteCache: watchPorts.emotes.thirdParty,
             officialEmoteCache: watchPorts.emotes.official,
             preferredMode: preferVodReplayChat

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -392,6 +393,10 @@ class _WatchChromeStack extends StatelessWidget {
           right: 12,
           top: 12,
           child: WatchTopActionBar(
+            showNavigation:
+                kIsWeb ||
+                defaultTargetPlatform != TargetPlatform.windows ||
+                widget.fullscreen,
             metadata: widget.metadata,
             isFollowing: widget.isFollowing,
             followBusy: widget.followBusy,
