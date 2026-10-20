@@ -1,4 +1,5 @@
 // ignore_for_file: avoid_relative_lib_imports
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/features/twitch/api/core/twitch_api_client.dart';
 import '../lib/features/twitch/api/auth/twitch_auth_api_service.dart';
@@ -32,6 +33,7 @@ class _Discovery extends TwitchDiscoveryService {
       );
   final requests = <String?>[];
   bool repeats = false;
+  Completer<void>? gate;
   int validations = 0;
   @override
   Future<TwitchViewerAuthSnapshot> resolveViewerAuth({
@@ -53,6 +55,7 @@ class _Discovery extends TwitchDiscoveryService {
     int first = 100,
   }) async {
     requests.add(after);
+    await gate?.future;
     return TwitchStreamPageResult(
       streams: after == null ? [item('a'), item('b')] : [item('b'), item('c')],
       cursor: after == null || repeats ? 'next' : null,
@@ -72,6 +75,9 @@ void main() {
       expect(service.requests, [null, 'next']);
       expect(service.validations, 1);
       expect(values.every((value) => value.profileImageUrl.isNotEmpty), true);
+      expect(service.cachedFollowedLiveRailStreams, values);
+      service.clearFollowedLiveRailCache();
+      expect(service.cachedFollowedLiveRailStreams, isEmpty);
     },
   );
   test(
@@ -87,4 +93,15 @@ void main() {
       expect(service.requests, [null, 'next']);
     },
   );
+  test('Clearing account cache rejects an older in-flight snapshot', () async {
+    final client = TwitchApiClient();
+    addTearDown(client.close);
+    final service = _Discovery(client)..gate = Completer<void>();
+    final pending = service.fetchFollowedLiveRailStreams();
+    await Future<void>.delayed(Duration.zero);
+    service.clearFollowedLiveRailCache();
+    service.gate!.complete();
+    expect(await pending, hasLength(3));
+    expect(service.cachedFollowedLiveRailStreams, isEmpty);
+  });
 }

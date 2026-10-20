@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:extended_text_field/extended_text_field.dart';
 import 'package:flutter/material.dart';
 
 import '../../localization/vioclass_localizations.dart';
@@ -9,6 +8,7 @@ import '../shared/twitch_notice.dart';
 import '../shared/twitch_text_field.dart';
 import 'twitch_chat_composer_button_style.dart';
 import 'twitch_chat_input_emote_state.dart';
+import 'twitch_input_emote_span_builder.dart';
 import 'twitch_chat_text_style.dart';
 
 class TwitchChatInputBar extends StatelessWidget {
@@ -21,6 +21,7 @@ class TwitchChatInputBar extends StatelessWidget {
   final Widget? trailingActions;
   final FutureOr<void> Function() onSend;
   final Object? sendContext;
+  final TwitchChatInputEmote? Function(String)? resolveEmote;
 
   const TwitchChatInputBar({
     super.key,
@@ -33,6 +34,7 @@ class TwitchChatInputBar extends StatelessWidget {
     this.trailingActions,
     required this.onSend,
     this.sendContext,
+    this.resolveEmote,
   });
 
   static const double _inputRowHeight = 48;
@@ -98,6 +100,7 @@ class TwitchChatInputBar extends StatelessWidget {
           _SelfDrawnInputField(
             height: rowHeight,
             controller: controller,
+            resolveEmote: resolveEmote,
             enabled: enabled && !sending,
             fontSize: fontSize,
             lineHeight: _inputLineHeight,
@@ -129,6 +132,7 @@ class TwitchChatInputBar extends StatelessWidget {
 }
 
 class _SelfDrawnInputField extends StatelessWidget {
+  final TwitchChatInputEmote? Function(String)? resolveEmote;
   final double height;
   final TextEditingController controller;
   final bool enabled;
@@ -140,6 +144,7 @@ class _SelfDrawnInputField extends StatelessWidget {
   final VoidCallback onSubmit;
 
   const _SelfDrawnInputField({
+    this.resolveEmote,
     required this.height,
     required this.controller,
     required this.enabled,
@@ -184,8 +189,9 @@ class _SelfDrawnInputField extends StatelessWidget {
         height: lineHeight,
         forceStrutHeight: true,
       ),
-      specialTextSpanBuilder: _ChatInputSpanBuilder(
+      specialTextSpanBuilder: TwitchInputEmoteSpanBuilder(
         controller: controller,
+        resolve: resolveEmote,
         emoteSize: fontSize * 1.45,
       ),
       selectionControls: materialTextSelectionControls,
@@ -213,47 +219,6 @@ class _SelfDrawnInputField extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _ChatInputSpanBuilder extends SpecialTextSpanBuilder {
-  final TextEditingController controller;
-  final double emoteSize;
-
-  _ChatInputSpanBuilder({required this.controller, required this.emoteSize});
-
-  @override
-  TextSpan build(
-    String data, {
-    TextStyle? textStyle,
-    SpecialTextGestureTapCallback? onTap,
-  }) {
-    final value = controller.value;
-    var sourceStart = 0;
-    if (data != value.text && value.composing.isValid) {
-      final before = value.composing.textBefore(value.text);
-      final after = value.composing.textAfter(value.text);
-      if (data == after && data != before) {
-        sourceStart = value.composing.end;
-      }
-    }
-    return TwitchChatInputEmoteState.buildTextSpanForSource(
-      controller,
-      data,
-      textStyle ?? const TextStyle(),
-      sourceStart: sourceStart,
-      emoteSize: emoteSize,
-    );
-  }
-
-  @override
-  SpecialText? createSpecialText(
-    String flag, {
-    TextStyle? textStyle,
-    SpecialTextGestureTapCallback? onTap,
-    required int index,
-  }) {
-    return null;
   }
 }
 

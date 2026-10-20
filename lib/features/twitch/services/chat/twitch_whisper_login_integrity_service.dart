@@ -200,8 +200,9 @@ class TwitchWhisperLoginIntegrityService {
     // A late response must not discard proof already renewed by another request.
     if (_sessionToken != session.token ||
         _context?.token != rejectedIntegrity ||
-        _context?.ownerId != session.validation.userId)
+        _context?.ownerId != session.validation.userId) {
       return;
+    }
     final generation = ++_generation;
     _context = null;
     _sessionToken = null;

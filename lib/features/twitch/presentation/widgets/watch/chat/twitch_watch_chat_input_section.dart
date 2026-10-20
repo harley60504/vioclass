@@ -6,11 +6,13 @@ import '../../../../services/engagement/twitch_channel_points_runtime_service.da
 import '../../../localization/vioclass_localizations.dart';
 import '../../../theme/twitch_ui_tokens.dart';
 import '../../chat/twitch_chat_input_bar.dart';
+import '../../chat/twitch_chat_input_emote_state.dart';
 import 'twitch_chat_room_mode_banner.dart';
 import 'twitch_pending_chat_action_banner.dart';
 import 'twitch_watch_chat_utility_bar.dart';
 
 class TwitchWatchChatInputSection extends StatelessWidget {
+  final TwitchChatInputEmote? Function(String)? resolveEmote;
   final TwitchChannelPointsRuntimeSnapshot? channelPoints;
   final TwitchChatRuntime? runtime;
   final bool viewerIsFollowing;
@@ -32,6 +34,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
   final Object? sendContext;
 
   const TwitchWatchChatInputSection({
+    this.resolveEmote,
     super.key,
     required this.channelPoints,
     required this.runtime,
@@ -148,6 +151,7 @@ class TwitchWatchChatInputSection extends StatelessWidget {
             )
           else
             TwitchChatInputBar(
+              resolveEmote: resolveEmote,
               controller: messageController,
               enabled: enabled,
               sending: sending,

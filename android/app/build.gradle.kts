@@ -39,6 +39,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -77,5 +78,10 @@ flutter {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.work:work-runtime-ktx:2.10.5")
+    testImplementation("junit:junit:4.13.2")
+    // Match integration_test's AndroidX test runtime (consistent resolution).
+    androidTestImplementation("androidx.test:runner:1.3.0")
+    androidTestImplementation("androidx.test.ext:junit:1.1.2")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

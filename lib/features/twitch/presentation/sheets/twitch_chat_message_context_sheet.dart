@@ -61,6 +61,7 @@ class TwitchChatMessageContextCard extends StatefulWidget {
   final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
 
   const TwitchChatMessageContextCard({
+    super.key,
     required this.messages,
     required this.selectedMessage,
     required this.entries,

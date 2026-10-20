@@ -13,6 +13,7 @@ import '../lib/features/twitch/services/chat/twitch_whisper_recovery_service.dar
 class _History extends TwitchWhisperHistoryApiService {
   final calls = <String>[];
   bool fail = false;
+  bool unknownBoundary = false;
   Completer<void>? gate;
   _History(TwitchApiClient superClient)
     : super(client: superClient, webTokenProviders: const []);
@@ -29,7 +30,8 @@ class _History extends TwitchWhisperHistoryApiService {
       ownerId: ownerId,
       peerId: peerId,
       requestedCursor: cursor,
-      nextCursor: cursor == null ? 'older' : null,
+      nextCursor: unknownBoundary ? null : (cursor == null ? 'older' : null),
+      paginationKnown: !unknownBoundary,
       messages: [
         TwitchWhisperMessage(
           id: '$peerId-${cursor ?? "recent"}',
@@ -127,87 +129,129 @@ void main() {
   });
   tearDown(() => client.close());
 
-  for (final complete in [false, true]) {
-    test('Imported new peer resets remote progress (complete=$complete)', () async {
-      final current = (await store.load('1')).single;
-      final imported = TwitchWhisperConversation(
-        userId: '3',
-        login: 'imported',
-        displayName: 'Imported',
-        avatarUrl: 'https://example.com/avatar.png',
-        draft: 'restored draft',
-        unreadCount: 8,
-        remoteUnreadCount: 11,
-        hasReceivedWhisper: true,
-        remoteHistoryCursor: complete ? null : 'other-device-cursor',
-        remoteHistoryComplete: complete,
-        messages: [
-          TwitchWhisperMessage(
-            id: 'imported-message',
-            fromUserId: '3',
-            toUserId: '1',
-            text: 'backup history',
-            timestamp: DateTime.utc(2026, 10, 4),
-            state: TwitchWhisperMessageState.received,
-          ),
-        ],
+  test(
+    'Unknown history boundary saves messages and stops without advancing recovery',
+    () async {
+      history.unknownBoundary = true;
+      await expectLater(
+        runner().run('1', canApply: () => true),
+        throwsA(isA<Exception>()),
       );
-      final raw = jsonEncode({
-        'version': 1,
-        'ownerId': '1',
-        'conversations': [
-          current.copyWith(
-            draft: 'not the current draft',
-            remoteUnreadCount: 99,
-            remoteHistoryCursor: 'not the current cursor',
-            replaceRemoteHistoryCursor: true,
-          ).toJson(),
-          imported.toJson(),
-        ],
-      });
-      final before = Map<String, String>.of(disk);
-      failWrite = true;
-      await expectLater(store.importBackup('1', raw), throwsStateError);
-      expect(disk, before);
-      failWrite = false;
-      expect(await store.importBackup('1', raw), 1);
-      store = newStore();
-      final saved = await store.load('1');
-      final newPeer = saved.singleWhere((peer) => peer.userId == '3');
-      expect(newPeer.remoteHistoryCursor, isNull);
-      expect(newPeer.remoteHistoryComplete, false);
-      expect(newPeer.remoteUnreadCount, 0);
-      expect(newPeer.unreadCount, 0);
-      expect(newPeer.hasReceivedWhisper, false);
-      expect(newPeer.draft, 'restored draft');
-      expect(newPeer.avatarUrl, imported.avatarUrl);
-      expect(newPeer.messages.single.historicalOnly, true);
-      final existing = saved.singleWhere((peer) => peer.userId == '2');
-      expect(existing.draft, 'keep draft');
-      expect(existing.remoteHistoryCursor, 'ui-history');
-      expect(existing.remoteHistoryComplete, false);
-      expect(existing.remoteUnreadCount, 0);
-      expect((await store.threadsCheckpoint('1')).cursor, 'ui-list');
-      expect(await store.receiveGapSince('1'), DateTime.utc(2026, 10, 1));
-      // First remote page is not blocked by another device's completion/cursor.
-      await store.mergeRemotePage(
+      expect(history.calls, hasLength(1));
+      final checkpoint = (await store.recoveryCheckpoint('1'))!;
+      expect(checkpoint.complete, false);
+      expect(checkpoint.phase, 'history');
+      expect(checkpoint.cursor, isNull);
+      final saved = (await store.load(
         '1',
-        newPeer,
-        TwitchWhisperRemotePage(
-          ownerId: '1',
-          peerId: '3',
-          messages: const [],
-          nextCursor: 'fresh-cursor',
-        ),
+      )).singleWhere((peer) => peer.userId == checkpoint.activePeerId);
+      expect(saved.messages, hasLength(1));
+      expect(saved.remoteHistoryComplete, false);
+      // Resuming an unresolved boundary must deduplicate, not loop or finish.
+      await expectLater(
+        runner().run('1', canApply: () => true),
+        throwsA(isA<Exception>()),
       );
-      expect(await store.importBackup('1', raw), 0);
-      store = newStore();
-      final refreshed = (await store.load('1')).singleWhere(
-        (peer) => peer.userId == '3',
+      expect(history.calls, hasLength(2));
+      expect(
+        (await store.recoveryCheckpoint('1'))!.toJson(),
+        checkpoint.toJson(),
       );
-      expect(refreshed.remoteHistoryCursor, 'fresh-cursor');
-      expect(refreshed.draft, 'restored draft');
-    });
+      expect(
+        (await store.load('1'))
+            .singleWhere((peer) => peer.userId == checkpoint.activePeerId)
+            .messages,
+        hasLength(1),
+      );
+    },
+  );
+
+  for (final complete in [false, true]) {
+    test(
+      'Imported new peer resets remote progress (complete=$complete)',
+      () async {
+        final current = (await store.load('1')).single;
+        final imported = TwitchWhisperConversation(
+          userId: '3',
+          login: 'imported',
+          displayName: 'Imported',
+          avatarUrl: 'https://example.com/avatar.png',
+          draft: 'restored draft',
+          unreadCount: 8,
+          remoteUnreadCount: 11,
+          hasReceivedWhisper: true,
+          remoteHistoryCursor: complete ? null : 'other-device-cursor',
+          remoteHistoryComplete: complete,
+          messages: [
+            TwitchWhisperMessage(
+              id: 'imported-message',
+              fromUserId: '3',
+              toUserId: '1',
+              text: 'backup history',
+              timestamp: DateTime.utc(2026, 10, 4),
+              state: TwitchWhisperMessageState.received,
+            ),
+          ],
+        );
+        final raw = jsonEncode({
+          'version': 1,
+          'ownerId': '1',
+          'conversations': [
+            current
+                .copyWith(
+                  draft: 'not the current draft',
+                  remoteUnreadCount: 99,
+                  remoteHistoryCursor: 'not the current cursor',
+                  replaceRemoteHistoryCursor: true,
+                )
+                .toJson(),
+            imported.toJson(),
+          ],
+        });
+        final before = Map<String, String>.of(disk);
+        failWrite = true;
+        await expectLater(store.importBackup('1', raw), throwsStateError);
+        expect(disk, before);
+        failWrite = false;
+        expect(await store.importBackup('1', raw), 1);
+        store = newStore();
+        final saved = await store.load('1');
+        final newPeer = saved.singleWhere((peer) => peer.userId == '3');
+        expect(newPeer.remoteHistoryCursor, isNull);
+        expect(newPeer.remoteHistoryComplete, false);
+        expect(newPeer.remoteUnreadCount, 0);
+        expect(newPeer.unreadCount, 0);
+        expect(newPeer.hasReceivedWhisper, false);
+        expect(newPeer.draft, 'restored draft');
+        expect(newPeer.avatarUrl, imported.avatarUrl);
+        expect(newPeer.messages.single.historicalOnly, true);
+        final existing = saved.singleWhere((peer) => peer.userId == '2');
+        expect(existing.draft, 'keep draft');
+        expect(existing.remoteHistoryCursor, 'ui-history');
+        expect(existing.remoteHistoryComplete, false);
+        expect(existing.remoteUnreadCount, 0);
+        expect((await store.threadsCheckpoint('1')).cursor, 'ui-list');
+        expect(await store.receiveGapSince('1'), DateTime.utc(2026, 10, 1));
+        // First remote page is not blocked by another device's completion/cursor.
+        await store.mergeRemotePage(
+          '1',
+          newPeer,
+          TwitchWhisperRemotePage(
+            ownerId: '1',
+            peerId: '3',
+            messages: const [],
+            nextCursor: 'fresh-cursor',
+          ),
+        );
+        expect(await store.importBackup('1', raw), 0);
+        store = newStore();
+        final refreshed = (await store.load(
+          '1',
+        )).singleWhere((peer) => peer.userId == '3');
+        expect(refreshed.remoteHistoryCursor, 'fresh-cursor');
+        expect(refreshed.draft, 'restored draft');
+      },
+    );
   }
 
   test(

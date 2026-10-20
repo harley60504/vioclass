@@ -78,6 +78,8 @@ void main() {
   var failWrite = false;
   var writeAttempts = 0;
   Completer<void>? writeGate;
+  Completer<String?>? readGate;
+  Completer<void>? readStarted;
   _Api api(String owner, String channel, {bool Function()? allowed}) {
     final value = _Api(owner, channel, allowed: allowed);
     apis.add(value);
@@ -91,8 +93,17 @@ void main() {
     failWrite = false;
     writeAttempts = 0;
     writeGate = null;
+    readGate = null;
+    readStarted = null;
     archive = TwitchModerationLogArchiveStore(
-      read: (key) async => disk[key],
+      read: (key) async {
+        final gate = readGate;
+        if (gate != null) {
+          readStarted?.complete();
+          return gate.future;
+        }
+        return disk[key];
+      },
       write: (key, value) async {
         writeAttempts++;
         await writeGate?.future;
@@ -119,6 +130,43 @@ void main() {
       api.client.close();
     }
   });
+  for (final change in ['stop', 'permission', 'switch']) {
+    test('Archive loading rejects obsolete records change=$change', () async {
+      var allowed = true;
+      final oldApi = api('10', '20', allowed: () => allowed);
+      await controller.start(oldApi);
+      receivers.last.emit('old-saved-record');
+      await controller.flush();
+      controller.stop();
+      final saved = disk.values.single;
+      final gate = readGate = Completer<String?>();
+      final started = readStarted = Completer<void>();
+      final loading = controller.start(oldApi);
+      await started.future;
+      expect(controller.entries, isEmpty);
+      readGate = null;
+      readStarted = null;
+      Future<void>? switching;
+      if (change == 'permission') {
+        allowed = false;
+      } else if (change == 'switch') {
+        switching = controller.start(api('11', '21'));
+      } else {
+        controller.stop();
+      }
+      final receiverCount = receivers.length;
+      gate.complete(saved);
+      await loading;
+      await switching;
+      expect(controller.entries, isEmpty);
+      expect(receivers.length, receiverCount + (change == 'switch' ? 1 : 0));
+      expect(controller.ownerId, change == 'switch' ? '11' : isNull);
+      expect(controller.broadcasterId, change == 'switch' ? '21' : isNull);
+      expect(controller.loading, isFalse);
+      expect(controller.connected, change == 'switch');
+      expect((await archive.load('10', '20')).single.id, 'old-saved-record');
+    });
+  }
   test(
     'Lost moderation permission rejects new events but preserves accepted local records',
     () async {

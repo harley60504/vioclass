@@ -20,7 +20,14 @@ import '../widgets/settings/twitch_chat_keyboard_settings_card.dart';
 import '../widgets/shared/twitch_text_field.dart';
 import '../widgets/shared/twitch_notice.dart';
 
-enum _TwitchSettingsTab { account, chat, player, appearance, updates }
+enum _TwitchSettingsTab {
+  account,
+  notifications,
+  chat,
+  player,
+  appearance,
+  updates,
+}
 
 Future<void> showTwitchAppSettingsSheet({
   required BuildContext context,
@@ -130,6 +137,7 @@ class _TwitchAppSettingsSheetState extends State<TwitchAppSettingsSheet> {
           _TwitchSettingsTab.chat => _ChatSettingsPane(
             controller: widget.chatAppearanceController,
           ),
+          _TwitchSettingsTab.notifications => const _NotificationSettingsPane(),
           _TwitchSettingsTab.player => _PlayerSettingsPane(
             controller: widget.playerSettingsController,
           ),
@@ -185,6 +193,13 @@ class _SettingsTabSelector extends StatelessWidget {
         label: l10n.accountTab,
         description: l10n.accountTabDescription,
       ),
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+        _SettingsTabMeta(
+          tab: _TwitchSettingsTab.notifications,
+          icon: Icons.notifications_rounded,
+          label: l10n.t('通知'),
+          description: l10n.t('開台與私訊'),
+        ),
       _SettingsTabMeta(
         tab: _TwitchSettingsTab.chat,
         icon: Icons.chat_bubble_rounded,
@@ -501,17 +516,25 @@ class _AccountSettingsPaneState extends State<_AccountSettingsPane> {
             ],
           ),
         ),
-        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
-          const SizedBox(height: 12),
-          _SettingsSection(
-            title: '通知與背景收件',
-            subtitle: '手機使用 Android 系統通知',
-            child: const TwitchAndroidBackgroundSettingsCard(),
-          ),
-        ],
       ],
     );
   }
+}
+
+class _NotificationSettingsPane extends StatelessWidget {
+  const _NotificationSettingsPane();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+    padding: const EdgeInsets.fromLTRB(14, 14, 14, 18),
+    children: [
+      _SettingsSection(
+        title: context.vio.t('通知'),
+        subtitle: context.vio.t('開台與私訊'),
+        child: const TwitchAndroidBackgroundSettingsCard(),
+      ),
+    ],
+  );
 }
 
 Future<void> _saveChatSetting(

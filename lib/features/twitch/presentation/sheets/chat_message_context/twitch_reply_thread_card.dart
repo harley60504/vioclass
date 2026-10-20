@@ -55,7 +55,7 @@ class TwitchReplyThreadMessageCard extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(13),
-            onTap: onCopy ?? () => _copyMessage(context, message),
+            onLongPress: onCopy ?? () => _copyMessage(context, message),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 9),

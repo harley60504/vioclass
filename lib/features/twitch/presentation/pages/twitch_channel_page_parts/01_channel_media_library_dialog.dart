@@ -185,8 +185,9 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
     super.didUpdateWidget(oldWidget);
     if (identical(oldWidget.discoveryService, widget.discoveryService) &&
         oldWidget.channel.broadcasterId == widget.channel.broadcasterId &&
-        oldWidget.channel.channelLogin == widget.channel.channelLogin)
+        oldWidget.channel.channelLogin == widget.channel.channelLogin) {
       return;
+    }
     _sourceGeneration++;
     videos = const [];
     clips = const [];

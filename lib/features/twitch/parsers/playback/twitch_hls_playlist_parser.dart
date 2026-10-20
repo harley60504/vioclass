@@ -399,8 +399,9 @@ class TwitchHlsPlaylistParser {
 
   static String _shortPlaylistUrl(String value) {
     final uri = Uri.tryParse(value);
-    if (uri == null)
+    if (uri == null) {
       return value.length <= 80 ? value : '${value.substring(0, 77)}...';
+    }
     final segments = uri.pathSegments;
     if (segments.isEmpty) return uri.host;
     final last = segments.last;

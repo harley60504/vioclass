@@ -8,6 +8,8 @@ import '../auth/twitch_viewer_session.dart';
 export '../auth/twitch_viewer_session.dart' show TwitchViewerAuthSnapshot;
 import 'twitch_channel_snapshot_cache.dart';
 import 'twitch_guest_discovery_service.dart';
+import 'twitch_shared_query_cache.dart';
+import 'twitch_android_followed_snapshot.dart';
 
 typedef TwitchWebTokenProvider = Future<String?> Function();
 
@@ -23,10 +25,16 @@ class TwitchDiscoveryService {
   TwitchViewerAuthSnapshot? get _cachedAuth => viewerSession.snapshot;
   List<TwitchLiveStream> _cachedFollowedLiveRailStreams = const [];
   int _railCacheGeneration = 0;
+  Object? _followedCacheIdentity;
+  final _followedPages =
+      TwitchSharedQueryCache<Object, TwitchStreamPageResult>();
+  final _androidFollowedSnapshot = TwitchAndroidFollowedSnapshot();
   List<TwitchLiveStream> get cachedFollowedLiveRailStreams =>
       _cachedFollowedLiveRailStreams;
   void clearFollowedLiveRailCache() {
     _railCacheGeneration++;
+    _followedPages.clear();
+    _androidFollowedSnapshot.clear();
     _cachedFollowedLiveRailStreams = const [];
   }
 
@@ -70,13 +78,16 @@ class TwitchDiscoveryService {
   Future<TwitchViewerAuthSnapshot?> resolveViewerAuthOrNull({
     bool forceValidate = false,
   }) async {
-    final previous = _cachedAuth;
     final snapshot = await viewerSession.resolve(
       authApi,
       forceValidate: forceValidate,
     );
+    final identity = snapshot == null
+        ? null
+        : (snapshot.viewerId, snapshot.accessToken);
     if ((snapshot != null || viewerSession.snapshot == null) &&
-        (previous?.viewerId != snapshot?.viewerId || snapshot == null)) {
+        (_followedCacheIdentity != identity || snapshot == null)) {
+      _followedCacheIdentity = identity;
       clearFollowedLiveRailCache();
     }
     return snapshot;
@@ -94,6 +105,33 @@ class TwitchDiscoveryService {
       );
     }
 
+    final generation = _railCacheGeneration;
+    final page = await _followedPages.read(
+      (auth.viewerId, auth.accessToken, after, first.clamp(1, 100)),
+      () async =>
+          await _androidFollowedSnapshot.page(
+            owner: auth.viewerId,
+            after: after,
+            first: first,
+          ) ??
+          await _fetchFollowedStreamPage(auth, after: after, first: first),
+    );
+    if (generation != _railCacheGeneration ||
+        authService.accessToken != auth.accessToken) {
+      throw const TwitchApiException('登入狀態已變更，請重新整理追隨直播。');
+    }
+    TwitchChannelSnapshotCache.instance.rememberLiveStreams(
+      page.streams,
+      isFollowed: true,
+    );
+    return page;
+  }
+
+  Future<TwitchStreamPageResult> _fetchFollowedStreamPage(
+    TwitchViewerAuthSnapshot auth, {
+    String? after,
+    int first = 100,
+  }) async {
     final raw = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/streams/followed',
       queryParameters: <String, dynamic>{
@@ -104,12 +142,7 @@ class TwitchDiscoveryService {
       headers: _helixHeaders(auth),
     );
 
-    final page = _parseStreamPage(raw);
-    TwitchChannelSnapshotCache.instance.rememberLiveStreams(
-      page.streams,
-      isFollowed: true,
-    );
-    return page;
+    return _parseStreamPage(raw);
   }
 
   /// Reuse the existing batched user lookup only for newly-live notifications.

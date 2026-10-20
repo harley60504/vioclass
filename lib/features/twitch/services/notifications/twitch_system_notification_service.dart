@@ -115,20 +115,46 @@ class TwitchSystemNotificationService {
           debugPrint('Notification launch details could not be read.');
         }
       }
-
-      if (_initialized && defaultTargetPlatform == TargetPlatform.android) {
-        await _plugin
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >()
-            ?.requestNotificationsPermission();
-      }
     } catch (error, stackTrace) {
       debugPrint('System notification initialization failed: $error');
       debugPrintStack(stackTrace: stackTrace);
       _initialized = false;
     } finally {
       _initializing = null;
+    }
+  }
+
+  Future<bool?> notificationPermission({bool request = false}) async {
+    if (!_supportsSystemNotification) return null;
+    await initialize();
+    if (!_initialized) return null;
+    try {
+      final android = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      final allowed = await android?.areNotificationsEnabled();
+      if (allowed != true && request) {
+        await android?.requestNotificationsPermission();
+        return await android?.areNotificationsEnabled();
+      }
+      return allowed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<bool> openNotificationSettings() async {
+    if (!_supportsSystemNotification) return false;
+    try {
+      return await _plugin
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >()
+              ?.openAppNotificationSettings() ??
+          false;
+    } catch (_) {
+      return false;
     }
   }
 

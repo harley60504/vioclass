@@ -593,8 +593,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     preferencesController = TwitchWatchPreferencesController(
       applyVolume: (volume) async {
         final player = playerSession.playerOrNull;
-        if (player != null)
+        if (player != null) {
           await twitchAudioSettings.setPlayerVolume(player, volume);
+        }
       },
       minChatPanelWidth: minChatPanelWidth,
       maxEffectiveMinChatPanelWidth: maxEffectiveMinChatPanelWidth,
@@ -701,6 +702,8 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     super.didChangeAppLifecycleState(state);
     switch (state) {
       case AppLifecycleState.resumed:
+        // Recover chat independently of potentially slow playback recovery.
+        unawaited(chatController.setAppForeground(true));
         final backgroundedAt = livePlaybackBackgroundedAt;
         livePlaybackBackgroundedAt = null;
         final backgroundDuration = backgroundedAt == null
@@ -722,6 +725,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
+        unawaited(chatController.setAppForeground(false));
         livePlaybackBackgroundedAt ??= DateTime.now();
         playbackTimelineController.suspendClock();
         break;

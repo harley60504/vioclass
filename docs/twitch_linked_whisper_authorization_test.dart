@@ -30,6 +30,8 @@ class _Client extends TwitchApiClient {
 class _Main extends TwitchAuthService {
   _Main(TwitchApiClient client) : super(apiClient: client);
   @override
+  String? get accessToken => 'main';
+  @override
   Future<void> loadStoredSession({bool refreshIfNeeded = true}) async {}
   @override
   Future<String?> getValidAccessToken({bool forceRefresh = false}) async =>

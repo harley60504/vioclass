@@ -6,7 +6,8 @@ import '../../api/core/twitch_api_constants.dart';
 String? _androidDesktopUserAgent;
 Future<void>? _preparingAndroidUserAgent;
 
-/// Keep the actual Chromium/WebKit versions, not an unrelated Chrome 120 UA.
+/// Keep the actual engine versions while requesting the Android mobile site.
+/// The legacy helper name is retained for existing callers.
 String twitchDesktopUserAgentFromAndroid(String nativeUserAgent) {
   final chrome = RegExp(r'Chrome/([0-9.]+)').firstMatch(nativeUserAgent)?[1];
   final webkit = RegExp(
@@ -16,8 +17,9 @@ String twitchDesktopUserAgentFromAndroid(String nativeUserAgent) {
   if (chrome == null || webkit == null || safari == null) {
     throw StateError('Native Android browser identification unavailable');
   }
-  return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-      'AppleWebKit/$webkit (KHTML, like Gecko) Chrome/$chrome Safari/$safari';
+  return 'Mozilla/5.0 (Linux; Android 10; K) '
+      'AppleWebKit/$webkit (KHTML, like Gecko) '
+      'Chrome/$chrome Mobile Safari/$safari';
 }
 
 Future<void> prepareTwitchDesktopWebViewSettings({
@@ -47,7 +49,7 @@ Future<void> _prepareAndroidUserAgent(
 String? get twitchAndroidDesktopUserAgent => _androidDesktopUserAgent;
 
 /// Apply before native creation, including the very first OAuth navigation.
-/// Keep native desktop UAs; mobile views explicitly request the desktop site.
+/// Android uses the mobile site; other platforms retain their existing settings.
 InAppWebViewSettings twitchDesktopWebViewSettings(
   InAppWebViewSettings settings,
 ) {
@@ -57,8 +59,10 @@ InAppWebViewSettings twitchDesktopWebViewSettings(
   }
   if (defaultTargetPlatform == TargetPlatform.android) {
     // Primary login and background verification await preparation before use.
-    settings.userAgent =
-        _androidDesktopUserAgent ?? TwitchApiConstants.browserUserAgent;
+    settings.preferredContentMode = UserPreferredContentMode.MOBILE;
+    // The login host prepares this before creation. If unavailable, keep the
+    // native Android identity rather than falling back to a Windows desktop UA.
+    settings.userAgent = _androidDesktopUserAgent;
     settings.useWideViewPort = true;
     settings.loadWithOverviewMode = true;
   }

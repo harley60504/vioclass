@@ -7,6 +7,7 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/features/twitch/presentation/widgets/shared/twitch_login_webview_host.dart';
 import '../lib/features/twitch/services/auth/twitch_webview_environment_disposal.dart';
+import '../lib/features/twitch/services/auth/twitch_desktop_webview_settings.dart';
 
 class _Environment extends Fake implements WebViewEnvironment {
   int disposals = 0;
@@ -28,6 +29,13 @@ void main() {
     ) async {
       debugDefaultTargetPlatformOverride = platform;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      if (platform == TargetPlatform.android) {
+        await prepareTwitchDesktopWebViewSettings(
+          userAgentProvider: () async =>
+              'Mozilla/5.0 (Linux; Android 15; wv) '
+              'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Mobile Safari/537.36',
+        );
+      }
       final environment = _Environment();
       final focus = FocusNode();
       await tester.pumpWidget(

@@ -10,8 +10,9 @@ import '../../services/chat/twitch_whisper_archive_store.dart';
 import '../localization/vioclass_localizations.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_sheet.dart';
-import '../widgets/chat/twitch_selectable_emote.dart';
-import '../widgets/chat/twitch_whisper_selection.dart';
+import 'package:extended_text_field/extended_text_field.dart';
+import '../widgets/chat/twitch_chat_input_emote_state.dart';
+import '../widgets/chat/twitch_input_emote_span_builder.dart';
 import '../widgets/shared/twitch_notice.dart';
 import '../widgets/shared/twitch_emote_image.dart';
 import '../widgets/shared/twitch_emote_picker_flow.dart';
@@ -1503,8 +1504,26 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                       : () => _toggleEmotes(emojiOnly: false),
                 ),
                 Expanded(
-                  child: TextField(
+                  child: ExtendedTextField(
                     controller: _message,
+                    specialTextSpanBuilder: TwitchInputEmoteSpanBuilder(
+                      controller: _message,
+                      resolve: (code) {
+                        final parts = inbox.emoteCatalog.parse(code);
+                        final emote = parts.length == 1
+                            ? parts.single.emote
+                            : null;
+                        if (emote == null) return null;
+                        return TwitchChatInputEmote(
+                          id: emote.id,
+                          name: emote.name,
+                          imageUrl: emote.preferredImageUrl(),
+                          staticImageUrl: emote.officialStaticImageUrl(),
+                          isOfficial: true,
+                          isAnimated: emote.supportsAnimation,
+                        );
+                      },
+                    ),
                     minLines: 1,
                     maxLines: 4,
                     enabled: !inbox.loading,
@@ -1645,43 +1664,40 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       alignment: outgoing ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 400),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: outgoing
-                ? TwitchUiColors.primarySoft.withValues(alpha: .16)
-                : TwitchUiColors.surfaceAlt,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: TwitchUiColors.textMuted.withValues(alpha: .12),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _whisperBody(message.text),
-              const SizedBox(height: 4),
-              Text(
-                '$time${state.isEmpty ? '' : ' · $state'}',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: message.state == TwitchWhisperMessageState.failed
-                      ? Colors.redAccent
-                      : TwitchUiColors.textMuted,
-                ),
+        child: GestureDetector(
+          onLongPress: () =>
+              Clipboard.setData(ClipboardData(text: message.text)),
+          onSecondaryTap: () =>
+              Clipboard.setData(ClipboardData(text: message.text)),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: outgoing
+                  ? TwitchUiColors.primarySoft.withValues(alpha: .16)
+                  : TwitchUiColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: TwitchUiColors.textMuted.withValues(alpha: .12),
               ),
-              if (inbox.emoteCatalog
-                  .parse(message.text)
-                  .any((part) => part.emote != null))
-                IconButton(
-                  tooltip: context.vio.t('複製原始訊息'),
-                  onPressed: () =>
-                      Clipboard.setData(ClipboardData(text: message.text)),
-                  icon: const Icon(Icons.copy_rounded, size: 15),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _whisperBody(message.text),
+                const SizedBox(height: 4),
+                Text(
+                  '$time${state.isEmpty ? '' : ' · $state'}',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: message.state == TwitchWhisperMessageState.failed
+                        ? Colors.redAccent
+                        : TwitchUiColors.textMuted,
+                  ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1690,38 +1706,29 @@ class _WhisperSheetState extends State<_WhisperSheet> {
 
   Widget _whisperBody(String text) {
     final parts = inbox.emoteCatalog.parse(text);
-    if (!parts.any((part) => part.emote != null)) return SelectableText(text);
-    return SelectionArea(
-      child: TwitchWhisperSelection(
-        parts: parts,
-        span: TextSpan(
-          children: [
-            for (final part in parts)
-              if (part.emote == null)
-                TextSpan(text: part.text)
-              else
-                WidgetSpan(
-                  alignment: PlaceholderAlignment.middle,
-                  child: TwitchSelectableEmote(
-                    text: part.text,
-                    child: Tooltip(
-                      message: part.text,
-                      child: TwitchEmoteImage(
-                        id: part.emote!.id,
-                        name: part.text,
-                        imageUrl: part.emote!.preferredImageUrl(),
-                        staticImageUrl: part.emote!.officialStaticImageUrl(),
-                        isOfficial: true,
-                        isAnimated: part.emote!.supportsAnimation,
-                        width: 28,
-                        height: 28,
-                        errorPlaceholder: Text(part.text),
-                      ),
-                    ),
-                  ),
+    if (!parts.any((part) => part.emote != null)) return Text(text);
+    return Text.rich(
+      TextSpan(
+        children: [
+          for (final part in parts)
+            if (part.emote == null)
+              TextSpan(text: part.text)
+            else
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: TwitchEmoteImage(
+                  id: part.emote!.id,
+                  name: part.text,
+                  imageUrl: part.emote!.preferredImageUrl(),
+                  staticImageUrl: part.emote!.officialStaticImageUrl(),
+                  isOfficial: true,
+                  isAnimated: part.emote!.supportsAnimation,
+                  width: 28,
+                  height: 28,
+                  errorPlaceholder: Text(part.text),
                 ),
-          ],
-        ),
+              ),
+        ],
       ),
     );
   }

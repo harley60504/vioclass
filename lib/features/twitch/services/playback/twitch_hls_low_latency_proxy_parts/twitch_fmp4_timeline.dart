@@ -69,8 +69,9 @@ class TwitchFmp4Timeline {
         final header = fields.where((field) => field.type == 'tfhd').single;
         final id = _fmp4Read(bytes, header.body + 4, 4, header.end).toInt();
         final scale = _scales[id];
-        if (scale == null)
+        if (scale == null) {
           throw const FormatException('Unknown fMP4 track timescale');
+        }
         final time = fields.where((field) => field.type == 'tfdt').single;
         final version = _fmp4Version(bytes, time.body, time.end);
         final width = version == 1 ? 8 : 4;
@@ -133,8 +134,9 @@ int _fmp4Version(List<int> bytes, int body, int end) {
 }
 
 BigInt _fmp4Read(List<int> bytes, int offset, int width, int end) {
-  if (offset < 0 || offset + width > end)
+  if (offset < 0 || offset + width > end) {
     throw const FormatException('Incomplete fMP4 field');
+  }
   var value = BigInt.zero;
   for (var i = 0; i < width; i++) {
     value = (value << 8) | BigInt.from(bytes[offset + i]);
@@ -159,8 +161,9 @@ Iterable<({String type, int body, int end})> _fmp4Boxes(
     } else if (size == 0) {
       size = end - cursor;
     }
-    if (size < header || cursor + size > end)
+    if (size < header || cursor + size > end) {
       throw const FormatException('Invalid fMP4 box length');
+    }
     yield (type: type, body: cursor + header, end: cursor + size);
     cursor += size;
   }
@@ -206,18 +209,20 @@ class _Fmp4TimelineSink implements TwitchHlsByteSink {
         }
         final type = String.fromCharCodes(_pending.sublist(4, 8));
         if (type == 'moof') {
-          if (size < header || size > 1024 * 1024)
+          if (size < header || size > 1024 * 1024) {
             throw const FormatException(
               'Unsupported fMP4 fragment header size',
             );
+          }
           if (_pending.length < size) break;
           final metadata = _pending.sublist(0, size);
           _pending.removeRange(0, size);
           timeline._rewrite(metadata, boundary, duration);
           await _emit(metadata);
         } else {
-          if (size != 0 && size < header)
+          if (size != 0 && size < header) {
             throw const FormatException('Invalid fMP4 media box');
+          }
           final bytes = _pending.sublist(0, header);
           _pending.removeRange(0, header);
           _opaqueToEnd = size == 0;
@@ -229,7 +234,8 @@ class _Fmp4TimelineSink implements TwitchHlsByteSink {
   }
 
   void finish() {
-    if (_pending.isNotEmpty || _opaqueRemaining != 0)
+    if (_pending.isNotEmpty || _opaqueRemaining != 0) {
       throw const FormatException('Incomplete fMP4 media segment');
+    }
   }
 }

@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -15,12 +16,15 @@
         android:usesCleartextTraffic="true">
         <service
             android:name="de.julianassmann.flutter_background.IsolateHolderService"
+            tools:node="remove" />
+        <service
+            android:name=".VioClassWhisperService"
             android:exported="false"
-            android:stopWithTask="true"
+            android:stopWithTask="false"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-enabled persistent Twitch EventSub whisper reception and followed-stream notifications while the app task remains open." />
+                android:value="User-enabled persistent Twitch private-message reception, including after the app task is dismissed. The user can disable receiving in app settings." />
         </service>
         <activity
             android:name=".MainActivity"

@@ -702,6 +702,32 @@ class _TwitchWatchChatPanelState extends State<TwitchWatchChatPanel> {
                       ),
                     ),
                   TwitchWatchChatInputSection(
+                    resolveEmote: (name) {
+                      final official = widget.officialEmoteCache
+                          .lookupRenderableByName(name);
+                      if (official != null) {
+                        return TwitchChatInputEmote(
+                          id: official.id,
+                          name: official.name,
+                          imageUrl: official.preferredImageUrl(),
+                          staticImageUrl: official.officialStaticImageUrl(),
+                          providerLabel: official.sourceLabel,
+                          isOfficial: true,
+                          isAnimated: official.supportsAnimation,
+                        );
+                      }
+                      final thirdParty = widget.thirdPartyEmoteCache
+                          .lookupLoose(name);
+                      if (thirdParty == null) return null;
+                      return TwitchChatInputEmote(
+                        id: thirdParty.id,
+                        name: thirdParty.name,
+                        imageUrl: thirdParty.imageUrl,
+                        staticImageUrl: thirdParty.effectiveStaticImageUrl,
+                        providerLabel: thirdParty.providerLabel,
+                        isAnimated: thirdParty.isAnimated,
+                      );
+                    },
                     channelPoints: widget.channelPoints,
                     runtime: currentRuntime,
                     viewerIsFollowing: widget.viewerIsFollowing,

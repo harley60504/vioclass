@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../models/chat/twitch_chat_runtime_message.dart';
 import '../../../../models/chat/twitch_chat_message_metadata.dart';
@@ -51,6 +52,8 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
         children: [
           _ChatHoverSurface(
             onOpenContext: onOpenContext,
+            onCopy: () =>
+                Clipboard.setData(ClipboardData(text: message.message)),
             child: TwitchChatMessageContent(
               onOpenUser: onOpenUser,
               message: message,
@@ -75,10 +78,15 @@ class TwitchChatNormalMessageCard extends StatelessWidget {
 }
 
 class _ChatHoverSurface extends StatefulWidget {
+  final VoidCallback onCopy;
   final Widget child;
   final VoidCallback? onOpenContext;
 
-  const _ChatHoverSurface({required this.child, required this.onOpenContext});
+  const _ChatHoverSurface({
+    required this.child,
+    required this.onOpenContext,
+    required this.onCopy,
+  });
 
   @override
   State<_ChatHoverSurface> createState() => _ChatHoverSurfaceState();
@@ -95,7 +103,7 @@ class _ChatHoverSurfaceState extends State<_ChatHoverSurface> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: widget.onOpenContext,
-        onLongPress: widget.onOpenContext,
+        onLongPress: widget.onCopy,
         onSecondaryTap: widget.onOpenContext,
         child: AnimatedContainer(
           duration: TwitchUiMotion.fast,
@@ -267,7 +275,8 @@ class TwitchChatSpecialMessageCard extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onOpenContext,
-        onLongPress: onOpenContext,
+        onLongPress: () =>
+            Clipboard.setData(ClipboardData(text: message.message)),
         onSecondaryTap: onOpenContext,
         child: Container(
           width: double.infinity,

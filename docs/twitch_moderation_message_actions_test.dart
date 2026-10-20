@@ -71,6 +71,54 @@ void main() {
     permission = true;
   });
   tearDown(() => api.client.close());
+  for (final changeApi in [false, true]) {
+    testWidgets('Confirmation rejects replaced context changeApi=$changeApi', (
+      tester,
+    ) async {
+      final replacement = _Api();
+      addTearDown(() => replacement.client.close());
+      final message = _message();
+      var currentApi = api;
+      var channel = 'test';
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                rebuild = setState;
+                return TwitchModerationMessageActions(
+                  api: currentApi,
+                  message: message,
+                  channelName: channel,
+                  canModerate: () => true,
+                  initialAction: TwitchChatModerationShortcut.delete,
+                );
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('確認管理操作'), findsOneWidget);
+      rebuild(() {
+        if (changeApi) {
+          currentApi = replacement;
+        } else {
+          channel = 'replacement-channel';
+        }
+      });
+      await tester.pump();
+      await tester.tap(find.text('確認'));
+      await tester.pumpAndSettle();
+      expect(api.actions, isEmpty);
+      expect(replacement.actions, isEmpty);
+      expect(find.text('管理身分或頻道已變更，未送出操作。'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(tester.takeException(), isNull);
+    });
+  }
   for (final action in TwitchChatModerationShortcut.values) {
     testWidgets(
       'Shortcut ${action.name} confirms before exactly one fake write',

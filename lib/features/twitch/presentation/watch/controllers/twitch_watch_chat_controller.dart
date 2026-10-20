@@ -26,6 +26,10 @@ class TwitchWatchChatController extends ChangeNotifier {
   final TwitchWatchChatRuntimeFactory? runtimeFactory;
   bool _disposed = false;
   int _connectionGeneration = 0;
+  Timer? _foregroundReconnectTimer;
+  bool _appForeground = true;
+  bool _autoReconnectEnabled = false;
+  bool _foregroundRefreshPending = false;
   final TwitchAuthService authService;
   final TwitchDropsAuthService dropsAuthService;
   final TwitchAuthApiService authApi;
@@ -114,6 +118,9 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   Future<void> connectChat(String channel) async {
     if (_disposed) return;
+    _autoReconnectEnabled = true;
+    _foregroundRefreshPending = false;
+    _startForegroundReconnectTimer();
     final generation = ++_connectionGeneration;
     bool isCurrent() => !_disposed && generation == _connectionGeneration;
     sending = false;
@@ -665,14 +672,49 @@ class TwitchWatchChatController extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _autoReconnectEnabled = false;
+    _foregroundReconnectTimer?.cancel();
+    _foregroundReconnectTimer = null;
     await runtime?.disconnect();
   }
 
-  Future<void> reconnectAfterNetworkRestored() async {
+  Future<void> setAppForeground(bool foreground) async {
+    if (_disposed) return;
+    _appForeground = foreground;
+    if (!foreground) {
+      _foregroundRefreshPending = true;
+      _foregroundReconnectTimer?.cancel();
+      _foregroundReconnectTimer = null;
+      return;
+    }
+    _startForegroundReconnectTimer();
+    await _recoverForegroundChat();
+  }
+
+  void _startForegroundReconnectTimer() {
+    if (_disposed || !_appForeground || !_autoReconnectEnabled) return;
+    _foregroundReconnectTimer ??= Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => unawaited(_recoverForegroundChat()),
+    );
+  }
+
+  Future<void> _recoverForegroundChat() async {
+    if (_disposed || !_appForeground || !_autoReconnectEnabled) return;
+    await reconnectAfterNetworkRestored(
+      refreshConnection: _foregroundRefreshPending,
+      silent: true,
+    );
+  }
+
+  Future<void> reconnectAfterNetworkRestored({
+    bool refreshConnection = false,
+    bool silent = false,
+  }) async {
     if (_disposed) return;
     final activeRuntime = runtime;
     if (activeRuntime == null ||
-        activeRuntime.connected ||
+        (activeRuntime.connected && !refreshConnection) ||
         activeRuntime.connecting ||
         connectingChat) {
       return;
@@ -685,6 +727,7 @@ class TwitchWatchChatController extends ChangeNotifier {
     if (viewer.status == TwitchViewerStatus.checking) {
       return;
     }
+    if (refreshConnection) _foregroundRefreshPending = false;
     final sameViewer = viewer.status == TwitchViewerStatus.guest
         ? _connectedToken == null
         : viewer.snapshot != null &&
@@ -709,11 +752,11 @@ class TwitchWatchChatController extends ChangeNotifier {
     notifyListeners();
     try {
       await activeRuntime.reconnect();
-      if (isCurrentRecovery() && activeRuntime.error != null) {
+      if (!silent && isCurrentRecovery() && activeRuntime.error != null) {
         showMessage('聊天室暫時連線失敗，稍後再試。');
       }
     } catch (_) {
-      if (isCurrentRecovery()) {
+      if (!silent && isCurrentRecovery()) {
         showMessage('聊天室暫時連線失敗，稍後再試。');
       }
     } finally {
@@ -752,6 +795,7 @@ class TwitchWatchChatController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _foregroundReconnectTimer?.cancel();
     unawaited(disposeRuntime());
     unawaited(_redemptionSubscription?.cancel());
     super.dispose();

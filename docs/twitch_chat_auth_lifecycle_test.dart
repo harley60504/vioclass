@@ -56,8 +56,9 @@ class _GuestRuntime implements TwitchChatRuntime {
   bool failConnect = false;
   @override
   dynamic noSuchMethod(Invocation invocation) {
-    if (invocation.memberName == #sendRejections)
+    if (invocation.memberName == #sendRejections) {
       return const Stream<TwitchChatSendRejection>.empty();
+    }
     if (invocation.memberName == #connect) {
       connects++;
       expect(invocation.namedArguments[#accessToken], isNull);
@@ -252,6 +253,29 @@ class _ReconnectRuntime extends _ReadyRuntime {
   }
 }
 
+class _ForegroundRuntime extends _ReadyRuntime {
+  bool ready = true;
+  bool failNext = false;
+  int reconnects = 0;
+  Completer<void>? pending;
+  @override
+  bool get connected => ready;
+  @override
+  bool get connecting => false;
+  @override
+  Object? get error => ready ? null : StateError('fixture disconnected');
+  @override
+  Future<void> reconnect() async {
+    reconnects++;
+    await pending?.future;
+    ready = !failNext;
+    failNext = false;
+  }
+
+  @override
+  Future<void> disconnect() async => ready = false;
+}
+
 // Unused dependencies intentionally throw if connection proceeds past validation.
 class _Drops implements TwitchDropsAuthService {
   @override
@@ -345,6 +369,78 @@ class _QueuedRewards extends _Engagement {
 }
 
 void main() {
+  for (final guest in [true, false]) {
+    testWidgets('Foreground refresh and disconnected-only retry guest=$guest', (
+      tester,
+    ) async {
+      final client = TwitchApiClient();
+      final runtime = _ForegroundRuntime();
+      final startup = _StartupPort();
+      final notices = <String>[];
+      final controller = TwitchWatchChatController(
+        runtimeFactory: ({required authenticated}) => runtime,
+        authService: guest ? _GuestAuth(client) : _Auth(client),
+        dropsAuthService: _ReadyDrops(),
+        authApi: _ReadyValidation(client, ['chat:read', 'chat:edit']),
+        recentMessagesApi: _Recent(),
+        chatPort: startup,
+        engagementPort: _Engagement(),
+        specialMessagesRuntime: _Special(),
+        channelLogin: () => 'fixture',
+        channelId: () => '7',
+        viewerId: () => guest ? null : '42',
+        channelPointsSnapshot: () => null,
+        refreshEngagement: ({bool showSnackOnError = false}) async {},
+        refreshSpecialMessages: ({bool autoSelectPending = false}) async {},
+        onChannelIdResolved: (_) {},
+        onViewerResolved: (_, _) {},
+        showMessage: notices.add,
+      );
+      await controller.connectChat('fixture');
+      await controller.setAppForeground(false);
+      await tester.pump(const Duration(seconds: 30));
+      expect(runtime.reconnects, 0);
+      // The old connected flag stays true despite a suspended/dead socket.
+      await controller.setAppForeground(true);
+      expect(runtime.reconnects, 1);
+      await controller.setAppForeground(true);
+      await tester.pump(const Duration(seconds: 30));
+      expect(runtime.reconnects, 1);
+      runtime.ready = false;
+      runtime.failNext = true;
+      await tester.pump(const Duration(seconds: 15));
+      expect(runtime.reconnects, 2);
+      expect(runtime.ready, isFalse);
+      await tester.pump(const Duration(seconds: 15));
+      expect(runtime.reconnects, 3);
+      expect(runtime.ready, isTrue);
+      runtime.ready = false;
+      runtime.pending = Completer<void>();
+      await tester.pump(const Duration(seconds: 15));
+      await tester.pump(const Duration(seconds: 30));
+      expect(runtime.reconnects, 4, reason: 'Do not overlap recovery attempts');
+      runtime.pending!.complete();
+      await tester.pump();
+      expect(
+        runtime.connects,
+        1,
+        reason: 'Reuse the existing runtime and history',
+      );
+      expect(startup.requests, 1);
+      expect(
+        notices,
+        isEmpty,
+        reason: 'Background retries must not spam notices',
+      );
+      await controller.disconnect();
+      await tester.pump(const Duration(seconds: 30));
+      expect(runtime.reconnects, 4, reason: 'Respect intentional disconnect');
+      controller.dispose();
+      await tester.pump(const Duration(seconds: 30));
+      expect(runtime.reconnects, 4);
+      client.close(force: true);
+    });
+  }
   for (final stage in ['drops', 'irc', 'supplement', 'official']) {
     test('Same-account validation preserves chat during $stage', () async {
       final client = TwitchApiClient();
@@ -372,7 +468,7 @@ void main() {
         refreshEngagement: ({bool showSnackOnError = false}) async {},
         refreshSpecialMessages: ({bool autoSelectPending = false}) async {},
         onChannelIdResolved: (_) {},
-        onViewerResolved: (_, __) {},
+        onViewerResolved: (_, _) {},
         showMessage: (_) {},
       );
       addTearDown(controller.dispose);
@@ -380,15 +476,17 @@ void main() {
       await drops.started.future;
       final viewer = TwitchViewerSession.forAuth(auth);
       final before = viewer.snapshot;
-      if (stage == 'drops')
+      if (stage == 'drops') {
         await viewer.resolve(validation, forceValidate: true);
+      }
       drops.release.complete();
       await runtime.started.future;
       if (stage == 'irc') await viewer.resolve(validation, forceValidate: true);
       runtime.gate.complete();
       await connection;
-      if (stage == 'supplement')
+      if (stage == 'supplement') {
         await viewer.resolve(validation, forceValidate: true);
+      }
       if (stage != 'official') expect(viewer.snapshot, isNot(same(before)));
       port.release.complete(
         TwitchChatStartupSnapshot(
@@ -1160,7 +1258,7 @@ void main() {
           refreshEngagement: ({bool showSnackOnError = false}) async {},
           refreshSpecialMessages: ({bool autoSelectPending = false}) async {},
           onChannelIdResolved: (_) {},
-          onViewerResolved: (_, __) {},
+          onViewerResolved: (_, _) {},
           showMessage: (_) {},
         );
         if (!close) addTearDown(controller.dispose);
@@ -1222,7 +1320,7 @@ void main() {
           refreshEngagement: ({bool showSnackOnError = false}) async {},
           refreshSpecialMessages: ({bool autoSelectPending = false}) async {},
           onChannelIdResolved: (_) {},
-          onViewerResolved: (_, __) {},
+          onViewerResolved: (_, _) {},
           showMessage: (_) {},
         );
         addTearDown(controller.dispose);
@@ -1289,7 +1387,7 @@ void main() {
         refreshEngagement: ({bool showSnackOnError = false}) async {},
         refreshSpecialMessages: ({bool autoSelectPending = false}) async {},
         onChannelIdResolved: (_) {},
-        onViewerResolved: (_, __) {},
+        onViewerResolved: (_, _) {},
         showMessage: notices.add,
       );
       addTearDown(controller.dispose);
@@ -1416,7 +1514,7 @@ void main() {
           refreshEngagement: ({bool showSnackOnError = false}) async {},
           refreshSpecialMessages: ({bool autoSelectPending = false}) async {},
           onChannelIdResolved: (_) {},
-          onViewerResolved: (_, __) {
+          onViewerResolved: (_, _) {
             viewerCallbacks++;
           },
           showMessage: (_) {},

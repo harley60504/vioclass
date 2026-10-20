@@ -1,6 +1,7 @@
 package com.vioclass.app
 
 import android.content.res.Configuration
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -12,8 +13,18 @@ class MainActivity : FlutterActivity() {
     private var pipBridge: TwitchPipBridge? = null
     private var updateBridge: VioClassUpdateBridge? = null
 
+    override fun provideFlutterEngine(context: Context): FlutterEngine? =
+        VioClassReceivingEngine.engine
+
+    override fun shouldDestroyEngineWithHost(): Boolean = !VioClassWhisperService.running
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        VioClassReceivingEngine.engine = flutterEngine
+        VioClassReceivingEngine.host = this
+        if (!flutterEngine.plugins.has(VioClassBackgroundPlugin::class.java)) {
+            flutterEngine.plugins.add(VioClassBackgroundPlugin())
+        }
         val bridge = TwitchPipBridge(this)
         bridge.attach(MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vio_class/android_pip"))
         pipBridge = bridge
@@ -27,6 +38,10 @@ class MainActivity : FlutterActivity() {
         pipBridge = null
         updateBridge?.detach()
         updateBridge = null
+        if (VioClassReceivingEngine.host === this) {
+            VioClassReceivingEngine.host = null
+            if (!VioClassWhisperService.running) VioClassReceivingEngine.engine = null
+        }
         super.onDestroy()
     }
 

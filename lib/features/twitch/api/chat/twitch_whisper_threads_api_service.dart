@@ -227,7 +227,11 @@ class TwitchWhisperThreadsApiService {
         'integrityRejected=$integrityRejected serverRequestId=$safeId',
       );
       phase = 'parse';
-      if (android && errors is List && errors.isNotEmpty && allowWebFallback) {
+      if (!history.androidOnlyReads &&
+          android &&
+          errors is List &&
+          errors.isNotEmpty &&
+          allowWebFallback) {
         log('android rejected; fallback to same-owner web once');
         return await _page(
           ownerId: ownerId,
@@ -274,6 +278,7 @@ class TwitchWhisperThreadsApiService {
           session?.validation.clientId ==
           TwitchApiConstants.twitchAndroidPublicClientId;
       if (android &&
+          !history.androidOnlyReads &&
           allowWebFallback &&
           (error.statusCode == 401 || error.statusCode == 403)) {
         log('android HTTP rejection; fallback to same-owner web once');

@@ -1,5 +1,31 @@
 # 新增私訊 API 與儲存清單
 
+## 2026-10-09：官方列表為準，完整同步後清理舊快取
+
+- 每次開啟私訊從第一頁重新讀官方列表，自動讀到末頁（最多 500 頁的保護上限）；未完成、逾時、驗證失敗或取消不移除任何快取對話。
+- Controller 在記憶體累積本輪 owner/generation、分頁 cursor、官方 peer IDs 與開始時的訊息 IDs。只有同一輪從第一頁至末頁的完整列舉才能核對清理；重開 App 只續讀舊 cursor 不視為完整快照。
+- 完整成功後，清掉官方列表沒有且未新增訊息的旧對話／空對話。保留未送草稿、失敗／待確認訊息、同步期間新收件及新建對話；官方仍存在的訊息快取不重建。被移除的選中對話回到未選取狀態。
+- 沿用原帳號隔離、序列化 archive 寫入；沒有新增持久儲存鍵，不修改 persisted hash、OAuth/token、IRC 或 Channel Points。
+- 本機資料改作快取與未送內容保護，不再把舊列表單純累加當作官方現況。跨多頁列表不是服務端原子快照；新收件保留至下一輪核對，避免同步期間被抹除。
+
+## 2026-10-09：純本機對話的刪除入口
+
+- 對話選單新增「只刪除本機紀錄」，經確認後使用既有 owner-scoped `removeConversation`，不呼叫官方封存、不依賴 Integrity 或官方存在對話。可清理未送訊息的空對話、草稿及官方已封存但本機仍有的紀錄。
+- 「刪除對話紀錄」仍維持官方封存成功才清本機，不將驗證失敗誤判為對話不存在。不推測紀錄來源，也不自動回退刪除。
+- 本機刪除不改 Twitch 官方紀錄；官方若仍有對話，下次同步可能重新匯入。沒有新增儲存鍵或修改 OAuth/token 儲存。
+
+## 2026-10-09：官方封存對話與本機清理
+
+- 新增 `api/chat/twitch_whisper_archive_api_service.dart`，使用使用者擷取的 `Thread_ArchiveThread`，hash 為 `4b4ef44b3b0a51ead216b83cfb340051ba49e4af12cf5eda580f6c5d609396c5`。沒有修改既有列表／歷史 persisted hash。
+- 請求：`variables.input.threadID` 使用 owner/peer 的數字排序組合，`isArchived: true`；動態建立，不寫死使用者或對象 ID。
+- 沿用同 owner 的既有 Web token 驗證與 `Client-Integrity` 更新服務；不新增 token、OAuth 儲存鍵或登入流程。不記錄 token、Cookie、Integrity 原值。
+- 必須確認 `data.updateWhisperThread.thread.id` 符合且 `isArchived` 為 true，才清理該 owner 的本機對話、訊息、草稿與未讀。成功的封存不代表抹除雙方訊息；新的即時私訊可重建對話。
+- 非同步操作在送出前再次核對 owner/generation。若送出後已獲成功確認才切換帳號，本機清理仍只操作捕捉的原 owner，不能變成刪新帳號的對話。
+- 僅明確 integrity 拒絕且沒有 data 回應時可更新驗證重試一次；HTTP 逾時、部分成功、錯 ID、格式錯誤不自動重送。未確認成功則保留本機資料。遠端成功但本機清理失敗會區分顯示。
+- 不新增本機儲存 schema/key；沿用原 owner-scoped whisper archive 的序列化刪除與持久保存。同步解析若回應明確 `isArchived: true`，保留分頁 cursor 但不匯入對話；沒有此欄位的舊回應維持相容。
+- 私訊列表每個對話的選單及長按入口會先確認，再封存。未提供封存 API 的測試／獨立 controller 不退回假冒官方刪除的本機清理。
+- 自動測試使用攔截器及假帳號，沒有對真實 Twitch 對話執行封存。真實帳號仍需由使用者選一個不要的對話測試。
+
 ## 2026-10-05：私訊驗證併入既有登入視窗（取代同步時背景開窗）
 
 新增 TwitchWhisperLoginIntegrityService，僅以記憶體保存 owner/client/Web token identity/到期時間及配對完整性 context，不新增任何持久儲存 key。一般聯合登入的 OAuth WebView 原本便會導向 Twitch 首頁擷取 Web/GQL token；現於同一個既有容器 document-start 監聽官方 kpsdk-ready，完成 Web token 驗證且核對主登入帳號後，在此容器 fetch /integrity，最多等待 40 秒，再關閉既有登入視窗。Windows 使用原獨立登入視窗，Android 使用原 Flutter InAppWebView，不再額外建立 SDK 測試視窗。SDK 失敗不改寫已完成的主 OAuth 登入為失敗；私訊端會明確拒絕缺少或失效的 context。

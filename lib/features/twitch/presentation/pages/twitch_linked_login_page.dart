@@ -6,6 +6,7 @@ import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/core/twitch_api_client.dart';
 import '../../api/core/twitch_api_constants.dart';
 import '../../services/auth/twitch_auth_service.dart';
+import '../../services/auth/twitch_login_webview_cookies.dart';
 import '../../services/auth/twitch_viewer_session.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
@@ -157,10 +158,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
       if (!status.mainReady ||
           !status.webGqlReady ||
           !status.whispersReady ||
-          !status.dropsReady ||
-          !TwitchWhisperLoginIntegrityService.instance.hasValidContextFor(
-            widget.webGqlAuthService.accessToken,
-          )) {
+          !status.dropsReady) {
         await Navigator.of(context).push<bool>(
           MaterialPageRoute<bool>(
             builder: (_) => TwitchOAuthWebViewLoginPage(
@@ -274,6 +272,7 @@ query ChannelPointsContext($channelLogin: String!) {
       await widget.mainAuthService.logout();
       await widget.webGqlAuthService.logout();
       await widget.dropsAuthService.logout(clearClientId: false);
+      await clearTwitchAndroidLoginCookies();
       if (!mounted) return;
       setState(() {
         _webGqlReady = false;

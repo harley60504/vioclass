@@ -83,6 +83,15 @@ class _SessionApi extends TwitchWhisperApiService {
   _SessionApi(TwitchApiClient client)
     : super(client: client, tokenProviders: const []);
   @override
+  Future<TwitchWhisperConversation> findUser(
+    String login,
+    String ownerId,
+  ) async => TwitchWhisperConversation(
+    userId: '8',
+    login: login,
+    displayName: 'New peer',
+  );
+  @override
   Future<TwitchWhisperSession> session({String? ownerId, String? scope}) async {
     sessionCalls++;
     final requestedOwner = owner;
@@ -160,6 +169,83 @@ void main() {
       expect(request!.headers['Client-Integrity'], 'sdk-test');
       expect(request!.headers['X-Device-ID'], 'existingdevice0001');
       expect(request!.headers['User-Agent'], 'native-test-UA');
+    },
+  );
+
+  test(
+    'Android inbox read skips integrity and Web fallback is capped at one',
+    () async {
+      final dio = Dio();
+      final gqlTokens = <String>[];
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final token = options.headers['Authorization']
+                .toString()
+                .split(' ')
+                .last;
+            if (options.uri.path.endsWith('/validate')) {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'user_id': '1',
+                    'login': 'me',
+                    'expires_in': 1000,
+                    'client_id': token == 'android'
+                        ? TwitchApiConstants.twitchAndroidPublicClientId
+                        : TwitchApiConstants.twitchWebClientId,
+                    'scopes': <String>['whispers_edit'],
+                  },
+                ),
+              );
+              return;
+            }
+            gqlTokens.add(token);
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'errors': [
+                    {'message': 'read client rejected'},
+                  ],
+                },
+              ),
+            );
+          },
+        ),
+      );
+      final client = TwitchApiClient(dio: dio);
+      addTearDown(client.close);
+      var integrityCalls = 0;
+      final history = TwitchWhisperHistoryApiService(
+        client: client,
+        androidTokenProviders: [() async => 'android'],
+        webTokenProviders: [() async => 'web'],
+      );
+      final service = TwitchWhisperThreadsApiService(
+        history: history,
+        integrityProvider: (session) async {
+          integrityCalls++;
+          return TwitchWhisperIntegrityContext(
+            ownerId: session.validation.userId,
+            clientId: session.validation.clientId,
+            token: 'web-integrity',
+            deviceId: 'existingdevice0001',
+            userAgent: 'native-test-UA',
+            expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 1)),
+          );
+        },
+      );
+
+      await expectLater(
+        service.page(ownerId: '1'),
+        throwsA(isA<TwitchWhisperException>()),
+      );
+      expect(gqlTokens, ['android', 'web']);
+      expect(integrityCalls, 1);
     },
   );
 
@@ -561,6 +647,235 @@ void main() {
       client.close();
     },
   );
+  test(
+    'Complete official snapshot prunes stale cache but keeps drafts',
+    () async {
+      final client = TwitchApiClient();
+      addTearDown(client.close);
+      final remote = _Threads(client);
+      final stale = TwitchWhisperConversation(
+        userId: '8',
+        login: 'stale',
+        displayName: 'Stale',
+      );
+      final drafted = TwitchWhisperConversation(
+        userId: '9',
+        login: 'drafted',
+        displayName: 'Drafted',
+      );
+      await store.saveDraft('1', stale, '');
+      await store.saveDraft('1', drafted, 'unsent');
+      final controller = TwitchWhisperInboxController(
+        api: _SessionApi(client),
+        threadsApi: remote,
+        store: store,
+        receiveInBackground: false,
+      );
+      addTearDown(controller.dispose);
+      await controller.refreshSession();
+      await controller.selectConversation('8');
+      await controller.syncThreads();
+      expect(controller.conversations.map((p) => p.userId), contains('8'));
+      remote.fail = true;
+      await controller.syncThreads(more: true);
+      expect(controller.conversations.map((p) => p.userId), contains('8'));
+      remote.fail = false;
+      await controller.syncThreads(more: true);
+      expect(
+        controller.conversations.map((p) => p.userId),
+        unorderedEquals(['2', '3', '9']),
+      );
+      expect(controller.activePeerId, isNull);
+      expect(
+        (await store.load('1')).map((p) => p.userId),
+        unorderedEquals(['2', '3', '9']),
+      );
+    },
+  );
+
+  for (final cleared in [false, true]) {
+    test(
+      'Locally opened unsent conversation survives repeated complete sync cleared=$cleared',
+      () async {
+        final client = TwitchApiClient();
+        addTearDown(client.close);
+        final remote = _Threads(client);
+        final api = _SessionApi(client);
+        final controller = TwitchWhisperInboxController(
+          api: api,
+          threadsApi: remote,
+          store: store,
+          receiveInBackground: false,
+        );
+        addTearDown(controller.dispose);
+        await controller.refreshSession();
+        await controller.startConversation('newpeer');
+        controller.setPanelVisible(true);
+        if (cleared) {
+          controller.updateDraft('8', 'unfinished');
+          controller.updateDraft('8', '');
+          await controller.flushDrafts();
+        }
+        for (var round = 0; round < 2; round++) {
+          await controller.syncThreads();
+          await controller.syncThreads(more: true);
+          expect(controller.activePeerId, '8');
+          expect(
+            controller.conversations.map((peer) => peer.userId),
+            contains('8'),
+          );
+          expect(
+            controller.conversations
+                .firstWhere((peer) => peer.userId == '8')
+                .messages,
+            isEmpty,
+          );
+        }
+        await controller.removeConversation('8');
+        expect(
+          controller.conversations.map((peer) => peer.userId),
+          isNot(contains('8')),
+        );
+        api.owner = '9';
+        await controller.refreshSession();
+        await store.saveDraft(
+          '9',
+          TwitchWhisperConversation(
+            userId: '8',
+            login: 'stale',
+            displayName: 'Stale',
+          ),
+          '',
+        );
+        await controller.syncThreads();
+        await controller.syncThreads(more: true);
+        expect(
+          controller.conversations.map((peer) => peer.userId),
+          isNot(contains('8')),
+        );
+      },
+    );
+  }
+
+  for (final draft in ['', 'keep me', 'cleared']) {
+    test(
+      'Sheet reopening reconciles empty compose using final draft=$draft',
+      () async {
+        final client = TwitchApiClient();
+        addTearDown(client.close);
+        final controller = TwitchWhisperInboxController(
+          api: _SessionApi(client),
+          threadsApi: _Threads(client),
+          store: store,
+          receiveInBackground: false,
+        );
+        addTearDown(controller.dispose);
+        await controller.refreshSession();
+        await controller.startConversation('newpeer');
+        controller.setPanelVisible(true);
+        if (draft.isNotEmpty) controller.updateDraft('8', draft);
+        if (draft == 'cleared') controller.updateDraft('8', '');
+        await controller.syncThreads();
+        await controller.syncThreads(more: true);
+        expect(controller.activePeerId, '8');
+        controller.setPanelVisible(false);
+        await controller.flushDrafts();
+        await controller.preparePanelOpen();
+        // This is the list the first modal frame sees, before remote sync.
+        expect(
+          controller.conversations.map((peer) => peer.userId),
+          draft == 'keep me' ? contains('8') : isNot(contains('8')),
+        );
+        controller.setPanelVisible(true);
+        await controller.syncThreads();
+        await controller.syncThreads(more: true);
+        expect(
+          controller.conversations.map((peer) => peer.userId),
+          draft == 'keep me' ? contains('8') : isNot(contains('8')),
+        );
+        expect(controller.activePeerId, draft == 'keep me' ? '8' : isNull);
+      },
+    );
+  }
+
+  test('Snapshot preserves receipts arriving during pagination', () async {
+    final client = TwitchApiClient();
+    addTearDown(client.close);
+    final controller = TwitchWhisperInboxController(
+      api: _SessionApi(client),
+      threadsApi: _Threads(client),
+      store: store,
+      receiveInBackground: false,
+    );
+    addTearDown(controller.dispose);
+    await store.saveDraft(
+      '1',
+      TwitchWhisperConversation(
+        userId: '8',
+        login: 'live',
+        displayName: 'Live',
+      ),
+      '',
+    );
+    await controller.refreshSession();
+    await controller.syncThreads();
+    await controller.receiveEvent({
+      'from_user_id': '8',
+      'to_user_id': '1',
+      'whisper_id': 'new-live',
+      'from_user_login': 'live',
+      'from_user_name': 'Live',
+      'whisper': {'text': 'arrived during enumeration'},
+    }, DateTime.now().toUtc());
+    await controller.syncThreads(more: true);
+    expect(controller.conversations.map((p) => p.userId), contains('8'));
+    // It is stale only if a later complete snapshot still omits it.
+    await controller.syncThreads();
+    await controller.syncThreads(more: true);
+    expect(controller.conversations.map((p) => p.userId), isNot(contains('8')));
+  });
+
+  test(
+    'Validated empty snapshot removes stale cache, cancellation does not',
+    () async {
+      final stale = TwitchWhisperConversation(
+        userId: '8',
+        login: 'stale',
+        displayName: 'Stale',
+      );
+      await store.saveDraft('1', stale, '');
+      await store.reconcileThreadsSnapshot(
+        '1',
+        officialPeerIds: {},
+        baselineMessageIds: {'8': {}},
+        protectedPeerIds: {},
+        canApply: () => false,
+      );
+      expect(await store.load('1'), hasLength(1));
+      fail = true;
+      await expectLater(
+        store.reconcileThreadsSnapshot(
+          '1',
+          officialPeerIds: {},
+          baselineMessageIds: {'8': {}},
+          protectedPeerIds: {},
+          canApply: () => true,
+        ),
+        throwsStateError,
+      );
+      expect(await store.load('1'), hasLength(1));
+      fail = false;
+      await store.reconcileThreadsSnapshot(
+        '1',
+        officialPeerIds: {},
+        baselineMessageIds: {'8': {}},
+        protectedPeerIds: {},
+        canApply: () => true,
+      );
+      expect(await store.load('1'), isEmpty);
+    },
+  );
+
   test(
     'Controller discovers unknown peers, resumes saved pages and explicitly restarts refresh',
     () async {

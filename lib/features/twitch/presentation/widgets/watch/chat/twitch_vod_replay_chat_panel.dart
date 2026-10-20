@@ -133,14 +133,12 @@ enum TwitchVodReplayChatMode { replay, live }
 
 class _VodReplayChatHeader extends StatelessWidget {
   final TwitchVodReplayChatMode mode;
-  final Future<void> Function(TwitchChatRuntimeMessage)? onOpenUser;
   final TwitchVodChatReplayRuntime runtime;
   final VoidCallback onToggleMode;
   final bool compact;
 
   const _VodReplayChatHeader({
     required this.mode,
-    this.onOpenUser,
     required this.runtime,
     required this.onToggleMode,
     required this.compact,

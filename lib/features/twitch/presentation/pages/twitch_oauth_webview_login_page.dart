@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io' show Directory, Platform;
 import 'dart:math';
@@ -18,8 +17,6 @@ import '../../services/auth/twitch_auth_service.dart';
 import '../../services/auth/twitch_drops_auth_service.dart';
 import '../../services/auth/twitch_web_gql_auth_service.dart';
 import '../../services/auth/twitch_desktop_webview_settings.dart';
-import '../../services/chat/twitch_whisper_login_integrity_service.dart';
-import '../../api/chat/twitch_whisper_api_service.dart';
 import '../theme/twitch_ui_tokens.dart';
 import '../widgets/shared/twitch_login_webview_host.dart';
 import '../widgets/shared/twitch_login_navigation_errors.dart';
@@ -304,7 +301,7 @@ class _TwitchOAuthWebViewLoginPageState
       }
 
       if (_shouldCaptureGql) {
-        await _captureWebGqlTokenFromSameWindow(ownerId: validation.userId);
+        await _captureWebGqlTokenFromSameWindow();
       }
 
       if (widget.completeDropsInSameWebView &&
@@ -377,8 +374,9 @@ class _TwitchOAuthWebViewLoginPageState
           obtainedAt: DateTime.now(),
         ),
       );
-      if (!await service.validateToken())
+      if (!await service.validateToken()) {
         throw StateError('Drops validation failed');
+      }
       await _closeWindow();
       if (mounted) Navigator.of(context).pop(true);
     } catch (_) {
@@ -387,9 +385,7 @@ class _TwitchOAuthWebViewLoginPageState
     }
   }
 
-  Future<void> _captureWebGqlTokenFromSameWindow({
-    required String ownerId,
-  }) async {
+  Future<void> _captureWebGqlTokenFromSameWindow() async {
     final webGqlAuthService = widget.webGqlAuthService;
     final apiClient = widget.apiClient;
     if (webGqlAuthService == null || apiClient == null) return;
@@ -444,38 +440,6 @@ class _TwitchOAuthWebViewLoginPageState
 
     await webGqlAuthService.saveSession(token);
     await _verifyKimneGql(apiClient, webToken);
-
-    // Finish private integrity in this same login window before closing it.
-    // An optional private SDK failure must not invalidate a valid main login.
-    try {
-      final validation = await TwitchAuthApiService(
-        client: apiClient,
-      ).validateToken(webToken);
-      if (validation.userId != ownerId ||
-          validation.clientId != TwitchApiConstants.twitchWebClientId) {
-        throw StateError('Web login account mismatch');
-      }
-      await TwitchWhisperLoginIntegrityService.instance.captureFromLogin(
-        session: TwitchWhisperSession(webToken, validation),
-        evaluate: (script) async => _isDesktopAuthWindowPlatform
-            ? await window.evaluateJavaScript(script)
-            : await embeddedController!.evaluateJavascript(source: script),
-        stillCurrent: () =>
-            mounted &&
-            webGqlAuthService.accessToken == webToken &&
-            (_isDesktopAuthWindowPlatform
-                ? identical(_webWindow, window)
-                : identical(_embeddedController, embeddedController)),
-      );
-      debugPrint(
-        '[TwitchAuth] private integrity prepared in existing login window',
-      );
-    } catch (error) {
-      debugPrint(
-        '[TwitchAuth] login valid; private integrity not prepared: '
-        '${error is TwitchWhisperException ? error.message : 'local capture/storage failed'}',
-      );
-    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -768,9 +732,6 @@ query ChannelPointsContext($channelLogin: String!) {
 
       _webWindow = window;
       _windowOpen = true;
-      window.addScriptToExecuteOnDocumentCreated(
-        TwitchWhisperLoginIntegrityService.documentStartScript,
-      );
       debugPrint('[TwitchAuth][open] desktop WebView created');
       debugPrint('[TwitchAuth][ua] using native WebView2 / Edge user agent');
 
@@ -860,12 +821,6 @@ query ChannelPointsContext($channelLogin: String!) {
     return TwitchLoginWebViewHost(
       builder: (environment) => InAppWebView(
         webViewEnvironment: environment,
-        initialUserScripts: UnmodifiableListView<UserScript>([
-          UserScript(
-            source: TwitchWhisperLoginIntegrityService.documentStartScript,
-            injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
-          ),
-        ]),
         initialUrlRequest: URLRequest(
           url: WebUri(_buildAuthorizationUri().toString()),
         ),

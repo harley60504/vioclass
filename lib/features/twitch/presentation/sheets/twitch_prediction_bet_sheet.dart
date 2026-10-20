@@ -459,8 +459,9 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
       if (!mounted) return;
       _localViewerOutcomeId = outcomeId;
       final expectedPoints = confirmedPointsBefore + points;
-      if (_localViewerPoints < expectedPoints)
+      if (_localViewerPoints < expectedPoints) {
         _localViewerPoints = expectedPoints;
+      }
       final optimistic = _visiblePrediction.withViewerPrediction(
         outcomeId: outcomeId,
         points: _localViewerPoints,

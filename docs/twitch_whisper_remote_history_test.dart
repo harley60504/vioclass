@@ -108,8 +108,56 @@ List<Map<String, dynamic>> response({
 ];
 
 void main() {
+  for (final edgeCursor in [null, '']) {
+    test(
+      'Final history page accepts message without edge cursor: $edgeCursor',
+      () {
+        final raw = response(hasNext: false);
+        final connection =
+            raw.single['data']['whisperThread']['messages'] as Map;
+        if (edgeCursor == null) {
+          (connection['edges'] as List).single.remove('cursor');
+        } else {
+          (connection['edges'] as List).single['cursor'] = edgeCursor;
+        }
+        final page = TwitchWhisperHistoryApiService.parse(
+          raw,
+          ownerId: '1',
+          peerId: '2',
+        );
+        expect(page.messages.single.text, 'hello');
+        expect(page.nextCursor, isNull);
+      },
+    );
+  }
+  test('Explicit page endCursor supplies boundary without message cursors', () {
+    final raw = response(hasNext: true);
+    final connection = raw.single['data']['whisperThread']['messages'] as Map;
+    (connection['edges'] as List).single.remove('cursor');
+    connection['pageInfo'] = <String, dynamic>{
+      'hasNextPage': true,
+      'endCursor': 'page-boundary',
+    };
+    final page = TwitchWhisperHistoryApiService.parse(
+      raw,
+      ownerId: '1',
+      peerId: '2',
+    );
+    expect(page.messages.length, 1);
+    expect(page.nextCursor, 'page-boundary');
+  });
+  test('Non-final page without any usable boundary is still rejected', () {
+    expect(
+      () => TwitchWhisperHistoryApiService.parse(
+        response(cursor: '', hasNext: true),
+        ownerId: '1',
+        peerId: '2',
+      ),
+      throwsA(isA<TwitchWhisperException>()),
+    );
+  });
   test(
-    'History diagnostics distinguish missing thread and empty edge cursor',
+    'History diagnostics distinguish missing thread and invalid edge cursor',
     () {
       final cases = <String, dynamic>{
         'data/whisperThread': [
@@ -117,7 +165,7 @@ void main() {
             'data': {'whisperThread': null},
           },
         ],
-        'messages/edges/cursor': response(cursor: ''),
+        'messages/edges/cursor': response(cursor: 'x' * 4097),
       };
       for (final entry in cases.entries) {
         final trace = <String>[];
@@ -135,6 +183,26 @@ void main() {
       }
     },
   );
+
+  for (final missing in [false, true]) {
+    test('Valid message without pageInfo keeps unknown boundary: $missing', () {
+      final raw = response(cursor: '');
+      if (missing) {
+        (raw.single['data']['whisperThread']['messages']['edges'] as List)
+            .single
+            .remove('cursor');
+      }
+      final parsed = TwitchWhisperHistoryApiService.parse(
+        raw,
+        ownerId: '1',
+        peerId: '2',
+      );
+      expect(parsed.messages.single.text, 'hello');
+      expect(parsed.nextCursor, isNull);
+      expect(parsed.paginationKnown, false);
+      expect(parsed.exhausted, false);
+    });
+  }
 
   test('Known thread key follows captured official numeric ordering', () {
     expect(TwitchWhisperHistoryApiService.threadId('10', '2'), '2_10');
@@ -282,6 +350,269 @@ void main() {
     },
   );
 
+  test(
+    'Same-owner Android token is preferred and does not request Web integrity',
+    () async {
+      final dio = Dio();
+      final requests = <RequestOptions>[];
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            requests.add(options);
+            final token = options.headers['Authorization']
+                .toString()
+                .split(' ')
+                .last;
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: options.uri.path.endsWith('/validate')
+                    ? {
+                        'user_id': '1',
+                        'login': 'me',
+                        'expires_in': 1000,
+                        'client_id': token == 'android'
+                            ? TwitchApiConstants.twitchAndroidPublicClientId
+                            : TwitchApiConstants.twitchWebClientId,
+                        'scopes': <String>['whispers_edit'],
+                      }
+                    : response(hasNext: false),
+              ),
+            );
+          },
+        ),
+      );
+      final client = TwitchApiClient(dio: dio);
+      addTearDown(client.close);
+      var integrityCalls = 0;
+      final api = TwitchWhisperHistoryApiService(
+        client: client,
+        androidTokenProviders: [() async => 'android'],
+        webTokenProviders: [() async => 'web'],
+        integrityHeadersProvider: (_) async {
+          integrityCalls++;
+          return {'Client-Integrity': 'web-only'};
+        },
+      );
+
+      await api.page(ownerId: '1', peerId: '2');
+
+      final gql = requests.singleWhere(
+        (request) => request.uri.host == 'gql.twitch.tv',
+      );
+      expect(gql.headers['Authorization'], 'OAuth android');
+      expect(gql.headers.containsKey('Client-Integrity'), false);
+      expect(gql.headers['Origin'], 'https://www.twitch.tv');
+      expect(gql.headers['Referer'], 'https://www.twitch.tv/');
+      expect(integrityCalls, 0);
+    },
+  );
+
+  test('Android rejection falls back to same-owner Web only once', () async {
+    final dio = Dio();
+    final gqlTokens = <String>[];
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          final token = options.headers['Authorization']
+              .toString()
+              .split(' ')
+              .last;
+          if (options.uri.path.endsWith('/validate')) {
+            handler.resolve(
+              Response(
+                requestOptions: options,
+                statusCode: 200,
+                data: {
+                  'user_id': token == 'foreign-android' ? '9' : '1',
+                  'login': 'me',
+                  'expires_in': 1000,
+                  'client_id': token == 'web'
+                      ? TwitchApiConstants.twitchWebClientId
+                      : token == 'unknown-client'
+                      ? 'unknown'
+                      : TwitchApiConstants.twitchAndroidPublicClientId,
+                  'scopes': <String>['whispers_edit'],
+                },
+              ),
+            );
+            return;
+          }
+          gqlTokens.add(token);
+          handler.resolve(
+            Response(
+              requestOptions: options,
+              statusCode: 200,
+              data: [
+                {
+                  'errors': [
+                    {'message': 'read client rejected'},
+                  ],
+                },
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    final client = TwitchApiClient(dio: dio);
+    addTearDown(client.close);
+    final api = TwitchWhisperHistoryApiService(
+      client: client,
+      androidTokenProviders: [
+        () async => 'foreign-android',
+        () async => 'unknown-client',
+        () async => 'android',
+      ],
+      webTokenProviders: [() async => 'web'],
+      integrityHeadersProvider: (_) async => {
+        'Client-Integrity': 'web-fixture',
+      },
+    );
+
+    await expectLater(
+      api.page(ownerId: '1', peerId: '2'),
+      throwsA(isA<TwitchWhisperException>()),
+    );
+    expect(gqlTokens, ['android', 'web']);
+  });
+
+  test(
+    'Android HTTP rejection can complete through one Web fallback',
+    () async {
+      final dio = Dio();
+      final gqlTokens = <String>[];
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final token = options.headers['Authorization']
+                .toString()
+                .split(' ')
+                .last;
+            if (options.uri.path.endsWith('/validate')) {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'user_id': '1',
+                    'login': 'me',
+                    'expires_in': 1000,
+                    'client_id': token == 'android'
+                        ? TwitchApiConstants.twitchAndroidPublicClientId
+                        : TwitchApiConstants.twitchWebClientId,
+                    'scopes': <String>['whispers_edit'],
+                  },
+                ),
+              );
+              return;
+            }
+            gqlTokens.add(token);
+            if (token == 'android') {
+              handler.reject(
+                DioException(
+                  requestOptions: options,
+                  response: Response(requestOptions: options, statusCode: 403),
+                ),
+              );
+            } else {
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: response(hasNext: false),
+                ),
+              );
+            }
+          },
+        ),
+      );
+      final client = TwitchApiClient(dio: dio);
+      addTearDown(client.close);
+      final api = TwitchWhisperHistoryApiService(
+        client: client,
+        androidTokenProviders: [() async => 'android'],
+        webTokenProviders: [() async => 'web'],
+        integrityHeadersProvider: (_) async => {
+          'Client-Integrity': 'web-fixture',
+        },
+      );
+
+      final page = await api.page(ownerId: '1', peerId: '2');
+      expect(page.messages, hasLength(1));
+      expect(gqlTokens, ['android', 'web']);
+    },
+  );
+
+  test(
+    'Missing invalid unknown-client and foreign Android tokens never reach GQL',
+    () async {
+      final dio = Dio();
+      var gqlCalls = 0;
+      dio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            final token = options.headers['Authorization']
+                .toString()
+                .split(' ')
+                .last;
+            if (options.uri.path.endsWith('/validate')) {
+              if (token == 'invalid') {
+                handler.reject(
+                  DioException(
+                    requestOptions: options,
+                    response: Response(
+                      requestOptions: options,
+                      statusCode: 401,
+                    ),
+                  ),
+                );
+                return;
+              }
+              handler.resolve(
+                Response(
+                  requestOptions: options,
+                  statusCode: 200,
+                  data: {
+                    'user_id': token == 'foreign' ? '9' : '1',
+                    'login': 'me',
+                    'expires_in': 1000,
+                    'client_id': token == 'unknown'
+                        ? 'unknown-client'
+                        : TwitchApiConstants.twitchAndroidPublicClientId,
+                    'scopes': <String>[],
+                  },
+                ),
+              );
+              return;
+            }
+            gqlCalls++;
+            handler.reject(DioException(requestOptions: options));
+          },
+        ),
+      );
+      final client = TwitchApiClient(dio: dio);
+      addTearDown(client.close);
+      final api = TwitchWhisperHistoryApiService(
+        client: client,
+        androidTokenProviders: [
+          () async => null,
+          () async => 'invalid',
+          () async => 'unknown',
+          () async => 'foreign',
+        ],
+        webTokenProviders: const [],
+      );
+
+      await expectLater(
+        api.page(ownerId: '1', peerId: '2'),
+        throwsA(isA<TwitchWhisperException>()),
+      );
+      expect(gqlCalls, 0);
+    },
+  );
+
   late Map<String, String> disk;
   late TwitchWhisperArchiveStore store;
   late TwitchWhisperConversation peer;
@@ -342,6 +673,47 @@ void main() {
         page(requested: 'next', next: null),
       );
       expect((await store.load('1')).single.remoteHistoryComplete, true);
+    },
+  );
+  test(
+    'Unknown boundary merges messages without replacing checkpoint',
+    () async {
+      await store.mergeRemotePage('1', peer, page());
+      final parsed = TwitchWhisperHistoryApiService.parse(
+        response(id: 'second', cursor: ''),
+        ownerId: '1',
+        peerId: '2',
+      );
+      await store.mergeRemotePage('1', peer, parsed);
+      await store.mergeRemotePage('1', peer, parsed);
+      var loaded = (await store.load('1')).single;
+      expect(loaded.messages, hasLength(2));
+      expect(loaded.remoteHistoryCursor, 'next');
+      expect(loaded.remoteHistoryComplete, false);
+      await store.mergeRemotePage(
+        '1',
+        peer,
+        page(requested: 'next', next: null),
+      );
+      await store.mergeRemotePage('1', peer, parsed);
+      loaded = (await store.load('1')).single;
+      expect(loaded.remoteHistoryComplete, true);
+      expect(loaded.remoteHistoryCursor, isNull);
+    },
+  );
+  test(
+    'Unknown boundary on first history page is not marked complete',
+    () async {
+      final parsed = TwitchWhisperHistoryApiService.parse(
+        response(cursor: ''),
+        ownerId: '1',
+        peerId: '2',
+      );
+      await store.mergeRemotePage('1', peer, parsed);
+      final loaded = (await store.load('1')).single;
+      expect(loaded.messages, hasLength(1));
+      expect(loaded.remoteHistoryComplete, false);
+      expect(loaded.remoteHistoryCursor, isNull);
     },
   );
   test('Wrong account and stale page cannot change existing disk', () async {

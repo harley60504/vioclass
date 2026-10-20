@@ -169,6 +169,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       client: apiClient,
       webTokenProviders: [webGqlAuthService.getToken],
       androidTokenProviders: [dropsAuthService.getToken],
+      androidOnlyReads: true,
       integrityHeadersProvider:
           TwitchWhisperLoginIntegrityService.instance.headersFor,
       integrityInvalidator:
@@ -425,8 +426,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       if (!mounted ||
           _loggingOut ||
           loadId != _loginStateLoadId ||
-          generation != _loginStateGeneration)
+          generation != _loginStateGeneration) {
         return;
+      }
       if (notificationOwner != null) {
         twitchAppNotificationCenter.retainAccountOwner(notificationOwner);
         _accountNotifications.start(notificationOwner);
@@ -548,6 +550,12 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       // Best effort.
     }
 
+    var cookiesCleared = true;
+    try {
+      await clearTwitchAndroidLoginCookies();
+    } catch (_) {
+      cookiesCleared = false;
+    }
     _loggingOut = false;
     discoveryService.clearViewerAuthCache();
     if (!mounted) return;
@@ -558,7 +566,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
       _homeSectionTouched = false;
       selectedSection = TwitchHomeSection.browse;
       viewerLabel = '未登入';
-      loginStatus = '已登出';
+      loginStatus = cookiesCleared ? '已登出' : '已登出，但登入網頁 Cookie 清除失敗，請重試登出';
       reloadTick++;
     });
     _stopFollowedLiveNotificationMonitor();
@@ -567,6 +575,19 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   }
 
   void _startFollowedLiveNotificationMonitor() {
+    final android = TwitchAndroidLiveNotificationController.instance;
+    if (android.supported) {
+      unawaited(
+        android.setSession(
+          owner: discoveryService.cachedAuth?.viewerId,
+          fetchPage: (after) => discoveryService.fetchFollowedChannels(
+            after: after,
+            attachProfiles: false,
+          ),
+        ),
+      );
+      return;
+    }
     if (_followedLiveNotificationTimer != null) return;
     _followedLiveNotificationTimer = Timer.periodic(
       _followedLivePollInterval,
@@ -576,6 +597,9 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   }
 
   void _stopFollowedLiveNotificationMonitor() {
+    unawaited(
+      TwitchAndroidLiveNotificationController.instance.setSession(owner: null),
+    );
     _followedLiveNotificationTimer?.cancel();
     _followedLiveNotificationTimer = null;
     _liveNotificationPolicy.reset();

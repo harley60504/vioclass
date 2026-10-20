@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
+import '../lib/features/twitch/api/core/twitch_api_exception.dart';
 import '../lib/features/twitch/models/discovery/twitch_live_stream.dart';
 import '../lib/features/twitch/presentation/widgets/home/twitch_followed_live_rail.dart';
 
@@ -23,6 +24,161 @@ TwitchLiveStream stream(int index) => TwitchLiveStream(
 );
 
 void main() {
+  testWidgets(
+    'Verified route reserves rail space without fetching until ready',
+    (tester) async {
+      tester.view.physicalSize = const Size(1200, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var loads = 0;
+      Future<List<TwitchLiveStream>> load() async {
+        loads++;
+        return [stream(1)];
+      }
+
+      Widget shell({required bool ready, required bool reserve}) => MaterialApp(
+        home: Scaffold(
+          body: TwitchFollowedLiveRailShell(
+            enabled: ready,
+            reserveSpace: reserve,
+            initialStreams: [stream(1)],
+            loadStreams: load,
+            onSelect: (_) async {},
+            child: const SizedBox.expand(key: ValueKey('content')),
+          ),
+        ),
+      );
+      await tester.pumpWidget(shell(ready: false, reserve: true));
+      await tester.pumpAndSettle();
+      final content = find.byKey(const ValueKey('content'));
+      final before = tester.getRect(content);
+      expect(before.left, 60);
+      expect(loads, 0);
+      expect(find.byKey(const ValueKey('live-rail-1')), findsOneWidget);
+      await tester.pumpWidget(shell(ready: true, reserve: false));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(content), before);
+      expect(loads, 1);
+      // A real guest does not reserve space or fetch account-scoped follows.
+      await tester.pumpWidget(shell(ready: false, reserve: false));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(content).dx, 0);
+      expect(find.byKey(const ValueKey('followed-live-rail')), findsNothing);
+      expect(loads, 1);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('Main content changes do not reload or clear the rail', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var calls = 0;
+    Completer<List<TwitchLiveStream>>? refresh;
+    Future<List<TwitchLiveStream>> load() async {
+      calls++;
+      return refresh == null ? [stream(1)] : await refresh.future;
+    }
+
+    Widget shell(String page) => MaterialApp(
+      home: Scaffold(
+        body: TwitchFollowedLiveRailShell(
+          loadStreams: load,
+          onSelect: (_) async {},
+          child: Text(page),
+        ),
+      ),
+    );
+    await tester.pumpWidget(shell('browse'));
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    await tester.pumpWidget(shell('following'));
+    await tester.pumpAndSettle();
+    expect(calls, 1);
+    expect(find.byKey(const ValueKey('live-rail-1')), findsOneWidget);
+    refresh = Completer<List<TwitchLiveStream>>();
+    await tester.pump(const Duration(minutes: 2));
+    expect(calls, 2);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(find.byKey(const ValueKey('live-rail-1')), findsOneWidget);
+    refresh.complete([stream(2)]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('live-rail-1')), findsNothing);
+    expect(find.byKey(const ValueKey('live-rail-2')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('New route uses cached avatars while refreshing invisibly', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 760);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final pending = Completer<List<TwitchLiveStream>>();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: TwitchFollowedLiveRailShell(
+            initialStreams: [stream(1)],
+            loadStreams: () => pending.future,
+            onSelect: (_) async {},
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('live-rail-1')), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    pending.complete([stream(2)]);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('live-rail-2')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  for (final status in [503, 401]) {
+    testWidgets('Refresh status $status preserves only safe cached data', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 760);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      var fail = false;
+      Future<List<TwitchLiveStream>> load() async {
+        if (fail) throw TwitchApiException('fixture', statusCode: status);
+        return [stream(1)];
+      }
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TwitchFollowedLiveRailShell(
+              loadStreams: load,
+              onSelect: (_) async {},
+              child: const SizedBox.expand(),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      fail = true;
+      await tester.pump(const Duration(minutes: 2));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('live-rail-1')),
+        status == 503 ? findsOneWidget : findsNothing,
+      );
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
   testWidgets(
     'Hover expands translucent rail without resizing the main content',
     (tester) async {

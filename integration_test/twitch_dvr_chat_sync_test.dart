@@ -1,5 +1,4 @@
 // No OS mouse/keyboard injection. Read-only navigation through Flutter events.
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -48,9 +47,7 @@ void main() {
       'A live card must be available',
       seconds: 40,
     );
-    final dynamic home = tester.state(
-      find.byType(TwitchStreamPage),
-    );
+    final dynamic home = tester.state(find.byType(TwitchStreamPage));
     final candidates = tester
         .widgetList<TwitchStreamCard>(find.byType(TwitchStreamCard))
         .map((card) => card.stream)

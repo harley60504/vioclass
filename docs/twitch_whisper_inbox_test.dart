@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:extended_text_field/extended_text_field.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../lib/features/twitch/services/chat/twitch_emote_image_cache_manager.dart';
 import 'package:flutter/gestures.dart';
@@ -17,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../lib/features/twitch/api/auth/twitch_auth_api_service.dart';
 import '../lib/features/twitch/api/chat/twitch_whisper_api_service.dart';
+import '../lib/features/twitch/api/chat/twitch_whisper_archive_api_service.dart';
 import '../lib/features/twitch/api/chat/twitch_whisper_history_api_service.dart';
 import '../lib/features/twitch/models/chat/twitch_whisper_remote_history.dart';
 import '../lib/features/twitch/api/core/twitch_api_client.dart';
@@ -142,7 +144,26 @@ class _FakeApi extends TwitchWhisperApiService {
   }
 }
 
+class _FakeArchive extends TwitchWhisperArchiveApiService {
+  int calls = 0;
+  bool fail = false;
+  Completer<void>? gate;
+  _FakeArchive(TwitchApiClient client) : super(history: _FakeHistory(client));
+  @override
+  Future<void> archive({
+    required String ownerId,
+    required String peerId,
+    required bool Function() canApply,
+  }) async {
+    if (!canApply()) throw const TwitchWhisperException('account changed');
+    calls++;
+    await gate?.future;
+    if (fail) throw const TwitchWhisperException('fake archive rejected');
+  }
+}
+
 class _FakeThreads extends TwitchWhisperThreadsApiService {
+  bool includeActivePeer = false;
   Completer<void>? gate;
   bool fail = false;
   int calls = 0;
@@ -162,6 +183,12 @@ class _FakeThreads extends TwitchWhisperThreadsApiService {
       requestedCursor: cursor,
       nextCursor: cursor == null ? 'next' : null,
       conversations: [
+        if (includeActivePeer)
+          TwitchWhisperConversation(
+            userId: '2',
+            login: 'peer',
+            displayName: 'Peer',
+          ),
         TwitchWhisperConversation(
           userId: '3',
           login: 'remotepeer',
@@ -357,6 +384,7 @@ void main() {
     await fixtureCacheDirectory.delete(recursive: true);
   });
   late _FakeApi api;
+  late _FakeArchive remoteArchive;
   late TwitchWhisperInboxController inbox;
   late Map<String, String> disk;
   var notifications = 0;
@@ -366,8 +394,10 @@ void main() {
     notifications = 0;
     notificationName = null;
     api = _FakeApi();
+    remoteArchive = _FakeArchive(api.client);
     inbox = TwitchWhisperInboxController(
       api: api,
+      archiveApi: remoteArchive,
       receiveInBackground: false,
       onIncomingNotification: (peer) {
         notifications++;
@@ -387,6 +417,171 @@ void main() {
     inbox.dispose();
     api.client.close();
   });
+
+  testWidgets(
+    'Inline whisper draft keeps codes and long press copies without icon',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await _seedSharedFixtureImage(tester);
+      await tester.runAsync(inbox.loadOfficialEmotes);
+      await tester.runAsync(
+        () => inbox.receiveEvent({
+          'from_user_id': '2',
+          'to_user_id': '1',
+          'whisper_id': 'long-copy',
+          'whisper': {'text': 'Kappa'},
+        }, DateTime.now().toUtc()),
+      );
+      String? copied;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            if (call.method == 'Clipboard.setData') {
+              copied = (call.arguments as Map)['text'] as String;
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () =>
+                    showTwitchWhisperSheet(context: context, controller: inbox),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('open'));
+      await _advancePrivateWidget(tester);
+      final composer = find.byType(ExtendedTextField);
+      expect(composer, findsOneWidget);
+      await tester.tap(composer);
+      await tester.pump();
+      tester.testTextInput.enterText('hello Kappa');
+      await tester.pump();
+      expect(inbox.activeConversation!.draft, 'hello Kappa');
+      expect(find.byIcon(Icons.copy_rounded), findsNothing);
+      final bubble = find.byWidgetPredicate(
+        (widget) =>
+            widget is GestureDetector &&
+            widget.onLongPress != null &&
+            widget.onSecondaryTap != null,
+      );
+      await tester.longPress(bubble.last);
+      await tester.pump();
+      expect(copied, 'Kappa');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  for (final confirm in [false, true]) {
+    testWidgets('Conversation deletion requires confirmation: $confirm', (
+      tester,
+    ) async {
+      inbox.updateDraft('2', 'delete only after confirmation');
+      await tester.runAsync(inbox.flushDrafts);
+      await _openPrivateWidget(tester, inbox, size: const Size(1100, 800));
+      await tester.tap(find.byKey(const ValueKey('whisper-actions-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刪除對話紀錄'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(inbox.conversations, hasLength(1));
+      await tester.tap(find.text(confirm ? '刪除' : '取消'));
+      await _advancePrivateWidget(tester);
+      expect(inbox.conversations, hasLength(confirm ? 0 : 1));
+      expect(await inbox.archive.load('1'), hasLength(confirm ? 0 : 1));
+      if (confirm) {
+        expect(inbox.activePeerId, isNull);
+      } else {
+        expect(
+          inbox.conversations.single.draft,
+          'delete only after confirmation',
+        );
+      }
+      expect(api.sent, 0);
+      expect(remoteArchive.calls, confirm ? 1 : 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  for (final withDraft in [false, true]) {
+    testWidgets('Local-only deletion skips remote archive: $withDraft', (
+      tester,
+    ) async {
+      remoteArchive.fail = true;
+      if (withDraft) {
+        inbox.updateDraft('2', 'local draft');
+        await tester.runAsync(inbox.flushDrafts);
+      }
+      await _openPrivateWidget(tester, inbox, size: const Size(1100, 800));
+      await tester.tap(find.byKey(const ValueKey('whisper-actions-2')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('只刪除本機紀錄'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.textContaining('不會變更 Twitch 官方紀錄'), findsOneWidget);
+      await tester.tap(find.text('刪除'));
+      await _advancePrivateWidget(tester);
+      expect(remoteArchive.calls, 0);
+      expect(inbox.conversations, isEmpty);
+      expect(await inbox.archive.load('1'), isEmpty);
+      expect(inbox.activePeerId, isNull);
+      expect(inbox.errorText, isNull);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
+
+  test('Official archive failure keeps local conversation and draft', () async {
+    inbox.updateDraft('2', 'preserve on rejection');
+    await inbox.flushDrafts();
+    final before = Map<String, String>.of(disk);
+    remoteArchive.fail = true;
+    await inbox.archiveConversation('2');
+    expect(disk, before);
+    expect(inbox.activePeerId, '2');
+    expect(inbox.errorText, 'fake archive rejected');
+    expect(remoteArchive.calls, 1);
+  });
+
+  test(
+    'Confirmed official archive after account change cleans only captured owner',
+    () async {
+      inbox.updateDraft('2', 'old account');
+      await inbox.flushDrafts();
+      remoteArchive.gate = Completer<void>();
+      final deletion = inbox.archiveConversation('2');
+      for (var step = 0; step < 20 && remoteArchive.calls == 0; step++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(remoteArchive.calls, 1);
+      inbox.clearSession();
+      api.owner = '9';
+      await inbox.refreshSession();
+      await inbox.startConversation('peer');
+      inbox.updateDraft('2', 'new account');
+      await inbox.flushDrafts();
+      remoteArchive.gate!.complete();
+      await deletion;
+      expect(await inbox.archive.load('1'), isEmpty);
+      expect((await inbox.archive.load('9')).single.draft, 'new account');
+      expect(inbox.ownerId, '9');
+      expect(inbox.activePeerId, '2');
+      expect(inbox.activeConversation!.draft, 'new account');
+    },
+  );
 
   testWidgets(
     'Private opens at latest then keeps manual scrolling on receive',
@@ -473,7 +668,7 @@ void main() {
       final store = inbox.archive;
       inbox.dispose();
       final history = _FakeHistory(api.client);
-      final threads = _FakeThreads(api.client);
+      final threads = _FakeThreads(api.client)..includeActivePeer = true;
       inbox = TwitchWhisperInboxController(
         api: api,
         store: store,
@@ -508,6 +703,8 @@ void main() {
         },
       );
       final list = find.byKey(const ValueKey('whisper-message-list'));
+      expect(inbox.activePeerId, '2');
+      expect(list, findsOneWidget);
       final position = tester
           .state<ScrollableState>(
             find.descendant(of: list, matching: find.byType(Scrollable)).first,
@@ -2291,6 +2488,46 @@ void main() {
     return history;
   }
 
+  for (final mode in ['blank', 'draft', 'cleared', 'fresh', 'message']) {
+    testWidgets(
+      'Opening sheet filters retired empty compose before display mode=$mode',
+      (tester) async {
+        await tester.runAsync(() async {
+          await inbox.startConversation('peer');
+          inbox.setPanelVisible(true);
+          if (mode == 'draft' || mode == 'cleared') {
+            inbox.updateDraft('2', 'keep draft');
+          }
+          if (mode == 'cleared') inbox.updateDraft('2', '');
+          if (mode == 'message') {
+            await inbox.receiveEvent({
+              'from_user_id': '2',
+              'to_user_id': '1',
+              'whisper_id': 'keep-existing-message',
+              'whisper': {'text': 'keep existing message'},
+            }, DateTime.now().toUtc());
+          }
+          inbox.setPanelVisible(false);
+          await inbox.flushDrafts();
+          if (mode == 'fresh') await inbox.startConversation('peer');
+        });
+        // Disable remote synchronization: cleanup must happen before modal paint,
+        // not as a side effect of the server response.
+        await _openPrivateWidget(tester, inbox, automaticSync: false);
+        final keep = mode == 'draft' || mode == 'fresh' || mode == 'message';
+        expect(
+          inbox.conversations.map((peer) => peer.userId),
+          keep ? contains('2') : isNot(contains('2')),
+        );
+        expect(inbox.activePeerId, keep ? '2' : isNull);
+        expect(api.sent, 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await _advancePrivateWidget(tester);
+      },
+    );
+  }
+
   for (final fails in [false, true]) {
     testWidgets(
       'Automatic inbox open uses cache and paginates; failure=$fails',
@@ -2330,6 +2567,8 @@ void main() {
         expect(find.text('可能有未恢復的收件區間；連線不代表歷史已補齊。'), findsNothing);
         expect(find.byTooltip('同步 Twitch 私訊歷史'), findsNothing);
         if (fails) {
+          expect(find.text('對話同步失敗，請稍後再試。'), findsOneWidget);
+          expect(find.text(inbox.threadsError!), findsNothing);
           expect(find.text('重試對話同步'), findsOneWidget);
           threads.fail = false;
           await tester.tap(find.text('重試對話同步'));
@@ -2350,40 +2589,54 @@ void main() {
     );
   }
 
-  testWidgets(
-    'Automatic history follows scrolling without pulling reader to tail',
-    (tester) async {
-      final history = (await tester.runAsync(enableHistory))!..extraPage = true;
-      await tester.runAsync(() async {
-        for (var i = 0; i < 40; i++) {
-          await inbox.receiveEvent({
-            'from_user_id': '2',
-            'to_user_id': '1',
-            'whisper_id': 'auto-anchor-$i',
-            'whisper': {'text': 'anchor $i'},
-          }, DateTime.utc(2026, 1, 1, 0, i));
-        }
-      });
-      await _openPrivateWidget(tester, inbox, automaticSync: true);
-      await _advancePrivateWidget(tester);
-      expect(history.cursors, [null]);
-      final list = find.byKey(const ValueKey('whisper-message-list'));
-      final position = tester
-          .state<ScrollableState>(
-            find.descendant(of: list, matching: find.byType(Scrollable)).first,
-          )
-          .position;
-      expect(position.extentBefore, lessThanOrEqualTo(.5));
-      position.jumpTo(position.maxScrollExtent);
-      await _advancePrivateWidget(tester);
-      expect(history.cursors, [null, 'older']);
-      expect(inbox.readingLatest, false);
-      expect(position.extentBefore, greaterThan(90));
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      await _advancePrivateWidget(tester);
-    },
-  );
+  testWidgets('Automatic history sync runs on opening, not on scrolling', (
+    tester,
+  ) async {
+    final history = (await tester.runAsync(enableHistory))!..extraPage = true;
+    await tester.runAsync(() async {
+      for (var i = 0; i < 40; i++) {
+        await inbox.receiveEvent({
+          'from_user_id': '2',
+          'to_user_id': '1',
+          'whisper_id': 'auto-anchor-$i',
+          'whisper': {'text': 'anchor $i'},
+        }, DateTime.utc(2026, 1, 1, 0, i));
+      }
+    });
+    await _openPrivateWidget(tester, inbox, automaticSync: true);
+    await _advancePrivateWidget(tester);
+    expect(history.cursors, [null]);
+    final list = find.byKey(const ValueKey('whisper-message-list'));
+    final position = tester
+        .state<ScrollableState>(
+          find.descendant(of: list, matching: find.byType(Scrollable)).first,
+        )
+        .position;
+    expect(position.extentBefore, lessThanOrEqualTo(.5));
+    position.jumpTo(position.maxScrollExtent);
+    await _advancePrivateWidget(tester);
+    expect(history.cursors, [null]);
+    expect(inbox.readingLatest, false);
+    expect(position.extentBefore, greaterThan(90));
+    await tester.runAsync(() async {
+      await inbox.archive.saveDraft(
+        '1',
+        TwitchWhisperConversation(
+          userId: '3',
+          login: 'other',
+          displayName: 'Other',
+        ),
+        'other draft',
+      );
+      await inbox.refreshSession();
+      await inbox.selectConversation('3');
+    });
+    await _advancePrivateWidget(tester);
+    expect(history.cursors, [null]);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await _advancePrivateWidget(tester);
+  });
 
   testWidgets('Closing automatic inbox stops subsequent pages and history', (
     tester,
@@ -2486,7 +2739,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步 Twitch 對話'));
       await _advancePrivateWidget(tester);
-      expect(find.text('fake inbox unavailable'), findsOneWidget);
+      expect(inbox.threadsError, 'fake inbox unavailable');
+      expect(find.text('對話同步失敗，請稍後再試。'), findsOneWidget);
       remote.fail = false;
       await tester.ensureVisible(find.text('重試對話同步'));
       await tester.tap(find.text('重試對話同步'));
@@ -2693,6 +2947,8 @@ void main() {
       await tester.tap(find.text('同步近期歷史'));
       await _advancePrivateWidget(tester);
       expect(inbox.historyError, 'fake history unavailable');
+      expect(find.text('fake history unavailable'), findsNothing);
+      expect(find.text('訊息同步失敗，請稍後再試。'), findsWidgets);
       await tester.pump(const Duration(seconds: 3));
       history.fail = false;
       await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
@@ -2981,7 +3237,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步近期歷史'));
       await _advancePrivateWidget(tester);
-      expect(find.text('fake history unavailable'), findsOneWidget);
+      expect(inbox.historyError, 'fake history unavailable');
+      expect(find.text('訊息同步失敗，請稍後再試。'), findsOneWidget);
       expect(inbox.activeConversation!.draft, 'keep draft');
       await tester.pump(const Duration(seconds: 3));
       await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
@@ -3270,6 +3527,22 @@ void main() {
     testWidgets(
       'private notification opens exact conversation from ${fromPanel ? "panel" : "toast"}',
       (tester) async {
+        // Android intentionally delegates notifications to the OS. These
+        // assertions exercise the Windows in-app overlay instead.
+        debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+        const windowChannel = MethodChannel('window_manager');
+        final messenger =
+            TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(windowChannel, (call) async {
+          if (call.method == 'isMaximized' || call.method == 'isFullScreen') {
+            return false;
+          }
+          throw StateError('Unexpected fixture window call: ${call.method}');
+        });
+        addTearDown(() {
+          messenger.setMockMethodCallHandler(windowChannel, null);
+          debugDefaultTargetPlatformOverride = null;
+        });
         final update = VioClassUpdateController();
         twitchAppNotificationCenter.clear();
         var opened = 0;
@@ -3294,7 +3567,7 @@ void main() {
             ),
           ),
         );
-        twitchAppNotificationCenter.show(
+        final notificationId = twitchAppNotificationCenter.show(
           title: 'Peer private notification',
           message: 'open private chat',
           whisperTarget: const TwitchWhisperNotificationTarget(
@@ -3304,8 +3577,21 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 200));
         if (fromPanel) {
-          await tester.tap(find.byIcon(Icons.notifications_none_rounded).first);
+          // Open history after the toast is gone, proving this is a panel
+          // action rather than accidentally tapping the still-visible toast.
+          twitchAppNotificationCenter.hideToast(notificationId);
           await tester.pump();
+          expect(find.text('Peer private notification'), findsNothing);
+          await tester.tap(
+            find
+                .ancestor(
+                  of: find.byIcon(Icons.notifications_none_rounded),
+                  matching: find.byType(InkWell),
+                )
+                .first,
+          );
+          await tester.pump();
+          expect(find.text('Peer private notification'), findsOneWidget);
         }
         await tester.tap(find.text('Peer private notification'));
         for (var i = 0; i < 8; i++) {
@@ -3320,6 +3606,7 @@ void main() {
         expect(find.text('Peer private notification'), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
+        debugDefaultTargetPlatformOverride = null;
       },
     );
   }

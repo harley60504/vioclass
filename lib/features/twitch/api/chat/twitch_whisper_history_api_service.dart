@@ -17,6 +17,7 @@ class TwitchWhisperHistoryApiService {
   final TwitchApiClient client;
   final List<Future<String?> Function()> webTokenProviders;
   final List<Future<String?> Function()> androidTokenProviders;
+  final bool androidOnlyReads;
   final Future<Map<String, String>> Function(TwitchWhisperSession)?
   integrityHeadersProvider;
   final Future<void> Function(TwitchWhisperSession, String)?
@@ -25,6 +26,7 @@ class TwitchWhisperHistoryApiService {
     required this.client,
     required this.webTokenProviders,
     this.androidTokenProviders = const [],
+    this.androidOnlyReads = false,
     this.integrityHeadersProvider,
     this.integrityInvalidator,
   });
@@ -83,6 +85,9 @@ class TwitchWhisperHistoryApiService {
 
   Future<TwitchWhisperSession> readSession(String owner) async {
     final android = await androidSession(owner);
+    if (android == null && androidOnlyReads) {
+      throw const TwitchWhisperException('私訊需要同一帳號的 Android 授權，請重新登入。');
+    }
     return android ?? await webSession(owner);
   }
 
@@ -165,7 +170,11 @@ class TwitchWhisperHistoryApiService {
         'HTTP=2xx errors=${errors is List ? errors.length : 0} '
         'integrityRejected=$integrityRejected',
       );
-      if (android && errors is List && errors.isNotEmpty && allowWebFallback) {
+      if (!androidOnlyReads &&
+          android &&
+          errors is List &&
+          errors.isNotEmpty &&
+          allowWebFallback) {
         log('android rejected; fallback to same-owner web once');
         return await _page(
           ownerId: ownerId,
@@ -215,6 +224,7 @@ class TwitchWhisperHistoryApiService {
           session?.validation.clientId ==
           TwitchApiConstants.twitchAndroidPublicClientId;
       if (android &&
+          !androidOnlyReads &&
           allowWebFallback &&
           (error.statusCode == 401 || error.statusCode == 403)) {
         log('android HTTP rejection; fallback to same-owner web once');

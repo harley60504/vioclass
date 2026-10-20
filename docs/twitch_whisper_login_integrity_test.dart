@@ -34,7 +34,11 @@ Map<String, Object> result({DateTime? expiry}) => {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => FlutterSecureStorage.setMockInitialValues({}));
+  setUp(() {
+    // This Flutter test lives in docs rather than the standard test directory.
+    // ignore: invalid_use_of_visible_for_testing_member
+    FlutterSecureStorage.setMockInitialValues({});
+  });
   test('Late rejection cannot discard newer proof', () async {
     final service = TwitchWhisperLoginIntegrityService();
     await service.captureFromLogin(
@@ -166,6 +170,8 @@ void main() {
     },
   );
   test('Corrupt cache is replaced, never used as authentication', () async {
+    // This Flutter test lives in docs rather than the standard test directory.
+    // ignore: invalid_use_of_visible_for_testing_member
     FlutterSecureStorage.setMockInitialValues({
       TwitchWhisperLoginIntegrityService.storageKey: 'broken',
     });
