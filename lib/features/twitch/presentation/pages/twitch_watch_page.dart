@@ -3,7 +3,6 @@ library;
 import 'dart:async';
 import '../navigation/twitch_route_observer.dart';
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
@@ -216,9 +215,6 @@ class TwitchWatchPage extends StatefulWidget {
 
 class TwitchWatchPageState extends State<TwitchWatchPage>
     with WidgetsBindingObserver {
-  static const Duration _foregroundRecoveryMinimumBackground = Duration(
-    seconds: 2,
-  );
   static const Duration _foregroundInitialProbeDuration = Duration(
     milliseconds: 1800,
   );
@@ -706,17 +702,10 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         unawaited(chatController.setAppForeground(true));
         final backgroundedAt = livePlaybackBackgroundedAt;
         livePlaybackBackgroundedAt = null;
-        final backgroundDuration = backgroundedAt == null
-            ? Duration.zero
-            : DateTime.now().difference(backgroundedAt);
         playbackTimelineController.resumeClock();
-        unawaited(
-          recoverWatchAfterForeground(
-            shouldProbeLiveRecovery:
-                defaultTargetPlatform != TargetPlatform.windows &&
-                backgroundDuration >= _foregroundRecoveryMinimumBackground,
-          ),
-        );
+        if (backgroundedAt != null) {
+          unawaited(recoverWatchAfterForeground(shouldProbeLiveRecovery: true));
+        }
         break;
       case AppLifecycleState.inactive:
         // Desktop focus changes and short system interruptions are not a real
@@ -763,16 +752,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     try {
       final isVisiblePlaybackRoute = TwitchPlaybackSessionController.instance
           .isTopRouteOwner(playbackRouteOwner);
-      if (defaultTargetPlatform == TargetPlatform.windows) {
-        // Minimizing or restoring a Windows window does not suspend the shared
-        // media player or either localhost proxy. Running the mobile recovery
-        // path here can turn a harmless window lifecycle transition into a
-        // discovery refresh, reconcile, or full player reload.
-        debugPrint(
-          '[WatchPlaybackState] keep Windows playback untouched on foreground '
-          'channel=$channel',
-        );
-      } else if (!isVisiblePlaybackRoute) {
+      if (!isVisiblePlaybackRoute) {
         debugPrint(
           '[WatchPlaybackState] skip foreground playback recovery '
           'because route is hidden channel=$channel',
@@ -803,10 +783,16 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
               await preferencesController.applyPlayerVolume();
               if (mounted) setState(() {});
             }
-          } else if (player != null) {
-            await _recoverLivePlaybackAfterForeground();
           } else {
-            await reconcileVisibleRoutePlayback(forceOpen: true);
+            // Playback advancing only proves liveness, not freshness. After a
+            // real background transition discard the old native reader and
+            // reconnect the upstream at LIVE instead of draining stale bytes.
+            await reconcileVisibleRoutePlayback(
+              forceOpen: true,
+              forceProxyReconnect: true,
+            );
+            if (!mounted) return;
+            playbackTimelineController.returnToLive();
           }
         } else if (TwitchMediaKitPlayerHost.currentMediaUri
                 ?.trim()

@@ -1,6 +1,7 @@
 // ignore_for_file: invalid_use_of_visible_for_testing_member
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
@@ -10,6 +11,8 @@ import 'package:vioclass/features/twitch/api/playback/twitch_playback_api_servic
 import 'package:vioclass/features/twitch/models/discovery/twitch_live_stream.dart';
 import 'package:vioclass/features/twitch/models/playback/twitch_m3u8_variant.dart';
 import 'package:vioclass/features/twitch/presentation/pages/twitch_watch_page.dart';
+import 'package:vioclass/features/twitch/presentation/pages/watch/twitch_watch_playback_state.dart';
+import 'package:vioclass/features/twitch/presentation/watch/twitch_watch_playback_kind.dart';
 import 'package:vioclass/features/twitch/presentation/watch/controllers/twitch_watch_preferences_controller.dart';
 import 'package:vioclass/features/twitch/services/discovery/twitch_discovery_service.dart';
 import 'package:vioclass/features/twitch/services/playback/twitch_media_kit_player_host.dart';
@@ -30,6 +33,16 @@ class _RecoveryRuntime extends TwitchPlaylistPlayerRuntime {
 
   final Uri media;
   int loads = 0;
+  int liveResets = 0;
+
+  @override
+  Future<Uri?> prepareLowLatencyLiveFromWarmUpstream({
+    bool forceProxyReconnect = false,
+  }) async {
+    expectSync(forceProxyReconnect, isTrue);
+    liveResets++;
+    return media;
+  }
 
   @override
   String get channelLogin => 'fixture';
@@ -179,6 +192,69 @@ void main() {
       expect(tester.takeException(), isNull);
       debugPrint(
         '[OfflineLive] complete loads=2 stablePolls=2 nativeVideo=true',
+      );
+      final opensBeforeResume = TwitchMediaKitPlayerHost.restoreOpenStarted;
+      try {
+        state.didChangeAppLifecycleState(AppLifecycleState.inactive);
+        state.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        expect(
+          runtime.liveResets,
+          0,
+          reason: 'Focus changes are not background',
+        );
+        await state.recoverWatchAfterForeground();
+        expect(
+          runtime.liveResets,
+          0,
+          reason: 'Ordinary reconciliation keeps playback',
+        );
+        var resets = 0;
+        for (final platform in [
+          TargetPlatform.windows,
+          TargetPlatform.android,
+        ]) {
+          debugDefaultTargetPlatformOverride = platform;
+          state.didChangeAppLifecycleState(AppLifecycleState.hidden);
+          state.didChangeAppLifecycleState(AppLifecycleState.resumed);
+          await state.foregroundRecoveryInFlight;
+          resets++;
+          expect(
+            runtime.liveResets,
+            resets,
+            reason: 'LIVE resets on $platform',
+          );
+          await _wait(
+            tester,
+            () =>
+                player.state.playing &&
+                player.state.position.inMilliseconds > 500,
+            'decoded playback after $platform foreground reset',
+          );
+        }
+        expect(
+          TwitchMediaKitPlayerHost.restoreOpenStarted,
+          opensBeforeResume + 2,
+        );
+        state.markOwnedPlayback(
+          kind: TwitchWatchPlaybackKind.liveDvr,
+          mediaUri: media.uri.toString(),
+        );
+        final dvrPosition = player.state.position;
+        await state.recoverWatchAfterForeground(shouldProbeLiveRecovery: true);
+        expect(runtime.liveResets, 2, reason: 'DVR keeps its viewing position');
+        expect(
+          TwitchMediaKitPlayerHost.restoreOpenStarted,
+          opensBeforeResume + 2,
+        );
+        expect(player.state.position, greaterThanOrEqualTo(dvrPosition));
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+      await _wait(
+        tester,
+        () =>
+            player.state.playing && player.state.position.inMilliseconds > 500,
+        'native playback after Android foreground edge reset',
       );
       await tester.pumpWidget(const SizedBox());
       final readsAfterUnmount = discovery.reads;

@@ -164,13 +164,13 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
     if (owned.kind == TwitchWatchPlaybackKind.live) {
       var shouldForceProxyReconnect = forceProxyReconnect;
       if (shouldForceProxyReconnect &&
+          !forceOpen &&
           currentUri != null &&
           currentUri.isNotEmpty &&
           currentUri == ownedUri &&
           playerSession.playerOrNull != null) {
-        final liveStatus = await watchPorts.player.runtime.refreshProxyLiveStatus(
-          notify: false,
-        );
+        final liveStatus = await watchPorts.player.runtime
+            .refreshProxyLiveStatus(notify: false);
         final existingConnectionIsHealthy =
             liveStatus != null && liveStatus.running && liveStatus.hasWriter;
         if (existingConnectionIsHealthy) {
