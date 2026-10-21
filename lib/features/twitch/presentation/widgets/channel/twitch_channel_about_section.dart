@@ -292,45 +292,66 @@ class _PanelCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: LayoutBuilder(
-              builder: (context, constraints) => TwitchCachedImageLayer(
-                imageUrl: imageUrl,
-                width: constraints.maxWidth,
-                height: constraints.maxHeight,
-                fit: BoxFit.contain,
-                fallbackColor: TwitchUiColors.surfaceRaised,
-                fallbackIcon: Icons.article_outlined,
-                fallbackIconColor: TwitchUiColors.textFaint,
-                fallbackIconSize: 34,
+          if (imageUrl.isNotEmpty)
+            AspectRatio(
+              aspectRatio: 16 / 9,
+              child: LayoutBuilder(
+                builder: (context, constraints) => TwitchCachedImageLayer(
+                  imageUrl: imageUrl,
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  fit: BoxFit.contain,
+                  fallbackColor: TwitchUiColors.surfaceRaised,
+                  fallbackIcon: Icons.article_outlined,
+                  fallbackIconColor: TwitchUiColors.textFaint,
+                  fallbackIconSize: 34,
+                ),
               ),
             ),
-          ),
           if (panel.title.isNotEmpty ||
               panel.description.isNotEmpty ||
               linkUrl.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      _panelLabel(context, panel),
+                  if (panel.title.isNotEmpty || linkUrl.isNotEmpty)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            panel.title.isNotEmpty
+                                ? panel.title
+                                : context.vio.t('開啟連結'),
+                            style: const TextStyle(
+                              color: TwitchUiColors.textSecondary,
+                              fontSize: TwitchUiFontSize.bodyCompact,
+                              height: 1.3,
+                              fontWeight: TwitchUiFontWeight.medium,
+                            ),
+                          ),
+                        ),
+                        if (linkUrl.isNotEmpty) ...[
+                          const SizedBox(width: TwitchUiSpacing.space8),
+                          const Icon(
+                            Icons.open_in_new_rounded,
+                            color: TwitchUiColors.primarySoft,
+                            size: 16,
+                          ),
+                        ],
+                      ],
+                    ),
+                  if (panel.description.isNotEmpty) ...[
+                    if (panel.title.isNotEmpty || linkUrl.isNotEmpty)
+                      const SizedBox(height: TwitchUiSpacing.space8),
+                    Text(
+                      panel.description,
                       style: const TextStyle(
                         color: TwitchUiColors.textSecondary,
                         fontSize: TwitchUiFontSize.bodyCompact,
-                        height: 1.3,
-                        fontWeight: TwitchUiFontWeight.medium,
+                        height: 1.5,
                       ),
-                    ),
-                  ),
-                  if (linkUrl.isNotEmpty) ...[
-                    const SizedBox(width: TwitchUiSpacing.space8),
-                    const Icon(
-                      Icons.open_in_new_rounded,
-                      color: TwitchUiColors.primarySoft,
-                      size: 16,
                     ),
                   ],
                 ],
@@ -339,12 +360,6 @@ class _PanelCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _panelLabel(BuildContext context, TwitchChannelPanel panel) {
-    if (panel.title.isNotEmpty) return panel.title;
-    if (panel.description.isNotEmpty) return panel.description;
-    return context.vio.t('開啟連結');
   }
 }
 

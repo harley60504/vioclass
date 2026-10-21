@@ -320,6 +320,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
   late final ScrollController _aboutScrollController;
   bool _switchingPage = false;
   double _aboutOverscroll = 0;
+  double _playerDragDistance = 0;
 
   @override
   void initState() {
@@ -356,7 +357,9 @@ class _PlayerColumnState extends State<_PlayerColumn> {
 
     return PageView(
       controller: _pageController,
-      physics: const PageScrollPhysics(),
+      // Wheel navigation is handled below. Letting PageView also consume the
+      // same signal cancels animateToPage and snaps back toward the player.
+      physics: const NeverScrollableScrollPhysics(),
       scrollDirection: Axis.vertical,
       children: <Widget>[
         Listener(
@@ -365,7 +368,17 @@ class _PlayerColumnState extends State<_PlayerColumn> {
               _showPage(1);
             }
           },
-          child: _PlayerSurface(child: widget.player),
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (_) => _playerDragDistance = 0,
+            onVerticalDragUpdate: (details) {
+              _playerDragDistance += details.primaryDelta ?? 0;
+            },
+            onVerticalDragEnd: (_) {
+              if (_playerDragDistance <= -48) _showPage(1);
+            },
+            child: _PlayerSurface(child: widget.player),
+          ),
         ),
         _WatchSurface(
           child: Listener(
