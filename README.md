@@ -10,6 +10,41 @@ An unofficial Twitch client built with Flutter, bringing live streams, DVR, VODs
 
 **[Download / 下載最新版](https://github.com/harley60504/vioclass/releases/latest)** · [繁體中文](#繁體中文) · [English](#english) · [Report a problem / 回報問題](https://github.com/harley60504/vioclass/issues)
 
+## Screenshots / 介面預覽
+
+### Live playback and chat / 直播與聊天室
+
+![VioClass live player with playback controls, channel information, and live chat / VioClass 直播播放器、播放控制列、頻道資訊與聊天室](docs/images/desktop-watch.png)
+
+<details>
+<summary>Browse live streams / 瀏覽直播</summary>
+
+![VioClass desktop discovery page with live stream cards and search / VioClass 電腦版探索頁、直播卡片與搜尋](docs/images/desktop-browse.png)
+
+</details>
+
+<details>
+<summary>Keep watching while browsing / 邊逛邊看的迷你播放器</summary>
+
+![VioClass mini player over the live stream discovery page / VioClass 探索頁上的迷你播放器](docs/images/desktop-mini-player.png)
+
+</details>
+
+<details>
+<summary>Compact layout / 窄版排版</summary>
+
+<img src="docs/images/compact-browse.png" alt="VioClass responsive compact browsing layout / VioClass 響應式窄版瀏覽介面" width="320">
+
+Captured by resizing the Windows app to show its responsive layout; this is not an Android device screenshot.
+
+此圖是在 Windows 上縮窄 App 視窗，展示響應式排版，並非 Android 實機截圖。
+
+</details>
+
+Actual app UI captured using Flutter-internal automation, without debug overlays or mock content. Streams, thumbnails, and public chat belong to their respective creators and may change over time.
+
+以上為使用 Flutter 內部自動化擷取的實際 App 介面，沒有除錯浮層或模擬內容。直播、縮圖與公開聊天內容屬於各自創作者，會隨時間變動。
+
 ## 繁體中文
 
 ### 這是什麼？
