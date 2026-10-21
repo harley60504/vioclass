@@ -40,7 +40,8 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
         // and starting playback before the stored session has resolved.
         if (state.loadingAuth ||
             state.watchLoadGeneration == 0 ||
-            state.loadingWatch) {
+            state.loadingWatch ||
+            state.loadingPlayer) {
           return;
         }
         if (!TwitchPlaybackSessionController.instance.isTopRouteOwner(
@@ -55,6 +56,8 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
         final live = await state.refreshLiveStatusForRecovery();
         if (!state.mounted ||
             state.watchLoadGeneration != loadGeneration ||
+            state.loadingWatch ||
+            state.loadingPlayer ||
             !TwitchPlaybackSessionController.instance.isTopRouteOwner(
               state.playbackRouteOwner,
             )) {
@@ -83,11 +86,18 @@ void ensureWatchModeRuntime(TwitchWatchPageState state) {
         final endedLive =
             state.currentPlaybackKind == TwitchWatchPlaybackKind.live &&
             state.playerSession.playerOrNull?.state.completed == true;
-        if (!changed && !endedLive) return;
+        // Discovery may announce a stream before its playback URL is ready.
+        // A failed open retains that stream identity, so it must be retried
+        // even if the next poll reports the exact same stream.
+        final retryOfflineLive =
+            enableWatchPlayer &&
+            state.showOfflineChannelPlaceholder &&
+            state.currentPlaybackKind == TwitchWatchPlaybackKind.live;
+        if (!changed && !endedLive && !retryOfflineLive) return;
 
         debugPrint(
           '[LiveWatch] discovered new live generation '
-          'endedLive=$endedLive '
+          'endedLive=$endedLive retryOfflineLive=$retryOfflineLive '
           'stream=$previousStreamId->$nextStreamId '
           'startedAt=$previousStartedAt->$nextStartedAt; '
           'restarting unified live/DVR startup',

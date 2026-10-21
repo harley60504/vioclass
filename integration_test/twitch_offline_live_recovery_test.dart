@@ -1,0 +1,199 @@
+// ignore_for_file: invalid_use_of_visible_for_testing_member
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:integration_test/integration_test.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vioclass/features/twitch/api/playback/twitch_playback_api_service.dart';
+import 'package:vioclass/features/twitch/models/discovery/twitch_live_stream.dart';
+import 'package:vioclass/features/twitch/models/playback/twitch_m3u8_variant.dart';
+import 'package:vioclass/features/twitch/presentation/pages/twitch_watch_page.dart';
+import 'package:vioclass/features/twitch/presentation/watch/controllers/twitch_watch_preferences_controller.dart';
+import 'package:vioclass/features/twitch/services/discovery/twitch_discovery_service.dart';
+import 'package:vioclass/features/twitch/services/playback/twitch_media_kit_player_host.dart';
+import 'package:vioclass/features/twitch/services/playback/twitch_playlist_player_runtime.dart';
+import 'package:vioclass/features/twitch/services/watch/twitch_watch_services.dart';
+
+import '../docs/twitch_watch_session_injection_test.dart' as fixture;
+
+class _UnusedApi implements TwitchPlaybackApiService {
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected external playback request');
+}
+
+class _RecoveryRuntime extends TwitchPlaylistPlayerRuntime {
+  _RecoveryRuntime(this.media, TwitchPlaybackApiService api)
+    : super(playbackApi: api);
+
+  final Uri media;
+  int loads = 0;
+
+  @override
+  String get channelLogin => 'fixture';
+
+  @override
+  Future<Uri?> loadLivePlaylist({
+    required String channelLogin,
+    TwitchM3u8Variant? preferredVariant,
+    String? preferredVariantName,
+    bool probeDvr = true,
+  }) async {
+    expectSync(channelLogin, 'fixture');
+    loads++;
+    if (loads == 1) throw StateError('Controlled first-open failure');
+    return media;
+  }
+}
+
+class _Discovery extends TwitchDiscoveryService {
+  _Discovery(TwitchWatchServices services)
+    : super(
+        client: services.apiClient,
+        authService: services.authService,
+        authApi: services.authApi,
+      );
+
+  bool live = false;
+  int reads = 0;
+
+  @override
+  Future<TwitchLiveStream?> fetchLiveStream({required String login}) async {
+    expectSync(login, 'fixture');
+    reads++;
+    if (!live) return null;
+    return TwitchLiveStream(
+      id: 'controlled-live-stream',
+      userId: '7',
+      userLogin: 'fixture',
+      userName: 'Fixture',
+      gameId: '',
+      gameName: '',
+      title: 'Offline to live recovery test',
+      viewerCount: 1,
+      startedAt: DateTime.utc(2026, 10, 21),
+      language: 'zh',
+      thumbnailUrl: '',
+      tags: const [],
+      isMature: false,
+    );
+  }
+}
+
+Future<void> _wait(
+  WidgetTester tester,
+  bool Function() ready,
+  String phase, {
+  Duration timeout = const Duration(seconds: 25),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!ready() && DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 100));
+  }
+  expect(ready(), isTrue, reason: phase);
+  debugPrint('[OfflineLive] passed $phase');
+}
+
+void main() {
+  final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
+  testWidgets('Windows offline to live retries and keeps decoded playback', (
+    tester,
+  ) async {
+    const path = String.fromEnvironment('VIOCLASS_RECOVERY_TEST_MEDIA');
+    final media = File(path);
+    expect(path, isNotEmpty);
+    expect(media.existsSync(), isTrue);
+    SharedPreferences.setMockInitialValues({
+      TwitchWatchPreferencesController.playerVolumePreferenceKey: 0.0,
+      TwitchWatchPreferencesController.playerMutedPreferenceKey: true,
+    });
+    MediaKit.ensureInitialized();
+    final player = await Player.create();
+    TwitchMediaKitPlayerHost.installIsolatedPlayerForTesting(player);
+    final session = TwitchMediaKitPlayerHost.acquire();
+    final api = _UnusedApi();
+    final runtime = _RecoveryRuntime(media.uri, api);
+    final services = fixture.isolatedWatchPlaybackServices(
+      session: session,
+      runtime: runtime,
+      playbackApi: api,
+    );
+    final discovery = _Discovery(services);
+    try {
+      await player.setVolume(0);
+      player.setProperty('loop-file', 'inf');
+      await session.ensureReady();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: TwitchWatchPage(
+            initialChannelLogin: 'fixture',
+            initialServices: services,
+            initialDiscoveryService: discovery,
+            initialChatRuntimeFactory: fixture.isolatedWatchChatRuntime,
+          ),
+        ),
+      );
+      final state = tester.state<TwitchWatchPageState>(
+        find.byType(TwitchWatchPage),
+      );
+      await _wait(
+        tester,
+        () => !state.loadingAuth && state.showOfflineChannelPlaceholder,
+        'initial offline artwork',
+      );
+      expect(runtime.loads, 0);
+      discovery.live = true;
+      await _wait(tester, () => runtime.loads == 1, 'first open attempted');
+      await _wait(
+        tester,
+        () => !state.loadingPlayer && state.showOfflineChannelPlaceholder,
+        'failed open retains offline artwork',
+      );
+      await _wait(
+        tester,
+        () => runtime.loads == 2 && !state.showOfflineChannelPlaceholder,
+        'same stream retried and player shown',
+      );
+      await _wait(
+        tester,
+        () =>
+            player.state.playing &&
+            player.state.position.inMilliseconds > 500 &&
+            (int.tryParse(player.getProperty('video-params/h')) ?? 0) > 0,
+        'native video decoding',
+      );
+      final reads = discovery.reads;
+      await _wait(
+        tester,
+        () => discovery.reads >= reads + 2,
+        'two further live status polls',
+      );
+      expect(runtime.loads, 2);
+      expect(state.showOfflineChannelPlaceholder, isFalse);
+      expect(state.liveTimelineStreamId, 'controlled-live-stream');
+      expect(player.state.playing, isTrue);
+      expect(state.playerError, isNull);
+      expect(tester.takeException(), isNull);
+      debugPrint(
+        '[OfflineLive] complete loads=2 stablePolls=2 nativeVideo=true',
+      );
+      await tester.pumpWidget(const SizedBox());
+      final readsAfterUnmount = discovery.reads;
+      final deadline = DateTime.now().add(const Duration(seconds: 9));
+      while (DateTime.now().isBefore(deadline)) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(discovery.reads, readsAfterUnmount);
+      expect(runtime.loads, 2);
+      debugPrint('[OfflineLive] passed no requests after unmount');
+    } finally {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 300));
+      await TwitchMediaKitPlayerHost.disposeNow();
+      services.apiClient.close(force: true);
+    }
+  });
+}

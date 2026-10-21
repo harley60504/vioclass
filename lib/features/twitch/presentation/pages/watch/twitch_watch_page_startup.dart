@@ -75,6 +75,7 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
     final generation = ++watchLoadGeneration;
     final reuseCurrentPlayback = reuseCurrentPlaybackOnNextLiveLoad;
     reuseCurrentPlaybackOnNextLiveLoad = false;
+    final keepOfflinePlaceholder = showOfflineChannelPlaceholder;
 
     setState(() {
       loadingWatch = true;
@@ -97,7 +98,9 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           clearStatus: false,
           cancelDeferredTasks: false,
         );
-        showOfflineChannelPlaceholder = false;
+        // Keep the offline artwork until opening the newly discovered stream
+        // succeeds, rather than flashing the player on every failed attempt.
+        showOfflineChannelPlaceholder = keepOfflinePlaceholder;
         if (!isCurrentWatchTask(generation, channel)) return;
         primeInitialActiveDvrAvailability(channel, generation);
       }
@@ -340,7 +343,9 @@ extension TwitchWatchPageStartupMethods on TwitchWatchPageState {
           generation: generation,
         );
         if (!isCurrentWatchTask(generation, channel)) return;
-      } else if (liveAvailable == true && showOfflineChannelPlaceholder) {
+      } else if (liveAvailable == true &&
+          showOfflineChannelPlaceholder &&
+          (!enableWatchPlayer || skipPlaybackStartup)) {
         offlineLatestVodVideo = null;
         showOfflineChannelPlaceholder = false;
         if (mounted) setState(() {});

@@ -282,10 +282,13 @@ class _Runtime implements TwitchPlaylistPlayerRuntime {
 
 class _PlayerSession implements TwitchMediaKitPlayerSession {
   int profileRequests = 0;
+  Completer<void>? profileGate;
   Player? exposedPlayer;
   @override
   Future<void> useLowLatencyHlsProfile() async {
     profileRequests++;
+    final gate = profileGate;
+    if (gate != null) await gate.future;
     throw StateError('fixture playback initialization unavailable');
   }
 
@@ -3338,24 +3341,44 @@ void main() {
               (services.playerSession as _PlayerSession).profileRequests,
               1,
             );
+            final retrySession = services.playerSession as _PlayerSession;
+            final retryGate = Completer<void>();
+            addTearDown(() {
+              if (!retryGate.isCompleted) retryGate.complete();
+            });
+            retrySession.profileGate = retryGate;
             for (var i = 0; i < 80; i++) {
               await tester.pump(const Duration(milliseconds: 100));
             }
-            expect(state.watchLoadGeneration, initialGeneration + 1);
+            expect(state.watchLoadGeneration, initialGeneration + 2);
             expect(
               (services.playerSession as _PlayerSession).profileRequests,
-              1,
+              2,
+              reason:
+                  'A failed offline-to-live startup must retry the same stream.',
             );
+            expect(state.loadingPlayer, isTrue);
+            expect(state.showOfflineChannelPlaceholder, isTrue);
+            for (var i = 0; i < 80; i++) {
+              await tester.pump(const Duration(milliseconds: 100));
+            }
+            expect(retrySession.profileRequests, 2);
+            expect(state.watchLoadGeneration, initialGeneration + 2);
+            retrySession.profileGate = null;
+            retryGate.complete();
+            for (var i = 0; i < 5; i++) {
+              await tester.pump(const Duration(milliseconds: 100));
+            }
             responseStreamId = 'fixture-live-stream-2';
             for (var i = 0; i < 80; i++) {
               await tester.pump(const Duration(milliseconds: 100));
             }
             expect(tester.takeException(), isNull);
             expect(state.liveTimelineStreamId, responseStreamId);
-            expect(state.watchLoadGeneration, initialGeneration + 2);
+            expect(state.watchLoadGeneration, initialGeneration + 3);
             expect(
               (services.playerSession as _PlayerSession).profileRequests,
-              2,
+              3,
             );
             expect(services.authService.loads, 1);
             expect(state.loadingAuth, isFalse);
@@ -3411,6 +3434,8 @@ void main() {
           if (liveAvailable) {
             final playerSession = services.playerSession as _PlayerSession;
             final before = playerSession.profileRequests;
+            // Model an established paused stream, not the failed-open fixture.
+            state.showOfflineChannelPlaceholder = false;
             playerSession.exposedPlayer = _EndedPlayer(completed: false);
             for (var i = 0; i < 80; i++) {
               await tester.pump(const Duration(milliseconds: 100));
