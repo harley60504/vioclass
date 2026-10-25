@@ -28,55 +28,55 @@ class PlayerMoreActionsButton extends StatelessWidget {
       size: 22,
       tooltip: context.vio.t('播放器設定'),
       icon: Icons.settings_rounded,
-      onPressed: () async {
-        const VolumeControlInteraction().dispatch(context);
-        final controller = TwitchPlayerSettingsController();
-        try {
-          await controller.load();
-          if (!context.mounted) return;
-          await PlayerSettingsDrawerHost.show(
-            context,
-            (drawerContext, close) => Material(
-              key: const ValueKey('player-settings-drawer'),
-              color: TwitchUiColors.playerOverlay,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              shape: const Border(
-                left: BorderSide(color: TwitchUiColors.border),
-              ),
-              child: Column(
+      onPressed: () => showTwitchPlayerSettings(context),
+    );
+  }
+}
+
+Future<void> showTwitchPlayerSettings(BuildContext context) async {
+  const VolumeControlInteraction().dispatch(context);
+  final controller = TwitchPlayerSettingsController();
+  try {
+    await controller.load();
+    if (!context.mounted) return;
+    await PlayerSettingsDrawerHost.show(
+      context,
+      (drawerContext, close) => Material(
+        key: const ValueKey('player-settings-drawer'),
+        color: TwitchUiColors.playerOverlay,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: const Border(left: BorderSide(color: TwitchUiColors.border)),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+              child: Row(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.settings_rounded, size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(context.vio.t('播放器設定'))),
-                        IconButton(
-                          tooltip: context.vio.t('關閉'),
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: close,
-                        ),
-                      ],
-                    ),
+                  const Icon(Icons.settings_rounded, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(context.vio.t('播放器設定'))),
+                  IconButton(
+                    tooltip: context.vio.t('關閉'),
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: close,
                   ),
-                  const Divider(height: 1),
-                  Expanded(child: buildTwitchPlayerSettingsPane(controller)),
                 ],
               ),
             ),
-          );
-        } catch (_) {
-          if (context.mounted) {
-            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-              SnackBar(content: Text(context.vio.t('設定讀取失敗，請稍後再試。'))),
-            );
-          }
-        } finally {
-          controller.dispose();
-        }
-      },
+            const Divider(height: 1),
+            Expanded(child: buildTwitchPlayerSettingsPane(controller)),
+          ],
+        ),
+      ),
     );
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(SnackBar(content: Text(context.vio.t('設定讀取失敗，請稍後再試。'))));
+    }
+  } finally {
+    controller.dispose();
   }
 }

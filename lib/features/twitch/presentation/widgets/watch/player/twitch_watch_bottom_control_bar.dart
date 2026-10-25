@@ -11,7 +11,6 @@ import '../../../watch/controllers/twitch_playback_timeline_controller.dart';
 import '../../../watch/twitch_watch_playback_kind.dart';
 import '../../shared/twitch_glass.dart';
 import 'twitch_player_common_buttons.dart';
-import 'twitch_player_more_actions_button.dart';
 import 'twitch_player_pip_button.dart';
 import 'twitch_player_quality_button.dart';
 import 'twitch_player_volume_control.dart';
@@ -405,19 +404,18 @@ class _CompactWatchBottomControls extends StatelessWidget {
                       size: veryNarrow ? 26 : 28,
                       dense: true,
                     ),
-                  ],
-                ),
-                center: timeControls,
-                right: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
                     PlayerVolumeButton(
                       muted: muted,
                       volume: volume,
                       onToggleMute: onToggleMute,
                       onVolumeChanged: onVolumeChanged,
                     ),
-                    SizedBox(width: veryNarrow ? 1 : 4),
+                  ],
+                ),
+                center: timeControls,
+                right: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     SizedBox.square(
                       dimension: 36,
                       child: QualityButton(
@@ -430,10 +428,6 @@ class _CompactWatchBottomControls extends StatelessWidget {
                         currentVariant: currentVariant,
                         onChanged: playerRuntime.busy ? null : onQualityChanged,
                       ),
-                    ),
-                    PlayerMoreActionsButton(
-                      playerRuntime: playerRuntime,
-                      player: player,
                     ),
                     _ChatToggleButton(
                       chatVisible: chatVisible,
@@ -556,18 +550,18 @@ class _WideWatchBottomControls extends StatelessWidget {
                           : null,
                       size: 26,
                     ),
-                  ],
-                ),
-                center: timeControls,
-                right: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
                     PlayerVolumeButton(
                       muted: muted,
                       volume: volume,
                       onToggleMute: onToggleMute,
                       onVolumeChanged: onVolumeChanged,
                     ),
+                  ],
+                ),
+                center: timeControls,
+                right: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     SizedBox.square(
                       dimension: 36,
                       child: QualityButton(
@@ -580,10 +574,6 @@ class _WideWatchBottomControls extends StatelessWidget {
                         currentVariant: currentVariant,
                         onChanged: playerRuntime.busy ? null : onQualityChanged,
                       ),
-                    ),
-                    PlayerMoreActionsButton(
-                      playerRuntime: playerRuntime,
-                      player: player,
                     ),
                     _ChatToggleButton(
                       chatVisible: chatVisible,
@@ -848,7 +838,7 @@ class _WatchControlZoneLayout extends MultiChildLayoutDelegate {
   void performLayout(Size size) {
     final left = layoutChild(
       _ControlZone.left,
-      BoxConstraints(maxWidth: size.width * 0.25, maxHeight: size.height),
+      BoxConstraints(maxWidth: size.width * 0.35, maxHeight: size.height),
     );
     // Reserve readable time space on small screens; only clip side controls
     // once their combined natural widths genuinely exceed the whole dock.

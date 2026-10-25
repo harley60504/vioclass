@@ -394,7 +394,7 @@ void main() {
       );
       expect(timeLabel, findsOneWidget);
       expect(tester.getRect(find.byTooltip('音量')).width, 36);
-      if (width >= 620) {
+      if (width >= 390) {
         expect(
           tester.getRect(timeLabel).center.dx,
           closeTo(tester.getRect(strip).center.dx, 0.1),
@@ -417,8 +417,8 @@ void main() {
       if (width == 390) {
         expect(
           tester.getRect(find.byTooltip('音量')).left,
-          greaterThanOrEqualTo(tester.getRect(rightZone).left),
-          reason: 'Shifting time frees room for the volume button.',
+          greaterThanOrEqualTo(tester.getRect(leftZone).left),
+          reason: 'Volume belongs beside play in the left controls.',
         );
       }
       expect(
@@ -437,6 +437,15 @@ void main() {
         tester.getRect(find.byTooltip('全螢幕')).right,
         closeTo(tester.getRect(rightZone).right, 0.1),
       );
+      expect(find.byTooltip('播放器設定'), findsNothing);
+      expect(
+        tester.getRect(find.byTooltip('播放')).right,
+        lessThanOrEqualTo(tester.getRect(find.byTooltip('音量')).left),
+      );
+      expect(
+        tester.getRect(find.byTooltip('音量')).right,
+        lessThanOrEqualTo(tester.getRect(timeLabel).left),
+      );
       if (width >= 720) {
         expect(
           tester.getRect(timeLabel).center.dx,
@@ -453,8 +462,8 @@ void main() {
         expect(find.byIcon(Icons.forward_10_rounded), findsNothing);
         final viewportRect = tester.getRect(volumeViewport);
         expect(
-          viewportRect.left - tester.getRect(timeLabel).right,
-          greaterThanOrEqualTo(11.9),
+          tester.getRect(timeLabel).left - viewportRect.right,
+          greaterThanOrEqualTo(5.9),
         );
         expect(
           tester.widget<SingleChildScrollView>(volumeViewport).clipBehavior,
@@ -463,8 +472,8 @@ void main() {
         await tester.drag(volumeViewport, const Offset(180, 0));
         await tester.pumpAndSettle();
         expect(
-          tester.getRect(volumeViewport).left - tester.getRect(timeLabel).right,
-          greaterThanOrEqualTo(11.9),
+          tester.getRect(timeLabel).left - tester.getRect(volumeViewport).right,
+          greaterThanOrEqualTo(5.9),
         );
       }
       final play = find.byIcon(Icons.play_arrow);

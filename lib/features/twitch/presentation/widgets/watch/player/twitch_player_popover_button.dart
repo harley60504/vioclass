@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/twitch_ui_tokens.dart';
@@ -99,6 +100,14 @@ class _PlayerPopoverButtonState extends State<PlayerPopoverButton> {
                 onHover: (_) => _wake(),
                 child: Listener(
                   onPointerDown: (_) => _wake(),
+                  onPointerSignal: (event) {
+                    if (event is PointerScrollEvent) {
+                      GestureBinding.instance.pointerSignalResolver.register(
+                        event,
+                        (_) {},
+                      );
+                    }
+                  },
                   child: Focus(
                     autofocus: true,
                     onKeyEvent: (_, event) {

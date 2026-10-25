@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 typedef PlayerSettingsDrawerBuilder =
@@ -95,7 +96,15 @@ class _PlayerSettingsDrawerHostState extends State<PlayerSettingsDrawerHost> {
                         }
                         return KeyEventResult.ignored;
                       },
-                      child: _builder!(context, _close),
+                      child: Listener(
+                        onPointerSignal: (event) {
+                          if (event is PointerScrollEvent) {
+                            GestureBinding.instance.pointerSignalResolver
+                                .register(event, (_) {});
+                          }
+                        },
+                        child: _builder!(context, _close),
+                      ),
                     ),
                   ),
                 ),

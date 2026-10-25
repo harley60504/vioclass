@@ -5,6 +5,7 @@ import '../../../../models/playback/twitch_m3u8_variant.dart';
 import '../../../localization/vioclass_localizations.dart';
 import '../../../watch/controllers/twitch_adaptive_quality_controller.dart';
 import 'twitch_player_popover_button.dart';
+import 'twitch_player_more_actions_button.dart';
 
 class QualityButton extends StatefulWidget {
   final List<TwitchM3u8Variant> variants;
@@ -130,6 +131,17 @@ class _QualityButtonState extends State<QualityButton> {
                   ? null
                   : () => setState(() => _page = 'speed'),
             ),
+            if (widget.player != null)
+              ListTile(
+                dense: true,
+                leading: const Icon(Icons.settings_rounded),
+                title: Text(l10n.t('播放器設定')),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  close();
+                  unawaited(showTwitchPlayerSettings(this.context));
+                },
+              ),
           ] else ...[
             ListTile(
               dense: true,

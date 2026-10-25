@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
@@ -7,6 +8,7 @@ import 'package:vioclass/features/twitch/models/playback/twitch_m3u8_variant.dar
 import 'package:vioclass/features/twitch/presentation/widgets/watch/player/twitch_player_more_actions_button.dart';
 import 'package:vioclass/features/twitch/presentation/widgets/watch/player/twitch_player_quality_button.dart';
 import 'package:vioclass/features/twitch/presentation/widgets/watch/player/twitch_player_settings_drawer.dart';
+import 'package:vioclass/features/twitch/presentation/widgets/watch/twitch_watch_responsive_body.dart';
 import 'package:vioclass/features/twitch/services/playback/twitch_playlist_player_runtime.dart';
 
 class _Player implements Player {
@@ -33,6 +35,107 @@ void main() {
     // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
   });
+  testWidgets(
+    'Quick menu scroll and settings stay inside the player instead of About',
+    (tester) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final player = _Player();
+      final variants = List.generate(
+        20,
+        (index) =>
+            TwitchM3u8Variant(name: 'quality-$index', url: 'fixture-$index'),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: TwitchWatchResponsiveBody(
+              chatVisible: true,
+              chatPanelWidth: 300,
+              chatPanelRatio: .25,
+              minChatPanelWidth: 200,
+              maxEffectiveMinChatPanelWidth: 300,
+              maxChatPanelWidth: 500,
+              minChatPanelRatio: .2,
+              minStoredChatPanelRatio: .15,
+              maxChatPanelRatio: .5,
+              player: PlayerSettingsDrawerHost(
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: QualityButton(
+                    player: player,
+                    variants: variants,
+                    currentVariant: variants.first,
+                    onChanged: (_) {},
+                  ),
+                ),
+              ),
+              chat: const Text('chat'),
+              belowPlayer: const SizedBox(height: 1500, child: Text('About')),
+              onSetChatPanelWidthForViewport:
+                  ({required viewportWidth, required value}) {},
+              onPersistChatPanelWidth: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('畫質'));
+      await tester.pumpAndSettle();
+      final popup = find.byKey(const ValueKey('player-anchored-popover'));
+      final scrollable = find.descendant(
+        of: popup,
+        matching: find.byType(Scrollable),
+      );
+      final position = tester.state<ScrollableState>(scrollable).position;
+      final page = tester.widget<PageView>(find.byType(PageView)).controller!;
+      final point = tester.getCenter(popup);
+      await tester.sendEventToBinding(
+        PointerScrollEvent(position: point, scrollDelta: const Offset(0, 150)),
+      );
+      await tester.pumpAndSettle();
+      expect(position.pixels, greaterThan(0));
+      expect(page.page, 0);
+      position.jumpTo(position.maxScrollExtent);
+      await tester.pump();
+      await tester.sendEventToBinding(
+        PointerScrollEvent(position: point, scrollDelta: const Offset(0, 150)),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        page.page,
+        0,
+        reason: 'Wheel at the menu edge must not enter About',
+      );
+      await tester.drag(popup, const Offset(0, 100));
+      await tester.pumpAndSettle();
+      expect(page.page, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.tune_rounded));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('播放器設定'));
+      await tester.pumpAndSettle();
+      expect(popup, findsNothing);
+      final drawer = find.byKey(const ValueKey('player-settings-drawer'));
+      expect(drawer, findsOneWidget);
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: tester.getCenter(drawer),
+          scrollDelta: const Offset(0, 150),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(page.page, 0);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    },
+  );
   for (final height in [160.0, 360.0]) {
     testWidgets(
       'Settings slide inside player and do not block chat height=$height',

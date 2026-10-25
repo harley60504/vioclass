@@ -259,7 +259,9 @@ void main() {
           TwitchMediaKitPlayerHost.restoreOpenStarted,
           opensBeforeResume + 3,
         );
-        await tester.tap(find.byTooltip('播放器設定').hitTestable());
+        await tester.tap(find.byIcon(Icons.tune_rounded).hitTestable());
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.tap(find.text('播放器設定'));
         await _wait(
           tester,
           () => find

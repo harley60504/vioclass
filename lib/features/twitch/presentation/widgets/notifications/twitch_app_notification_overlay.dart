@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import '../../localization/vioclass_localizations.dart';
 import '../../navigation/twitch_route_observer.dart';
 import '../../settings/twitch_app_settings_launcher.dart';
 import '../../../services/notifications/twitch_app_notification_service.dart';
+import '../../../services/window/twitch_fullscreen_controller.dart';
 import 'twitch_notification_card.dart';
 
 class TwitchAppNotificationOverlay extends StatefulWidget {
@@ -29,6 +31,7 @@ class _TwitchAppNotificationOverlayState
   bool _isNotificationPanelOpen = false;
   bool _isWindowMaximized = false;
   bool _isWindowFullScreen = false;
+  int _fullscreenRevision = 0;
 
   bool get _usesCustomWindowsFrame =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
@@ -39,19 +42,25 @@ class _TwitchAppNotificationOverlayState
     WidgetsBinding.instance.addObserver(this);
     if (_usesCustomWindowsFrame) {
       windowManager.addListener(this);
+      TwitchFullscreenController.desktopFullscreen.addListener(
+        _syncRequestedFullscreen,
+      );
       windowManager.isMaximized().then((value) {
         if (mounted) setState(() => _isWindowMaximized = value);
       });
-      windowManager.isFullScreen().then((value) {
-        if (mounted) setState(() => _isWindowFullScreen = value);
-      });
+      unawaited(_refreshNativeFullscreen());
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    if (_usesCustomWindowsFrame) windowManager.removeListener(this);
+    if (_usesCustomWindowsFrame) {
+      windowManager.removeListener(this);
+      TwitchFullscreenController.desktopFullscreen.removeListener(
+        _syncRequestedFullscreen,
+      );
+    }
     twitchAppNotificationCenter.resumeAutoDismiss();
     super.dispose();
   }
@@ -161,12 +170,30 @@ class _TwitchAppNotificationOverlayState
 
   @override
   void onWindowEnterFullScreen() {
-    if (mounted) setState(() => _isWindowFullScreen = true);
+    unawaited(_refreshNativeFullscreen());
   }
 
   @override
   void onWindowLeaveFullScreen() {
-    if (mounted) setState(() => _isWindowFullScreen = false);
+    unawaited(_refreshNativeFullscreen());
+  }
+
+  void _syncRequestedFullscreen() {
+    final state = TwitchFullscreenController.desktopFullscreen.value;
+    if (!mounted || state == null) return;
+    _fullscreenRevision++;
+    setState(() => _isWindowFullScreen = state.enabled);
+  }
+
+  Future<void> _refreshNativeFullscreen() async {
+    final revision = ++_fullscreenRevision;
+    try {
+      final enabled = await windowManager.isFullScreen();
+      if (!mounted || revision != _fullscreenRevision) return;
+      setState(() => _isWindowFullScreen = enabled);
+    } catch (_) {
+      // Retain the last confirmed state if the platform cannot answer.
+    }
   }
 
   @override

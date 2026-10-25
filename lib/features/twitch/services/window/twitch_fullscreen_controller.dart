@@ -12,6 +12,11 @@ class TwitchFullscreenController {
   const TwitchFullscreenController._();
 
   static bool _desktopInitialized = false;
+  static final _desktopFullscreen =
+      ValueNotifier<({bool enabled, int revision})?>(null);
+
+  static ValueListenable<({bool enabled, int revision})?>
+  get desktopFullscreen => _desktopFullscreen;
 
   static bool get isDesktopPlatform {
     if (kIsWeb) return false;
@@ -38,9 +43,15 @@ class TwitchFullscreenController {
     await _ensureDesktopInitialized();
 
     final alreadyFullscreen = await windowManager.isFullScreen();
-    if (alreadyFullscreen == enabled) return;
-
-    await windowManager.setFullScreen(enabled);
+    if (alreadyFullscreen != enabled) {
+      await windowManager.setFullScreen(enabled);
+    }
+    // A successful request must update the custom frame even when the native
+    // enter/leave notification is missing. Publish no-op requests as well.
+    _desktopFullscreen.value = (
+      enabled: enabled,
+      revision: (_desktopFullscreen.value?.revision ?? 0) + 1,
+    );
     if (enabled) {
       await windowManager.focus();
     }

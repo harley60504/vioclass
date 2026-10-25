@@ -365,7 +365,10 @@ class _PlayerColumnState extends State<_PlayerColumn> {
         Listener(
           onPointerSignal: (event) {
             if (event is PointerScrollEvent && event.scrollDelta.dy > 0) {
-              _showPage(1);
+              GestureBinding.instance.pointerSignalResolver.register(
+                event,
+                (_) => _showPage(1),
+              );
             }
           },
           child: GestureDetector(
@@ -387,7 +390,10 @@ class _PlayerColumnState extends State<_PlayerColumn> {
                   event.scrollDelta.dy < 0 &&
                   _aboutScrollController.hasClients &&
                   _aboutScrollController.offset <= 0) {
-                _showPage(0);
+                GestureBinding.instance.pointerSignalResolver.register(
+                  event,
+                  (_) => _showPage(0),
+                );
               }
             },
             child: NotificationListener<ScrollNotification>(
