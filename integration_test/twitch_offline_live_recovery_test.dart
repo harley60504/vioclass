@@ -1,5 +1,6 @@
 // ignore_for_file: invalid_use_of_visible_for_testing_member
 import 'dart:io';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,7 @@ import 'package:vioclass/features/twitch/models/discovery/twitch_live_stream.dar
 import 'package:vioclass/features/twitch/models/playback/twitch_m3u8_variant.dart';
 import 'package:vioclass/features/twitch/presentation/pages/twitch_watch_page.dart';
 import 'package:vioclass/features/twitch/presentation/pages/watch/twitch_watch_playback_state.dart';
+import 'package:vioclass/features/twitch/presentation/widgets/watch/player/twitch_watch_controls_overlay.dart';
 import 'package:vioclass/features/twitch/presentation/watch/twitch_watch_playback_kind.dart';
 import 'package:vioclass/features/twitch/presentation/watch/controllers/twitch_watch_preferences_controller.dart';
 import 'package:vioclass/features/twitch/services/discovery/twitch_discovery_service.dart';
@@ -235,16 +237,69 @@ void main() {
           TwitchMediaKitPlayerHost.restoreOpenStarted,
           opensBeforeResume + 2,
         );
+        await player.pause();
+        await tester.pump(const Duration(milliseconds: 200));
+        final pointer = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await pointer.addPointer(
+          location: tester.getCenter(find.byType(WatchControlsOverlay)),
+        );
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.tap(find.byTooltip('播放').hitTestable());
+        await _wait(
+          tester,
+          () =>
+              runtime.liveResets == 3 &&
+              player.state.playing &&
+              !state.liveTimelineActionInFlight,
+          'paused LIVE restarts at the edge',
+        );
+        expect(
+          TwitchMediaKitPlayerHost.restoreOpenStarted,
+          opensBeforeResume + 3,
+        );
+        await tester.tap(find.byTooltip('播放器設定').hitTestable());
+        await _wait(
+          tester,
+          () => find
+              .byKey(const ValueKey('player-settings-drawer'))
+              .evaluate()
+              .isNotEmpty,
+          'player settings drawer',
+        );
+        final close = find.descendant(
+          of: find.byKey(const ValueKey('player-settings-drawer')),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is IconButton && widget.tooltip == '關閉',
+          ),
+        );
+        tester.widget<IconButton>(close).onPressed!();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.byIcon(Icons.tune_rounded).hitTestable());
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.tap(find.text('播放速度'));
+        await tester.pump(const Duration(milliseconds: 200));
+        await tester.tap(find.text('1.5×').last);
+        await _wait(
+          tester,
+          () => player.state.rate == 1.5,
+          'native playback speed 1.5x',
+        );
+        expect(double.parse(player.getProperty('speed')), closeTo(1.5, .01));
+        await tester.pump(const Duration(milliseconds: 300));
+        await player.setRate(1);
+        await pointer.removePointer();
         state.markOwnedPlayback(
           kind: TwitchWatchPlaybackKind.liveDvr,
           mediaUri: media.uri.toString(),
         );
         final dvrPosition = player.state.position;
         await state.recoverWatchAfterForeground(shouldProbeLiveRecovery: true);
-        expect(runtime.liveResets, 2, reason: 'DVR keeps its viewing position');
+        expect(runtime.liveResets, 3, reason: 'DVR keeps its viewing position');
         expect(
           TwitchMediaKitPlayerHost.restoreOpenStarted,
-          opensBeforeResume + 2,
+          opensBeforeResume + 3,
         );
         expect(player.state.position, greaterThanOrEqualTo(dvrPosition));
       } finally {

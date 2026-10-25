@@ -21,7 +21,32 @@ Color parseTwitchChatUserColorOrFallback({
   required String color,
   required String login,
 }) {
-  return parseTwitchChatUserColor(color) ?? fallbackTwitchChatUserColor(login);
+  return readableTwitchChatUserColor(
+    parseTwitchChatUserColor(color) ?? fallbackTwitchChatUserColor(login),
+  );
+}
+
+final _readableNameColors = <Color, Color>{};
+
+/// Adjust only the rendered name; keep the source Twitch color unchanged.
+Color readableTwitchChatUserColor(Color color) {
+  final cached = _readableNameColors[color];
+  if (cached != null) return cached;
+  final backgroundLuminance = TwitchUiColors.surfaceRaised.computeLuminance();
+  var adjusted = color;
+  var hsl = HSLColor.fromColor(color);
+  for (var step = 0; step < 20; step++) {
+    final contrast =
+        (adjusted.computeLuminance() + .05) / (backgroundLuminance + .05);
+    if (contrast >= 4.5) break;
+    hsl = hsl.withLightness(hsl.lightness + (1 - hsl.lightness) * .1);
+    adjusted = hsl.toColor();
+  }
+  if (_readableNameColors.length >= 2000) {
+    _readableNameColors.remove(_readableNameColors.keys.first);
+  }
+  _readableNameColors[color] = adjusted;
+  return adjusted;
 }
 
 Color? parseTwitchChatUserColor(String value) {

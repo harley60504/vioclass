@@ -42,6 +42,12 @@ class _Streams implements PlayerStream {
 
 class _Player implements Player {
   final seeks = <Duration>[];
+  int plays = 0;
+  @override
+  Future<void> play({bool synchronized = true}) async {
+    plays++;
+  }
+
   @override
   PlayerState get state => _State();
   @override
@@ -54,6 +60,8 @@ class _Player implements Player {
 }
 
 class _Runtime implements TwitchPlaylistPlayerRuntime {
+  @override
+  bool get busy => false;
   @override
   bool get usingExternalVodPlayback => true;
   @override
@@ -72,6 +80,55 @@ class _LiveClock extends TwitchPlaybackTimelineController {
 }
 
 void main() {
+  for (final kind in [
+    TwitchWatchPlaybackKind.live,
+    TwitchWatchPlaybackKind.liveDvr,
+    TwitchWatchPlaybackKind.vod,
+    TwitchWatchPlaybackKind.clip,
+  ]) {
+    testWidgets('Resume uses LIVE edge only for plain live: $kind', (
+      tester,
+    ) async {
+      final player = _Player();
+      var liveResumes = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: SizedBox(
+                height: 80,
+                child: WatchBottomControlBar(
+                  player: player,
+                  playerRuntime: _Runtime(),
+                  muted: false,
+                  volume: 50,
+                  fullscreen: false,
+                  chatVisible: true,
+                  showFullscreenButton: false,
+                  onToggleMute: null,
+                  onVolumeChanged: null,
+                  qualityVariants: const [],
+                  currentVariant: null,
+                  onQualityChanged: null,
+                  onToggleChat: null,
+                  onToggleFullscreen: null,
+                  playbackKind: kind,
+                  onReturnToLive: () => liveResumes++,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byTooltip('播放'));
+      await tester.pump();
+      expect(liveResumes, kind == TwitchWatchPlaybackKind.live ? 1 : 0);
+      expect(player.plays, kind == TwitchWatchPlaybackKind.live ? 0 : 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    });
+  }
   testWidgets(
     'limited window shares clock and freezes its target during drag',
     (tester) async {

@@ -23,6 +23,45 @@ const audio = TwitchM3u8Variant(
 );
 
 void main() {
+  for (final bottom in [true, false]) {
+    testWidgets(
+      'Quality popup stays anchored inside narrow viewport bottom=$bottom',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 500);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: Align(
+                alignment: bottom ? Alignment.bottomRight : Alignment.topLeft,
+                child: QualityButton(
+                  variants: const [source, low],
+                  currentVariant: source,
+                  onChanged: (_) {},
+                ),
+              ),
+            ),
+          ),
+        );
+        final button = tester.getRect(find.byIcon(Icons.tune_rounded));
+        await tester.tap(find.byIcon(Icons.tune_rounded));
+        await tester.pumpAndSettle();
+        final popup = tester.getRect(
+          find.byKey(const ValueKey('player-anchored-popover')),
+        );
+        expect(popup.left, greaterThanOrEqualTo(0));
+        expect(popup.right, lessThanOrEqualTo(320));
+        if (bottom) {
+          expect(popup.bottom, lessThan(button.top));
+        } else {
+          expect(popup.top, greaterThan(button.bottom));
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
   for (final enabled in [true, false]) {
     testWidgets('quality popup availability follows callback $enabled', (
       tester,
@@ -41,9 +80,9 @@ void main() {
       );
       await tester.tap(find.byIcon(Icons.tune_rounded));
       await tester.pumpAndSettle();
-      final items = tester.widgetList<PopupMenuItem<TwitchM3u8Variant>>(
-        find.byType(PopupMenuItem<TwitchM3u8Variant>),
-      );
+      await tester.tap(find.text('畫質'));
+      await tester.pumpAndSettle();
+      final items = tester.widgetList<ListTile>(find.byType(ListTile)).skip(1);
       expect(items.length, 2);
       expect(items.every((item) => item.enabled == enabled), isTrue);
       await tester.tap(find.text('360p'));
@@ -69,12 +108,10 @@ void main() {
     );
     await tester.tap(find.byIcon(Icons.tune_rounded));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('畫質').first);
+    await tester.pumpAndSettle();
     expect(
-      tester
-          .widget<PopupMenuItem<TwitchM3u8Variant>>(
-            find.byType(PopupMenuItem<TwitchM3u8Variant>),
-          )
-          .enabled,
+      tester.widget<ListTile>(find.byType(ListTile).last).enabled,
       isFalse,
     );
     expect(selections, isEmpty);

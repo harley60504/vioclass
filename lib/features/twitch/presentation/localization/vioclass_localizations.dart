@@ -92,6 +92,10 @@ class VioClassLocalizations {
 }
 
 const Map<String, String> _englishText = <String, String>{
+  '播放器設定': 'Player settings',
+  '播放速度': 'Playback speed',
+  '播放速度設定失敗': 'Could not change playback speed',
+  '最高畫質': 'Highest quality',
   '列車結束': 'Train ended',
   '升級！': 'Level up!',
   '確認下注': 'Confirm prediction',

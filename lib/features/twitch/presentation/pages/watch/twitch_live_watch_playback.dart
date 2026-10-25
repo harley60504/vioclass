@@ -335,7 +335,12 @@ extension TwitchLiveWatchPlaybackMethods on TwitchWatchPageState {
       return;
     }
     if (!watchPorts.player.runtime.usingExternalVodPlayback) {
-      debugPrint('[LiveDvrBridge] return to low-latency live ignored');
+      await reconcileVisibleRoutePlayback(
+        forceOpen: true,
+        forceProxyReconnect: true,
+      );
+      if (!mounted) return;
+      playbackTimelineController.returnToLive();
       return;
     }
     debugPrint('[LiveDvrBridge] return external replay to low-latency live');

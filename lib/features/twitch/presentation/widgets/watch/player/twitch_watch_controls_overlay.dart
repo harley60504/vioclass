@@ -17,6 +17,7 @@ import 'twitch_watch_top_action_bar.dart';
 import '../../../settings/twitch_player_settings_controller.dart';
 import 'twitch_player_seek_gestures.dart';
 import 'twitch_player_volume_control.dart';
+import 'twitch_player_settings_drawer.dart';
 
 class WatchControlsOverlay extends StatefulWidget {
   final bool loading;
@@ -271,53 +272,55 @@ class _WatchControlsOverlayState extends State<WatchControlsOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: _keyboardFocusNode,
-      autofocus: true,
-      onKeyEvent: _handleKeyEvent,
-      child: NotificationListener<VolumeControlInteraction>(
-        onNotification: (_) {
-          _showAndRestartAutoHide();
-          return true;
-        },
-        child: _WatchControlsInteractionLayer(
-          onWakeControls: _showAndRestartAutoHide,
-          onRequestKeyboardFocus: _requestKeyboardFocus,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: PlayerSeekGestures(
-                  controller: widget.playbackTimelineController,
-                  enabled: _gesturesReady && !widget.loading && !_hasError,
-                  doubleTapEnabled: _gestureSettings.doubleTapSeekEnabled,
-                  dragEnabled: _gestureSettings.dragSeekEnabled,
-                  limitToLiveBuffer: !widget.hasFullLiveDvr,
-                  onJump: (seconds) {
-                    _showAndRestartAutoHide();
-                    return _jumpBy(seconds);
-                  },
-                  onSeek: (target) {
-                    _showAndRestartAutoHide();
-                    widget.playbackTimelineController?.seekTo(
-                      target,
-                      _commitSeek,
-                    );
-                  },
+    return PlayerSettingsDrawerHost(
+      child: Focus(
+        focusNode: _keyboardFocusNode,
+        autofocus: true,
+        onKeyEvent: _handleKeyEvent,
+        child: NotificationListener<VolumeControlInteraction>(
+          onNotification: (_) {
+            _showAndRestartAutoHide();
+            return true;
+          },
+          child: _WatchControlsInteractionLayer(
+            onWakeControls: _showAndRestartAutoHide,
+            onRequestKeyboardFocus: _requestKeyboardFocus,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: PlayerSeekGestures(
+                    controller: widget.playbackTimelineController,
+                    enabled: _gesturesReady && !widget.loading && !_hasError,
+                    doubleTapEnabled: _gestureSettings.doubleTapSeekEnabled,
+                    dragEnabled: _gestureSettings.dragSeekEnabled,
+                    limitToLiveBuffer: !widget.hasFullLiveDvr,
+                    onJump: (seconds) {
+                      _showAndRestartAutoHide();
+                      return _jumpBy(seconds);
+                    },
+                    onSeek: (target) {
+                      _showAndRestartAutoHide();
+                      widget.playbackTimelineController?.seekTo(
+                        target,
+                        _commitSeek,
+                      );
+                    },
+                  ),
                 ),
-              ),
-              Positioned.fill(
-                child: _PlayerDimOverlay(visible: widget.loading),
-              ),
-              _FadingWatchChrome(
-                visible: _visible,
-                fadeDuration: _fadeDuration,
-                child: _WatchChromeStack(widget: widget, hasError: _hasError),
-              ),
-              _WatchErrorOverlay(
-                error: widget.error,
-                runtimeError: widget.runtimeError,
-              ),
-            ],
+                Positioned.fill(
+                  child: _PlayerDimOverlay(visible: widget.loading),
+                ),
+                _FadingWatchChrome(
+                  visible: _visible,
+                  fadeDuration: _fadeDuration,
+                  child: _WatchChromeStack(widget: widget, hasError: _hasError),
+                ),
+                _WatchErrorOverlay(
+                  error: widget.error,
+                  runtimeError: widget.runtimeError,
+                ),
+              ],
+            ),
           ),
         ),
       ),

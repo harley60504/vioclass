@@ -75,6 +75,7 @@ class TwitchUiColors {
   static const Color surfaceHover = Color(0xFF2C2C31);
   static const Color surfaceSelected = Color(0xFF352957);
   static const Color surfacePlayer = Color(0xFF09070D);
+  static const Color playerOverlay = Color(0xDB141417);
   static const Color surfaceGlass = Color(0xFF1A1A1E);
 
   // Backward-compatible aliases. New code should prefer semantic names above.

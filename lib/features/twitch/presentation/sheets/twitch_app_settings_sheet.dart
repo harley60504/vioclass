@@ -767,6 +767,11 @@ class _TrustedDomainsControlState extends State<_TrustedDomainsControl> {
   }
 }
 
+/// Reuse the same preferences from the player without duplicating their state.
+Widget buildTwitchPlayerSettingsPane(
+  TwitchPlayerSettingsController controller,
+) => _PlayerSettingsPane(controller: controller);
+
 class _PlayerSettingsPane extends StatelessWidget {
   final TwitchPlayerSettingsController controller;
 

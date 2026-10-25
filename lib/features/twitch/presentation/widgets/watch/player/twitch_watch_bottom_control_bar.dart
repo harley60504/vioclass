@@ -397,6 +397,11 @@ class _CompactWatchBottomControls extends StatelessWidget {
                     _PlayPauseButton(
                       player: player,
                       playing: playing,
+                      onResumeLive:
+                          playbackKind == TwitchWatchPlaybackKind.live &&
+                              !playerRuntime.usingLiveTimelineReplay
+                          ? onReturnToLive
+                          : null,
                       size: veryNarrow ? 26 : 28,
                       dense: true,
                     ),
@@ -416,10 +421,19 @@ class _CompactWatchBottomControls extends StatelessWidget {
                     SizedBox.square(
                       dimension: 36,
                       child: QualityButton(
+                        player: player,
+                        automaticEnabled:
+                            playbackKind != TwitchWatchPlaybackKind.liveDvr &&
+                            !playerRuntime.usingLiveTimelineReplay &&
+                            !playerRuntime.busy,
                         variants: qualityVariants,
                         currentVariant: currentVariant,
-                        onChanged: onQualityChanged,
+                        onChanged: playerRuntime.busy ? null : onQualityChanged,
                       ),
+                    ),
+                    PlayerMoreActionsButton(
+                      playerRuntime: playerRuntime,
+                      player: player,
                     ),
                     _ChatToggleButton(
                       chatVisible: chatVisible,
@@ -435,7 +449,6 @@ class _CompactWatchBottomControls extends StatelessWidget {
                         onPressed: onToggleFullscreen,
                       ),
                     const AndroidPipButton(dense: true, size: 22),
-                    PlayerMoreActionsButton(playerRuntime: playerRuntime),
                   ],
                 ),
               ),
@@ -536,6 +549,11 @@ class _WideWatchBottomControls extends StatelessWidget {
                     _PlayPauseButton(
                       player: player,
                       playing: playing,
+                      onResumeLive:
+                          playbackKind == TwitchWatchPlaybackKind.live &&
+                              !playerRuntime.usingLiveTimelineReplay
+                          ? onReturnToLive
+                          : null,
                       size: 26,
                     ),
                   ],
@@ -553,10 +571,19 @@ class _WideWatchBottomControls extends StatelessWidget {
                     SizedBox.square(
                       dimension: 36,
                       child: QualityButton(
+                        player: player,
+                        automaticEnabled:
+                            playbackKind != TwitchWatchPlaybackKind.liveDvr &&
+                            !playerRuntime.usingLiveTimelineReplay &&
+                            !playerRuntime.busy,
                         variants: qualityVariants,
                         currentVariant: currentVariant,
-                        onChanged: onQualityChanged,
+                        onChanged: playerRuntime.busy ? null : onQualityChanged,
                       ),
+                    ),
+                    PlayerMoreActionsButton(
+                      playerRuntime: playerRuntime,
+                      player: player,
                     ),
                     _ChatToggleButton(
                       chatVisible: chatVisible,
@@ -570,7 +597,6 @@ class _WideWatchBottomControls extends StatelessWidget {
                         onPressed: onToggleFullscreen,
                       ),
                     const AndroidPipButton(dense: true, size: 20),
-                    PlayerMoreActionsButton(playerRuntime: playerRuntime),
                   ],
                 ),
               ),
@@ -690,12 +716,14 @@ class _PlayPauseButton extends StatelessWidget {
   final bool playing;
   final double size;
   final bool dense;
+  final VoidCallback? onResumeLive;
 
   const _PlayPauseButton({
     required this.player,
     required this.playing,
     required this.size,
     this.dense = false,
+    this.onResumeLive,
   });
 
   @override
@@ -707,7 +735,11 @@ class _PlayPauseButton extends StatelessWidget {
       size: size,
       dense: dense,
       onPressed: () {
-        unawaited(playing ? player.pause() : player.play());
+        if (!playing && onResumeLive != null) {
+          onResumeLive!();
+        } else {
+          unawaited(playing ? player.pause() : player.play());
+        }
       },
     );
   }

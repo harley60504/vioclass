@@ -134,8 +134,9 @@ class _VolumeButtonState extends State<PlayerVolumeButton> {
             },
             child: Material(
               key: const ValueKey('player-volume-popover'),
-              color: TwitchUiColors.surfaceRaised,
-              elevation: 6,
+              color: TwitchUiColors.playerOverlay,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
                 side: const BorderSide(color: TwitchUiColors.border),
