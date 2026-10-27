@@ -154,7 +154,7 @@ extension TwitchWatchPageChatMethods on TwitchWatchPageState {
       } catch (error) {
         if (isCurrent()) {
           showSnack(
-            error is StateError ? error.message.toString() : '私訊暫時無法開啟。',
+            error is StateError ? error.message.toString() : '悄悄話暫時無法開啟。',
           );
         }
       }

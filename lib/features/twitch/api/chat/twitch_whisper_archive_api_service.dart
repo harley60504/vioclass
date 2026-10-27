@@ -31,7 +31,7 @@ class TwitchWhisperArchiveApiService {
       for (var attempt = 0; attempt < 2; attempt++) {
         final proof = await history.integrityHeadersProvider?.call(session);
         if (proof == null || (proof['Client-Integrity'] ?? '').isEmpty) {
-          throw const TwitchWhisperException('尚未取得私訊驗證資料，未送出封存。');
+          throw const TwitchWhisperException('尚未取得悄悄話驗證資料，未送出封存。');
         }
         requireCurrent();
         final response = await history.client.postJson<dynamic>(

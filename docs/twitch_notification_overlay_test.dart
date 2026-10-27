@@ -1,7 +1,9 @@
 // ignore_for_file: avoid_relative_lib_imports, invalid_use_of_visible_for_testing_member
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../lib/features/twitch/services/notifications/twitch_app_notification_service.dart';
@@ -24,7 +26,151 @@ void main() {
     ),
   );
 
+  void useWindowsFrame(WidgetTester tester) {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    const channel = MethodChannel('window_manager');
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      channel,
+      (_) async => false,
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        channel,
+        null,
+      ),
+    );
+  }
+
+  for (final surface in ['toast', 'panel', 'frame']) {
+    testWidgets(
+      'Hover notification close above the Navigator overlay surface=$surface',
+      (tester) async {
+        useWindowsFrame(tester);
+        if (surface != 'frame') {
+          twitchAppNotificationCenter.show(
+            title: 'fixture hover',
+            message: 'fixture body',
+          );
+        }
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+        try {
+          await tester.pumpWidget(
+            MaterialApp(
+              builder: (_, child) =>
+                  TwitchAppNotificationOverlay(child: child!),
+              home: const Scaffold(body: SizedBox.expand()),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 250));
+          if (surface == 'panel') {
+            await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+            await tester.pumpAndSettle();
+          }
+          await mouse.addPointer();
+          final close = surface == 'frame'
+              ? find.byIcon(Icons.close_rounded).last
+              : find.widgetWithIcon(IconButton, Icons.close_rounded).first;
+          await mouse.moveTo(tester.getCenter(close));
+          await tester.pump(const Duration(seconds: 1));
+          expect(tester.takeException(), isNull);
+        } finally {
+          await mouse.removePointer();
+          await tester.pumpWidget(const SizedBox());
+          twitchAppNotificationCenter.clear();
+          debugDefaultTargetPlatformOverride = null;
+        }
+      },
+    );
+  }
+
   for (final size in [const Size(900, 700), const Size(320, 640)]) {
+    testWidgets(
+      'Clicking outside a toast hides it without losing history or swallowing the video click $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        useWindowsFrame(tester);
+        var videoClicks = 0;
+        twitchAppNotificationCenter.show(
+          title: 'fixture toast',
+          message: 'fixture body',
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: TwitchAppNotificationOverlay(
+              child: Scaffold(
+                body: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => videoClicks++,
+                  child: const SizedBox.expand(),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 250));
+        expect(find.byType(TwitchNotificationCard), findsOneWidget);
+        await tester.tapAt(Offset(5, size.height - 30));
+        await tester.pump();
+        expect(find.byType(TwitchNotificationCard), findsNothing);
+        expect(videoClicks, 1);
+        expect(twitchAppNotificationCenter.items, hasLength(1));
+        expect(twitchAppNotificationCenter.unreadCount, 1);
+        await tester.pumpWidget(const SizedBox());
+        twitchAppNotificationCenter.clear();
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+
+    testWidgets(
+      'Notification panel keeps inside taps, closes outside, and still toggles from its bell $size',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        useWindowsFrame(tester);
+        twitchAppNotificationCenter.show(
+          title: 'fixture history',
+          message: 'fixture body',
+        );
+        await tester.pumpWidget(page());
+        await tester.pump(const Duration(milliseconds: 250));
+        final bell = find.byIcon(Icons.notifications_none_rounded);
+        await tester.tap(bell);
+        await tester.pumpAndSettle();
+        await tester.tapAt(
+          tester.getTopLeft(find.byKey(const ValueKey('notification-panel'))) +
+              const Offset(8, 8),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('notification-panel')),
+          findsOneWidget,
+        );
+        await tester.tapAt(Offset(5, size.height - 30));
+        await tester.pump();
+        expect(find.byKey(const ValueKey('notification-panel')), findsNothing);
+        expect(find.byType(TwitchNotificationCard), findsNothing);
+        expect(twitchAppNotificationCenter.items, hasLength(1));
+        await tester.tap(bell);
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('notification-panel')),
+          findsOneWidget,
+        );
+        await tester.tap(bell);
+        await tester.pump();
+        expect(find.byKey(const ValueKey('notification-panel')), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        twitchAppNotificationCenter.clear();
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+
     for (final pending in [false, true]) {
       testWidgets(
         'Account notification rejects obsolete open before repaint or late error size=$size pending=$pending',
@@ -124,7 +270,10 @@ void main() {
         of: find.text('fixture new account reward'),
         matching: find.byType(TwitchNotificationCard),
       );
-      final open = find.descendant(of: card, matching: find.text('開啟'));
+      final open = find.descendant(
+        of: card,
+        matching: find.text('fixture new account reward'),
+      );
       await tester.ensureVisible(open);
       await tester.tap(open);
       await tester.pumpAndSettle();
@@ -201,7 +350,10 @@ void main() {
         await tester.pump(const Duration(milliseconds: 250));
         await tester.tap(find.byIcon(Icons.notifications_none_rounded));
         await tester.pumpAndSettle();
-        expect(find.text('通知中心'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('notification-panel')),
+          findsOneWidget,
+        );
         expect(find.text('fixture first'), findsOneWidget);
         expect(find.text('fixture second'), findsOneWidget);
         expect(twitchAppNotificationCenter.unreadCount, 0);

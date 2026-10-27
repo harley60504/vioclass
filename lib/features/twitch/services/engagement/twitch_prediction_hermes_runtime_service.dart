@@ -204,7 +204,9 @@ class TwitchPredictionHermesGlobalRuntime {
         : null;
     final sameViewer = (_viewerUserId ?? '') == (effectiveViewerUserId ?? '');
 
-    if (sameChannel && sameViewer && _runtime.connected) {
+    if (sameChannel &&
+        sameViewer &&
+        (_runtime.connected || _runtime.connecting)) {
       if (previousPrediction != null && previousPrediction.hasPrediction) {
         TwitchPredictionHermesRealtimeBus.publishPrediction(previousPrediction);
       }
@@ -235,12 +237,24 @@ class TwitchPredictionHermesGlobalRuntime {
 }
 
 class TwitchPredictionHermesRuntimeService {
+  final WebSocketChannel Function(Uri) _connect;
+
+  TwitchPredictionHermesRuntimeService({
+    WebSocketChannel Function(Uri)? connector,
+  }) : _connect = connector ?? _openSocket;
+
+  static WebSocketChannel _openSocket(Uri uri) => IOWebSocketChannel.connect(
+    uri,
+    connectTimeout: const Duration(seconds: 15),
+  );
+
   WebSocketChannel? _socket;
   StreamSubscription<dynamic>? _subscription;
   final Map<String, String> _subscriptionTopics = <String, String>{};
 
   int _generation = 0;
   bool _connected = false;
+  bool _connecting = false;
   String? _viewerUserId;
   TwitchPredictionSnapshot? _lastPrediction;
   TwitchHermesPredictionHandler? _onPrediction;
@@ -249,6 +263,7 @@ class TwitchPredictionHermesRuntimeService {
   TwitchHermesStatusHandler? _onStatus;
 
   bool get connected => _connected;
+  bool get connecting => _connecting;
 
   Future<void> connect({
     required String? channelId,
@@ -263,14 +278,17 @@ class TwitchPredictionHermesRuntimeService {
     final safeChannelId = channelId?.trim() ?? '';
     final safeViewerId = viewerUserId?.trim();
 
-    await disconnect();
+    final cleanup = disconnect();
+    final generation = _generation;
+    _connecting = safeChannelId.isNotEmpty;
+    await cleanup;
+    if (generation != _generation) return;
 
     if (safeChannelId.isEmpty) {
       onStatus?.call('Hermes prediction skipped: missing channelId');
       return;
     }
 
-    final generation = ++_generation;
     _viewerUserId = safeViewerId == null || safeViewerId.isEmpty
         ? null
         : safeViewerId;
@@ -290,28 +308,34 @@ class TwitchPredictionHermesRuntimeService {
       final uri = Uri.parse(
         '${TwitchApiConstants.hermesWebSocketUrl}?clientId=${Uri.encodeComponent(safeClientId)}',
       );
-      final socket = IOWebSocketChannel.connect(uri);
+      final socket = _connect(uri);
       _socket = socket;
-      _connected = true;
       _emitStatus('Hermes prediction connecting...');
+      var socketClosed = false;
 
       _subscription = socket.stream.listen(
         (event) => _handleSocketEvent(event, generation),
         onError: (Object error) {
+          socketClosed = true;
           if (generation != _generation) return;
+          _connecting = false;
           _connected = false;
           _emitStatus('Hermes prediction error: $error');
         },
         onDone: () {
+          socketClosed = true;
           if (generation != _generation) return;
+          _connecting = false;
           _connected = false;
           _emitStatus('Hermes prediction disconnected');
         },
         cancelOnError: false,
       );
 
-      await Future<void>.delayed(const Duration(milliseconds: 220));
-      if (generation != _generation) return;
+      await socket.ready;
+      if (generation != _generation || socketClosed) return;
+      _connecting = false;
+      _connected = true;
 
       _subscribe('predictions-channel-v1.$safeChannelId');
       _subscribe('community-points-channel-v1.$safeChannelId');
@@ -323,6 +347,7 @@ class TwitchPredictionHermesRuntimeService {
       _emitStatus('Hermes prediction subscribed');
     } catch (error) {
       if (generation != _generation) return;
+      _connecting = false;
       _connected = false;
       _emitStatus('Hermes prediction failed: $error');
     }
@@ -330,6 +355,7 @@ class TwitchPredictionHermesRuntimeService {
 
   Future<void> disconnect() async {
     _generation++;
+    _connecting = false;
     _connected = false;
     _subscriptionTopics.clear();
     _onPrediction = null;
@@ -339,10 +365,9 @@ class TwitchPredictionHermesRuntimeService {
 
     final subscription = _subscription;
     _subscription = null;
-    await subscription?.cancel();
-
     final socket = _socket;
     _socket = null;
+    await subscription?.cancel();
     await socket?.sink.close();
   }
 

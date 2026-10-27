@@ -45,7 +45,7 @@ class TwitchWatchChatUtilityBar extends StatelessWidget {
           ),
           const SizedBox(width: 3),
           _UtilityButton(
-            tooltip: l10n.t(loadingEmotes ? '貼圖載入中' : '貼圖'),
+            tooltip: l10n.t(loadingEmotes ? '表情符號載入中' : '表情符號'),
             icon: loadingEmotes ? Icons.sync_rounded : Icons.tag_faces_rounded,
             active: loadingEmotes,
             onTap: onOpenEmotes,

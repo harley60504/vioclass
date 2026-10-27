@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.os.Build
 import android.util.Rational
+import android.util.Log
 import io.flutter.plugin.common.MethodChannel
 
 class TwitchPipBridge(
@@ -13,6 +14,7 @@ class TwitchPipBridge(
     private var channel: MethodChannel? = null
     private var sourceRectHint: Rect? = null
     private var autoPipEnabled: Boolean = false
+    private var enteringPip = false
 
     fun attach(methodChannel: MethodChannel) {
         channel = methodChannel
@@ -55,7 +57,15 @@ class TwitchPipBridge(
         return enterPip(16, 9)
     }
 
+    fun notifyPipTransitionStarted() {
+        enteringPip = true
+        logState("transition-start")
+        channel?.invokeMethod("onPipTransitionStarted", null)
+    }
+
     fun notifyPipModeChanged(isInPip: Boolean) {
+        enteringPip = false
+        logState("mode-changed")
         channel?.invokeMethod(
             "onPipModeChanged",
             mapOf("isInPip" to isInPip),
@@ -63,6 +73,7 @@ class TwitchPipBridge(
     }
 
     fun notifyActivityStarted() {
+        logState("activity-start")
         channel?.invokeMethod(
             "onActivityStarted",
             mapOf("isInPip" to isCurrentlyInPip()),
@@ -70,6 +81,7 @@ class TwitchPipBridge(
     }
 
     fun notifyActivityStopped() {
+        logState("activity-stop")
         channel?.invokeMethod(
             "onActivityStopped",
             mapOf("isInPip" to isCurrentlyInPip()),
@@ -98,7 +110,15 @@ class TwitchPipBridge(
         }
 
         updatePictureInPictureParams(width, height)
-        return activity.enterPictureInPictureMode(buildPictureInPictureParams(width, height))
+        notifyPipTransitionStarted()
+        val entered = activity.enterPictureInPictureMode(buildPictureInPictureParams(width, height))
+        if (!entered) enteringPip = false
+        logState("enter-result-$entered")
+        return entered
+    }
+
+    private fun logState(phase: String) {
+        Log.i("VioClassPip", "phase=$phase inPip=${isCurrentlyInPip()} entering=$enteringPip")
     }
 
     private fun updatePictureInPictureParams(width: Int, height: Int) {

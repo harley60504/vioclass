@@ -12,15 +12,6 @@ extension _TwitchStreamPageStatePlaybackOps on _TwitchStreamPageState {
         !pip.stoppedOutsidePictureInPicture;
     unawaited(TwitchAndroidPipController.instance.setAutoEnterEnabled(enabled));
   }
-
-  Future<void> _suspendPlaybackOutsidePictureInPicture() async {
-    TwitchAndroidPipController.instance
-        .acknowledgeStoppedOutsidePictureInPicture();
-    TwitchMiniPlayerController.instance.close(pausePlayback: true);
-    TwitchPlaybackSessionController.instance.clear();
-    await TwitchMediaKitPlayerHost.pauseShared();
-    TwitchMediaKitPlayerHost.keepPlayingWithoutSession(null);
-  }
 }
 
 extension _TwitchStreamPageStateCoreOps on _TwitchStreamPageState {

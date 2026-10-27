@@ -74,7 +74,7 @@ class _ClipCard extends StatelessWidget {
                         children: [
                           Text(
                             clip.title.trim().isEmpty
-                                ? l10n.t('未命名片段')
+                                ? l10n.t('未命名剪輯')
                                 : clip.title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -171,7 +171,7 @@ class _ClipMetaText extends StatelessWidget {
     final creator = clip.creatorName.trim();
     final l10n = context.vio;
     return Text(
-      '${creator.isEmpty ? l10n.t('已建立片段') : '${l10n.t('由')} $creator ${l10n.t('建立片段-meta')}'}'
+      '${creator.isEmpty ? l10n.t('已建立剪輯') : '${l10n.t('由')} $creator ${l10n.t('建立剪輯-meta')}'}'
       '${date.isEmpty ? '' : ' · $date'}',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,

@@ -2,6 +2,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vioclass/features/twitch/platform/android_playback/twitch_android_playback_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 import '../lib/features/twitch/presentation/settings/twitch_player_settings_controller.dart';
@@ -66,6 +67,11 @@ void main() {
         '允許 Android 子母畫面',
         TwitchPlayerSettingsController.androidPipEnabledPreferenceKey,
         (TwitchPlayerSettingsController c) => c.androidPipEnabled,
+      ),
+      (
+        '背景播放',
+        TwitchAndroidPlaybackController.backgroundEnabledKey,
+        (TwitchPlayerSettingsController c) => c.backgroundPlaybackEnabled,
       ),
       (
         '開始時靜音',

@@ -167,6 +167,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
   bool videosLoaded = false;
   bool clipsLoaded = false;
   bool panelsLoaded = false;
+  bool isPartner = false;
   int _sourceGeneration = 0;
 
   @override
@@ -198,6 +199,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
     loadingFirstPage = loadingClipsFirstPage = loadingPanels = false;
     loadingMore = loadingMoreClips = false;
     videosLoaded = clipsLoaded = panelsLoaded = false;
+    isPartner = false;
     _loadActiveTab();
   }
 
@@ -242,6 +244,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
       if (!mounted || generation != _sourceGeneration) return;
       setState(() {
         panels = loaded.panels;
+        isPartner = loaded.isPartner;
         socialLinks = loaded.socialLinks;
         loadingPanels = false;
         panelsLoaded = true;
@@ -376,7 +379,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
             ),
             Tab(
               icon: const Icon(Icons.movie_filter_rounded),
-              text: l10n.t('片段'),
+              text: l10n.clipsTitle,
             ),
             const Tab(icon: Icon(Icons.video_library_rounded), text: 'VOD'),
           ],
@@ -387,6 +390,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
         children: [
           _AboutTab(
             channel: widget.channel,
+            isPartner: isPartner,
             panels: panels,
             socialLinks: socialLinks,
             loadingPanels: loadingPanels,
@@ -433,6 +437,7 @@ class _TwitchChannelPageState extends State<TwitchChannelPage>
 }
 
 class _AboutTab extends StatelessWidget {
+  final bool isPartner;
   final TwitchFollowedChannel channel;
   final List<TwitchChannelPanel> panels;
   final List<TwitchChannelSocialLink> socialLinks;
@@ -441,6 +446,7 @@ class _AboutTab extends StatelessWidget {
   final VoidCallback onRetryPanels;
 
   const _AboutTab({
+    required this.isPartner,
     required this.channel,
     required this.panels,
     required this.socialLinks,
@@ -464,15 +470,25 @@ class _AboutTab extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    channel.displayName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          channel.displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      if (isPartner) ...[
+                        const SizedBox(width: 4),
+                        const TwitchVerifiedBadge(size: 20),
+                      ],
+                    ],
                   ),
                   if (channel.channelLogin.isNotEmpty)
                     Text(

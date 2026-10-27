@@ -147,7 +147,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('thirdParty:kap'), findsOneWidget);
       expect(find.text('official:kap'), findsNothing);
-      await tester.tap(find.byTooltip('關閉貼圖'));
+      await tester.tap(find.byTooltip('關閉表情符號'));
       expect(closed, isTrue);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());

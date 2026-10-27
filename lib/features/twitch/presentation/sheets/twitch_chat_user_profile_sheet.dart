@@ -553,7 +553,7 @@ class _ProfileState extends State<TwitchChatUserProfileCard> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
         ),
         icon: const Icon(Icons.chat_bubble_outline, size: 16),
-        label: Text(t('私訊')),
+        label: Text(t('悄悄話')),
       ),
     );
     final actions = Wrap(

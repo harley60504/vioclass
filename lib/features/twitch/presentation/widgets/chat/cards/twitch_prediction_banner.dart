@@ -108,7 +108,7 @@ class TwitchPredictionBanner extends StatelessWidget {
                   Expanded(
                     child: Text(
                       prediction.title.isEmpty
-                          ? context.vio.t('賭盤預測')
+                          ? context.vio.t('賽況預測')
                           : prediction.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -239,8 +239,8 @@ class _PredictionStatusPillState extends State<_PredictionStatusPill> {
             !widget.canceled &&
             remaining != null
         ? remaining.inSeconds > 0
-              ? '${context.vio.t('關盤')} ${_formatLockCountdown(remaining)}'
-              : context.vio.t('即將關盤')
+              ? '${context.vio.t('預測截止')} ${_formatLockCountdown(remaining)}'
+              : context.vio.t('預測即將截止')
         : context.vio.t(twitchPredictionStatusLabel(widget.label));
     final urgent =
         widget.active &&

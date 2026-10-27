@@ -153,15 +153,26 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     final revision = widget.discoveryService.viewerSession.identityRevision;
     if (revision != _observedIdentityRevision) {
       _observedIdentityRevision = revision;
-      unawaited(refreshStreams(clearExisting: true));
+      unawaited(refreshStreams(clearExisting: !_canRetainFollowingWindow()));
       return;
     }
     if (_loadedViewerAuth == null) return;
     final currentAuth = widget.discoveryService.cachedAuth;
-    if (!identical(_loadedViewerAuth, currentAuth) ||
-        currentAuth?.canReadFollows != true) {
+    if (!_canRetainFollowingWindow()) {
       unawaited(refreshStreams(clearExisting: true));
+    } else {
+      _loadedViewerAuth = currentAuth;
     }
+  }
+
+  bool _canRetainFollowingWindow() {
+    final previous = _loadedViewerAuth;
+    final current = widget.discoveryService.cachedAuth;
+    return previous != null &&
+        current != null &&
+        previous.viewerId.isNotEmpty &&
+        previous.viewerId == current.viewerId &&
+        current.canReadFollows;
   }
 
   void _handleScroll() {
@@ -180,10 +191,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     // Keep cards during an ordinary refresh, but never carry one verified
     // identity's private following window into a new or unverified session.
-    final currentAuth = widget.discoveryService.cachedAuth;
-    if (_loadedViewerAuth != null &&
-        (!identical(_loadedViewerAuth, currentAuth) ||
-            currentAuth?.canReadFollows != true)) {
+    if (_loadedViewerAuth != null && !_canRetainFollowingWindow()) {
       clearExisting = true;
     }
     final generation = ++_refreshGeneration;
@@ -191,7 +199,9 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
 
     setState(() {
       _refreshing = true;
-      loadingFirstPage = !hadExistingStreams;
+      loadingFirstPage =
+          !hadExistingStreams &&
+          (clearExisting || offlineFollowedChannels.isEmpty);
       errorText = null;
       paginationError = null;
       offlineError = null;
@@ -223,7 +233,23 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
       setState(() {
         _loadedViewerAuth = widget.discoveryService.cachedAuth;
         loadedStreams = refreshed.streams;
-        offlineFollowedChannels = offline.channels;
+        if (offline.errorText == null || clearExisting) {
+          offlineFollowedChannels = offline.channels;
+        } else {
+          final liveIds = refreshed.streams
+              .map((stream) => stream.userId)
+              .toSet();
+          final liveLogins = refreshed.streams
+              .map((stream) => stream.channelLogin)
+              .toSet();
+          offlineFollowedChannels = offlineFollowedChannels
+              .where(
+                (channel) =>
+                    !liveIds.contains(channel.broadcasterId) &&
+                    !liveLogins.contains(channel.channelLogin),
+              )
+              .toList(growable: false);
+        }
         nextCursor = refreshed.cursor;
         hasMore = refreshed.hasMore;
         loadingFirstPage = false;
@@ -889,7 +915,7 @@ class TwitchFollowingPageState extends State<TwitchFollowingPage> {
     final slivers = <Widget>[];
     final l10n = context.vio;
 
-    if (loadingOfflineChannels) {
+    if (loadingOfflineChannels && followedOfflineChannels.isEmpty) {
       slivers.add(
         SliverToBoxAdapter(
           child: Padding(

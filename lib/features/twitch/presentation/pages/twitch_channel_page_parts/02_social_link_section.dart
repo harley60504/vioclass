@@ -352,8 +352,8 @@ class _ClipTab extends StatelessWidget {
     if (clips.isEmpty && error != null && error.isNotEmpty) {
       return _CenteredAction(
         icon: Icons.error_outline_rounded,
-        title: l10n.t('片段讀取失敗'),
-        message: l10n.t('片段暫時讀取失敗，稍後再試或重新整理。'),
+        title: l10n.t('剪輯讀取失敗'),
+        message: l10n.t('剪輯暫時讀取失敗，稍後再試或重新整理。'),
         actionLabel: l10n.t('重試'),
         onPressed: onRetry,
       );
@@ -362,8 +362,8 @@ class _ClipTab extends StatelessWidget {
     if (clips.isEmpty) {
       return _CenteredAction(
         icon: Icons.movie_filter_outlined,
-        title: l10n.t('目前沒有片段'),
-        message: l10n.t('這個頻道沒有可顯示的精華片段。'),
+        title: l10n.t('目前沒有剪輯'),
+        message: l10n.t('這個頻道沒有可顯示的剪輯。'),
         actionLabel: l10n.t('重新整理'),
         onPressed: onRetry,
       );
@@ -375,15 +375,15 @@ class _ClipTab extends StatelessWidget {
           _mediaSearchSliver(
             context: context,
             controller: searchController,
-            hintText: l10n.t('搜尋片段'),
+            hintText: l10n.t('搜尋剪輯'),
             onChanged: onSearchChanged,
           ),
           SliverFillRemaining(
             hasScrollBody: false,
             child: _CenteredAction(
               icon: Icons.search_off_rounded,
-              title: l10n.t('找不到符合的片段'),
-              message: l10n.t('可以換個關鍵字，或清空搜尋回到全部片段。'),
+              title: l10n.t('找不到符合的剪輯'),
+              message: l10n.t('可以換個關鍵字，或清空搜尋回到全部剪輯。'),
               actionLabel: l10n.t('清空搜尋'),
               onPressed: () {
                 searchController.clear();
@@ -400,7 +400,7 @@ class _ClipTab extends StatelessWidget {
         _mediaSearchSliver(
           context: context,
           controller: searchController,
-          hintText: l10n.t('搜尋片段'),
+          hintText: l10n.t('搜尋剪輯'),
           onChanged: onSearchChanged,
         ),
         SliverPadding(
@@ -441,7 +441,7 @@ class _ClipTab extends StatelessWidget {
                       label: Text(l10n.t(loadingMore ? '載入中' : '載入更多')),
                     )
                   : Text(
-                      l10n.t('已顯示目前可讀取的片段'),
+                      l10n.t('已顯示目前可讀取的剪輯'),
                       style: const TextStyle(
                         color: Colors.white38,
                         fontSize: 12,

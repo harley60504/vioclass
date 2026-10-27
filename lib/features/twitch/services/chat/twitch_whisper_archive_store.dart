@@ -43,7 +43,7 @@ class TwitchWhisperArchiveStore {
     if (raw.length > maxBackupBytes ||
         utf8.encode(raw).length > maxBackupBytes) {
       throw TwitchWhisperArchiveException(
-        '私訊備份超過 $maxBackupBytes 位元組的 UTF-8 容量上限；原本歷史已保留。',
+        '悄悄話備份超過 $maxBackupBytes 位元組的 UTF-8 容量上限；原本歷史已保留。',
       );
     }
   }

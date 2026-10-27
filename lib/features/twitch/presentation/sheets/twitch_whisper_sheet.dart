@@ -107,7 +107,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                       '不會變更 Twitch 官方紀錄；如果官方仍有這個對話，後續同步可能再次出現。'
                 : '從 Twitch 對話列表移除與 ${peer.displayName} 的對話，'
                       '並清除本機訊息及草稿？\n\n'
-                      '這會封存對話，不會抹除對方的訊息。收到新私訊時可再次出現。',
+                      '這會封存對話，不會抹除對方的訊息。收到新悄悄話時可再次出現。',
           ),
           actions: [
             TextButton(
@@ -123,7 +123,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       );
       if (!mounted || confirmed != true || inbox.ownerId != owner) return;
       if (!_canDeleteConversation) {
-        showTwitchNotice(context, '目前正在處理私訊，請稍後再刪除。');
+        showTwitchNotice(context, '目前正在處理悄悄話，請稍後再刪除。');
         return;
       }
       if (localOnly) {
@@ -219,7 +219,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
   TwitchWhisperInboxController get inbox => widget.controller;
 
   bool get _showReceiveStatus =>
-      inbox.receiveStatus != '私訊收件已連線' && inbox.receiveStatus != '私訊收件尚未連線';
+      inbox.receiveStatus != '悄悄話收件已連線' && inbox.receiveStatus != '悄悄話收件尚未連線';
 
   bool get _showStatusRow =>
       _showReceiveStatus ||
@@ -254,7 +254,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       if (mounted) {
         showTwitchNotice(
           context,
-          context.vio.t('私訊重新授權未完成，原本對話與草稿仍保留。'),
+          context.vio.t('悄悄話重新授權未完成，原本對話與草稿仍保留。'),
           tone: TwitchNoticeTone.error,
         );
       }
@@ -493,7 +493,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(context.vio.t('複製私訊備份')),
+          title: Text(context.vio.t('複製悄悄話備份')),
           content: Text(context.vio.t('備份包含私人對話，將複製到剪貼簿。請妥善保存，不要貼到公開場合。')),
           actions: [
             TextButton(
@@ -512,7 +512,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
         final raw = await inbox.exportBackup();
         if (raw != null && mounted) {
           await Clipboard.setData(ClipboardData(text: raw));
-          if (mounted) await _showHistoryResult('私訊備份已複製到剪貼簿。');
+          if (mounted) await _showHistoryResult('悄悄話備份已複製到剪貼簿。');
         }
       } catch (error) {
         if (mounted) {
@@ -522,7 +522,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                 context.vio.t(
                   error is TwitchWhisperArchiveException
                       ? error.message
-                      : '私訊草稿或歷史儲存失敗，請稍後再試。',
+                      : '悄悄話草稿或歷史儲存失敗，請稍後再試。',
                 ),
               ),
             ),
@@ -535,7 +535,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
     final raw = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(context.vio.t('匯入私訊備份')),
+        title: Text(context.vio.t('匯入悄悄話備份')),
         content: SizedBox(
           width: 440,
           child: TextField(
@@ -544,7 +544,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
             maxLines: 8,
             decoration: InputDecoration(
               hintText: context.vio.t(
-                '貼上目前 Twitch 帳號的 VioClass 私訊備份；只合併本機歷史，不向 Twitch 發送。',
+                '貼上目前 Twitch 帳號的 VioClass 悄悄話備份；只合併本機歷史，不向 Twitch 發送。',
               ),
             ),
           ),
@@ -566,7 +566,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       final added = await inbox.importBackup(raw);
       if (mounted && added != null) {
         await _showHistoryResult(
-          '${context.vio.t('已合併本機私訊')}：$added ${context.vio.t('則新訊息')}',
+          '${context.vio.t('已合併本機悄悄話')}：$added ${context.vio.t('則新訊息')}',
         );
       }
     }
@@ -738,7 +738,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                               Expanded(
                                 child: inbox.errorText != null
                                     ? Tooltip(
-                                        message: context.vio.t('私訊錯誤詳情'),
+                                        message: context.vio.t('悄悄話錯誤詳情'),
                                         child: TextButton(
                                           onPressed: () {
                                             final error = inbox.errorText!;
@@ -748,7 +748,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                                                   AlertDialog(
                                                     scrollable: true,
                                                     title: Text(
-                                                      context.vio.t('私訊錯誤詳情'),
+                                                      context.vio.t('悄悄話錯誤詳情'),
                                                     ),
                                                     content: Text(
                                                       context.vio.t(error),
@@ -768,7 +768,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                                             );
                                           },
                                           child: Text(
-                                            context.vio.t('私訊發生問題（點此查看）'),
+                                            context.vio.t('悄悄話發生問題（點此查看）'),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -776,7 +776,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                                       )
                                     : Text(
                                         peer?.displayName ??
-                                            context.vio.t('Twitch 私訊'),
+                                            context.vio.t('Twitch 悄悄話'),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -823,7 +823,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                               if (widget.onAuthorize != null &&
                                   !inbox.sessionReady)
                                 IconButton(
-                                  tooltip: context.vio.t('重新授權私訊'),
+                                  tooltip: context.vio.t('重新授權悄悄話'),
                                   onPressed: _canAuthorize
                                       ? _reauthorize
                                       : null,
@@ -853,9 +853,9 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                 return TwitchUnifiedSheetScaffold(
                   showRefresh: false,
                   onClose: () => Navigator.of(context).pop(),
-                  title: context.vio.t('Twitch 私訊'),
+                  title: context.vio.t('Twitch 悄悄話'),
                   subtitle: inbox.ownerId == null
-                      ? context.vio.t('請先登入 Twitch 再使用私訊。')
+                      ? context.vio.t('請先登入 Twitch 再使用悄悄話。')
                       : '@${inbox.ownerName}',
                   icon: Icons.chat_bubble_outline,
                   loading:
@@ -915,7 +915,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                                       Icons.login_rounded,
                                       size: 16,
                                     ),
-                                    label: Text(context.vio.t('重新授權私訊')),
+                                    label: Text(context.vio.t('重新授權悄悄話')),
                                   ),
                               ],
                             ),
@@ -1099,7 +1099,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                     ],
                   ),
                   PopupMenuButton<String>(
-                    tooltip: context.vio.t('本機私訊歷史'),
+                    tooltip: context.vio.t('本機悄悄話歷史'),
                     enabled:
                         inbox.ownerId != null &&
                         !inbox.sending &&
@@ -1130,11 +1130,11 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                       ],
                       PopupMenuItem(
                         value: 'export',
-                        child: Text(context.vio.t('複製私訊備份')),
+                        child: Text(context.vio.t('複製悄悄話備份')),
                       ),
                       PopupMenuItem(
                         value: 'import',
-                        child: Text(context.vio.t('匯入私訊備份')),
+                        child: Text(context.vio.t('匯入悄悄話備份')),
                       ),
                     ],
                   ),
@@ -1327,7 +1327,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       tooltip: context.vio.t(
         widget.automaticSync || inbox.historyApi == null
             ? '對話操作'
-            : '同步 Twitch 私訊歷史',
+            : '同步 Twitch 悄悄話歷史',
       ),
       enabled:
           !inbox.loading &&
@@ -1405,7 +1405,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
       icon: const Icon(Icons.arrow_downward, size: 16),
       label: Text(
         _latestCount > 0
-            ? '${context.vio.t('新私訊')} · $_latestCount · ${context.vio.t('返回最新訊息')}'
+            ? '${context.vio.t('新悄悄話')} · $_latestCount · ${context.vio.t('返回最新訊息')}'
             : context.vio.t('返回最新訊息'),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -1528,7 +1528,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                     maxLines: 4,
                     enabled: !inbox.loading,
                     decoration: InputDecoration(
-                      hintText: context.vio.t('私訊內容'),
+                      hintText: context.vio.t('悄悄話內容'),
                       isDense: true,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -1539,7 +1539,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                           ? '${_message.text.length}/${peer.messageLimit}'
                           : '',
                       errorText: _message.text.length > peer.messageLimit
-                          ? context.vio.t('內容超過目前私訊額度，草稿已保留；不會截短送出。')
+                          ? context.vio.t('內容超過目前悄悄話額度，草稿已保留；不會截短送出。')
                           : null,
                     ),
                     onChanged: (text) {
@@ -1558,7 +1558,7 @@ class _WhisperSheetState extends State<_WhisperSheet> {
                           _message.text.length > peer.messageLimit
                       ? null
                       : inbox.sendActiveMessage,
-                  tooltip: context.vio.t('傳送私訊'),
+                  tooltip: context.vio.t('傳送悄悄話'),
                   icon: inbox.sending
                       ? const SizedBox(
                           width: 20,
@@ -1826,7 +1826,7 @@ class _WhisperEmotePickerState extends State<_WhisperEmotePicker> {
               .where((emote) => emote.name.toLowerCase().contains(query))
               .toList();
           if (emotes.isEmpty) {
-            return Center(child: Text(context.vio.t('目前沒有可用的官方貼圖')));
+            return Center(child: Text(context.vio.t('目前沒有可用的官方表情符號')));
           }
           return TwitchEmotePickerFlow(
             itemCount: emotes.length,

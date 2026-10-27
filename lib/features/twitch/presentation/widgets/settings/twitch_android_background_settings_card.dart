@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../localization/vioclass_localizations.dart';
 import '../../../services/notifications/twitch_android_background_controller.dart';
 import '../../../services/notifications/twitch_android_live_notification_controller.dart';
 
@@ -59,7 +60,7 @@ class _TwitchAndroidBackgroundSettingsCardState
     final opened = await controller.openReceivingNotificationSettings();
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('無法開啟通知分類，請在系統通知設定中調整「私訊背景收件」。')),
+        const SnackBar(content: Text('無法開啟通知分類，請在系統通知設定中調整「悄悄話背景收件」。')),
       );
     }
   }
@@ -76,7 +77,7 @@ class _TwitchAndroidBackgroundSettingsCardState
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('允許 VioClass 通知'),
-        content: const Text('系統目前封鎖通知，無法顯示私訊與開台提醒。請在系統設定中開啟通知，再啟用所需的通知功能。'),
+        content: const Text('系統目前封鎖通知，無法顯示悄悄話與開台提醒。請在系統設定中開啟通知，再啟用所需的通知功能。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -120,8 +121,8 @@ class _TwitchAndroidBackgroundSettingsCardState
           Material(
             type: MaterialType.transparency,
             child: SwitchListTile(
-              title: const Text('背景私訊'),
-              subtitle: const Text('關閉 App 後仍接收私訊'),
+              title: Text(context.vio.t('背景悄悄話')),
+              subtitle: Text(context.vio.t('關閉 App 後仍接收悄悄話')),
               value: controller.enabled,
               onChanged: controller.busy ? null : _setEnabled,
             ),

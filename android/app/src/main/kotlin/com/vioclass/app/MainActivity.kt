@@ -1,6 +1,7 @@
 package com.vioclass.app
 
 import android.content.res.Configuration
+import android.app.PictureInPictureUiState
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
@@ -16,7 +17,8 @@ class MainActivity : FlutterActivity() {
     override fun provideFlutterEngine(context: Context): FlutterEngine? =
         VioClassReceivingEngine.engine
 
-    override fun shouldDestroyEngineWithHost(): Boolean = !VioClassWhisperService.running
+    override fun shouldDestroyEngineWithHost(): Boolean =
+        !VioClassWhisperService.running && !VioClassPlaybackService.running
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -24,6 +26,9 @@ class MainActivity : FlutterActivity() {
         VioClassReceivingEngine.host = this
         if (!flutterEngine.plugins.has(VioClassBackgroundPlugin::class.java)) {
             flutterEngine.plugins.add(VioClassBackgroundPlugin())
+        }
+        if (!flutterEngine.plugins.has(VioClassPlaybackPlugin::class.java)) {
+            flutterEngine.plugins.add(VioClassPlaybackPlugin())
         }
         val bridge = TwitchPipBridge(this)
         bridge.attach(MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "vio_class/android_pip"))
@@ -40,7 +45,7 @@ class MainActivity : FlutterActivity() {
         updateBridge = null
         if (VioClassReceivingEngine.host === this) {
             VioClassReceivingEngine.host = null
-            if (!VioClassWhisperService.running) VioClassReceivingEngine.engine = null
+            if (!VioClassWhisperService.running && !VioClassPlaybackService.running) VioClassReceivingEngine.engine = null
         }
         super.onDestroy()
     }
@@ -72,5 +77,12 @@ class MainActivity : FlutterActivity() {
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         pipBridge?.notifyPipModeChanged(isInPictureInPictureMode)
+    }
+
+    override fun onPictureInPictureUiStateChanged(pipState: PictureInPictureUiState) {
+        super.onPictureInPictureUiStateChanged(pipState)
+        if (Build.VERSION.SDK_INT >= 35 && pipState.isTransitioningToPip) {
+            pipBridge?.notifyPipTransitionStarted()
+        }
     }
 }

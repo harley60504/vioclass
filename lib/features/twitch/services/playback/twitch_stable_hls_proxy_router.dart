@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import '../../models/playback/twitch_hls_proxy_models.dart';
 import 'twitch_hls_low_latency_proxy.dart';
 import 'twitch_sequential_live_replay_proxy.dart';
@@ -226,6 +228,9 @@ class TwitchStableHlsProxyRouter {
         startupSkipCurrentLatestSegment: startupSkipCurrentLatestSegment,
         startupMode: startupMode,
         verboseLogging: verboseLogging,
+        onLog: (message) {
+          if (message.startsWith('[HlsLifecycle]')) debugPrint(message);
+        },
       );
       nextReplay = TwitchSequentialLiveReplayProxy(
         upstreamPlaylistUrl: safeUrl,

@@ -13,6 +13,7 @@ import '../lib/features/twitch/services/discovery/twitch_discovery_service.dart'
 import '../lib/features/twitch/services/auth/twitch_viewer_session.dart';
 
 class _ViewerSession extends ChangeNotifier implements TwitchViewerSession {
+  void changed() => notifyListeners();
   bool get listening => hasListeners;
   @override
   int get identityRevision => 0;
@@ -24,7 +25,8 @@ class _Discovery implements TwitchDiscoveryService {
   @override
   final _ViewerSession viewerSession = _ViewerSession();
   @override
-  TwitchViewerAuthSnapshot get cachedAuth => _identity;
+  TwitchViewerAuthSnapshot? get cachedAuth => identity;
+  TwitchViewerAuthSnapshot? identity = _identity;
   static const _identity = TwitchViewerAuthSnapshot(
     accessToken: 'fixture-only',
     clientId: 'fixture-client',
@@ -135,10 +137,127 @@ Future<TwitchFollowingPageState> _mount(
 }
 
 void main() {
+  testWidgets('Offline cards remain during refresh and transient failure', (
+    tester,
+  ) async {
+    final service = _Discovery(
+      (_) async =>
+          TwitchStreamPageResult(streams: [_stream('live')], cursor: null),
+    );
+    service.offline = () async => const TwitchFollowedChannelPageResult(
+      channels: [
+        TwitchFollowedChannel(
+          broadcasterId: 'a',
+          broadcasterLogin: 'a',
+          broadcasterName: 'offline-a',
+          followedAt: null,
+        ),
+        TwitchFollowedChannel(
+          broadcasterId: 'b',
+          broadcasterLogin: 'b',
+          broadcasterName: 'offline-b',
+          followedAt: null,
+        ),
+      ],
+      cursor: null,
+    );
+    final state = await _mount(tester, service);
+    final pending = Completer<TwitchStreamPageResult>();
+    service.fetch = (_) => pending.future;
+    service.offline = () async => throw StateError('fixture offline outage');
+    final refresh = state.refreshStreams();
+    await tester.pump();
+    expect(state.offlineFollowedChannels.length, 2);
+    expect(find.text('offline-b'), findsOneWidget);
+    pending.complete(
+      TwitchStreamPageResult(
+        streams: [_stream('live'), _stream('a')],
+        cursor: null,
+      ),
+    );
+    await refresh;
+    await tester.pump();
+    expect(
+      state.offlineFollowedChannels.map((channel) => channel.broadcasterId),
+      ['b'],
+    );
+    expect(state.offlineError, isNotNull);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   setUp(() {
     // This docs fixture runs exclusively through flutter test.
     // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({});
+  });
+
+  testWidgets(
+    'Same viewer revalidation retains cards and scroll during refresh',
+    (tester) async {
+      final service = _Discovery(
+        (_) async =>
+            TwitchStreamPageResult(streams: _window('old'), cursor: null),
+      );
+      final state = await _mount(tester, service);
+      state.scrollController.jumpTo(240);
+      final cards = state.loadedStreams;
+      service.identity = const TwitchViewerAuthSnapshot(
+        accessToken: 'fixture-renewed',
+        clientId: 'fixture-client',
+        viewerId: 'fixture-viewer',
+        viewerLogin: 'fixture-viewer',
+        scopes: ['user:read:follows'],
+      );
+      service.viewerSession.changed();
+      await tester.pump();
+      expect(state.loadedStreams, same(cards));
+      expect(state.loadingFirstPage, isFalse);
+      final pending = Completer<TwitchStreamPageResult>();
+      service.fetch = (_) => pending.future;
+      final refresh = state.refreshStreams();
+      await tester.pump();
+      expect(state.loadedStreams, same(cards));
+      expect(state.loadingFirstPage, isFalse);
+      expect(state.scrollController.offset, 240);
+      pending.complete(
+        TwitchStreamPageResult(streams: _window('new'), cursor: null),
+      );
+      await refresh;
+      await tester.pump();
+      expect(state.loadedStreams.first.id, 'new0');
+      expect(state.scrollController.offset, 240);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
+  testWidgets('Different viewer clears the previous following window', (
+    tester,
+  ) async {
+    final service = _Discovery(
+      (_) async => TwitchStreamPageResult(
+        streams: [_stream('private-old')],
+        cursor: null,
+      ),
+    );
+    final state = await _mount(tester, service);
+    final pending = Completer<TwitchStreamPageResult>();
+    service.fetch = (_) => pending.future;
+    service.identity = const TwitchViewerAuthSnapshot(
+      accessToken: 'fixture-other',
+      clientId: 'fixture-client',
+      viewerId: 'other-viewer',
+      viewerLogin: 'other',
+      scopes: ['user:read:follows'],
+    );
+    service.viewerSession.changed();
+    await tester.pump();
+    expect(state.loadedStreams, isEmpty);
+    pending.complete(
+      TwitchStreamPageResult(streams: [_stream('new-account')], cursor: null),
+    );
+    await tester.pumpAndSettle();
+    expect(state.loadedStreams.single.id, 'new-account');
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('Following session listener moves with service and detaches', (

@@ -25,7 +25,7 @@ class FollowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlayerChromeButton(
-      tooltip: context.vio.t(followed ? '取消追隨' : '追隨'),
+      tooltip: followed ? context.vio.t('取消追隨') : context.vio.followAction,
       icon: followed ? Icons.favorite_rounded : Icons.favorite_border_rounded,
       selected: followed,
       busy: busy,
@@ -54,11 +54,9 @@ class SubscribeButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = compact ? null : context.vio.t('訂閱');
     return PlayerChromeButton(
       tooltip: context.vio.t('訂閱'),
       icon: Icons.auto_awesome_rounded,
-      label: label,
       primary: true,
       compact: compact,
       tiny: tiny,
@@ -87,7 +85,6 @@ class ChannelLibraryButton extends StatelessWidget {
     return PlayerChromeButton(
       tooltip: context.vio.t('關於 / VOD'),
       icon: Icons.video_library_rounded,
-      label: compact ? null : context.vio.t('媒體庫'),
       compact: compact,
       tiny: tiny,
       height: height,
@@ -115,7 +112,7 @@ class CreateClipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PlayerChromeButton(
-      tooltip: context.vio.t('建立片段'),
+      tooltip: context.vio.t('建立剪輯'),
       icon: Icons.movie_creation_outlined,
       busy: busy,
       compact: compact,

@@ -12,6 +12,7 @@ import '../theme/twitch_ui_tokens.dart';
 import '../widgets/responsive/twitch_responsive_layout.dart';
 import '../widgets/shared/twitch_cached_image_layer.dart';
 import '../widgets/shared/twitch_centered_text_field.dart';
+import '../widgets/shared/twitch_verified_badge.dart';
 import 'twitch_watch_page.dart';
 
 part 'twitch_channel_page_parts/01_channel_media_library_dialog.dart';

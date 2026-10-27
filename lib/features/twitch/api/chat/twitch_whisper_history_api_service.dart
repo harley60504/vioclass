@@ -35,7 +35,7 @@ class TwitchWhisperHistoryApiService {
     if (!RegExp(r'^\d+$').hasMatch(owner) ||
         !RegExp(r'^\d+$').hasMatch(peer) ||
         owner == peer) {
-      throw const TwitchWhisperException('私訊歷史的帳號或對象無效。');
+      throw const TwitchWhisperException('悄悄話歷史的帳號或對象無效。');
     }
     // Official inbox responses order IDs numerically. Lexical ordering puts
     // a 10-digit ID beginning with 1 before a smaller 9-digit ID.
@@ -60,7 +60,7 @@ class TwitchWhisperHistoryApiService {
         /* Never store credentials or fall back to another account. */
       }
     }
-    throw const TwitchWhisperException('私訊歷史需要同一帳號的 Twitch Web 授權。');
+    throw const TwitchWhisperException('悄悄話歷史需要同一帳號的 Twitch Web 授權。');
   }
 
   Future<TwitchWhisperSession?> androidSession(String owner) async {
@@ -86,7 +86,7 @@ class TwitchWhisperHistoryApiService {
   Future<TwitchWhisperSession> readSession(String owner) async {
     final android = await androidSession(owner);
     if (android == null && androidOnlyReads) {
-      throw const TwitchWhisperException('私訊需要同一帳號的 Android 授權，請重新登入。');
+      throw const TwitchWhisperException('悄悄話需要同一帳號的 Android 授權，請重新登入。');
     }
     return android ?? await webSession(owner);
   }
@@ -107,7 +107,7 @@ class TwitchWhisperHistoryApiService {
   }) async {
     final id = threadId(ownerId, peerId);
     if (cursor != null && (cursor.isEmpty || cursor.length > 4096)) {
-      throw const TwitchWhisperException('私訊歷史分頁游標無效。');
+      throw const TwitchWhisperException('悄悄話歷史分頁游標無效。');
     }
     final trace = ++_diagnosticSequence;
     final watch = Stopwatch()..start();
@@ -238,11 +238,11 @@ class TwitchWhisperHistoryApiService {
       }
       log('failed HTTP=${error.statusCode ?? 'unknown'}; no archive write');
       throw TwitchWhisperException(
-        '私訊歷史請求失敗（HTTP ${error.statusCode ?? '未知'}），既有資料保持不變。',
+        '悄悄話歷史請求失敗（HTTP ${error.statusCode ?? '未知'}），既有資料保持不變。',
       );
     } catch (_) {
       log('failed requestException; no archive write');
-      throw const TwitchWhisperException('私訊歷史讀取失敗，既有資料保持不變。');
+      throw const TwitchWhisperException('悄悄話歷史讀取失敗，既有資料保持不變。');
     }
   }
 
@@ -375,7 +375,7 @@ class TwitchWhisperHistoryApiService {
       );
     } catch (_) {
       diagnostic?.call('formatFailure stage=$stage');
-      throw TwitchWhisperException('私訊歷史回應不完整（$stage），未合併資料。');
+      throw TwitchWhisperException('悄悄話歷史回應不完整（$stage），未合併資料。');
     }
   }
 }

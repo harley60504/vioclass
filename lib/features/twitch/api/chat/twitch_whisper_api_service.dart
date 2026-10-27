@@ -63,12 +63,12 @@ class TwitchWhisperApiService {
     }
     throw TwitchWhisperException(
       primaryChanged
-          ? '主登入帳號已變更，未使用其他連結帳號執行私訊。'
+          ? '主登入帳號已變更，未使用其他連結帳號執行悄悄話。'
           : primaryId == null
-          ? '無法確認主登入帳號，請重新登入 Twitch 再使用私訊。'
+          ? '無法確認主登入帳號，請重新登入 Twitch 再使用悄悄話。'
           : scope == null
-          ? '請先登入 Twitch 再使用私訊。'
-          : '目前登入缺少私訊所需授權：$scope',
+          ? '請先登入 Twitch 再使用悄悄話。'
+          : '目前登入缺少悄悄話所需授權：$scope',
     );
   }
 
@@ -86,7 +86,7 @@ class TwitchWhisperApiService {
         !auth.validation.scopes.any(
           const {'user:read:whispers', 'user:manage:whispers'}.contains,
         )) {
-      throw const TwitchWhisperException('私訊收件授權無效。');
+      throw const TwitchWhisperException('悄悄話收件授權無效。');
     }
     await client.postJson<dynamic>(
       '${TwitchApiConstants.helixBaseUrl}/eventsub/subscriptions',
@@ -122,10 +122,10 @@ class TwitchWhisperApiService {
     final id = user['id']?.toString() ?? '';
     if (!RegExp(r'^\d+$').hasMatch(id) ||
         user['login']?.toString().toLowerCase() != clean) {
-      throw const TwitchWhisperException('私訊收件者資料不符，未開啟對話。');
+      throw const TwitchWhisperException('悄悄話收件者資料不符，未開啟對話。');
     }
     if (id == ownerId) {
-      throw const TwitchWhisperException('不能傳送私訊給自己。');
+      throw const TwitchWhisperException('不能傳送悄悄話給自己。');
     }
     return TwitchWhisperConversation(
       userId: id,
@@ -143,11 +143,11 @@ class TwitchWhisperApiService {
     if (!RegExp(r'^[1-9][0-9]*$').hasMatch(ownerId) ||
         !RegExp(r'^[1-9][0-9]*$').hasMatch(peerId) ||
         ownerId == peerId) {
-      throw const TwitchWhisperException('私訊對象 ID 無效。');
+      throw const TwitchWhisperException('悄悄話對象 ID 無效。');
     }
     final auth = await session(ownerId: ownerId);
     if (canRead != null && !canRead()) {
-      throw const TwitchWhisperException('私訊帳號或對話已變更，未讀取資料。');
+      throw const TwitchWhisperException('悄悄話帳號或對話已變更，未讀取資料。');
     }
     final result = await client.getJson<Map<String, dynamic>>(
       '${TwitchApiConstants.helixBaseUrl}/users',
@@ -168,7 +168,7 @@ class TwitchWhisperApiService {
         name is! String ||
         name.trim().isEmpty ||
         image is! String) {
-      throw const TwitchWhisperException('私訊對象資料不符；原本對話仍保留。');
+      throw const TwitchWhisperException('悄悄話對象資料不符；原本對話仍保留。');
     }
     final uri = image.isEmpty ? null : Uri.tryParse(image);
     if (image.isNotEmpty &&
@@ -176,7 +176,7 @@ class TwitchWhisperApiService {
             uri.scheme != 'https' ||
             uri.host.isEmpty ||
             uri.userInfo.isNotEmpty)) {
-      throw const TwitchWhisperException('私訊頭像網址無效；原本資料仍保留。');
+      throw const TwitchWhisperException('悄悄話頭像網址無效；原本資料仍保留。');
     }
     return TwitchWhisperConversation(
       userId: peerId,
@@ -193,7 +193,7 @@ class TwitchWhisperApiService {
     final auth = await session(ownerId: ownerId);
     void checkContext() {
       if (!canRead()) {
-        throw const TwitchWhisperException('私訊帳號已變更，未載入貼圖。');
+        throw const TwitchWhisperException('悄悄話帳號已變更，未載入表情符號。');
       }
     }
 
@@ -202,7 +202,7 @@ class TwitchWhisperApiService {
       TwitchOfficialEmoteSource source,
     ) {
       final data = raw['data'];
-      if (data is! List) throw const TwitchWhisperException('官方貼圖回應格式無效。');
+      if (data is! List) throw const TwitchWhisperException('官方表情符號回應格式無效。');
       return data
           .whereType<Map>()
           .map(
@@ -256,10 +256,10 @@ class TwitchWhisperApiService {
         final pagination = raw['pagination'];
         cursor = pagination is Map ? pagination['cursor'] as String? : null;
         if (cursor != null && cursor.isNotEmpty && !cursors.add(cursor)) {
-          throw const TwitchWhisperException('官方貼圖分頁重複，請重新載入。');
+          throw const TwitchWhisperException('官方表情符號分頁重複，請重新載入。');
         }
         if (cursors.length > 100) {
-          throw const TwitchWhisperException('官方貼圖分頁超過安全上限，請重新載入。');
+          throw const TwitchWhisperException('官方表情符號分頁超過安全上限，請重新載入。');
         }
       } while (cursor != null && cursor.isNotEmpty);
     } on TwitchWhisperException catch (error) {
@@ -267,7 +267,7 @@ class TwitchWhisperApiService {
       userError = error.message;
     } catch (_) {
       user.clear();
-      userError = '個人官方貼圖暫時無法載入；仍可使用全域貼圖。';
+      userError = '個人官方表情符號暫時無法載入；仍可使用全域表情符號。';
     }
     checkContext();
     final byId = <String, TwitchOfficialEmote>{};
@@ -296,7 +296,7 @@ class TwitchWhisperApiService {
     }
     final auth = await session(ownerId: ownerId, scope: 'user:manage:whispers');
     if (canSend != null && !canSend()) {
-      throw const TwitchWhisperException('登入帳號已變更，未發送私訊。');
+      throw const TwitchWhisperException('登入帳號已變更，未發送悄悄話。');
     }
     try {
       final response = await client.dio.post<dynamic>(
@@ -311,12 +311,12 @@ class TwitchWhisperApiService {
       final status = response.statusCode;
       if (status == 204) return;
       final message = switch (status) {
-        400 => 'Twitch 未接受私訊；對方可能不允許陌生人私訊、帳號停權或收件者無效。',
-        401 => '私訊授權失效或缺少電話驗證，請檢查目前 Twitch 帳號。',
-        403 => '目前 Twitch 帳號不允許傳送私訊，請檢查帳號限制。',
-        404 => '找不到私訊收件者，請重新確認帳號。',
-        429 => '私訊傳送過於頻繁或已達 Twitch 上限，請稍候再試；不會自動重送。',
-        _ => '私訊送出結果未確認，請先向對方確認；不要直接重送。',
+        400 => 'Twitch 未接受悄悄話；對方可能不允許陌生人悄悄話、帳號停權或收件者無效。',
+        401 => '悄悄話授權失效或缺少電話驗證，請檢查目前 Twitch 帳號。',
+        403 => '目前 Twitch 帳號不允許傳送悄悄話，請檢查帳號限制。',
+        404 => '找不到悄悄話收件者，請重新確認帳號。',
+        429 => '悄悄話傳送過於頻繁或已達 Twitch 上限，請稍候再試；不會自動重送。',
+        _ => '悄悄話送出結果未確認，請先向對方確認；不要直接重送。',
       };
       throw TwitchWhisperException(
         message,
@@ -324,7 +324,7 @@ class TwitchWhisperApiService {
       );
     } on DioException {
       throw const TwitchWhisperException(
-        '私訊送出結果未確認，請先向對方確認；不要直接重送。',
+        '悄悄話送出結果未確認，請先向對方確認；不要直接重送。',
         outcomeUnknown: true,
       );
     }

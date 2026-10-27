@@ -218,7 +218,7 @@ void main() {
           await tester.pump(const Duration(milliseconds: 300));
           expect(find.text('Fresh media 1'), findsOneWidget);
           expect(find.text('Old media 1'), findsNothing);
-          expect(find.text(clip ? '片段讀取失敗' : 'VOD 讀取失敗'), findsNothing);
+          expect(find.text(clip ? '剪輯讀取失敗' : 'VOD 讀取失敗'), findsNothing);
           expect(fresh.calls, [null]);
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
@@ -251,7 +251,7 @@ void main() {
           expect(find.text('Media item 2'), findsOneWidget);
           await tester.enterText(find.byType(TextField).first, 'not-found');
           await tester.pump();
-          expect(find.text(clip ? '找不到符合的片段' : '找不到符合的 VOD'), findsOneWidget);
+          expect(find.text(clip ? '找不到符合的剪輯' : '找不到符合的 VOD'), findsOneWidget);
           await tester.tap(find.text('清空搜尋'));
           await tester.pump();
           expect(find.text('Media item 1'), findsOneWidget);
@@ -267,7 +267,7 @@ void main() {
     ) async {
       final api = _Discovery()..fail = true;
       await open(tester, api, clip);
-      expect(find.text(clip ? '片段讀取失敗' : 'VOD 讀取失敗'), findsOneWidget);
+      expect(find.text(clip ? '剪輯讀取失敗' : 'VOD 讀取失敗'), findsOneWidget);
       expect(find.textContaining('fixture media failure'), findsNothing);
       api.fail = false;
       await tester.tap(find.text('重試'));
@@ -355,7 +355,7 @@ void main() {
     await open(tester, api, false);
     await tester.enterText(find.byType(TextField).first, 'item 2');
     await tester.pump();
-    await tester.tap(find.text('片段'));
+    await tester.tap(find.text('剪輯'));
     await tester.pumpAndSettle();
     expect(api.calls, [null, null]);
     expect(find.text('Media item 1'), findsOneWidget);
@@ -365,7 +365,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Media item 1'), findsNothing);
     expect(find.text('Media item 2'), findsOneWidget);
-    await tester.tap(find.text('片段'));
+    await tester.tap(find.text('剪輯'));
     await tester.pumpAndSettle();
     expect(find.text('Media item 1'), findsOneWidget);
     expect(find.text('Media item 2'), findsNothing);

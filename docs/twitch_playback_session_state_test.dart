@@ -301,6 +301,53 @@ void main() {
     },
   );
 
+  test(
+    'Media controls follow top route and discard disposed seek/timeline callbacks',
+    () async {
+      final root = owner();
+      final top = owner();
+      final seeks = <String>[];
+      controller.registerRouteOwner(
+        root,
+        onMediaSeek: (target) async {
+          seeks.add('root:${target.inSeconds}');
+        },
+        mediaTimeline: () => (
+          position: const Duration(seconds: 10),
+          duration: const Duration(seconds: 100),
+          minimum: Duration.zero,
+        ),
+      );
+      controller.registerRouteOwner(
+        top,
+        onMediaSeek: (target) async {
+          seeks.add('top:${target.inSeconds}');
+        },
+        mediaTimeline: () => (
+          position: const Duration(seconds: 80),
+          duration: const Duration(seconds: 100),
+          minimum: const Duration(seconds: 80),
+        ),
+      );
+      expect(
+        controller.timelineForMediaControls()!.minimum,
+        const Duration(seconds: 80),
+      );
+      expect(
+        await controller.seekFromMediaControls(const Duration(seconds: 90)),
+        true,
+      );
+      expect(seeks, ['top:90']);
+      await controller.restoreAfterUnregisterRouteOwner(top);
+      expect(controller.timelineForMediaControls()!.minimum, Duration.zero);
+      await controller.seekFromMediaControls(const Duration(seconds: 15));
+      expect(seeks, ['top:90', 'root:15']);
+      await controller.restoreAfterUnregisterRouteOwner(root);
+      expect(controller.timelineForMediaControls(), isNull);
+      expect(await controller.seekFromMediaControls(Duration.zero), false);
+    },
+  );
+
   for (final removeMiddleFirst in [false, true]) {
     test('Three route stack restores only surviving owners '
         '(remove middle first=$removeMiddleFirst)', () async {

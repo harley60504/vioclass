@@ -97,7 +97,7 @@ class TwitchWhisperThreadsApiService {
   }) async {
     if (!RegExp(r'^\d+$').hasMatch(ownerId) ||
         (cursor != null && (cursor.isEmpty || cursor.length > 4096))) {
-      throw const TwitchWhisperException('私訊列表帳號或分頁位置無效。');
+      throw const TwitchWhisperException('悄悄話列表帳號或分頁位置無效。');
     }
     final trace = ++_diagnosticSequence;
     final watch = Stopwatch()..start();

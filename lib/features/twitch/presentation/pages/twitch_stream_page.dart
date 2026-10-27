@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../localization/vioclass_localizations.dart';
 import '../../services/notifications/twitch_android_background_controller.dart';
 import '../../services/notifications/twitch_android_live_notification_controller.dart';
 
@@ -26,10 +27,11 @@ import '../../services/notifications/twitch_app_notification_service.dart';
 import '../../services/notifications/twitch_live_notification_policy.dart';
 import '../../services/notifications/twitch_account_notification_monitor.dart';
 import '../../api/notifications/twitch_account_notification_api.dart';
-import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/watch/twitch_watch_services.dart';
 import '../watch/controllers/twitch_watch_chat_controller.dart';
 import '../../platform/android_pip/twitch_android_pip_controller.dart';
+import '../../platform/android_playback/twitch_android_playback_controller.dart';
+import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../settings/twitch_chat_appearance_controller.dart';
 import '../settings/twitch_app_settings_launcher.dart';
 import '../settings/twitch_player_settings_controller.dart';

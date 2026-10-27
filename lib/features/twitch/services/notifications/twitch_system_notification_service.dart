@@ -313,16 +313,16 @@ class TwitchSystemNotificationService {
     if (target == null) return Future<void>.value();
     if (_usesInAppNotification) {
       twitchAppNotificationCenter.show(
-        title: '$sender 傳來 Twitch 私訊',
-        message: '開啟私訊查看對話',
+        title: '$sender 傳來 Twitch 悄悄話',
+        message: '開啟悄悄話查看對話',
         whisperTarget: target,
         category: TwitchAppNotificationCategory.whisper,
       );
       return Future<void>.value();
     }
     return _show(
-      title: '$sender 傳來 Twitch 私訊',
-      message: '開啟私訊查看對話',
+      title: '$sender 傳來 Twitch 悄悄話',
+      message: '開啟悄悄話查看對話',
       payload: target.payload,
     );
   }

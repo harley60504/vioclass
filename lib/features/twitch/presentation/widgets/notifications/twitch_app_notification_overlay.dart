@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +31,7 @@ class _TwitchAppNotificationOverlayState
   bool _isWindowMaximized = false;
   bool _isWindowFullScreen = false;
   int _fullscreenRevision = 0;
+  final Object _notificationTapGroup = Object();
 
   bool get _usesCustomWindowsFrame =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
@@ -75,12 +75,20 @@ class _TwitchAppNotificationOverlayState
   }
 
   void _openNotificationPanel() {
+    final toast = twitchAppNotificationCenter.visibleItems.firstOrNull;
+    if (toast != null) twitchAppNotificationCenter.hideToast(toast.id);
     setState(() => _isNotificationPanelOpen = true);
     twitchAppNotificationCenter.markAllRead();
   }
 
   void _closeNotificationPanel() {
     setState(() => _isNotificationPanelOpen = false);
+  }
+
+  void _dismissNotificationSurfaces() {
+    if (_isNotificationPanelOpen) _closeNotificationPanel();
+    final toast = twitchAppNotificationCenter.visibleItems.firstOrNull;
+    if (toast != null) twitchAppNotificationCenter.hideToast(toast.id);
   }
 
   bool _openingWhisper = false;
@@ -128,14 +136,14 @@ class _TwitchAppNotificationOverlayState
     } on StateError catch (error) {
       if (!isCurrentNotification()) return;
       twitchAppNotificationCenter.showWarning(
-        title: '無法開啟私訊',
+        title: '無法開啟悄悄話',
         message: error.message.toString(),
       );
     } catch (_) {
       if (!isCurrentNotification()) return;
       twitchAppNotificationCenter.showWarning(
-        title: '無法開啟私訊',
-        message: '請開啟私訊列表查看。',
+        title: '無法開啟悄悄話',
+        message: '請開啟悄悄話列表查看。',
       );
     } finally {
       _openingWhisper = false;
@@ -215,9 +223,19 @@ class _TwitchAppNotificationOverlayState
         final screenWidth = screenSize.width;
         final hasWindowsFrame = _usesCustomWindowsFrame && !_isWindowFullScreen;
         final panelTop = hasWindowsFrame ? _windowsTitleBarHeight + 8 : 12.0;
-        final panelWidth = math.min(400.0, math.max(0.0, screenWidth - 24));
+        final panelWidth = math.min(360.0, math.max(0.0, screenWidth - 24));
+        final textScaler = MediaQuery.textScalerOf(context);
+        final rowHeight =
+            math.max(
+              34.0,
+              textScaler.scale(13) * 1.2 + textScaler.scale(11.5) * 1.2 + 3,
+            ) +
+            17;
+        final desiredPanelHeight = center.items.isEmpty
+            ? 88.0
+            : (44 + rowHeight * center.items.length).clamp(88.0, 360.0);
         final panelHeight = math.min(
-          480.0,
+          desiredPanelHeight,
           math.max(0.0, screenSize.height - panelTop - 12),
         );
         final toastWidth = math.min(380.0, math.max(0.0, screenWidth - 24));
@@ -225,6 +243,7 @@ class _TwitchAppNotificationOverlayState
             ? Column(
                 children: <Widget>[
                   _TwitchWindowsTitleBar(
+                    notificationTapGroup: _notificationTapGroup,
                     height: _windowsTitleBarHeight,
                     navigation: twitchRouteObserver.watchNavigation.value,
                     isMaximized: _isWindowMaximized,
@@ -247,23 +266,22 @@ class _TwitchAppNotificationOverlayState
           fit: StackFit.expand,
           children: <Widget>[
             content,
-            if (_isNotificationPanelOpen)
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.translucent,
-                  onTap: _closeNotificationPanel,
-                  child: const SizedBox.expand(),
-                ),
-              ),
             if (!_isNotificationPanelOpen && toast != null)
               Positioned(
                 top: hasWindowsFrame ? _windowsTitleBarHeight + 8 : 62,
-                left: math.max(12, (screenWidth - toastWidth) / 2),
+                left: _usesCustomWindowsFrame
+                    ? null
+                    : math.max(12, (screenWidth - toastWidth) / 2),
+                right: _usesCustomWindowsFrame ? 12 : null,
                 width: toastWidth,
-                child: _TwitchAppNotificationCard(
-                  item: toast,
-                  onOpen: () => _openNotification(toast),
-                  onDismiss: () => center.hideToast(toast.id),
+                child: TapRegion(
+                  groupId: _notificationTapGroup,
+                  onTapOutside: (_) => _dismissNotificationSurfaces(),
+                  child: _TwitchAppNotificationCard(
+                    item: toast,
+                    onOpen: () => _openNotification(toast),
+                    onDismiss: () => center.hideToast(toast.id),
+                  ),
                 ),
               ),
             if (!hasWindowsFrame && !_isNotificationPanelOpen)
@@ -273,6 +291,7 @@ class _TwitchAppNotificationOverlayState
                 child: SafeArea(
                   minimum: EdgeInsets.zero,
                   child: _NotificationIslandButton(
+                    tapGroup: _notificationTapGroup,
                     unreadCount: center.unreadCount,
                     onPressed: _openNotificationPanel,
                   ),
@@ -284,10 +303,14 @@ class _TwitchAppNotificationOverlayState
                 left: math.max(12, (screenWidth - panelWidth) / 2),
                 width: panelWidth,
                 height: panelHeight,
-                child: _NotificationPanel(
-                  items: center.items,
-                  onClose: _closeNotificationPanel,
-                  onOpen: _openNotification,
+                child: TapRegion(
+                  groupId: _notificationTapGroup,
+                  onTapOutside: (_) => _dismissNotificationSurfaces(),
+                  child: _NotificationPanel(
+                    items: center.items,
+                    onClose: _closeNotificationPanel,
+                    onOpen: _openNotification,
+                  ),
                 ),
               ),
           ],
@@ -298,6 +321,7 @@ class _TwitchAppNotificationOverlayState
 }
 
 class _TwitchWindowsTitleBar extends StatelessWidget {
+  final Object notificationTapGroup;
   final TwitchWatchFrameNavigation? navigation;
   final double height;
   final bool isMaximized;
@@ -312,6 +336,7 @@ class _TwitchWindowsTitleBar extends StatelessWidget {
   final VoidCallback onClose;
 
   const _TwitchWindowsTitleBar({
+    required this.notificationTapGroup,
     required this.navigation,
     required this.height,
     required this.isMaximized,
@@ -416,6 +441,7 @@ class _TwitchWindowsTitleBar extends StatelessWidget {
                         : 0,
                   ),
                   child: _NotificationIslandButton(
+                    tapGroup: notificationTapGroup,
                     unreadCount: unreadCount,
                     selected: isNotificationPanelOpen,
                     onPressed: onToggleNotifications,
@@ -455,7 +481,7 @@ class _TwitchWindowsTitleBar extends StatelessWidget {
                         ),
                       ),
                     Semantics(
-                      label: context.vio.t('Twitch 私訊'),
+                      label: context.vio.t('Twitch 悄悄話'),
                       child: _WindowFrameButton(
                         icon: Icons.chat_bubble_outline_rounded,
                         badgeCount:
@@ -542,11 +568,13 @@ class _WindowFrameButton extends StatelessWidget {
 }
 
 class _NotificationIslandButton extends StatelessWidget {
+  final Object tapGroup;
   final int unreadCount;
   final VoidCallback onPressed;
   final bool selected;
 
   const _NotificationIslandButton({
+    required this.tapGroup,
     required this.unreadCount,
     required this.onPressed,
     this.selected = false,
@@ -554,64 +582,67 @@ class _NotificationIslandButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: unreadCount > 0 ? 58 : 42,
-      height: 30,
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF241A31) : const Color(0xDD15131A),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: selected
-              ? const Color(0xFFBF94FF).withValues(alpha: 0.42)
-              : Colors.white.withValues(alpha: 0.10),
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+    return TapRegion(
+      groupId: tapGroup,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: unreadCount > 0 ? 58 : 42,
+        height: 30,
+        decoration: BoxDecoration(
+          color: selected ? const Color(0xFF241A31) : const Color(0xDD15131A),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFBF94FF).withValues(alpha: 0.42)
+                : Colors.white.withValues(alpha: 0.10),
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(999),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              const Icon(
-                Icons.notifications_none_rounded,
-                color: Color(0xFFBF94FF),
-                size: 17,
-              ),
-              if (unreadCount > 0)
-                Positioned(
-                  right: 5,
-                  child: Container(
-                    constraints: const BoxConstraints(minWidth: 16),
-                    height: 16,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF4D73),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      unreadCount > 99 ? '99+' : '$unreadCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 8.5,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.28),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Color(0xFFBF94FF),
+                  size: 17,
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: 5,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16),
+                      height: 16,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF4D73),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        unreadCount > 99 ? '99+' : '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8.5,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -632,102 +663,92 @@ class _NotificationPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.42),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Material(
-            color: const Color(0xC7100C16),
-            child: Column(
-              children: <Widget>[
-                SizedBox(
-                  height: 62,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 8, 8),
-                    child: Row(
-                      children: <Widget>[
-                        const Icon(
-                          Icons.notifications_rounded,
-                          color: Color(0xFFBF94FF),
-                          size: 22,
+    return Semantics(
+      key: const ValueKey('notification-panel'),
+      label: context.vio.t('通知中心'),
+      container: true,
+      child: Material(
+        color: const Color(0xFF17151D),
+        elevation: 8,
+        shadowColor: Colors.black54,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            SizedBox(
+              height: 36,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, right: 4),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    if (items.isNotEmpty)
+                      TextButton(
+                        onPressed: twitchAppNotificationCenter.clear,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 28),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            context.vio.t('通知中心'),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+                        child: Text(
+                          context.vio.t('全部清除'),
+                          style: const TextStyle(fontSize: 11),
                         ),
-                        if (items.isNotEmpty)
-                          TextButton(
-                            onPressed: twitchAppNotificationCenter.clear,
-                            child: Text(context.vio.t('全部清除')),
-                          ),
-                        IconButton(
-                          onPressed: onClose,
-                          icon: const Icon(Icons.close_rounded),
+                      ),
+                    Semantics(
+                      label: context.vio.t('關閉通知'),
+                      button: true,
+                      child: IconButton(
+                        onPressed: onClose,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 28,
+                          height: 28,
                         ),
-                      ],
+                        visualDensity: VisualDensity.compact,
+                        icon: const Icon(Icons.close_rounded, size: 17),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-                Divider(height: 1, color: Colors.white.withValues(alpha: 0.09)),
-                Expanded(
-                  child: items.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: <Widget>[
-                              Icon(
-                                Icons.notifications_none_rounded,
-                                color: Colors.white.withValues(alpha: 0.24),
-                                size: 42,
-                              ),
-                              const SizedBox(height: 10),
-                              Text(
-                                context.vio.t('目前沒有通知'),
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.52),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.all(12),
-                          itemCount: items.length,
-                          separatorBuilder: (_, _) => const SizedBox(height: 9),
-                          itemBuilder: (context, index) {
-                            final item = items[index];
-                            return _TwitchAppNotificationCard(
-                              key: ValueKey<int>(item.id),
-                              item: item,
-                              onOpen: () => onOpen(item),
-                              onDismiss: () =>
-                                  twitchAppNotificationCenter.dismiss(item.id),
-                            );
-                          },
-                        ),
-                ),
-              ],
+              ),
             ),
-          ),
+            Divider(height: 1, color: Colors.white.withValues(alpha: 0.08)),
+            Expanded(
+              child: items.isEmpty
+                  ? Center(
+                      child: Text(
+                        context.vio.t('目前沒有通知'),
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 4,
+                      ),
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        color: Colors.white.withValues(alpha: 0.07),
+                      ),
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        return _TwitchAppNotificationCard(
+                          key: ValueKey<int>(item.id),
+                          item: item,
+                          embedded: true,
+                          onOpen: () => onOpen(item),
+                          onDismiss: () =>
+                              twitchAppNotificationCenter.dismiss(item.id),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
@@ -735,18 +756,24 @@ class _NotificationPanel extends StatelessWidget {
 }
 
 class _TwitchAppNotificationCard extends StatelessWidget {
+  final bool embedded;
   final TwitchAppNotification item;
   final VoidCallback onDismiss;
   final VoidCallback? onOpen;
 
   const _TwitchAppNotificationCard({
     super.key,
+    this.embedded = false,
     required this.item,
     required this.onDismiss,
     this.onOpen,
   });
 
   @override
-  Widget build(BuildContext context) =>
-      TwitchNotificationCard(item: item, onDismiss: onDismiss, onOpen: onOpen);
+  Widget build(BuildContext context) => TwitchNotificationCard(
+    item: item,
+    onDismiss: onDismiss,
+    onOpen: onOpen,
+    embedded: embedded,
+  );
 }

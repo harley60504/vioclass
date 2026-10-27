@@ -97,6 +97,7 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
   final _liveNotificationPolicy = TwitchLiveNotificationPolicy();
   bool _checkingFollowedLiveNotifications = false;
   bool _settingsSheetOpen = false;
+  bool _resumeMiniAfterBackground = false;
   StreamSubscription<VioClassConnectivitySnapshot>?
   _networkRestoredSubscription;
   StreamSubscription<VioClassConnectivitySnapshot>? _networkLostSubscription;
@@ -297,6 +298,14 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
     super.didChangeAppLifecycleState(state);
     whisperInbox.setAppForeground(state == AppLifecycleState.resumed);
     if (state == AppLifecycleState.resumed) {
+      if (_resumeMiniAfterBackground) {
+        _resumeMiniAfterBackground = false;
+        if (TwitchMiniPlayerController.instance.isActive) {
+          unawaited(
+            TwitchMiniPlayerController.instance.recoverAfterNetworkRestored(),
+          );
+        }
+      }
       _syncRootAutoPip();
       if (_followedLiveNotificationTimer != null) {
         unawaited(_checkFollowedLiveNotifications());
@@ -315,10 +324,31 @@ class _TwitchStreamPageState extends State<TwitchStreamPage>
 
   void _handleRootPlaybackPolicyChanged() {
     if (TwitchAndroidPipController.instance.stoppedOutsidePictureInPicture) {
-      unawaited(_suspendPlaybackOutsidePictureInPicture());
+      // The watch/mini route still owns its playback while Android is hidden.
+      // Foreground recovery decides whether its reader needs replacing.
+      TwitchAndroidPipController.instance
+          .acknowledgeStoppedOutsidePictureInPicture();
     }
+    _applyBackgroundPausePolicy();
     _syncRootAutoPip();
     if (mounted) setState(() {});
+  }
+
+  void _applyBackgroundPausePolicy() {
+    final pip = TwitchAndroidPipController.instance;
+    if (!pip.isAndroid ||
+        TwitchAndroidPlaybackController.instance.enabled ||
+        pip.isActivityStarted ||
+        pip.isInPictureInPictureMode ||
+        pip.isPreparingPictureInPicture ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed ||
+        TwitchMediaKitPlayerHost.playerOrNull?.state.playing != true) {
+      return;
+    }
+    final mini = TwitchMiniPlayerController.instance;
+    _resumeMiniAfterBackground = mini.isActive;
+    if (_resumeMiniAfterBackground) mini.rememberNetworkLoss();
+    unawaited(TwitchMediaKitPlayerHost.pauseShared().catchError((_) {}));
   }
 
   bool get _shouldBackEnterPictureInPicture {

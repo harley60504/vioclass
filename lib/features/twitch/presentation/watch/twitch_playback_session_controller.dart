@@ -57,6 +57,14 @@ class TwitchPlaybackSessionController extends ChangeNotifier {
       <Object, TwitchPlaybackSessionState>{};
   final Map<Object, Future<void> Function()> _routeRestoreCallbacks =
       <Object, Future<void> Function()>{};
+  final Map<Object, Future<void> Function()> _routeMediaPlayCallbacks = {};
+  final Map<Object, Future<void> Function(Duration)> _routeMediaSeekCallbacks =
+      {};
+  final Map<
+    Object,
+    ({Duration position, Duration duration, Duration minimum})? Function()
+  >
+  _routeMediaTimelines = {};
 
   TwitchPlaybackSessionState? get state => _state;
 
@@ -96,13 +104,45 @@ class TwitchPlaybackSessionController extends ChangeNotifier {
     return _routeOwners.isNotEmpty && identical(_routeOwners.last, owner);
   }
 
-  void registerRouteOwner(Object owner, {Future<void> Function()? onRestore}) {
+  void registerRouteOwner(
+    Object owner, {
+    Future<void> Function()? onRestore,
+    Future<void> Function()? onMediaPlay,
+    Future<void> Function(Duration)? onMediaSeek,
+    ({Duration position, Duration duration, Duration minimum})? Function()?
+    mediaTimeline,
+  }) {
     if (!_routeOwners.any((candidate) => identical(candidate, owner))) {
       _routeOwners.add(owner);
     }
     if (onRestore != null) {
       _routeRestoreCallbacks[owner] = onRestore;
     }
+    if (onMediaPlay != null) _routeMediaPlayCallbacks[owner] = onMediaPlay;
+    if (onMediaSeek != null) _routeMediaSeekCallbacks[owner] = onMediaSeek;
+    if (mediaTimeline != null) _routeMediaTimelines[owner] = mediaTimeline;
+  }
+
+  ({Duration position, Duration duration, Duration minimum})?
+  timelineForMediaControls() {
+    if (_routeOwners.isEmpty) return null;
+    return _routeMediaTimelines[_routeOwners.last]?.call();
+  }
+
+  Future<bool> seekFromMediaControls(Duration position) async {
+    if (_routeOwners.isEmpty) return false;
+    final callback = _routeMediaSeekCallbacks[_routeOwners.last];
+    if (callback == null) return false;
+    await callback(position);
+    return true;
+  }
+
+  Future<bool> playFromMediaControls() async {
+    if (_routeOwners.isEmpty) return false;
+    final callback = _routeMediaPlayCallbacks[_routeOwners.last];
+    if (callback == null) return false;
+    await callback();
+    return true;
   }
 
   void activateRouteOwner(Object owner) {
@@ -186,6 +226,9 @@ class TwitchPlaybackSessionController extends ChangeNotifier {
     _routeOwners.removeWhere((candidate) => identical(candidate, owner));
     _routePlayback.remove(owner);
     _routeRestoreCallbacks.remove(owner);
+    _routeMediaPlayCallbacks.remove(owner);
+    _routeMediaSeekCallbacks.remove(owner);
+    _routeMediaTimelines.remove(owner);
     if (!wasTop) return;
 
     for (final candidate in _routeOwners.reversed) {

@@ -99,7 +99,7 @@ class TwitchAndroidBackgroundController extends ChangeNotifier {
     notificationsAllowed = await _notificationPermission(request);
     if (notificationsAllowed == true) return true;
     errorText = notificationsAllowed == false
-        ? '系統通知未允許，私訊與開台提醒不會顯示。請前往系統設定開啟通知。'
+        ? '系統通知未允許，悄悄話與開台提醒不會顯示。請前往系統設定開啟通知。'
         : '無法確認系統通知權限，請檢查系統設定後重試。';
     return false;
   }
@@ -153,7 +153,7 @@ class TwitchAndroidBackgroundController extends ChangeNotifier {
     final initialized = await FlutterBackground.initialize(
       androidConfig: const FlutterBackgroundAndroidConfig(
         notificationTitle: 'VioClass 背景收件',
-        notificationText: '持續接收 Twitch 私訊，滑掉 App 後仍運作，可在設定關閉。',
+        notificationText: '持續接收 Twitch 悄悄話，滑掉 App 後仍運作，可在設定關閉。',
         notificationIcon: AndroidResource(name: 'vio_notification_icon'),
         enableWifiLock: false,
         showBadge: false,

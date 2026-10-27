@@ -1,0 +1,10 @@
+<resources>
+    <string name="playback_channel">媒體播放</string>
+    <string name="playback_active">正在播放</string>
+    <string name="playback_stop">停止播放</string>
+    <string name="playback_paused">已暫停</string>
+    <string name="playback_play">播放</string>
+    <string name="playback_pause">暫停</string>
+    <string name="playback_rewind">倒退 10 秒</string>
+    <string name="playback_forward">快轉 10 秒</string>
+</resources>

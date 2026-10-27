@@ -229,7 +229,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                           ),
                           if (odds != null)
                             Tooltip(
-                              message: context.vio.t('目前估算賠率，結算前可能變動'),
+                              message: context.vio.t('目前估算報酬率，結算前可能變動'),
                               child: Text(
                                 '${context.vio.t('預估回報')} ${odds.toStringAsFixed(1)}×',
                                 style: TextStyle(color: accent, fontSize: 12),
@@ -247,7 +247,7 @@ class TwitchPredictionOutcomeBetCard extends StatelessWidget {
                             ),
                           if (selectedByViewer)
                             Text(
-                              context.vio.t('已下注'),
+                              context.vio.t('已提交預測'),
                               style: TextStyle(color: accent, fontSize: 12),
                             ),
                           if (selectedForBet && !selectedByViewer)

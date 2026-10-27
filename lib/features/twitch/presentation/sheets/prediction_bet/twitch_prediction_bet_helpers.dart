@@ -25,7 +25,7 @@ String twitchPredictionStatusLabel(String status) {
   if (value.contains('CANCEL') || value.contains('REFUND')) return '點數已退還';
   if (value.contains('RESOLVED') || value.contains('ENDED')) return '已結算';
   if (value.contains('RESOLVE_PENDING')) return '結算中';
-  if (value.contains('LOCKED')) return '已關盤';
+  if (value.contains('LOCKED')) return '已停止接受預測';
   if (value == 'ACTIVE' || value == 'OPEN' || value.isEmpty) return '開放預測';
   return '等待更新';
 }
@@ -77,9 +77,9 @@ String? twitchPredictionTimeLabel(
     if (locksAt == null) return null;
     final remaining = locksAt.difference(now);
     if (remaining.inSeconds > 0) {
-      return '${l10n.t('鎖盤剩')} ${twitchPredictionFormatDuration(remaining)}';
+      return '${l10n.t('預測截止剩餘')} ${twitchPredictionFormatDuration(remaining)}';
     }
-    return l10n.t('已鎖盤');
+    return l10n.t('預測已截止');
   }
 
   if (prediction.isLockedLike) {

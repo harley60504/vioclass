@@ -107,13 +107,17 @@ class _TwitchHlsLowLatencyEngine {
     _idleStopTimer?.cancel();
     _idleStopTimer = Timer(owner.idleKeepAliveDuration, () {
       if (_activeClientCount <= 0) {
-        stop();
+        stop(reason: 'idle-no-clients');
       }
     });
   }
 
-  void stop() {
+  void stop({String reason = 'owner-request'}) {
     if (_stopped) return;
+    owner.onLog?.call(
+      '[HlsLifecycle] stop reason=$reason clients=$_activeClientCount '
+      'sequence=$_latestPlayableSequence',
+    );
 
     _stopped = true;
 
@@ -183,14 +187,19 @@ class _TwitchHlsLowLatencyEngine {
         response: response,
         iterator: iterator,
       );
-    } catch (_) {
-      // Silent by design.
+    } catch (error) {
+      owner.onLog?.call(
+        '[HlsLifecycle] reader-error type=${error.runtimeType}',
+      );
     } finally {
       _clientIterators.remove(iterator);
       try {
         await iterator.cancel();
       } catch (_) {}
       _activeClientCount = math.max(0, _activeClientCount - 1);
+      owner.onLog?.call(
+        '[HlsLifecycle] reader-closed clients=$_activeClientCount',
+      );
 
       try {
         await response.close();
@@ -305,10 +314,46 @@ class _TwitchHlsLowLatencyEngine {
   }
 
   Future<void> _runPlaylistPoller() async {
+    var consecutiveFailures = 0;
     try {
       while (!_stopped && owner.server != null) {
         final loopStartedAt = DateTime.now();
-        final media = await owner._loadMediaPlaylist(playlistUrl);
+        final TwitchParsedMediaPlaylist media;
+        try {
+          media = await owner._loadMediaPlaylist(playlistUrl);
+          if (_stopped || owner.server == null) break;
+          if (consecutiveFailures > 0) {
+            owner.onLog?.call('[HlsLifecycle] playlist-recovered');
+          }
+          consecutiveFailures = 0;
+        } catch (error) {
+          final transient =
+              error is SocketException ||
+              error is TimeoutException ||
+              (error is _TwitchHlsUpstreamHttpException
+                  ? error.statusCode >= 500 ||
+                        error.statusCode == 429 ||
+                        error.statusCode == 408
+                  : error is HttpException);
+          if (!transient ||
+              _activeClientCount <= 0 ||
+              !hasFirstStartupSegment) {
+            rethrow;
+          }
+          // Playlist metadata emits no media bytes. Preserve existing readers
+          // across a temporary network outage; partial segment failures keep
+          // their separate safety path. Stop/close and idle cleanup still win.
+          consecutiveFailures++;
+          if (consecutiveFailures == 1) {
+            owner.onLog?.call(
+              '[HlsLifecycle] playlist-wait-network type=${error.runtimeType}',
+            );
+          }
+          await Future<void>.delayed(
+            Duration(milliseconds: math.min(250 * consecutiveFailures, 2000)),
+          );
+          continue;
+        }
         // A fatal writer error or source switch can stop this engine while
         // the request is pending. Do not schedule work from its late response.
         if (_stopped || owner.server == null) break;
@@ -398,10 +443,10 @@ class _TwitchHlsLowLatencyEngine {
           playlistChanged: playlistChanged,
         );
       }
-    } catch (_) {
-      // Silent by design.
+    } catch (error) {
+      stop(reason: 'playlist-error:${error.runtimeType}');
     } finally {
-      stop();
+      stop(reason: 'playlist-loop-exit');
     }
   }
 

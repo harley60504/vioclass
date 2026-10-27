@@ -85,17 +85,17 @@ void main() {
             prediction.copyWith(status: 'LOCKED'),
           );
           await tester.pump();
-          expect(find.text('確認下注'), findsNothing);
+          expect(find.text('確認預測'), findsNothing);
           expect(calls, 0);
         } else {
           final input = find.byType(TextField);
           await tester.enterText(input, '0');
-          await tester.tap(find.text('確認下注'));
+          await tester.tap(find.text('確認預測'));
           await tester.pump();
           expect(calls, 0);
           expect(find.text('請輸入有效點數'), findsOneWidget);
           await tester.enterText(input, '50');
-          await tester.tap(find.text('確認下注'));
+          await tester.tap(find.text('確認預測'));
           await tester.pump();
           expect(calls, 1);
           final submit = find.byType(FilledButton);
@@ -109,11 +109,11 @@ void main() {
           }
           await tester.pump(const Duration(milliseconds: 250));
           if (scenario == 'failure') {
-            expect(find.text('下注未成功，請稍後重試'), findsOneWidget);
+            expect(find.text('預測未成功，請稍後重試'), findsOneWidget);
             expect(tester.widget<TextField>(input).controller!.text, '50');
             expect(find.text('fixture private bet failure'), findsNothing);
           } else {
-            expect(find.text('加注'), findsOneWidget);
+            expect(find.text('追加點數'), findsOneWidget);
             expect(
               TwitchPredictionHermesRealtimeBus
                   .latestPrediction!

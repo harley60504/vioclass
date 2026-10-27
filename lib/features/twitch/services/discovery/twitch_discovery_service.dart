@@ -625,6 +625,7 @@ query SearchFreeformTags(
         'query': '''
 query ChannelPanels(\$login: String!) {
   user(login: \$login) {
+    roles { isPartner }
     panels {
       __typename
       id
@@ -907,6 +908,7 @@ query ChannelPanels(\$login: String!) {
   TwitchChannelAboutResult _parseChannelAbout(Map<String, dynamic> raw) {
     final data = raw['data'];
     final user = data is Map ? data['user'] : null;
+    final roles = user is Map ? user['roles'] : null;
     final panels = user is Map ? user['panels'] : null;
     final channel = user is Map ? user['channel'] : null;
     final socialMedias = channel is Map ? channel['socialMedias'] : null;
@@ -928,6 +930,7 @@ query ChannelPanels(\$login: String!) {
         : const <TwitchChannelSocialLink>[];
 
     return TwitchChannelAboutResult(
+      isPartner: roles is Map && roles['isPartner'] == true,
       panels: parsedPanels,
       socialLinks: parsedSocialLinks,
     );

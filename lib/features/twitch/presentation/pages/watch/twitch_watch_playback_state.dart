@@ -58,6 +58,7 @@ extension TwitchWatchPlaybackStateMethods on TwitchWatchPageState {
           : effectiveKind,
       mediaUri: safeUri,
       metadata: widget.resolvedInitialMetadata.copyWith(
+        isPartner: channelIsPartner,
         streamId: usesLiveTimeline ? liveTimelineStreamId ?? '' : null,
         channelLogin: channelLogin,
         streamTitle: streamTitle,

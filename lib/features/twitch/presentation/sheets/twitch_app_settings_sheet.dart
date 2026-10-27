@@ -198,7 +198,7 @@ class _SettingsTabSelector extends StatelessWidget {
           tab: _TwitchSettingsTab.notifications,
           icon: Icons.notifications_rounded,
           label: l10n.t('通知'),
-          description: l10n.t('開台與私訊'),
+          description: l10n.t('開台與悄悄話'),
         ),
       _SettingsTabMeta(
         tab: _TwitchSettingsTab.chat,
@@ -530,7 +530,7 @@ class _NotificationSettingsPane extends StatelessWidget {
     children: [
       _SettingsSection(
         title: context.vio.t('通知'),
-        subtitle: context.vio.t('開台與私訊'),
+        subtitle: context.vio.t('開台與悄悄話'),
         child: const TwitchAndroidBackgroundSettingsCard(),
       ),
     ],
@@ -870,11 +870,26 @@ class _PlayerSettingsPane extends StatelessWidget {
                   ),
                   _SettingsSwitchRow(
                     title: l10n.t('離開觀看頁保留小窗'),
-                    subtitle: l10n.t('從直播、VOD 或片段回主畫面時保留 App 內小窗'),
+                    subtitle: l10n.t('從直播、VOD 或剪輯回主畫面時保留 App 內小窗'),
                     value: controller.homeKeepsMiniPlayer,
                     onChanged: (value) async {
                       try {
                         await controller.setHomeKeepsMiniPlayer(value);
+                      } catch (_) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(l10n.t('設定儲存失敗，請稍後再試。'))),
+                        );
+                      }
+                    },
+                  ),
+                  _SettingsSwitchRow(
+                    title: l10n.t('背景播放'),
+                    subtitle: l10n.t('離開 App 後繼續播放，並在通知欄控制播放與暫停'),
+                    value: controller.backgroundPlaybackEnabled,
+                    onChanged: (value) async {
+                      try {
+                        await controller.setBackgroundPlaybackEnabled(value);
                       } catch (_) {
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(

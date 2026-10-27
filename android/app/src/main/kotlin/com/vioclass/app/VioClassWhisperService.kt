@@ -21,7 +21,7 @@ internal object VioClassReceivingEngine {
     var engine: FlutterEngine? = null
     var host: MainActivity? = null
     fun releaseWithoutHost() {
-        if (host == null) {
+        if (host == null && !VioClassWhisperService.running && !VioClassPlaybackService.running) {
             val previous = engine
             engine = null
             previous?.destroy()

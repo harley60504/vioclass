@@ -110,7 +110,7 @@ void main() {
         await tester.pump();
         if (change == 'channel') login = 'replacement';
         if (change == 'prediction') eventId = 'replacement-event';
-        await tester.tap(find.text('確認下注'));
+        await tester.tap(find.text('確認預測'));
         await tester.pump();
         expect(port.bets, change == 'none' ? 1 : 0);
         expect(tester.takeException(), isNull);
@@ -183,7 +183,7 @@ void main() {
           );
           expect(port.bets, allowed ? 1 : 0);
           expect(refreshes, allowed ? 1 : 0);
-          if (!authenticated) expect(notices, ['請先完成登入再下注。']);
+          if (!authenticated) expect(notices, ['請先完成登入再參與預測。']);
         },
       );
     }

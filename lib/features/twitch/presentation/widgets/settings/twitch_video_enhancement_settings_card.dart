@@ -220,7 +220,7 @@ class TwitchVideoEnhancementSettingsCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   _EnhancementToggle(
                     title: l10n.t('Chroma Enhance'),
-                    subtitle: l10n.t('使用 CfL 重建色度細節，改善彩色文字、HUD 與紅藍邊緣。'),
+                    subtitle: l10n.t('改善彩色文字、HUD 與紅藍邊緣的色度細節。'),
                     loadLabel: l10n.t('中負載'),
                     value: controller.videoChromaEnhance,
                     onChanged: (value) =>

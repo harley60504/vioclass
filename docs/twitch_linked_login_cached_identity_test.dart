@@ -153,7 +153,7 @@ void main() {
         final fixture = await prepare();
         await tester.pumpWidget(fixture.page);
         await tester.pumpAndSettle();
-        expect(find.text('已登入 Twitch，請再次授權以啟用私訊收發。'), findsOneWidget);
+        expect(find.text('已登入 Twitch，請再次授權以啟用悄悄話收發。'), findsOneWidget);
         final cached = fixture.session.snapshot;
         fixture.web.fail = !validationFailure;
         fixture.api.fail = validationFailure;

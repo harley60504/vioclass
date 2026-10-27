@@ -301,12 +301,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('這則訊息的 Twitch 徽章'), findsNothing);
       final row = find.byKey(const ValueKey('profile-actions-and-badges'));
-      expect(find.descendant(of: row, matching: find.text('私訊')), findsNothing);
+      expect(find.descendant(of: row, matching: find.text('悄悄話')), findsNothing);
       expect(
         find.descendant(of: row, matching: find.byType(IconButton)),
         findsNWidgets(3),
       );
-      final button = tester.getRect(find.text('私訊'));
+      final button = tester.getRect(find.text('悄悄話'));
       expect(find.text('Moderator'), findsNothing);
       expect(find.text('Chat Bot'), findsNothing);
       expect(find.text('Subscriber'), findsNothing);
@@ -729,7 +729,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(result, isNull);
         await tester.scrollUntilVisible(
-          find.text('私訊'),
+          find.text('悄悄話'),
           120,
           scrollable: find.descendant(
             of: find.byType(TwitchChatUserProfileCard),
@@ -737,7 +737,7 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.tap(find.text('私訊'));
+        await tester.tap(find.text('悄悄話'));
         await tester.pumpAndSettle();
         expect(result, isTrue);
         expect(tester.takeException(), isNull);

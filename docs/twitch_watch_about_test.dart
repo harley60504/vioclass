@@ -7,6 +7,71 @@ import 'package:vioclass/features/twitch/presentation/widgets/channel/twitch_cha
 import 'package:vioclass/features/twitch/presentation/widgets/watch/twitch_watch_responsive_body.dart';
 
 void main() {
+  for (final platform in [
+    TargetPlatform.windows,
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+  ]) {
+    testWidgets('Short About can be pulled back to the player on $platform', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1280, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: ScrollConfiguration(
+              behavior: const MaterialScrollBehavior().copyWith(
+                platform: platform,
+              ),
+              child: TwitchWatchResponsiveBody(
+                chatVisible: true,
+                chatPanelWidth: 300,
+                chatPanelRatio: .25,
+                minChatPanelWidth: 200,
+                maxEffectiveMinChatPanelWidth: 300,
+                maxChatPanelWidth: 500,
+                minChatPanelRatio: .2,
+                minStoredChatPanelRatio: .15,
+                maxChatPanelRatio: .5,
+                player: const ColoredBox(
+                  key: ValueKey('short-player'),
+                  color: Colors.black,
+                ),
+                chat: const Text('chat'),
+                belowPlayer: const SizedBox(
+                  height: 60,
+                  child: Text('short About'),
+                ),
+                onSetChatPanelWidthForViewport:
+                    ({required viewportWidth, required value}) {},
+                onPersistChatPanelWidth: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      final page = tester.widget<PageView>(find.byType(PageView)).controller!;
+      page.jumpToPage(1);
+      await tester.pumpAndSettle();
+      final scroll = find.byType(SingleChildScrollView);
+      expect(
+        tester
+            .state<ScrollableState>(
+              find.descendant(of: scroll, matching: find.byType(Scrollable)),
+            )
+            .position
+            .maxScrollExtent,
+        0,
+      );
+      await tester.drag(scroll, const Offset(0, 180));
+      await tester.pumpAndSettle();
+      expect(page.page, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
   testWidgets('Desktop wheel enters About without competing page scrolling', (
     tester,
   ) async {

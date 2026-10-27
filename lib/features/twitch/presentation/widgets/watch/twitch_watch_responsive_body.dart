@@ -418,6 +418,7 @@ class _PlayerColumnState extends State<_PlayerColumn> {
               },
               child: SingleChildScrollView(
                 controller: _aboutScrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.zero,
                 child: content,
               ),

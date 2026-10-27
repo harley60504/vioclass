@@ -81,7 +81,7 @@ class _TwitchWhisperBrowserSyncPageState
     try {
       final window = await WebviewWindow.create(
         configuration: CreateConfiguration(
-          title: 'Twitch 私訊列表同步：請登入並開啟悄悄話',
+          title: 'Twitch 悄悄話列表同步：請登入並開啟悄悄話',
           windowWidth: 1120,
           windowHeight: 820,
           userDataFolderWindows:
@@ -144,7 +144,7 @@ class _TwitchWhisperBrowserSyncPageState
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('同步 Twitch 私訊列表')),
+    appBar: AppBar(title: const Text('同步 Twitch 悄悄話列表')),
     body: Column(
       children: [
         Padding(

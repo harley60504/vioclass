@@ -4,6 +4,7 @@ import 'dart:async';
 import '../navigation/twitch_route_observer.dart';
 
 import 'package:flutter/material.dart';
+import '../watch/controllers/twitch_live_foreground_checkpoint.dart';
 
 import '../../api/auth/twitch_auth_api_service.dart';
 import '../../api/channel/twitch_user_api_service.dart';
@@ -279,6 +280,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   StreamSubscription<VioClassConnectivitySnapshot>? networkLostSubscription;
   bool wasPlayingBeforeNetworkLoss = false;
   DateTime? livePlaybackBackgroundedAt;
+  TwitchLiveForegroundCheckpoint? liveForegroundCheckpoint;
   Future<void>? foregroundRecoveryInFlight;
   Future<void>? networkRecoveryInFlight;
   int watchLoadGeneration = 0;
@@ -356,6 +358,12 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   String? liveTimelineStreamId;
   DateTime? liveTimelineStartedAt;
   List<TwitchChannelPanel> aboutPanels = const <TwitchChannelPanel>[];
+  final Map<String, bool> _aboutPartnerStatus = {};
+  bool get channelIsPartner =>
+      _aboutPartnerStatus[channelLogin.toLowerCase()] ??
+      (widget.resolvedInitialMetadata.channelLogin.toLowerCase() ==
+              channelLogin.toLowerCase() &&
+          widget.resolvedInitialMetadata.isPartner);
   List<TwitchChannelSocialLink> aboutSocialLinks =
       const <TwitchChannelSocialLink>[];
   String? aboutErrorText;
@@ -439,7 +447,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   Future<void> createLiveClip() async {
     if (creatingClip) return;
     if (currentPlaybackKind != TwitchWatchPlaybackKind.live) {
-      showSnack('目前在 VOD/片段模式，請先回直播再建立片段。');
+      showSnack('目前在 VOD/剪輯模式，請先回直播再建立剪輯。');
       return;
     }
 
@@ -468,7 +476,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
                 .inSeconds
                 .toDouble();
       if (offsetSeconds < 30) {
-        showSnack('直播剛開始，至少約 30 秒後才能剪片段。');
+        showSnack('直播剛開始，至少約 30 秒後才能建立剪輯。');
         return;
       }
       if (!mounted) return;
@@ -484,11 +492,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     } catch (error) {
       final message = error.toString();
       if (message.contains('Drops / Android token')) {
-        showSnack('片段剪輯失敗，請先補 Drops / Android 授權。');
+        showSnack('剪輯編輯失敗，請先補 Drops / Android 授權。');
       } else if (_looksLikeClipDisabledError(message)) {
-        showSnack('這個實況主可能沒有開放片段。');
+        showSnack('這個實況主可能沒有開放剪輯。');
       } else {
-        showSnack('片段剪輯暫時失敗，稍後再試。');
+        showSnack('剪輯編輯暫時失敗，稍後再試。');
       }
     } finally {
       if (mounted) setState(() => creatingClip = false);
@@ -531,9 +539,14 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       if (!mounted || login != channelLogin) return;
       setState(() {
         aboutPanels = loaded.panels;
+        _aboutPartnerStatus[login.toLowerCase()] = loaded.isPartner;
         aboutSocialLinks = loaded.socialLinks;
         loadingAboutPanels = false;
       });
+      final owned = ownedPlaybackForVisibleRoute;
+      if (owned != null && owned.playable) {
+        markOwnedPlayback(kind: owned.kind, mediaUri: owned.mediaUri);
+      }
     } catch (error) {
       if (!mounted || login != channelLogin) return;
       setState(() {
@@ -563,6 +576,36 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     TwitchPlaybackSessionController.instance.registerRouteOwner(
       playbackRouteOwner,
       onRestore: reconcileVisibleRoutePlayback,
+      onMediaPlay: () => reconcileVisibleRoutePlayback(
+        forceOpen: currentPlaybackKind == TwitchWatchPlaybackKind.live,
+        forceProxyReconnect:
+            currentPlaybackKind == TwitchWatchPlaybackKind.live,
+      ),
+      mediaTimeline: () {
+        if (!mounted ||
+            currentPlaybackKind != TwitchWatchPlaybackKind.liveDvr) {
+          return null;
+        }
+        final duration = currentLiveTimelineDuration();
+        if (duration == null || duration <= Duration.zero) return null;
+        return (
+          position: playbackTimelineController.positionFor(duration),
+          duration: duration,
+          minimum:
+              hasUsableLiveDvrArchive || duration <= const Duration(seconds: 20)
+              ? Duration.zero
+              : duration - const Duration(seconds: 20),
+        );
+      },
+      onMediaSeek: (target) async {
+        if (!mounted) return;
+        if (currentPlaybackKind == TwitchWatchPlaybackKind.liveDvr) {
+          await openActiveDvrReplayAt(target);
+        } else if (currentPlaybackKind == TwitchWatchPlaybackKind.vod ||
+            currentPlaybackKind == TwitchWatchPlaybackKind.clip) {
+          await playerSession.player.seek(target);
+        }
+      },
     );
     reuseCurrentPlaybackOnNextLiveLoad = widget.initialReuseCurrentPlayback;
 
@@ -715,7 +758,24 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
         unawaited(chatController.setAppForeground(false));
-        livePlaybackBackgroundedAt ??= DateTime.now();
+        if (livePlaybackBackgroundedAt == null) {
+          final now = DateTime.now();
+          livePlaybackBackgroundedAt = now;
+          final player = playerSession.playerOrNull;
+          final owned = ownedPlaybackForVisibleRoute;
+          liveForegroundCheckpoint =
+              player != null &&
+                  owned?.kind == TwitchWatchPlaybackKind.live &&
+                  owned?.mediaUri.trim() ==
+                      TwitchMediaKitPlayerHost.currentMediaUri?.trim()
+              ? TwitchLiveForegroundCheckpoint(
+                  capturedAt: now,
+                  position: player.state.position,
+                  mediaUri: owned!.mediaUri.trim(),
+                  wasPlaying: player.state.playing && !player.state.buffering,
+                )
+              : null;
+        }
         playbackTimelineController.suspendClock();
         break;
     }
@@ -748,6 +808,17 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
   }) async {
     if (!mounted) return;
     final channel = channelLogin;
+    final recoveryGeneration = watchLoadGeneration;
+    bool recoveryIsCurrent() =>
+        mounted &&
+        watchLoadGeneration == recoveryGeneration &&
+        channelLogin == channel &&
+        livePlaybackBackgroundedAt == null &&
+        TwitchPlaybackSessionController.instance.isTopRouteOwner(
+          playbackRouteOwner,
+        );
+    final checkpoint = liveForegroundCheckpoint;
+    liveForegroundCheckpoint = null;
 
     try {
       final isVisiblePlaybackRoute = TwitchPlaybackSessionController.instance
@@ -758,8 +829,14 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
           'because route is hidden channel=$channel',
         );
       } else {
+        final wasOffline = showOfflineChannelPlaceholder;
+        final discoveryStartedAt = DateTime.now();
         final liveStatus = await refreshLiveStatusForRecovery();
-        if (!mounted) return;
+        if (!recoveryIsCurrent()) return;
+        if (wasOffline) {
+          if (liveStatus == true) await loadWatch();
+          return;
+        }
         if (liveStatus == false) {
           await loadWatch();
           return;
@@ -772,7 +849,82 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
           final player = playerSession.playerOrNull;
           final ownedUri = ownedPlaybackForVisibleRoute?.mediaUri.trim();
           final currentUri = TwitchMediaKitPlayerHost.currentMediaUri?.trim();
-          if (!shouldProbeCurrentLive) {
+          var upstreamCurrent = false;
+          var upstreamDiagnostic = 'unavailable';
+          if (shouldProbeCurrentLive) {
+            bool sourceIsCurrent() =>
+                recoveryIsCurrent() &&
+                ownedPlaybackForVisibleRoute?.kind ==
+                    TwitchWatchPlaybackKind.live &&
+                ownedPlaybackForVisibleRoute?.mediaUri.trim() == ownedUri &&
+                TwitchMediaKitPlayerHost.currentMediaUri?.trim() ==
+                    currentUri &&
+                identical(player, playerSession.playerOrNull);
+            try {
+              final initialStatus = await watchPorts.player.runtime
+                  .refreshProxyLiveStatus(notify: false);
+              final confirmationClock = Stopwatch()..start();
+              final status =
+                  await TwitchLiveForegroundCheckpoint.confirmUpstream(
+                    initial: initialStatus,
+                    refresh: () => watchPorts.player.runtime
+                        .refreshProxyLiveStatus(notify: false),
+                    isCurrent: sourceIsCurrent,
+                  );
+              if (!sourceIsCurrent()) return;
+              upstreamCurrent =
+                  TwitchLiveForegroundCheckpoint.upstreamIsCurrent(
+                    status,
+                    DateTime.now(),
+                  );
+              if (status != null) {
+                upstreamDiagnostic =
+                    'confirmMs=${confirmationClock.elapsedMilliseconds} '
+                    'running=${status.running} writer=${status.hasWriter} '
+                    'clients=${status.activeClientCount} '
+                    'lag=${status.lagSegments} '
+                    'ageMs=${DateTime.now().difference(status.updatedAt).inMilliseconds}';
+              }
+            } catch (_) {
+              // An unavailable status cannot establish a warm upstream.
+            }
+            if (!sourceIsCurrent()) return;
+          }
+          if (!recoveryIsCurrent()) return;
+          final keptUpWithLive =
+              shouldProbeCurrentLive &&
+              upstreamCurrent &&
+              player != null &&
+              checkpoint?.keptUp(
+                    now: DateTime.now(),
+                    currentPosition: player.state.position,
+                    currentUri: currentUri,
+                    playing: player.state.playing,
+                    buffering: player.state.buffering,
+                    hasError: playerError != null,
+                  ) ==
+                  true;
+          if (shouldProbeCurrentLive) {
+            final elapsed = checkpoint == null
+                ? null
+                : DateTime.now().difference(checkpoint.capturedAt);
+            final advanced = checkpoint == null || player == null
+                ? null
+                : player.state.position - checkpoint.position;
+            debugPrint(
+              '[WatchForegroundDecision] reuse=$keptUpWithLive '
+              'checkpoint=${checkpoint != null} '
+              'elapsedMs=${elapsed?.inMilliseconds} '
+              'advancedMs=${advanced?.inMilliseconds} '
+              'wasPlaying=${checkpoint?.wasPlaying} '
+              'playing=${player?.state.playing} '
+              'buffering=${player?.state.buffering} error=${playerError != null} '
+              'sameSource=${checkpoint?.mediaUri == currentUri} '
+              'discoveryMs=${DateTime.now().difference(discoveryStartedAt).inMilliseconds} '
+              'upstreamCurrent=$upstreamCurrent $upstreamDiagnostic',
+            );
+          }
+          if (!shouldProbeCurrentLive || keptUpWithLive) {
             if (player == null ||
                 ownedUri == null ||
                 ownedUri.isEmpty ||
@@ -784,12 +936,11 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
               if (mounted) setState(() {});
             }
           } else {
-            // Playback advancing only proves liveness, not freshness. After a
-            // real background transition discard the old native reader and
-            // reconnect the upstream at LIVE instead of draining stale bytes.
+            // A stopped, replaced, or lagging reader cannot prove continuity.
+            // Reconnect it at LIVE rather than draining old cached media.
             await reconcileVisibleRoutePlayback(
               forceOpen: true,
-              forceProxyReconnect: true,
+              forceProxyReconnect: !upstreamCurrent,
             );
             if (!mounted) return;
             playbackTimelineController.returnToLive();
@@ -990,8 +1141,14 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
     )) {
       return;
     }
+    final wasOffline = showOfflineChannelPlaceholder;
     final liveStatus = await refreshLiveStatusForRecovery();
     if (!mounted) return;
+    if (wasOffline) {
+      wasPlayingBeforeNetworkLoss = false;
+      if (liveStatus == true) await loadWatch();
+      return;
+    }
     if (liveStatus == false) {
       await loadWatch();
       return;
@@ -1037,6 +1194,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
 
   Future<bool?> refreshLiveStatusForRecovery() async {
     final initial = await refreshLiveTimelineStartedAt(
+      allowWithoutLivePlayback: showOfflineChannelPlaceholder,
       preserveStateWhenOffline: true,
     );
     if (initial != false) return initial;
@@ -1051,7 +1209,9 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         )) {
       return null;
     }
-    return refreshLiveTimelineStartedAt();
+    return refreshLiveTimelineStartedAt(
+      allowWithoutLivePlayback: showOfflineChannelPlaceholder,
+    );
   }
 
   Future<bool?> refreshLiveTimelineStartedAt({
@@ -1345,6 +1505,7 @@ class TwitchWatchPageState extends State<TwitchWatchPage>
         currentPlaybackKind == TwitchWatchPlaybackKind.live ||
         currentPlaybackKind == TwitchWatchPlaybackKind.liveDvr;
     final metadata = widget.resolvedInitialMetadata.copyWith(
+      isPartner: channelIsPartner,
       streamId: usesLiveTimeline ? liveTimelineStreamId ?? '' : null,
       channelLogin: channelLogin,
       streamTitle: fallbackVideo == null

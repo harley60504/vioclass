@@ -230,7 +230,7 @@ void main() {
         const Offset(0, -1800),
       );
       await tester.pump();
-      expect(find.text('目前沒有共享列車參與者'), findsOneWidget);
+      expect(find.text('目前沒有共享發燒列車參與者'), findsOneWidget);
       api.next = _train(level: 4, progress: 60);
       await controller.refresh(channelLogin: 'fixture');
       await tester.pumpWidget(page());

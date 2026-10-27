@@ -7,6 +7,7 @@ import '../../localization/vioclass_localizations.dart';
 import '../../theme/twitch_ui_tokens.dart';
 import '../shared/twitch_cached_image_layer.dart';
 import '../shared/twitch_ui_primitives.dart';
+import '../shared/twitch_verified_badge.dart';
 
 class TwitchChannelAboutSection extends StatelessWidget {
   final TwitchStreamHeaderMetadata metadata;
@@ -45,15 +46,25 @@ class TwitchChannelAboutSection extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      metadata.displayName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: TwitchUiColors.textPrimary,
-                        fontSize: TwitchUiFontSize.title,
-                        fontWeight: TwitchUiFontWeight.strong,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            metadata.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: TwitchUiColors.textPrimary,
+                              fontSize: TwitchUiFontSize.title,
+                              fontWeight: TwitchUiFontWeight.strong,
+                            ),
+                          ),
+                        ),
+                        if (metadata.isPartner) ...[
+                          const SizedBox(width: TwitchUiSpacing.space4),
+                          const TwitchVerifiedBadge(size: 18),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: TwitchUiSpacing.space4),
                     Text(

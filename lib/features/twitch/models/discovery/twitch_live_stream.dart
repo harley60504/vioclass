@@ -454,10 +454,12 @@ class TwitchChannelSocialLink {
 }
 
 class TwitchChannelAboutResult {
+  final bool isPartner;
   final List<TwitchChannelPanel> panels;
   final List<TwitchChannelSocialLink> socialLinks;
 
   const TwitchChannelAboutResult({
+    this.isPartner = false,
     required this.panels,
     required this.socialLinks,
   });

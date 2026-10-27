@@ -148,7 +148,7 @@ extension TwitchRecordedWatchPlaybackMethods on TwitchWatchPageState {
     } catch (error) {
       if (isCurrentWatchTask(generation, channel)) {
         debugPrint('initial clip playback failed: $error');
-        showSnack('片段暫時載入失敗，請稍後再試。');
+        showSnack('剪輯暫時載入失敗，請稍後再試。');
       }
       return false;
     }

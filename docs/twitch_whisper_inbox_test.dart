@@ -129,7 +129,7 @@ class _FakeApi extends TwitchWhisperApiService {
   }) async {
     await sendGate?.future;
     if (canSend != null && !canSend()) {
-      throw const TwitchWhisperException('登入帳號已變更，未發送私訊。');
+      throw const TwitchWhisperException('登入帳號已變更，未發送悄悄話。');
     }
     if (failSend) throw const TwitchWhisperException('fake send failure');
     if (unknownSend) {
@@ -715,7 +715,7 @@ void main() {
       expect(programmaticUpdates, 0);
       expect(find.textContaining('tail row 59'), findsOneWidget);
       expect(find.text('已提交不代表送達或對方已讀。'), findsNothing);
-      expect(find.text('部分表情符號會佔兩格；未確認收過對方私訊時額度為 500。'), findsNothing);
+      expect(find.text('部分表情符號會佔兩格；未確認收過對方悄悄話時額度為 500。'), findsNothing);
       final updatesBefore = programmaticUpdates;
       unawaited(inbox.syncActiveHistory());
       await _advancePrivateWidget(tester);
@@ -1114,8 +1114,8 @@ void main() {
           scale: scenario.scale,
           keyboardInset: scenario.keyboard,
         );
-        expect(find.byTooltip('私訊錯誤詳情'), findsOneWidget);
-        await tester.tap(find.byTooltip('私訊錯誤詳情'));
+        expect(find.byTooltip('悄悄話錯誤詳情'), findsOneWidget);
+        await tester.tap(find.byTooltip('悄悄話錯誤詳情'));
         await _advancePrivateWidget(tester);
         expect(find.byType(AlertDialog), findsOneWidget);
         expect(find.text(error), findsOneWidget);
@@ -1151,7 +1151,7 @@ void main() {
         size: const Size(390, 260),
         scale: 1.4,
       );
-      await tester.tap(find.byTooltip('私訊錯誤詳情'));
+      await tester.tap(find.byTooltip('悄悄話錯誤詳情'));
       await _advancePrivateWidget(tester);
       expect(find.text(error), findsOneWidget);
       expect(find.byType(AlertDialog), findsOneWidget);
@@ -1694,7 +1694,7 @@ void main() {
       inbox.recordReceiveGap('9');
       expect(inbox.historyRecoveryNeeded, false);
       inbox.recordReceiveGap('1');
-      inbox.receiveStatus = '私訊收件已連線';
+      inbox.receiveStatus = '悄悄話收件已連線';
       await inbox.refreshSession();
       expect(inbox.historyRecoveryNeeded, true);
       api.owner = '9';
@@ -1935,7 +1935,7 @@ void main() {
           await inbox.refreshSession();
           await inbox.startConversation('peer');
           inbox.recordReceiveGap('1');
-          inbox.receiveStatus = '私訊收件已連線';
+          inbox.receiveStatus = '悄悄話收件已連線';
         });
         await _openPrivateWidget(tester, inbox, size: size);
         final compact = size.height < 310;
@@ -2565,7 +2565,7 @@ void main() {
           findsNothing,
         );
         expect(find.text('可能有未恢復的收件區間；連線不代表歷史已補齊。'), findsNothing);
-        expect(find.byTooltip('同步 Twitch 私訊歷史'), findsNothing);
+        expect(find.byTooltip('同步 Twitch 悄悄話歷史'), findsNothing);
         if (fails) {
           expect(find.text('對話同步失敗，請稍後再試。'), findsOneWidget);
           expect(find.text(inbox.threadsError!), findsNothing);
@@ -2694,7 +2694,7 @@ void main() {
             if (outcome == 'account-change') api.owner = '9';
           },
         );
-        await tester.tap(find.byTooltip('本機私訊歷史'));
+        await tester.tap(find.byTooltip('本機悄悄話歷史'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('授權並重試對話同步'));
         await _advancePrivateWidget(tester);
@@ -2735,7 +2735,7 @@ void main() {
       await tester.runAsync(inbox.refreshSession);
       inbox.updateDraft('2', 'keep retry draft');
       await _openPrivateWidget(tester, inbox, size: size);
-      await tester.tap(find.byTooltip('本機私訊歷史'));
+      await tester.tap(find.byTooltip('本機悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步 Twitch 對話'));
       await _advancePrivateWidget(tester);
@@ -2755,7 +2755,7 @@ void main() {
       await tester.pumpAndSettle();
       final gate = Completer<void>();
       remote.gate = gate;
-      await tester.tap(find.byTooltip('本機私訊歷史'));
+      await tester.tap(find.byTooltip('本機悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('載入更多對話'));
       await _advancePrivateWidget(tester);
@@ -2794,7 +2794,7 @@ void main() {
     await tester.runAsync(inbox.refreshSession);
     final consent = Completer<void>();
     await _openPrivateWidget(tester, inbox, onAuthorize: () => consent.future);
-    await tester.tap(find.byTooltip('本機私訊歷史'));
+    await tester.tap(find.byTooltip('本機悄悄話歷史'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('授權並重試對話同步'));
     await _advancePrivateWidget(tester);
@@ -2833,7 +2833,7 @@ void main() {
             unawaited(inbox.refreshSession());
           },
         );
-        await tester.tap(find.byTooltip('本機私訊歷史'));
+        await tester.tap(find.byTooltip('本機悄悄話歷史'));
         await tester.pumpAndSettle();
         await tester.tap(find.text('授權並重試對話同步'));
         for (var step = 0; step < 8; step++) {
@@ -2872,7 +2872,7 @@ void main() {
       );
       await tester.runAsync(inbox.refreshSession);
       await _openPrivateWidget(tester, inbox, size: size);
-      await tester.tap(find.byTooltip('本機私訊歷史'));
+      await tester.tap(find.byTooltip('本機悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步 Twitch 對話'));
       await _advancePrivateWidget(tester);
@@ -2892,7 +2892,7 @@ void main() {
         );
         await tester.pumpAndSettle();
       }
-      await tester.tap(find.byTooltip('本機私訊歷史'));
+      await tester.tap(find.byTooltip('本機悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('載入更多對話'));
       await _advancePrivateWidget(tester);
@@ -2913,13 +2913,13 @@ void main() {
     ) async {
       final history = await tester.runAsync(enableHistory);
       await _openPrivateWidget(tester, inbox, size: size);
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步近期歷史'));
       await _advancePrivateWidget(tester);
       expect(history!.cursors, [null]);
       expect(inbox.activeConversation!.messages, hasLength(5));
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('載入更早訊息'));
       await _advancePrivateWidget(tester);
@@ -2942,7 +2942,7 @@ void main() {
       final history = (await tester.runAsync(enableHistory))!..fail = true;
       inbox.updateDraft('2', 'keep history retry draft');
       await _openPrivateWidget(tester, inbox, size: size);
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步近期歷史'));
       await _advancePrivateWidget(tester);
@@ -2951,7 +2951,7 @@ void main() {
       expect(find.text('訊息同步失敗，請稍後再試。'), findsWidgets);
       await tester.pump(const Duration(seconds: 3));
       history.fail = false;
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('重試歷史同步'));
       await _advancePrivateWidget(tester);
@@ -2959,12 +2959,12 @@ void main() {
       expect(inbox.activeConversation!.draft, 'keep history retry draft');
       final gate = Completer<void>();
       history.gate = gate;
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('載入更早訊息'));
       await _advancePrivateWidget(tester);
       expect(inbox.canCancelHistorySync, true);
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('取消歷史同步'));
       await _advancePrivateWidget(tester);
@@ -3027,7 +3027,7 @@ void main() {
           final anchor = find.byKey(const ValueKey('anchor-0'));
           final before = anchorOffset(anchor);
           Future<void> older() async {
-            await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+            await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
             await tester.pumpAndSettle();
             await tester.tap(find.text('載入更早訊息'));
             await _advancePrivateWidget(tester);
@@ -3056,7 +3056,7 @@ void main() {
           await older();
           expect(anchorOffset(pastAnchor), closeTo(pastOffset, 1));
           expect(history.cursors, [null, 'older', 'oldest']);
-          expect(find.textContaining('新私訊 ·'), findsNothing);
+          expect(find.textContaining('新悄悄話 ·'), findsNothing);
           expect(inbox.readingLatest, false);
           await tester.runAsync(
             () => inbox.receiveEvent({
@@ -3070,16 +3070,16 @@ void main() {
           expect(inbox.activeConversation!.unreadCount, 1);
           expect(inbox.readingLatest, false);
           expect(anchorOffset(pastAnchor), closeTo(pastOffset, 1));
-          expect(find.textContaining('新私訊 · 1 ·'), findsOneWidget);
+          expect(find.textContaining('新悄悄話 · 1 ·'), findsOneWidget);
           expect(
             tester.getRect(find.byType(TextField).last).bottom,
             lessThanOrEqualTo(scenario.size.height - scenario.inset + 1),
           );
-          await tester.tap(find.textContaining('新私訊 · 1 ·'));
+          await tester.tap(find.textContaining('新悄悄話 · 1 ·'));
           await _advancePrivateWidget(tester);
           expect(inbox.readingLatest, true);
           expect(inbox.activeConversation!.unreadCount, 0);
-          expect(find.textContaining('新私訊 ·'), findsNothing);
+          expect(find.textContaining('新悄悄話 ·'), findsNothing);
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
           await _advancePrivateWidget(tester);
@@ -3113,14 +3113,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(inbox.readingLatest, false);
       final beforeHistory = position.pixels;
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('載入更早訊息'));
       await _advancePrivateWidget(tester);
       expect(position.pixels, closeTo(beforeHistory, 1));
       expect(position.extentBefore, greaterThan(100));
       expect(inbox.readingLatest, false);
-      expect(find.textContaining('新私訊 ·'), findsNothing);
+      expect(find.textContaining('新悄悄話 ·'), findsNothing);
       expect(inbox.activeConversation!.messages, hasLength(45));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
@@ -3189,7 +3189,7 @@ void main() {
         await _advancePrivateWidget(tester);
         expect(importFinished, true);
         expect(added, 1);
-        expect(find.textContaining('新私訊 ·'), findsNothing);
+        expect(find.textContaining('新悄悄話 ·'), findsNothing);
         expect(inbox.unreadCount, 0);
         expect(inbox.isHistoricalMessage(imported.id), true);
         expect(offset(), closeTo(before, 1));
@@ -3213,10 +3213,10 @@ void main() {
         await receive();
         expect(inbox.unreadCount, 1);
         expect(inbox.isHistoricalMessage(imported.id), false);
-        expect(find.textContaining('新私訊 · 1 ·'), findsOneWidget);
+        expect(find.textContaining('新悄悄話 · 1 ·'), findsOneWidget);
         await receive();
         expect(inbox.unreadCount, 1);
-        expect(find.textContaining('新私訊 · 1 ·'), findsOneWidget);
+        expect(find.textContaining('新悄悄話 · 1 ·'), findsOneWidget);
         expect(offset(), closeTo(before, 1));
         expect(api.sent, 0);
         expect(tester.takeException(), isNull);
@@ -3233,7 +3233,7 @@ void main() {
       inbox.updateDraft('2', 'keep draft');
       history!.fail = true;
       await _openPrivateWidget(tester, inbox, size: const Size(390, 260));
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('同步近期歷史'));
       await _advancePrivateWidget(tester);
@@ -3241,7 +3241,7 @@ void main() {
       expect(find.text('訊息同步失敗，請稍後再試。'), findsOneWidget);
       expect(inbox.activeConversation!.draft, 'keep draft');
       await tester.pump(const Duration(seconds: 3));
-      await tester.tap(find.byTooltip('同步 Twitch 私訊歷史'));
+      await tester.tap(find.byTooltip('同步 Twitch 悄悄話歷史'));
       await tester.pumpAndSettle();
       expect(find.text('更新對象資料'), findsNothing);
       expect(find.text('刪除本機對話'), findsNothing);
@@ -3255,9 +3255,9 @@ void main() {
 
   for (final size in [const Size(1100, 800), const Size(390, 260)]) {
     testWidgets('Connected inbox hides normal status at $size', (tester) async {
-      inbox.receiveStatus = '私訊收件已連線';
+      inbox.receiveStatus = '悄悄話收件已連線';
       await _openPrivateWidget(tester, inbox, size: size);
-      expect(find.text('私訊收件已連線'), findsNothing);
+      expect(find.text('悄悄話收件已連線'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await _advancePrivateWidget(tester);
@@ -3272,8 +3272,8 @@ void main() {
         size: size,
         onAuthorize: () async {},
       );
-      expect(find.text('重新授權私訊'), findsNothing);
-      expect(find.byTooltip('重新授權私訊'), findsNothing);
+      expect(find.text('重新授權悄悄話'), findsNothing);
+      expect(find.byTooltip('重新授權悄悄話'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await _advancePrivateWidget(tester);
@@ -3295,11 +3295,11 @@ void main() {
           return consent.future;
         },
       );
-      await tester.tap(find.text('重新授權私訊'));
+      await tester.tap(find.text('重新授權悄悄話'));
       await _advancePrivateWidget(tester);
       expect(attempts, 1);
       final button = tester.widget<TextButton>(
-        find.widgetWithText(TextButton, '重新授權私訊'),
+        find.widgetWithText(TextButton, '重新授權悄悄話'),
       );
       expect(button.onPressed, isNull);
       expect((await inbox.archive.load('1')).single.draft, 'keep this draft');
@@ -3324,7 +3324,7 @@ void main() {
           api.owner = '3';
         },
       );
-      await tester.tap(find.text('重新授權私訊'));
+      await tester.tap(find.text('重新授權悄悄話'));
       await _advancePrivateWidget(tester);
       expect(inbox.ownerId, '3');
       expect(inbox.conversations, isEmpty);
@@ -3347,13 +3347,13 @@ void main() {
         throw StateError('fake failure');
       },
     );
-    await tester.tap(find.text('重新授權私訊'));
+    await tester.tap(find.text('重新授權悄悄話'));
     await _advancePrivateWidget(tester);
     expect(inbox.activeConversation!.draft, 'retry draft');
-    expect(find.text('私訊重新授權未完成，原本對話與草稿仍保留。'), findsOneWidget);
+    expect(find.text('悄悄話重新授權未完成，原本對話與草稿仍保留。'), findsOneWidget);
     expect(
       tester
-          .widget<TextButton>(find.widgetWithText(TextButton, '重新授權私訊'))
+          .widget<TextButton>(find.widgetWithText(TextButton, '重新授權悄悄話'))
           .onPressed,
       isNotNull,
     );
@@ -3378,7 +3378,7 @@ void main() {
           return consent.future;
         },
       );
-      await tester.tap(find.byTooltip('重新授權私訊'));
+      await tester.tap(find.byTooltip('重新授權悄悄話'));
       await _advancePrivateWidget(tester);
       expect(attempts, 1);
       await tester.tap(find.byTooltip('關閉').first);
@@ -3446,7 +3446,7 @@ void main() {
       );
       final item = twitchAppNotificationCenter.items.single;
       expect(item.whisperTarget!.payload, 'whisper:1:2');
-      expect(item.message, '開啟私訊查看對話');
+      expect(item.message, '開啟悄悄話查看對話');
       await twitchSystemNotificationService.showWhisper(
         sender: 'Peer',
         userId: '2',
@@ -3701,7 +3701,7 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
       expect(opened, 1);
-      expect(twitchAppNotificationCenter.items.single.title, '無法開啟私訊');
+      expect(twitchAppNotificationCenter.items.single.title, '無法開啟悄悄話');
       expect(api.sent, 0);
     },
   );
@@ -3732,7 +3732,7 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
       expect(opened, 0);
-      expect(twitchAppNotificationCenter.items.single.title, '無法開啟私訊');
+      expect(twitchAppNotificationCenter.items.single.title, '無法開啟悄悄話');
       await inbox.refreshSession();
       await Future<void>.delayed(Duration.zero);
       expect(opened, 0);
@@ -4195,7 +4195,7 @@ void main() {
         }
         final composer = find.byWidgetPredicate(
           (widget) =>
-              widget is TextField && widget.decoration?.hintText == '私訊內容',
+              widget is TextField && widget.decoration?.hintText == '悄悄話內容',
         );
         final beforePicker = tester.getTopLeft(composer).dy;
         await tester.tap(find.byTooltip('聊天表情'));
@@ -4281,11 +4281,11 @@ void main() {
         await _openPrivateWidget(tester, inbox, size: size);
         final composer = find.byWidgetPredicate(
           (widget) =>
-              widget is TextField && widget.decoration?.hintText == '私訊內容',
+              widget is TextField && widget.decoration?.hintText == '悄悄話內容',
         );
         final center = tester.getCenter(composer).dy;
         expect(find.byTooltip('Twitch 官方貼圖'), findsNothing);
-        for (final label in ['聊天表情', '傳送私訊']) {
+        for (final label in ['聊天表情', '傳送悄悄話']) {
           expect(
             tester.getCenter(find.byTooltip(label)).dy,
             closeTo(center, 1),
@@ -5128,8 +5128,8 @@ void main() {
         expect(received, true);
         expect(position.pixels, closeTo(offset, 1));
         expect(inbox.unreadCount, 1);
-        expect(find.text('新私訊 · 1 · 返回最新訊息'), findsOneWidget);
-        await tester.tap(find.text('新私訊 · 1 · 返回最新訊息'));
+        expect(find.text('新悄悄話 · 1 · 返回最新訊息'), findsOneWidget);
+        await tester.tap(find.text('新悄悄話 · 1 · 返回最新訊息'));
         await tester.pumpAndSettle();
         for (var step = 0; step < 6; step++) {
           await tester.runAsync(() => Future<void>.delayed(Duration.zero));
@@ -5137,7 +5137,7 @@ void main() {
         }
         expect(inbox.readingLatest, true);
         expect(inbox.unreadCount, 0);
-        expect(find.text('新私訊 · 1 · 返回最新訊息'), findsNothing);
+        expect(find.text('新悄悄話 · 1 · 返回最新訊息'), findsNothing);
         expect(find.textContaining('latest received marker'), findsOneWidget);
         expect(position.extentBefore, lessThanOrEqualTo(0.5));
         if (variableHeight) {
@@ -5218,7 +5218,7 @@ void main() {
         expect(inbox.unreadCount, 1);
         // Invoke the real button callback before the next frame can finish seeking.
         final button = tester.widget<TextButton>(
-          find.widgetWithText(TextButton, '新私訊 · 1 · 返回最新訊息'),
+          find.widgetWithText(TextButton, '新悄悄話 · 1 · 返回最新訊息'),
         );
         button.onPressed!();
         if (useGesture) {
@@ -5248,7 +5248,7 @@ void main() {
         final stopped = position.pixels;
         await tester.pump(const Duration(milliseconds: 500));
         expect(position.pixels, closeTo(stopped, .5));
-        await tester.tap(find.text('新私訊 · 1 · 返回最新訊息'));
+        await tester.tap(find.text('新悄悄話 · 1 · 返回最新訊息'));
         await _advancePrivateWidget(tester);
         expect(position.extentBefore, lessThanOrEqualTo(.5));
         expect(inbox.readingLatest, true);
@@ -5457,12 +5457,12 @@ void main() {
       await tester.enterText(find.byType(TextField), 'x' * 501);
       await tester.pumpAndSettle();
       expect(find.text('501/500'), findsOneWidget);
-      expect(find.text('內容超過目前私訊額度，草稿已保留；不會截短送出。'), findsOneWidget);
+      expect(find.text('內容超過目前悄悄話額度，草稿已保留；不會截短送出。'), findsOneWidget);
       expect(
         tester
             .widget<IconButton>(
               find.byWidgetPredicate(
-                (widget) => widget is IconButton && widget.tooltip == '傳送私訊',
+                (widget) => widget is IconButton && widget.tooltip == '傳送悄悄話',
               ),
             )
             .onPressed,
@@ -5515,7 +5515,7 @@ void main() {
         await tester.pumpAndSettle();
         final messageInput = find.byWidgetPredicate(
           (widget) =>
-              widget is TextField && widget.decoration?.hintText == '私訊內容',
+              widget is TextField && widget.decoration?.hintText == '悄悄話內容',
         );
         await tester.enterText(messageInput, 'system back draft');
         // This harness lives in docs/ by repository policy, but is a widget test.
@@ -5524,11 +5524,11 @@ void main() {
         await tester.pumpAndSettle();
         if (scenario.closeFirst) {
           expect(inbox.panelVisible, false);
-          expect(find.byTooltip('傳送私訊'), findsNothing);
+          expect(find.byTooltip('傳送悄悄話'), findsNothing);
         } else {
           expect(inbox.activePeerId, isNull);
           expect(inbox.panelVisible, true);
-          expect(find.byTooltip('傳送私訊'), findsNothing);
+          expect(find.byTooltip('傳送悄悄話'), findsNothing);
           expect(
             find.byWidgetPredicate(
               (widget) =>

@@ -116,7 +116,7 @@ class TwitchWhisperRecoveryService {
               canApply: current,
             );
             throw const TwitchWhisperException(
-              '已保存收到的私訊；伺服器未提供歷史分頁位置，完整恢復進度保留。',
+              '已保存收到的悄悄話；伺服器未提供歷史分頁位置，完整恢復進度保留。',
             );
           }
           await archive.mergeRemotePage(

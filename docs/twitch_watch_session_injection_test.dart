@@ -1524,7 +1524,7 @@ void main() {
             matching: find.byType(Scrollable),
           );
           await tester.scrollUntilVisible(
-            find.descendant(of: card, matching: find.text('私訊')),
+            find.descendant(of: card, matching: find.text('悄悄話')),
             120,
             scrollable: profileScrollable,
           );
@@ -2007,7 +2007,9 @@ void main() {
         expect(find.byType(TwitchWatchPage), findsNothing);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
-        await tester.pump(const Duration(seconds: 3));
+        // The fixture's real Hermes dial has a finite 15-second handshake
+        // deadline. Let that cancelled route's deadline settle in fake time.
+        await tester.pump(const Duration(seconds: 16));
         chat.dispose();
         debugDefaultTargetPlatformOverride = null;
         return;
@@ -3290,6 +3292,36 @@ void main() {
             state.messageController.text = 'fixture guest draft';
             await state.sendMessage();
             expect(state.messageController.text, 'fixture guest draft');
+            final foregroundGeneration = state.watchLoadGeneration;
+            final foregroundChat = state.chatController.runtime;
+            final foregroundProfiles =
+                (services.playerSession as _PlayerSession).profileRequests;
+            for (var cycle = 0; cycle < 3; cycle++) {
+              state.didChangeAppLifecycleState(AppLifecycleState.hidden);
+              state.didChangeAppLifecycleState(AppLifecycleState.resumed);
+              final recovery = state.foregroundRecoveryInFlight;
+              for (var i = 0; i < 25; i++) {
+                await tester.pump(const Duration(milliseconds: 100));
+              }
+              await recovery;
+              final networkRecovery = state.recoverWatchAfterNetworkRestored();
+              for (var i = 0; i < 25; i++) {
+                await tester.pump(const Duration(milliseconds: 100));
+              }
+              await networkRecovery;
+              expect(
+                state.watchLoadGeneration,
+                foregroundGeneration,
+                reason:
+                    'An unchanged offline page must not restart on foreground cycle $cycle',
+              );
+              expect(state.chatController.runtime, same(foregroundChat));
+              expect(
+                (services.playerSession as _PlayerSession).profileRequests,
+                foregroundProfiles,
+              );
+              expect(state.showOfflineChannelPlaceholder, isTrue);
+            }
           }
           expect(
             find.text('OAuth 暫時載入失敗，請稍後再試。'),

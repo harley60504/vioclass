@@ -6,6 +6,10 @@ import 'package:media_kit_video/media_kit_video.dart';
 
 import 'twitch_video_enhancement.dart';
 import 'twitch_audio_settings.dart';
+import '../../platform/android_playback/twitch_android_playback_controller.dart';
+import '../../presentation/watch/twitch_playback_session_controller.dart';
+import '../../presentation/mini_player/twitch_mini_player_controller.dart';
+import '../../presentation/watch/twitch_watch_playback_kind.dart';
 
 const bool _enableWatchPlayer = bool.fromEnvironment(
   'TWITCH_ENABLE_WATCH_PLAYER',
@@ -34,6 +38,8 @@ class TwitchMediaKitPlayerHost {
   static String? _keepPlayingWithoutSessionUri;
   static Future<void>? _creatingPlayer;
   static Future<void>? _creatingVideoController;
+  static StreamSubscription<bool>? _playingServiceSubscription;
+  static Timer? _mediaServiceTimer;
   static const bool _observeRestoreOpen = bool.fromEnvironment(
     'TWITCH_READONLY_OBSERVE_RESTORE_OPEN',
   );
@@ -166,6 +172,46 @@ class TwitchMediaKitPlayerHost {
         ),
       );
       _player = player;
+      final playbackService = TwitchAndroidPlaybackController.instance;
+      await playbackService.loadPreferences();
+      playbackService.onStopRequested = () async {
+        await pauseShared();
+        await playbackService.clearMedia();
+      };
+      playbackService.onPauseRequested = pauseShared;
+      playbackService.onSeekRequested = (position) async {
+        final mini = TwitchMiniPlayerController.instance;
+        if (mini.isActiveMediaUri(_currentMediaUri)) {
+          await mini.seekFromMediaControls(position);
+        } else {
+          await TwitchPlaybackSessionController.instance.seekFromMediaControls(
+            position,
+          );
+        }
+        _publishMediaServiceState();
+      };
+      playbackService.onPlayRequested = () async {
+        if (!await TwitchPlaybackSessionController.instance
+            .playFromMediaControls()) {
+          final mini = TwitchMiniPlayerController.instance;
+          if (mini.isActive) {
+            await mini.recoverAfterNetworkRestored(forceResume: true);
+          } else {
+            await _player?.play();
+          }
+        }
+      };
+      _playingServiceSubscription = player.stream.playing.listen((playing) {
+        if (identical(_player, player)) {
+          _publishMediaServiceState();
+          unawaited(playbackService.setActive(playing));
+        }
+      });
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        _mediaServiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+          if (identical(_player, player)) _publishMediaServiceState();
+        });
+      }
       await TwitchVideoEnhancementRuntime.applyStoredToPlayer(player);
       try {
         await twitchAudioSettings.attach(TwitchMpvAudioOutput(player));
@@ -227,6 +273,53 @@ class TwitchMediaKitPlayerHost {
       throw StateError('VideoController creation failed.');
     }
     return created;
+  }
+
+  static void _publishMediaServiceState() {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    final player = _player;
+    if (player == null) return;
+    final sessions = TwitchPlaybackSessionController.instance;
+    final mini = TwitchMiniPlayerController.instance;
+    final playback = mini.isActiveMediaUri(_currentMediaUri)
+        ? mini.entry?.playback
+        : sessions.playableStateForMediaUri(_currentMediaUri);
+    if (playback == null) return;
+    final replay = playback.kind == TwitchWatchPlaybackKind.liveDvr;
+    final timeline = replay
+        ? (mini.isActiveMediaUri(_currentMediaUri)
+              ? mini.timelineForMediaControls()
+              : sessions.timelineForMediaControls())
+        : null;
+    final seekable = replay
+        ? timeline != null
+        : playback.kind == TwitchWatchPlaybackKind.vod ||
+              playback.kind == TwitchWatchPlaybackKind.clip;
+    unawaited(
+      TwitchAndroidPlaybackController.instance.setMedia(
+        TwitchAndroidMediaState(
+          id:
+              '${playback.metadata.channelLogin}:${playback.metadata.streamId}:'
+              '${playback.vodVideo?.id ?? ''}:${playback.clip?.id ?? ''}:'
+              '${playback.revision}:${playback.kind.name}',
+          title: playback.metadata.streamTitle,
+          artist: playback.metadata.displayName,
+          artworkUrl: playback.kind == TwitchWatchPlaybackKind.vod
+              ? playback.vodVideo?.thumbnail(width: 640, height: 360) ??
+                    playback.metadata.profileImageUrl
+              : playback.kind == TwitchWatchPlaybackKind.clip
+              ? playback.clip?.thumbnailUrl ?? playback.metadata.profileImageUrl
+              : 'https://static-cdn.jtvnw.net/previews-ttv/live_user_'
+                    '${Uri.encodeComponent(playback.metadata.channelLogin)}-640x360.jpg',
+          position: timeline?.position ?? player.state.position,
+          duration: timeline?.duration ?? player.state.duration,
+          minimum: timeline?.minimum ?? Duration.zero,
+          seekable: seekable,
+          rate: player.state.rate,
+          buffering: player.state.buffering,
+        ),
+      ),
+    );
   }
 
   static Future<void> openOrResume(
@@ -388,6 +481,10 @@ class TwitchMediaKitPlayerHost {
 
   static Future<void> _disposeCurrent() async {
     final player = _player;
+    final serviceSubscription = _playingServiceSubscription;
+    _mediaServiceTimer?.cancel();
+    _mediaServiceTimer = null;
+    _playingServiceSubscription = null;
     _mediaOpenRevision++;
     twitchAudioSettings.detach();
     _player = null;
@@ -397,6 +494,18 @@ class TwitchMediaKitPlayerHost {
     _keepPlayingWithoutSessionUri = null;
     _hlsCacheProfile = _TwitchHlsCacheProfile.lowLatency;
     _generation++;
+
+    await serviceSubscription?.cancel();
+    final playbackService = TwitchAndroidPlaybackController.instance;
+    if (_player == null) {
+      await playbackService.clearMedia();
+      playbackService.onStopRequested = null;
+      playbackService.onPauseRequested = null;
+      playbackService.onPlayRequested = null;
+      playbackService.onSeekRequested = null;
+    } else {
+      await playbackService.setActive(_player!.state.playing);
+    }
 
     if (player == null) return;
 

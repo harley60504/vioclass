@@ -243,11 +243,21 @@ class TwitchVideoEnhancementRuntime {
     final mode = config.mode;
     var activeScale = mode.mpvScale;
     player.setProperty('scale', activeScale);
+    // Windows renders through ANGLE. CfL's multipass GLSL is incompatible
+    // with that path; use mpv's native chroma scaler without changing hwdec.
+    if (Platform.isWindows) {
+      player.setProperty(
+        'cscale',
+        config.chromaEnhance ? 'ewa_lanczossharp' : 'bilinear',
+      );
+    }
 
     final assets = <_TwitchVideoShaderAsset>[];
     final mainAsset = _shaderAssetForMode(mode);
     if (mainAsset != null) assets.add(mainAsset);
-    if (config.chromaEnhance) assets.add(_TwitchVideoShaderAsset.chromaCfL);
+    if (config.chromaEnhance && !Platform.isWindows) {
+      assets.add(_TwitchVideoShaderAsset.chromaCfL);
+    }
     if (config.sharpen) assets.add(_TwitchVideoShaderAsset.adaptiveSharpen);
 
     final shaderPaths = <String>[];

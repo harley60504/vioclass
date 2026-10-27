@@ -140,7 +140,7 @@ class _TwitchUnifiedEmotePickerSheetState
                 key: PageStorageKey('embedded-$id'),
                 entries: page.entries,
                 query: query,
-                emptyText: l10n.t(loading ? '正在載入貼圖...' : '沒有可用貼圖'),
+                emptyText: l10n.t(loading ? '正在載入表情符號...' : '沒有可用表情符號'),
                 onSelect: _selectEntry,
                 onLongPress: _toggleFavorite,
               );
@@ -150,7 +150,7 @@ class _TwitchUnifiedEmotePickerSheetState
 
         return SafeArea(
           child: TwitchUnifiedSheetScaffold(
-            title: l10n.t('貼圖'),
+            title: l10n.t('表情符號'),
             subtitle: l10n.t('最近 / 最愛 / Twitch / 7TV / BTTV / FFZ｜長按收藏'),
             icon: Icons.emoji_emotions_rounded,
             loading: loading,
@@ -382,7 +382,7 @@ class _SearchBar extends StatelessWidget {
           cursorColor: TwitchUiColors.sheet.backplate.foreground,
           decoration: InputDecoration(
             isDense: true,
-            hintText: context.vio.t('搜尋貼圖名稱'),
+            hintText: context.vio.t('搜尋表情符號名稱'),
             hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
             prefixIcon: const Icon(
               Icons.search_rounded,
@@ -503,8 +503,8 @@ class _ProviderPageState extends State<_ProviderPage>
                     entries: page.entries,
                     query: widget.query,
                     emptyText: widget.loading
-                        ? context.vio.t('正在載入貼圖...')
-                        : context.vio.t('沒有可用貼圖'),
+                        ? context.vio.t('正在載入表情符號...')
+                        : context.vio.t('沒有可用表情符號'),
                     onSelect: widget.onSelect,
                     onLongPress: widget.onLongPress,
                   ),

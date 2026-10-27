@@ -108,11 +108,11 @@ class TwitchPredictionApiService {
     required int points,
   }) {
     if (!prediction.hasPrediction || prediction.id.isEmpty) {
-      throw StateError('目前沒有可下注的預測。');
+      throw StateError('目前沒有可參與的賽況預測。');
     }
 
     if (outcome.id.isEmpty) {
-      throw StateError('Outcome id 是空的，不能下注。');
+      throw StateError('Outcome id 是空的，不能參與預測。');
     }
 
     if (points <= 0) {

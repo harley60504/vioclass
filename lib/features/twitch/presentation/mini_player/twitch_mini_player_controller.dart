@@ -8,6 +8,7 @@ import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_playlist_player_runtime.dart';
 import '../watch/twitch_playback_session_controller.dart';
 import '../watch/twitch_watch_playback_kind.dart';
+import '../watch/controllers/twitch_playback_timeline_controller.dart';
 
 class TwitchMiniPlayerEntry {
   final TwitchPlaybackSessionState playback;
@@ -44,6 +45,114 @@ class TwitchMiniPlayerController extends ChangeNotifier {
   TwitchMiniPlayerEntry? _entry;
   TwitchMediaKitPlayerSession? _activeSession;
   bool _wasPlayingBeforeNetworkLoss = false;
+  final _mediaTimeline = TwitchPlaybackTimelineController();
+  int _mediaSeekRevision = 0;
+
+  ({Duration position, Duration duration, Duration minimum})?
+  timelineForMediaControls() {
+    final entry = _entry;
+    if (entry == null) return null;
+    final player = _activeSession?.playerOrNull;
+    final runtime = entry.playerRuntime;
+    final duration = runtime?.canonicalLiveTimelineDuration;
+    if (entry.kind != TwitchWatchPlaybackKind.liveDvr ||
+        player == null ||
+        duration == null ||
+        duration <= Duration.zero) {
+      return null;
+    }
+    _mediaTimeline.configure(
+      mode: TwitchPlaybackTimelineMode.liveDvr,
+      timelineEnabled: true,
+      advancing: player.state.playing && !player.state.buffering,
+      position: runtime?.liveDvrBridgeTimelinePosition,
+      duration: duration,
+    );
+    return (
+      position: _mediaTimeline.positionFor(duration),
+      duration: duration,
+      minimum:
+          entry.activeDvrVideo != null ||
+              duration <= const Duration(seconds: 20)
+          ? Duration.zero
+          : duration - const Duration(seconds: 20),
+    );
+  }
+
+  Future<void> seekFromMediaControls(Duration target) async {
+    final entry = _entry;
+    final session = _activeSession;
+    final player = session?.playerOrNull;
+    if (entry == null || session == null || player == null) return;
+    if (entry.kind == TwitchWatchPlaybackKind.vod ||
+        entry.kind == TwitchWatchPlaybackKind.clip) {
+      await player.seek(target);
+      return;
+    }
+    if (entry.kind != TwitchWatchPlaybackKind.liveDvr) return;
+    final timeline = timelineForMediaControls();
+    final runtime = entry.playerRuntime;
+    if (timeline == null || runtime == null) return;
+    final revision = ++_mediaSeekRevision;
+    final play = player.state.playing;
+    final safeTarget = Duration(
+      milliseconds: target.inMilliseconds.clamp(
+        timeline.minimum.inMilliseconds,
+        timeline.duration.inMilliseconds,
+      ),
+    );
+    final fromLive = timeline.duration - safeTarget;
+    String? uri;
+    Duration? start;
+    var kind = TwitchWatchPlaybackKind.liveDvr;
+    if (fromLive <= Duration.zero) {
+      uri = (await runtime.prepareLowLatencyLiveFromWarmUpstream())?.toString();
+      kind = TwitchWatchPlaybackKind.live;
+    } else {
+      if (fromLive <= const Duration(seconds: 20)) {
+        uri = await runtime.seekLiveBufferReplay(
+          fromLive: fromLive,
+          timelineDuration: timeline.duration,
+        );
+      }
+      if (uri == null && entry.activeDvrVideo != null) {
+        final result = await runtime.seekLiveDvrBridgePosition(
+          safeTarget,
+          targetProgramDateTime: runtime.canonicalTimelineOrigin?.add(
+            safeTarget,
+          ),
+        );
+        uri = result?.playbackUrl;
+        start = result?.startPosition;
+      }
+    }
+    if (uri == null ||
+        revision != _mediaSeekRevision ||
+        !identical(_entry, entry) ||
+        !identical(_activeSession, session)) {
+      return;
+    }
+    await TwitchMediaKitPlayerHost.openOrResume(
+      session,
+      uri: uri,
+      forceOpen: true,
+      play: play,
+      startPosition: start,
+    );
+    if (revision != _mediaSeekRevision || !identical(_entry, entry)) return;
+    _mediaTimeline.commitPosition(safeTarget);
+    final playback = TwitchPlaybackSessionState(
+      revision: entry.revision + 1,
+      kind: kind,
+      mediaUri: uri,
+      metadata: entry.metadata,
+      activeDvrVideo: entry.activeDvrVideo,
+      vodVideo: entry.resumeVodVideo,
+      preferVodReplayChat: entry.resumeVodReplayChat,
+    );
+    TwitchMediaKitPlayerHost.keepPlayingWithoutSession(uri);
+    showPlayback(playback: playback, playerRuntime: runtime, playOnOpen: play);
+  }
 
   TwitchMiniPlayerEntry? get entry => _entry;
   bool get isActive => _entry != null;
@@ -108,6 +217,11 @@ class TwitchMiniPlayerController extends ChangeNotifier {
   }) {
     final safeUri = playback.mediaUri.trim();
     if (safeUri.isEmpty) return;
+    if (_entry?.metadata.channelLogin != playback.metadata.channelLogin ||
+        _entry?.metadata.streamId != playback.metadata.streamId ||
+        _entry?.kind != playback.kind) {
+      _mediaTimeline.reset();
+    }
     _entry = TwitchMiniPlayerEntry(
       playback: playback,
       playerRuntime: playerRuntime,
@@ -123,6 +237,8 @@ class TwitchMiniPlayerController extends ChangeNotifier {
   void close({bool pausePlayback = true}) {
     if (_entry == null) return;
     _entry = null;
+    _mediaSeekRevision++;
+    _mediaTimeline.reset();
     TwitchMediaKitPlayerHost.keepPlayingWithoutSession(null);
     if (pausePlayback) {
       TwitchPlaybackSessionController.instance.clear();
@@ -138,13 +254,14 @@ class TwitchMiniPlayerController extends ChangeNotifier {
   }
 
   Future<void> recoverAfterNetworkRestored({
+    bool forceResume = false,
     // Tests can hold recovery before native open without changing OS network.
     Future<void>? beforeOpenForTesting,
   }) async {
     final activeEntry = _entry;
     final session = _activeSession;
     final player = session?.playerOrNull;
-    final shouldResume = _wasPlayingBeforeNetworkLoss;
+    final shouldResume = forceResume || _wasPlayingBeforeNetworkLoss;
     _wasPlayingBeforeNetworkLoss = false;
     if (!shouldResume ||
         activeEntry == null ||
@@ -159,8 +276,18 @@ class TwitchMiniPlayerController extends ChangeNotifier {
         !identical(_activeSession, session)) {
       return;
     }
+    var uri = activeEntry.mediaUri;
+    if (forceResume && activeEntry.kind == TwitchWatchPlaybackKind.live) {
+      final fresh = await activeEntry.playerRuntime
+          ?.prepareLowLatencyLiveFromWarmUpstream(forceProxyReconnect: true);
+      if (!identical(_entry, activeEntry) ||
+          !identical(_activeSession, session)) {
+        return;
+      }
+      uri = fresh?.toString() ?? uri;
+    }
     await TwitchMediaKitPlayerHost.restoreSharedMedia(
-      uri: activeEntry.mediaUri,
+      uri: uri,
       forceOpen: true,
     );
     if (!identical(_entry, activeEntry) ||

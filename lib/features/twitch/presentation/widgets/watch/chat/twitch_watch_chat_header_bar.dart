@@ -73,10 +73,10 @@ class TwitchWatchChatHeaderBar extends StatelessWidget {
             const SizedBox(width: 5),
             _HeaderToggleButton(
               tooltip: predictionVisible
-                  ? l10n.t('隱藏賭盤通知')
+                  ? l10n.t('隱藏賽況預測通知')
                   : hasPrediction
-                  ? l10n.t('顯示賭盤通知')
-                  : l10n.t('沒有賭盤'),
+                  ? l10n.t('顯示賽況預測通知')
+                  : l10n.t('沒有賽況預測'),
               icon: Icons.how_to_vote_rounded,
               active: predictionVisible,
               enabled: hasPrediction,

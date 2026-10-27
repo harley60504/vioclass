@@ -84,7 +84,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       isDense: true,
-                      hintText: l10n.t(choosingModifier ? '選擇修改效果' : '搜尋貼圖名稱'),
+                      hintText: l10n.t(choosingModifier ? '選擇修改效果' : '搜尋表情符號名稱'),
                       hintStyle: const TextStyle(
                         color: Colors.white38,
                         fontSize: 13,
@@ -177,7 +177,7 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
                                 Expanded(
                                   child: Text(
                                     rewardTitle.isEmpty
-                                        ? l10n.t('選擇貼圖')
+                                        ? l10n.t('選擇表情符號')
                                         : rewardTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -218,11 +218,11 @@ class ChannelPointEmoteMenuOverlay extends StatelessWidget {
             ),
             Expanded(
               child: loading
-                  ? _OverlayLoadingMessage(message: l10n.t('正在讀取貼圖清單...'))
+                  ? _OverlayLoadingMessage(message: l10n.t('正在讀取表情符號清單...'))
                   : error != null
                   ? _OverlayMessage(
                       icon: Icons.error_outline_rounded,
-                      message: l10n.t('貼圖清單暫時載入失敗，稍後再試。'),
+                      message: l10n.t('表情符號清單暫時載入失敗，稍後再試。'),
                     )
                   : choosingModifier
                   ? _ModifierGrid(
@@ -331,13 +331,13 @@ class _EmoteEmptyMessage extends StatelessWidget {
     if (mode == ChannelPointEmoteOverlayMode.modify && !hasQuery) {
       return _OverlayMessage(
         icon: Icons.auto_fix_off_rounded,
-        message: context.vio.t('這個頻道目前沒有可修改的訂閱貼圖。'),
+        message: context.vio.t('這個頻道目前沒有可修改的訂閱表情符號。'),
       );
     }
     return _OverlayMessage(
       icon: Icons.search_off_rounded,
       message: context.vio.t(
-        hasQuery ? '沒有符合搜尋條件的貼圖' : '沒有符合的 Channel Points 貼圖',
+        hasQuery ? '沒有符合搜尋條件的表情符號' : '沒有符合的 Channel Points 表情符號',
       ),
     );
   }
@@ -364,7 +364,7 @@ class _ModifierGrid extends StatelessWidget {
     if (modifications.isEmpty) {
       return _OverlayMessage(
         icon: Icons.auto_fix_off_rounded,
-        message: context.vio.t('這個貼圖沒有可用的修改效果。'),
+        message: context.vio.t('這個表情符號沒有可用的修改效果。'),
       );
     }
 

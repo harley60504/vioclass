@@ -67,7 +67,7 @@ class TwitchLoginRequiredView extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               statusText.trim().isEmpty
-                  ? context.vio.t('追隨頁、聊天室發言、官方貼圖與部分互動功能需要 OAuth token。')
+                  ? context.vio.t('追隨頁、聊天室發言、官方表情符號與部分互動功能需要 OAuth token。')
                   : statusText,
               textAlign: TextAlign.center,
               style: const TextStyle(

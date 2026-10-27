@@ -32,7 +32,7 @@ class WatchTopActionBar extends StatelessWidget {
     this.onOpenChannel,
     this.onCreateClip,
     this.creatingClip = false,
-    this.showNavigation = true,
+    this.showNavigation = false,
   });
 
   @override
@@ -110,9 +110,7 @@ class _WatchTopActionBarMetrics {
       compact: compact,
       tiny: tiny,
       actionGap: tiny ? TwitchUiSpacing.space4 : TwitchUiSpacing.space8,
-      slotHeight: compact
-          ? TwitchUiControlSize.playerBarCompact
-          : TwitchUiControlSize.playerBar,
+      slotHeight: compact ? 64 : 76,
       controlHeight: controlHeight,
       designWidth: compact ? (tiny ? 430.0 : 560.0) : 940.0,
     );
@@ -228,13 +226,14 @@ class _CompactWatchTopActionContent extends StatelessWidget {
           actions.buildHomeButton(context),
           SizedBox(width: metrics.actionGap),
         ],
-        WatchCompactAvatarTile(
-          metadata: metadata,
-          tiny: metrics.tiny,
-          height: metrics.controlHeight,
-          onOpenChannel: onOpenChannel,
+        Expanded(
+          child: WatchStreamHeaderCard(
+            metadata: metadata,
+            compact: true,
+            height: metrics.slotHeight,
+            onOpenChannel: onOpenChannel,
+          ),
         ),
-        const Spacer(),
         SizedBox(width: metrics.actionGap),
         ...actions.buildRightActions(),
       ],
@@ -270,7 +269,7 @@ class _WideWatchTopActionContent extends StatelessWidget {
           child: WatchStreamHeaderCard(
             metadata: metadata,
             compact: false,
-            height: metrics.controlHeight,
+            height: metrics.slotHeight,
             onOpenChannel: onOpenChannel,
           ),
         ),

@@ -46,7 +46,7 @@ class TwitchWhisperEventSubService {
 
   Future<void> _open(int generation, {Uri? redirect}) async {
     if (!_current(generation)) return;
-    onStatus('正在連接私訊收件…');
+    onStatus('正在連接悄悄話收件…');
     WebSocketChannel? channel;
     try {
       // Obtain authorization before welcome: Twitch allows only 10 seconds
@@ -102,7 +102,7 @@ class TwitchWhisperEventSubService {
                 }
                 _attempt = 0;
                 _armWatchdog(socket, generation);
-                onStatus('私訊收件已連線');
+                onStatus('悄悄話收件已連線');
               case 'session_keepalive':
                 if (socket == _active) _armWatchdog(socket, generation);
               case 'notification':
@@ -140,13 +140,13 @@ class TwitchWhisperEventSubService {
                 for (final socket in _channels.toList()) {
                   _close(socket);
                 }
-                onStatus('私訊收件授權已撤銷，請重新登入後再連線。');
+                onStatus('悄悄話收件授權已撤銷，請重新登入後再連線。');
             }
           } on TwitchWhisperException {
-            _terminal(generation, '私訊收件缺少授權，請重新登入後再連線。');
+            _terminal(generation, '悄悄話收件缺少授權，請重新登入後再連線。');
           } on TwitchApiException catch (error) {
             if (error.statusCode == 401 || error.statusCode == 403) {
-              _terminal(generation, '私訊收件缺少授權，請重新登入後再連線。');
+              _terminal(generation, '悄悄話收件缺少授權，請重新登入後再連線。');
             } else {
               _lost(socket, generation);
             }
@@ -168,7 +168,7 @@ class TwitchWhisperEventSubService {
       );
       await socket.ready;
     } on TwitchWhisperException {
-      _terminal(generation, '私訊收件缺少授權，請重新登入後再連線。');
+      _terminal(generation, '悄悄話收件缺少授權，請重新登入後再連線。');
     } catch (_) {
       if (channel != null) {
         _lost(channel, generation);
@@ -214,7 +214,7 @@ class TwitchWhisperEventSubService {
   void _scheduleRetry(int generation) {
     if (!_current(generation) || _retry?.isActive == true) return;
     onReceiveGap?.call(_owner!);
-    onStatus('私訊收件已斷線，正在重試；斷線期間訊息不會自動補回。');
+    onStatus('悄悄話收件已斷線，正在重試；斷線期間訊息不會自動補回。');
     final delay = Duration(seconds: 1 << (_attempt++).clamp(0, 5));
     _retry = Timer(delay, () => unawaited(_open(generation)));
   }

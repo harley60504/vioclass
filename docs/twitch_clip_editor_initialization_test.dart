@@ -77,17 +77,17 @@ void main() {
           await tester.pump();
           expect(tester.takeException(), isNull);
           if (!closeFirst) {
-            expect(find.text('片段剪輯暫時失敗，請稍後再試。'), findsOneWidget);
+            expect(find.text('剪輯編輯暫時失敗，請稍後再試。'), findsOneWidget);
             expect(find.byType(CircularProgressIndicator), findsNothing);
             expect(find.textContaining('fixture native'), findsNothing);
             await tester.tap(find.text('重試'));
             await tester.pump();
             await tester.pump();
             expect(attempts, 2);
-            expect(find.text('片段剪輯暫時失敗，請稍後再試。'), findsOneWidget);
+            expect(find.text('剪輯編輯暫時失敗，請稍後再試。'), findsOneWidget);
             expect(tester.takeException(), isNull);
           } else {
-            expect(find.text('剪輯片段'), findsNothing);
+            expect(find.text('編輯剪輯'), findsNothing);
             expect(find.text('fixture open'), findsOneWidget);
           }
           await tester.pumpWidget(const SizedBox());

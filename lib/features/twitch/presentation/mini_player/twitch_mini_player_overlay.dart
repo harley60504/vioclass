@@ -390,7 +390,7 @@ class _MiniPlaybackKindBadge extends StatelessWidget {
       TwitchWatchPlaybackKind.live => context.vio.t('直播'),
       TwitchWatchPlaybackKind.liveDvr => 'DVR',
       TwitchWatchPlaybackKind.vod => 'VOD',
-      TwitchWatchPlaybackKind.clip => context.vio.t('片段'),
+      TwitchWatchPlaybackKind.clip => context.vio.t('剪輯'),
       TwitchWatchPlaybackKind.none => context.vio.t('播放'),
     };
 

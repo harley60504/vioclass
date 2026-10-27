@@ -724,7 +724,7 @@ class ChannelPointsRedeemResultPane extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        result.hasEmote ? l10n.t('已解鎖貼圖') : result.title,
+                        result.hasEmote ? l10n.t('已解鎖表情符號') : result.title,
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,

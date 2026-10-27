@@ -63,6 +63,9 @@ class _TwitchMediaKitVideoSurfaceState
       controller: widget.controller,
       fit: widget.fit,
       controls: widget.controls,
+      // Watch/mini playback owns lifecycle recovery. The Video default would
+      // pause the shared player even after the route retained its session.
+      pauseUponEnteringBackgroundMode: false,
     );
   }
 

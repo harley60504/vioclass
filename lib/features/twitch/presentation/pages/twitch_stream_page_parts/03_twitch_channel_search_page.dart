@@ -175,7 +175,7 @@ class _TwitchChannelSearchPage extends StatelessWidget {
           if (clips.isNotEmpty)
             _mediaSliverSection<_TwitchSearchClipResult>(
               icon: Icons.movie_filter_outlined,
-              title: '片段',
+              title: context.vio.clipsTitle,
               items: clips,
               itemBuilder: (context, result) {
                 return _SearchClipCard(
@@ -387,9 +387,9 @@ class _SearchClipCard extends StatelessWidget {
     return _SearchMediaCardFrame(
       thumbnailUrl: clip.thumbnailUrl,
       fallbackIcon: Icons.movie_filter_outlined,
-      topLeftPill: '片段',
+      topLeftPill: context.vio.t('剪輯'),
       bottomRightPill: '${clip.duration.toStringAsFixed(1)}s',
-      title: clip.title.trim().isEmpty ? '未命名片段' : clip.title,
+      title: clip.title.trim().isEmpty ? context.vio.t('未命名剪輯') : clip.title,
       subtitle: '${channel.displayName} · ${_formatCount(clip.viewCount)} 次觀看',
       avatarUrl: channel.profileImageUrl,
       onTap: () {

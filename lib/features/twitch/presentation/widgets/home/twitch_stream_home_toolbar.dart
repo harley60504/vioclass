@@ -119,7 +119,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
               label: Text('${twitchAppSettingsLauncher.whisperUnreadCount}'),
               child: TwitchStreamHomeToolbarIconButton(
                 key: const ValueKey('mobile-whispers'),
-                tooltip: l10n.t('Twitch 私訊'),
+                tooltip: l10n.t('Twitch 悄悄話'),
                 icon: Icons.chat_bubble_outline_rounded,
                 compact: compact,
                 onPressed: () => twitchAppSettingsLauncher.openWhispers(),
@@ -130,7 +130,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
         ],
       ] else if (kIsWeb || defaultTargetPlatform != TargetPlatform.windows) ...[
         PopupMenuButton<String>(
-          tooltip: l10n.t('私訊與更新'),
+          tooltip: l10n.t('悄悄話與更新'),
           icon: AnimatedBuilder(
             animation: twitchAppSettingsLauncher,
             builder: (context, _) => Badge(
@@ -153,7 +153,7 @@ class TwitchStreamHomeToolbar extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(l10n.t('Twitch 私訊')),
+                    Text(l10n.t('Twitch 悄悄話')),
                     if (twitchAppSettingsLauncher.whisperUnreadCount > 0) ...[
                       const SizedBox(width: 8),
                       Badge.count(

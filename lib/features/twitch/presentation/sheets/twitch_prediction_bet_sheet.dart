@@ -220,7 +220,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
         : prediction.status;
     return SafeArea(
       child: TwitchUnifiedSheetScaffold(
-        title: prediction.title.isEmpty ? l10n.t('賭盤預測') : prediction.title,
+        title: prediction.title.isEmpty ? l10n.t('賽況預測') : prediction.title,
         icon: Icons.how_to_vote_rounded,
         showRefresh: false,
         child: LayoutBuilder(
@@ -385,7 +385,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                                   decoration: InputDecoration(
                                     isDense: true,
                                     border: const OutlineInputBorder(),
-                                    labelText: l10n.t('下注點數'),
+                                    labelText: l10n.t('投入點數'),
                                     suffixText: l10n.t('點'),
                                   ),
                                 ),
@@ -406,8 +406,8 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
                                     : Text(
                                         l10n.t(
                                           viewerChoiceId.isEmpty
-                                              ? '確認下注'
-                                              : '加注',
+                                              ? '確認預測'
+                                              : '追加點數',
                                         ),
                                       ),
                               ),
@@ -478,7 +478,7 @@ class _TwitchPredictionBetSheetState extends State<TwitchPredictionBetSheet> {
       // Post-bet reconciliation uses a quiet progress line, not debug text.
       unawaited(_refreshPredictionFromGqlFallback(showSyncIndicator: true));
     } catch (_) {
-      if (mounted) setState(() => _feedback = context.vio.t('下注未成功，請稍後重試'));
+      if (mounted) setState(() => _feedback = context.vio.t('預測未成功，請稍後重試'));
     } finally {
       if (mounted) {
         setState(() => _submitting = false);

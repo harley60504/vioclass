@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/playback/twitch_media_kit_player_host.dart';
 import '../../services/playback/twitch_video_enhancement.dart';
+import '../../platform/android_playback/twitch_android_playback_controller.dart';
 import '../watch/controllers/twitch_watch_preferences_controller.dart';
 
 class TwitchPlayerSettingsController extends ChangeNotifier {
@@ -54,6 +55,7 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool _muted = false;
   bool _chatVisible = true;
   bool _androidPipEnabled = true;
+  bool _backgroundPlaybackEnabled = false;
   bool _homeKeepsMiniPlayer = true;
   bool _videoEnhancementEnabled = false;
   TwitchVideoEnhancementMode _videoEnhancementMode =
@@ -69,6 +71,7 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
   bool get muted => _muted;
   bool get chatVisible => _chatVisible;
   bool get androidPipEnabled => _androidPipEnabled;
+  bool get backgroundPlaybackEnabled => _backgroundPlaybackEnabled;
   bool get homeKeepsMiniPlayer => _homeKeepsMiniPlayer;
   bool get videoEnhancementEnabled => _videoEnhancementEnabled;
   TwitchVideoEnhancementMode get videoEnhancementMode => _videoEnhancementMode;
@@ -109,6 +112,12 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
         ) ??
         true;
     _androidPipEnabled = prefs.getBool(androidPipEnabledPreferenceKey) ?? true;
+    _backgroundPlaybackEnabled =
+        prefs.getBool(TwitchAndroidPlaybackController.backgroundEnabledKey) ??
+        false;
+    await TwitchAndroidPlaybackController.instance.setEnabled(
+      _backgroundPlaybackEnabled,
+    );
     _homeKeepsMiniPlayer =
         prefs.getBool(homeKeepsMiniPlayerPreferenceKey) ?? true;
 
@@ -160,6 +169,17 @@ class TwitchPlayerSettingsController extends ChangeNotifier {
     if (_androidPipEnabled == value) return;
     await _saveBoolPreference(androidPipEnabledPreferenceKey, value);
     _androidPipEnabled = value;
+    notifyListeners();
+  }
+
+  Future<void> setBackgroundPlaybackEnabled(bool value) async {
+    if (_backgroundPlaybackEnabled == value) return;
+    await _saveBoolPreference(
+      TwitchAndroidPlaybackController.backgroundEnabledKey,
+      value,
+    );
+    _backgroundPlaybackEnabled = value;
+    await TwitchAndroidPlaybackController.instance.setEnabled(value);
     notifyListeners();
   }
 

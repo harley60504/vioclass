@@ -68,7 +68,7 @@ class _TwitchEmotePickerPanelState extends State<TwitchEmotePickerPanel> {
                         key: const ValueKey('emote-panel-search'),
                         style: const TextStyle(fontSize: 13),
                         decoration: InputDecoration(
-                          hintText: context.vio.t('搜尋貼圖'),
+                          hintText: context.vio.t('搜尋表情符號'),
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -97,7 +97,7 @@ class _TwitchEmotePickerPanelState extends State<TwitchEmotePickerPanel> {
                         ),
                       ),
                     IconButton(
-                      tooltip: context.vio.t('關閉貼圖'),
+                      tooltip: context.vio.t('關閉表情符號'),
                       onPressed: widget.onClose,
                       icon: const Icon(Icons.close, size: 18),
                     ),

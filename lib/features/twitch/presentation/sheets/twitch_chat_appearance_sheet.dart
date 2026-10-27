@@ -15,7 +15,7 @@ Future<void> showTwitchChatAppearanceSheet({
   return showTwitchUnifiedSheet<void>(
     context: context,
     title: l10n.t('聊天室字體'),
-    subtitle: l10n.t('調整訊息文字與貼圖大小'),
+    subtitle: l10n.t('調整訊息文字與表情符號大小'),
     icon: Icons.format_size_rounded,
     size: TwitchUnifiedSheetSize.compact,
     showRefresh: false,

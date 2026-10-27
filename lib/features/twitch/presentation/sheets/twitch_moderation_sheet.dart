@@ -253,7 +253,7 @@ class _ModerationSheetState extends State<_ModerationSheet> {
             children: [
               if (_error != null)
                 Text(_error!, style: const TextStyle(color: Colors.redAccent)),
-              _mode('emote_mode', '僅限貼圖'),
+              _mode('emote_mode', '僅限表情符號'),
               _mode('subscriber_mode', '僅限訂閱者'),
               _mode('follower_mode', '僅限追隨者'),
               _durationControl('follower_mode', '追隨時間門檻'),

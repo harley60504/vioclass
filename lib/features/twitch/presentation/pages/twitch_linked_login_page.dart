@@ -121,7 +121,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         _statusText = status.complete
             ? '已登入'
             : status.mainReady && !status.whispersReady
-            ? '已登入 Twitch，請再次授權以啟用私訊收發。'
+            ? '已登入 Twitch，請再次授權以啟用悄悄話收發。'
             : '尚未登入';
       });
     } catch (_) {
@@ -198,7 +198,7 @@ class _TwitchLinkedLoginPageState extends State<TwitchLinkedLoginPage> {
         setState(() {
           _statusText = '登入尚未完成';
           _errorText = status.mainReady && !status.whispersReady
-              ? '私訊收發授權尚未完成，請再次登入並允許私訊權限。'
+              ? '悄悄話收發授權尚未完成，請再次登入並允許悄悄話權限。'
               : '登入沒有完成，請再試一次。';
         });
       }

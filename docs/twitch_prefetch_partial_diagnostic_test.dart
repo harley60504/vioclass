@@ -15,14 +15,36 @@ void main() {
       (15, 'valid'),
       (10, 'changed'),
       (10, 'short'),
+      (10, 'unavailable'),
+      (10, 'interrupted'),
+      (10, 'recovered'),
+      (10, 'recovered-twice'),
+      (10, 'changed-after-interrupt'),
+      (10, 'short-after-interrupt'),
+      if (format == 'mp4') (10, 'stalled'),
     ]) {
       final prefixLength = scenario.$1;
       final fallback = scenario.$2;
-      final rejected = fallback != 'valid';
+      final rejected = ![
+        'valid',
+        'recovered',
+        'recovered-twice',
+        'stalled',
+      ].contains(fallback);
+      final expectedRequests = switch (fallback) {
+        'unavailable' => 15,
+        'interrupted' || 'recovered-twice' => 4,
+        'recovered' ||
+        'stalled' ||
+        'changed-after-interrupt' ||
+        'short-after-interrupt' => 3,
+        _ => 2,
+      };
       test('Partial $format prefix=$prefixLength fallback=$fallback', () async {
         final upstream = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         final cut = Completer<void>();
         final releasePlaylist = Completer<void>();
+        final releaseStalled = Completer<void>();
         var playlistRequests = 0;
         var init = [0, 0, 0, 8, ...'ftyp'.codeUnits];
         var fragment = format == 'ts'
@@ -73,10 +95,43 @@ void main() {
               cut.complete();
               return;
             }
-            final replacement = fallback == 'short'
-                ? fragment.take(prefixLength - 1).toList()
+            if (fallback == 'unavailable') {
+              request.response.statusCode = HttpStatus.serviceUnavailable;
+              await request.response.close();
+              return;
+            }
+            if (fallback == 'interrupted' ||
+                (fallback != 'valid' &&
+                    fallback != 'changed' &&
+                    fallback != 'short' &&
+                    segmentRequests == 2) ||
+                (fallback == 'recovered-twice' && segmentRequests == 3)) {
+              request.response.contentLength = fragment.length;
+              final socket = await request.response.detachSocket();
+              socket.add(
+                fragment
+                    .take(prefixLength + (segmentRequests == 3 ? 4 : 2))
+                    .toList(),
+              );
+              await socket.flush();
+              if (fallback == 'stalled') await releaseStalled.future;
+              socket.destroy();
+              return;
+            }
+            final replacement =
+                fallback == 'short' || fallback == 'short-after-interrupt'
+                ? fragment
+                      .take(
+                        fallback == 'short'
+                            ? prefixLength - 1
+                            : prefixLength + 1,
+                      )
+                      .toList()
                 : fragment.toList();
             if (fallback == 'changed') replacement[0] ^= 1;
+            if (fallback == 'changed-after-interrupt') {
+              replacement[prefixLength + 1] ^= 1;
+            }
             request.response.contentLength = replacement.length;
             // Exercise retry reads whose write boundaries differ from prefetch.
             request.response.add(replacement.take(3).toList());
@@ -100,7 +155,8 @@ void main() {
           while (true) {
             final status = await proxy.requestLiveStatus();
             if (rejected
-                ? (segmentRequests == 2 && status?.hasWriter == false)
+                ? (segmentRequests == expectedRequests &&
+                      status?.hasWriter == false)
                 : status?.lastWrittenSequence == 0) {
               if (rejected) {
                 expect(status?.lastWrittenSequence, -1);
@@ -115,7 +171,7 @@ void main() {
             }
             await Future<void>.delayed(const Duration(milliseconds: 20));
           }
-          expect(segmentRequests, 2);
+          expect(segmentRequests, expectedRequests);
           if (rejected) return;
           final response = await (await client.getUrl(
             Uri.parse(proxy.streamTsUrl),
@@ -130,11 +186,12 @@ void main() {
           } finally {
             await iterator.cancel();
           }
-          expect(segmentRequests, 2);
+          expect(segmentRequests, expectedRequests);
           expect(bytes, [...init, ...fragment]);
         } finally {
           if (!cut.isCompleted) cut.complete();
           if (!releasePlaylist.isCompleted) releasePlaylist.complete();
+          if (!releaseStalled.isCompleted) releaseStalled.complete();
           client.close(force: true);
           await proxy.close();
           await upstream.close(force: true);

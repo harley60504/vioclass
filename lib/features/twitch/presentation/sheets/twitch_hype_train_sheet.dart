@@ -59,7 +59,7 @@ class TwitchHypeTrainSheet extends StatelessWidget {
             ),
             _InfoRow(label: l10n.t('類型'), value: snapshot.type),
             _InfoRow(
-              label: l10n.t('共享列車'),
+              label: l10n.t('共享發燒列車'),
               value: snapshot.isSharedTrain ? l10n.t('是') : l10n.t('否'),
             ),
             const SizedBox(height: 16),
@@ -75,9 +75,9 @@ class TwitchHypeTrainSheet extends StatelessWidget {
                   value: '${contribution.amount} ${contribution.type}',
                 ),
             const SizedBox(height: 16),
-            _SectionTitle(l10n.t('共享列車參與者')),
+            _SectionTitle(l10n.t('共享發燒列車參與者')),
             if (snapshot.sharedTrainParticipants.isEmpty)
-              _EmptyText(l10n.t('目前沒有共享列車參與者'))
+              _EmptyText(l10n.t('目前沒有共享發燒列車參與者'))
             else
               for (final participant in snapshot.sharedTrainParticipants)
                 _InfoRow(

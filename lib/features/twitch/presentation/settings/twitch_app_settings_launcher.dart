@@ -62,15 +62,15 @@ class TwitchAppSettingsLauncher extends ChangeNotifier {
     } on StateError catch (error) {
       if (!_disposed) {
         twitchAppNotificationCenter.showWarning(
-          title: '無法開啟私訊',
+          title: '無法開啟悄悄話',
           message: error.message.toString(),
         );
       }
     } catch (_) {
       if (!_disposed) {
         twitchAppNotificationCenter.showWarning(
-          title: '無法開啟私訊',
-          message: '請開啟私訊列表查看。',
+          title: '無法開啟悄悄話',
+          message: '請開啟悄悄話列表查看。',
         );
       }
     } finally {
@@ -142,10 +142,10 @@ class TwitchAppSettingsLauncher extends ChangeNotifier {
     final inbox = _whisperInbox;
     final opener = _whisperOpener;
     if (inbox == null || opener == null || inbox.ownerId != ownerId) {
-      throw StateError('私訊通知屬於其他帳號，請切回收件帳號。');
+      throw StateError('悄悄話通知屬於其他帳號，請切回收件帳號。');
     }
     if (!inbox.conversations.any((peer) => peer.userId == peerId)) {
-      throw StateError('這則私訊對話已不存在，請開啟私訊列表查看。');
+      throw StateError('這則悄悄話對話已不存在，請開啟悄悄話列表查看。');
     }
     await inbox.selectConversation(peerId);
     if (_whisperInbox != inbox ||
@@ -153,7 +153,7 @@ class TwitchAppSettingsLauncher extends ChangeNotifier {
         inbox.ownerId != ownerId ||
         inbox.activePeerId != peerId ||
         !inbox.conversations.any((peer) => peer.userId == peerId)) {
-      throw StateError('私訊帳號或對話已變更，未開啟通知。');
+      throw StateError('悄悄話帳號或對話已變更，未開啟通知。');
     }
     await opener();
   }
@@ -165,11 +165,11 @@ class TwitchAppSettingsLauncher extends ChangeNotifier {
   }) async {
     final inbox = _whisperInbox;
     if (inbox == null || _whisperOpener == null || inbox.ownerId != ownerId) {
-      throw StateError('私訊帳號尚未準備好或已變更。');
+      throw StateError('悄悄話帳號尚未準備好或已變更。');
     }
     await inbox.startConversation(login);
     if (_whisperInbox != inbox || inbox.ownerId != ownerId) {
-      throw StateError('登入帳號已變更，未開啟私訊。');
+      throw StateError('登入帳號已變更，未開啟悄悄話。');
     }
     if (inbox.errorText != null) throw StateError(inbox.errorText!);
     final selected = inbox.conversations.where(
@@ -177,12 +177,12 @@ class TwitchAppSettingsLauncher extends ChangeNotifier {
     );
     if (selected.isEmpty ||
         selected.first.login.toLowerCase() != login.trim().toLowerCase()) {
-      throw StateError('私訊對象尚未準備好，請稍後再試。');
+      throw StateError('悄悄話對象尚未準備好，請稍後再試。');
     }
     if (peerId != null &&
         peerId.isNotEmpty &&
         selected.first.userId != peerId) {
-      throw StateError('私訊對象與原本選取的使用者不符。');
+      throw StateError('悄悄話對象與原本選取的使用者不符。');
     }
     await openWhispers();
   }

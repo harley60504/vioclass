@@ -1,5 +1,23 @@
 part of '../twitch_hls_low_latency_proxy.dart';
 
+class _TwitchHlsUpstreamHttpException extends HttpException {
+  final int statusCode;
+
+  _TwitchHlsUpstreamHttpException(this.statusCode, String label)
+    : super('Upstream HTTP $statusCode for $label');
+}
+
+class _TwitchHlsSegmentIntegrityException extends FormatException {
+  const _TwitchHlsSegmentIntegrityException(super.message);
+}
+
+class _TwitchHlsSegmentReadFailure implements Exception {
+  final Object cause;
+  final StackTrace stackTrace;
+
+  _TwitchHlsSegmentReadFailure(this.cause, this.stackTrace);
+}
+
 class _TwitchDartHlsLowLatencyProxyCore {
   final String upstreamPlaylistUrl;
   final Map<String, String> upstreamHeaders;
@@ -537,64 +555,111 @@ class _TwitchDartHlsLowLatencyProxyCore {
   }) async {
     final job = prefetchJob;
     final deliveredPrefix = <List<int>>[];
+    var prefixBytes = 0;
+    List<int> remember(List<int> chunk) {
+      if (chunk.isEmpty) return chunk;
+      // Retain raw input, not rewritten fMP4 output. Bound retry bookkeeping
+      // instead of retaining arbitrarily large broken segments.
+      if (prefixBytes + chunk.length > 16 * 1024 * 1024) {
+        throw const _TwitchHlsSegmentIntegrityException(
+          'Segment retry prefix exceeds limit.',
+        );
+      }
+      final bytes = Uint8List.fromList(chunk);
+      deliveredPrefix.add(bytes);
+      prefixBytes += bytes.length;
+      return bytes;
+    }
 
     if (job != null) {
       try {
-        await output.addStream(
-          job.controller.stream.map((chunk) {
-            if (chunk.isNotEmpty) deliveredPrefix.add(chunk);
-            return chunk;
-          }),
-        );
+        await output.addStream(job.controller.stream.map(remember));
         return;
-      } catch (_) {}
+      } catch (error) {
+        if (error is! SocketException &&
+            error is! TimeoutException &&
+            error is! HttpException) {
+          rethrow;
+        }
+      }
     }
 
-    final upstreamResponse = await _openSuccessfulUpstream(
-      method: 'GET',
-      url: item.url,
-      range: null,
-      retryLiveSegment: true,
-      label: 'segment',
-    );
+    const maxBodyAttempts = 3;
+    for (var attempt = 1; attempt <= maxBodyAttempts; attempt++) {
+      // Opening failures already have their own finite request budget. Do not
+      // multiply that budget by treating them as body-read failures as well.
+      final upstreamResponse = await _openSuccessfulUpstream(
+        method: 'GET',
+        url: item.url,
+        range: null,
+        retryLiveSegment: true,
+        label: 'segment',
+      );
 
-    // Replacement GET begins at byte zero. Validate and skip the prefix that
-    // the failed prefetch already emitted, instead of duplicating media bytes.
-    Stream<List<int>> remainingSegment() async* {
-      var prefixIndex = 0;
-      var prefixOffset = 0;
-      await for (final chunk in upstreamResponse) {
-        var offset = 0;
-        while (prefixIndex < deliveredPrefix.length && offset < chunk.length) {
-          final prefix = deliveredPrefix[prefixIndex];
-          final count = math.min(
-            prefix.length - prefixOffset,
-            chunk.length - offset,
-          );
-          for (var i = 0; i < count; i++) {
-            if (prefix[prefixOffset + i] != chunk[offset + i]) {
-              throw const HttpException('Segment prefix changed during retry.');
+      // Replacement GET begins at byte zero. Validate and skip the prefix that
+      // the failed prefetch already emitted, instead of duplicating media bytes.
+      Stream<List<int>> remainingSegment() async* {
+        final prefixChunks = deliveredPrefix.length;
+        var prefixIndex = 0;
+        var prefixOffset = 0;
+        try {
+          await for (final chunk in upstreamResponse.timeout(
+            const Duration(seconds: 5),
+          )) {
+            var offset = 0;
+            while (prefixIndex < prefixChunks && offset < chunk.length) {
+              final prefix = deliveredPrefix[prefixIndex];
+              final count = math.min(
+                prefix.length - prefixOffset,
+                chunk.length - offset,
+              );
+              for (var i = 0; i < count; i++) {
+                if (prefix[prefixOffset + i] != chunk[offset + i]) {
+                  throw const _TwitchHlsSegmentIntegrityException(
+                    'Segment prefix changed during retry.',
+                  );
+                }
+              }
+              offset += count;
+              prefixOffset += count;
+              if (prefixOffset == prefix.length) {
+                prefixIndex++;
+                prefixOffset = 0;
+              }
+            }
+            if (offset < chunk.length) {
+              yield remember(offset == 0 ? chunk : chunk.sublist(offset));
             }
           }
-          offset += count;
-          prefixOffset += count;
-          if (prefixOffset == prefix.length) {
-            prefixIndex++;
-            prefixOffset = 0;
+          if (prefixIndex < prefixChunks) {
+            throw const _TwitchHlsSegmentIntegrityException(
+              'Replacement segment is shorter than its prefix.',
+            );
           }
-        }
-        if (offset < chunk.length) {
-          yield offset == 0 ? chunk : chunk.sublist(offset);
+        } catch (error, stackTrace) {
+          if (error is SocketException ||
+              error is TimeoutException ||
+              error is HttpException) {
+            throw _TwitchHlsSegmentReadFailure(error, stackTrace);
+          }
+          rethrow;
         }
       }
-      if (prefixIndex < deliveredPrefix.length) {
-        throw const HttpException(
-          'Replacement segment is shorter than its prefix.',
+
+      try {
+        await output.addStream(remainingSegment());
+        return;
+      } on _TwitchHlsSegmentReadFailure catch (failure) {
+        if (attempt == maxBodyAttempts || server == null) {
+          Error.throwWithStackTrace(failure.cause, failure.stackTrace);
+        }
+        onLog?.call(
+          '[HlsLifecycle] segment-body-retry attempt=$attempt '
+          'prefixBytes=$prefixBytes type=${failure.cause.runtimeType}',
         );
+        await Future<void>.delayed(Duration(milliseconds: 100 * attempt));
       }
     }
-
-    await output.addStream(remainingSegment());
   }
 
   Future<HttpClientResponse> _openSuccessfulUpstream({
@@ -626,7 +691,7 @@ class _TwitchDartHlsLowLatencyProxyCore {
         }
 
         await _discardUpstreamResponse(upstreamResponse);
-        lastError = HttpException('Upstream HTTP $status for $label');
+        lastError = _TwitchHlsUpstreamHttpException(status, label);
 
         if (!retryLiveSegment || attempt >= maxAttempts) {
           throw lastError;

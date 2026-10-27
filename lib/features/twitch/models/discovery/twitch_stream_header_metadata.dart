@@ -9,6 +9,7 @@ class TwitchStreamHeaderMetadata {
   final String language;
   final List<String> tags;
   final bool isMature;
+  final bool isPartner;
   final int? viewerCount;
   final String profileImageUrl;
   final DateTime? startedAt;
@@ -22,6 +23,7 @@ class TwitchStreamHeaderMetadata {
     this.language = '',
     this.tags = const <String>[],
     this.isMature = false,
+    this.isPartner = false,
     this.viewerCount,
     this.profileImageUrl = '',
     this.startedAt,
@@ -71,6 +73,7 @@ class TwitchStreamHeaderMetadata {
     String? language,
     List<String>? tags,
     bool? isMature,
+    bool? isPartner,
     int? viewerCount,
     bool clearViewerCount = false,
     String? profileImageUrl,
@@ -87,6 +90,7 @@ class TwitchStreamHeaderMetadata {
       language: language ?? this.language,
       tags: tags ?? this.tags,
       isMature: isMature ?? this.isMature,
+      isPartner: isPartner ?? this.isPartner,
       viewerCount: clearViewerCount ? null : viewerCount ?? this.viewerCount,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       startedAt: clearStartedAt ? null : startedAt ?? this.startedAt,

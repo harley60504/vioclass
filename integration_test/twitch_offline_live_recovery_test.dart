@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vioclass/features/twitch/api/playback/twitch_playback_api_service.dart';
 import 'package:vioclass/features/twitch/models/discovery/twitch_live_stream.dart';
 import 'package:vioclass/features/twitch/models/playback/twitch_m3u8_variant.dart';
+import 'package:vioclass/features/twitch/models/playback/twitch_hls_proxy_models.dart';
 import 'package:vioclass/features/twitch/presentation/pages/twitch_watch_page.dart';
 import 'package:vioclass/features/twitch/presentation/pages/watch/twitch_watch_playback_state.dart';
 import 'package:vioclass/features/twitch/presentation/widgets/watch/player/twitch_watch_controls_overlay.dart';
@@ -36,12 +37,32 @@ class _RecoveryRuntime extends TwitchPlaylistPlayerRuntime {
   final Uri media;
   int loads = 0;
   int liveResets = 0;
+  int upstreamReconnects = 0;
+  bool freshUpstream = false;
+
+  @override
+  Future<TwitchHlsLiveStatus?> refreshProxyLiveStatus({
+    bool notify = true,
+  }) async {
+    if (!freshUpstream) return null;
+    return TwitchHlsLiveStatus.fromJson({
+      'running': true,
+      'hasWriter': true,
+      'outputDurationMs': 30000,
+      'latestPlayableSequence': 50,
+      'lastWrittenSequence': 50,
+      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
+    });
+  }
 
   @override
   Future<Uri?> prepareLowLatencyLiveFromWarmUpstream({
     bool forceProxyReconnect = false,
   }) async {
-    expectSync(forceProxyReconnect, isTrue);
+    debugPrint(
+      '[ForegroundTest] prepare forceProxyReconnect=$forceProxyReconnect',
+    );
+    if (forceProxyReconnect) upstreamReconnects++;
     liveResets++;
     return media;
   }
@@ -117,6 +138,12 @@ void main() {
   testWidgets('Windows offline to live retries and keeps decoded playback', (
     tester,
   ) async {
+    expect(
+      const bool.fromEnvironment('TWITCH_READONLY_OBSERVE_RESTORE_OPEN'),
+      isTrue,
+      reason:
+          'Run with --dart-define=TWITCH_READONLY_OBSERVE_RESTORE_OPEN=true',
+    );
     const path = String.fromEnvironment('VIOCLASS_RECOVERY_TEST_MEDIA');
     final media = File(path);
     expect(path, isNotEmpty);
@@ -237,6 +264,30 @@ void main() {
           TwitchMediaKitPlayerHost.restoreOpenStarted,
           opensBeforeResume + 2,
         );
+        runtime.freshUpstream = true;
+        await player.seek(Duration.zero);
+        await player.play();
+        await tester.pump(const Duration(milliseconds: 100));
+        state.didChangeAppLifecycleState(AppLifecycleState.hidden);
+        await tester.pump(const Duration(milliseconds: 1500));
+        state.didChangeAppLifecycleState(AppLifecycleState.resumed);
+        await state.foregroundRecoveryInFlight;
+        debugPrint(
+          '[ForegroundTest] healthy resets=${runtime.liveResets} upstream=${runtime.upstreamReconnects} opens=${TwitchMediaKitPlayerHost.restoreOpenStarted} baseline=$opensBeforeResume',
+        );
+        expect(
+          runtime.liveResets,
+          inInclusiveRange(2, 3),
+          reason:
+              'Current upstream is retained even if the local reader needs reset',
+        );
+        final warmReaderResets = runtime.liveResets - 2;
+        expect(
+          TwitchMediaKitPlayerHost.restoreOpenStarted,
+          opensBeforeResume + 2 + warmReaderResets,
+        );
+        expect(runtime.upstreamReconnects, 2);
+        runtime.freshUpstream = false;
         await player.pause();
         await tester.pump(const Duration(milliseconds: 200));
         final pointer = await tester.createGesture(
@@ -250,14 +301,14 @@ void main() {
         await _wait(
           tester,
           () =>
-              runtime.liveResets == 3 &&
+              runtime.liveResets == 3 + warmReaderResets &&
               player.state.playing &&
               !state.liveTimelineActionInFlight,
           'paused LIVE restarts at the edge',
         );
         expect(
           TwitchMediaKitPlayerHost.restoreOpenStarted,
-          opensBeforeResume + 3,
+          opensBeforeResume + 3 + warmReaderResets,
         );
         await tester.tap(find.byIcon(Icons.tune_rounded).hitTestable());
         await tester.pump(const Duration(milliseconds: 200));
@@ -298,12 +349,32 @@ void main() {
         );
         final dvrPosition = player.state.position;
         await state.recoverWatchAfterForeground(shouldProbeLiveRecovery: true);
-        expect(runtime.liveResets, 3, reason: 'DVR keeps its viewing position');
+        expect(
+          runtime.liveResets,
+          3 + warmReaderResets,
+          reason: 'DVR keeps its viewing position',
+        );
         expect(
           TwitchMediaKitPlayerHost.restoreOpenStarted,
-          opensBeforeResume + 3,
+          opensBeforeResume + 3 + warmReaderResets,
         );
         expect(player.state.position, greaterThanOrEqualTo(dvrPosition));
+        runtime.freshUpstream = true;
+        state.markOwnedPlayback(
+          kind: TwitchWatchPlaybackKind.live,
+          mediaUri: media.uri.toString(),
+        );
+        await state.recoverWatchAfterForeground(shouldProbeLiveRecovery: true);
+        expect(
+          runtime.liveResets,
+          4 + warmReaderResets,
+          reason: 'A lagging reader is replaced locally',
+        );
+        expect(
+          runtime.upstreamReconnects,
+          3,
+          reason: 'A current upstream is not reconnected',
+        );
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }

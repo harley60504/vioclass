@@ -254,7 +254,7 @@ class TwitchWatchSheetPortLauncher {
   Future<void> openPredictionBetSheet(BuildContext context) async {
     final prediction = predictionSnapshot();
     if (prediction == null || !prediction.hasPrediction) {
-      showMessage('目前沒有賭盤。');
+      showMessage('目前沒有賽況預測。');
       return;
     }
     final destinationLogin = channelLogin();
@@ -286,12 +286,12 @@ class TwitchWatchSheetPortLauncher {
     int points,
   ) async {
     if (!canPlacePredictionBet()) {
-      showMessage('請先完成登入再下注。');
+      showMessage('請先完成登入再參與預測。');
       throw StateError('Prediction viewer is not ready');
     }
     final prediction = predictionSnapshot();
     if (prediction == null || !prediction.hasPrediction) {
-      showMessage('目前沒有可下注的賭盤。');
+      showMessage('目前沒有可參與的賽況預測。');
       throw StateError('No active prediction');
     }
     final balanceSnapshot = channelPointsSnapshot();
@@ -306,7 +306,7 @@ class TwitchWatchSheetPortLauncher {
       throw StateError('Prediction balance is unavailable');
     }
     if (points <= 0 || points > context.balance) {
-      showMessage(points <= 0 ? '請輸入有效點數' : '點數餘額不足，未送出下注。');
+      showMessage(points <= 0 ? '請輸入有效點數' : '點數餘額不足，未提交預測。');
       throw StateError('Prediction points exceed available balance');
     }
 
@@ -316,9 +316,9 @@ class TwitchWatchSheetPortLauncher {
         outcome: outcome,
         points: points,
       );
-      showMessage('已送出下注：${result.outcomeTitle} · ${result.points} 點');
+      showMessage('已提交預測：${result.outcomeTitle} · ${result.points} 點');
     } catch (error) {
-      showMessage('下注失敗，稍後再試。');
+      showMessage('提交預測失敗，稍後再試。');
       rethrow;
     }
     try {

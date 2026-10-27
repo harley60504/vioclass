@@ -61,8 +61,8 @@ String? channelPointRewardStatusText(
   }
   if (readChannelPointBool(reward['isUserInputRequired'])) return '需要輸入';
   if (requiresChannelPointMessageInput(reward)) return '需要訊息';
-  if (requiresChannelPointModifiedEmoteSelection(reward)) return '需要貼圖與效果';
-  if (requiresChannelPointOfficialEmoteSelection(reward)) return '需要貼圖';
+  if (requiresChannelPointModifiedEmoteSelection(reward)) return '需要表情符號與效果';
+  if (requiresChannelPointOfficialEmoteSelection(reward)) return '需要表情符號';
 
   return null;
 }

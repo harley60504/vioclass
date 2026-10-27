@@ -72,7 +72,7 @@ class TwitchWhisperLoginIntegrityService {
     if (_pending != null && _pendingKey == key) return _pending!;
     if (_pending != null) {
       return Future.error(
-        const TwitchWhisperException('私訊驗證工作階段正在變更，未混用其他帳號資料。'),
+        const TwitchWhisperException('悄悄話驗證工作階段正在變更，未混用其他帳號資料。'),
       );
     }
     _pendingKey = key;
@@ -105,7 +105,7 @@ class TwitchWhisperLoginIntegrityService {
       try {
         final raw = await _enqueueRead();
         if (generation != _generation) {
-          throw const TwitchWhisperException('私訊登入工作階段已變更，未恢復舊驗證。');
+          throw const TwitchWhisperException('悄悄話登入工作階段已變更，未恢復舊驗證。');
         }
         if (raw != null) {
           final data = jsonDecode(raw) as Map;
@@ -134,11 +134,11 @@ class TwitchWhisperLoginIntegrityService {
         rethrow;
       } catch (_) {
         if (browser == null) {
-          throw const TwitchWhisperException('私訊驗證快取無法讀取或格式無效；登入與聊天紀錄未變更。');
+          throw const TwitchWhisperException('悄悄話驗證快取無法讀取或格式無效；登入與聊天紀錄未變更。');
         }
         // A damaged cache is not a damaged OAuth login. Acquire fresh proof.
         if (generation != _generation) {
-          throw const TwitchWhisperException('登入已變更，未更新舊的私訊驗證。');
+          throw const TwitchWhisperException('登入已變更，未更新舊的悄悄話驗證。');
         }
       }
     }
@@ -165,7 +165,7 @@ class TwitchWhisperLoginIntegrityService {
           documentStartScript: documentStartScript,
           capture: (evaluate) async {
             if (before != _generation) {
-              throw const TwitchWhisperException('登入已變更，未更新舊的私訊驗證。');
+              throw const TwitchWhisperException('登入已變更，未更新舊的悄悄話驗證。');
             }
             await captureFromLogin(
               session: session,
@@ -177,13 +177,13 @@ class TwitchWhisperLoginIntegrityService {
       } on TwitchWhisperException {
         rethrow;
       } catch (_) {
-        throw const TwitchWhisperException('背景私訊驗證未完成；登入及既有紀錄保留，稍後可重試。');
+        throw const TwitchWhisperException('背景悄悄話驗證未完成；登入及既有紀錄保留，稍後可重試。');
       }
       context = _context;
     }
     if (context == null || _sessionToken != session.token) {
       throw const TwitchWhisperException(
-        '目前登入尚無可用的私訊驗證資料；需在既有登入視窗完成驗證，重試歷史不會補回驗證。',
+        '目前登入尚無可用的悄悄話驗證資料；需在既有登入視窗完成驗證，重試歷史不會補回驗證。',
       );
     }
     context.headersFor(session);
@@ -230,7 +230,7 @@ class TwitchWhisperLoginIntegrityService {
     final watch = Stopwatch()..start();
     while (watch.elapsed < timeout) {
       if (generation != _generation || !stillCurrent()) {
-        throw const TwitchWhisperException('登入工作階段已變更，未保存舊的私訊驗證資料。');
+        throw const TwitchWhisperException('登入工作階段已變更，未保存舊的悄悄話驗證資料。');
       }
       dynamic value;
       try {
@@ -277,7 +277,7 @@ class TwitchWhisperLoginIntegrityService {
               ? ' HTTP ${value['status']}'
               : '';
           throw TwitchWhisperException(
-            '登入完成，但私訊驗證取得失敗（$category$status）；登入資料仍保留。',
+            '登入完成，但悄悄話驗證取得失敗（$category$status）；登入資料仍保留。',
           );
         }
         final token = value['token'];
@@ -288,7 +288,7 @@ class TwitchWhisperLoginIntegrityService {
             device is! String ||
             ua is! String ||
             expiry is! num) {
-          throw const TwitchWhisperException('登入視窗的私訊驗證回應格式無效。');
+          throw const TwitchWhisperException('登入視窗的悄悄話驗證回應格式無效。');
         }
         final context = TwitchWhisperIntegrityContext(
           ownerId: session.validation.userId,
@@ -303,7 +303,7 @@ class TwitchWhisperLoginIntegrityService {
         );
         context.headersFor(session);
         if (generation != _generation || !stillCurrent()) {
-          throw const TwitchWhisperException('登入工作階段已變更，未保存舊的私訊驗證資料。');
+          throw const TwitchWhisperException('登入工作階段已變更，未保存舊的悄悄話驗證資料。');
         }
         _context = context;
         _sessionToken = session.token;
@@ -323,12 +323,12 @@ class TwitchWhisperLoginIntegrityService {
           );
         });
         if (generation != _generation || !stillCurrent()) {
-          throw const TwitchWhisperException('登入工作階段已變更，未使用舊的私訊驗證資料。');
+          throw const TwitchWhisperException('登入工作階段已變更，未使用舊的悄悄話驗證資料。');
         }
         return;
       }
       await Future<void>.delayed(pollInterval);
     }
-    throw const TwitchWhisperException('登入完成，但私訊驗證準備逾時；同步不會另開 WebView。');
+    throw const TwitchWhisperException('登入完成，但悄悄話驗證準備逾時；同步不會另開 WebView。');
   }
 }

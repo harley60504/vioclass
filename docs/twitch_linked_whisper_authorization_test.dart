@@ -136,7 +136,7 @@ void main() {
     tester,
   ) async {
     await open(tester, ['chat:read', 'chat:edit']);
-    expect(find.text('已登入 Twitch，請再次授權以啟用私訊收發。'), findsOneWidget);
+    expect(find.text('已登入 Twitch，請再次授權以啟用悄悄話收發。'), findsOneWidget);
     expect(find.text('登入完成'), findsNothing);
     expect(find.text('登出'), findsOneWidget);
     await tester.tap(find.text('使用 Twitch 登入'));
@@ -162,7 +162,7 @@ void main() {
     tester,
   ) async {
     await open(tester, ['user:read:whispers']);
-    expect(find.text('已登入 Twitch，請再次授權以啟用私訊收發。'), findsOneWidget);
+    expect(find.text('已登入 Twitch，請再次授權以啟用悄悄話收發。'), findsOneWidget);
     expect(find.text('登入完成'), findsNothing);
   });
 

@@ -54,14 +54,18 @@ class _TwitchHlsPersistentWriter {
 
         await _writeItemAtBoundary(next);
       }
-    } catch (_) {
+    } catch (error) {
+      engine.owner.onLog?.call(
+        '[HlsLifecycle] writer-error type=${error.runtimeType} '
+        'itemOutputStarted=$_itemOutputStarted bytes=${output.bufferedBytes}',
+      );
       // A fatal segment error can leave partial media in existing readers.
       // End those streams instead of silently restarting into the same byte
       // bus or leaving native playback waiting forever for missing bytes.
       // The next client request creates a fresh engine and initialization.
       if (_itemOutputStarted &&
           (_fmp4Timeline != null || output.bufferedBytes > 0)) {
-        engine.stop();
+        engine.stop(reason: 'segment-error:${error.runtimeType}');
       }
     } finally {
       stop();

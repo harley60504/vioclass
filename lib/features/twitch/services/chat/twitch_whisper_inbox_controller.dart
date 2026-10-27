@@ -87,7 +87,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
   late final TwitchWhisperArchiveStore archive;
   TwitchWhisperEventSubService? _receiver;
   final void Function(TwitchWhisperConversation peer)? onIncomingNotification;
-  String receiveStatus = '私訊收件尚未連線';
+  String receiveStatus = '悄悄話收件尚未連線';
   final _receiveGaps = <String, DateTime>{};
   final _receiveGapObservations = <String, DateTime>{};
   final _receiveGapObservationIds = <String, String>{};
@@ -300,7 +300,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
         try {
           onIncomingNotification?.call(notificationPeer);
         } catch (_) {
-          errorText = '私訊已保存，但通知顯示失敗。';
+          errorText = '悄悄話已保存，但通知顯示失敗。';
         }
       }
     }
@@ -535,7 +535,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
         _activeReceiveOwner = null;
         _conversations = const [];
         _activePeerId = null;
-        errorText = '私訊資料暫時無法載入；原本歷史已保留。';
+        errorText = '悄悄話資料暫時無法載入；原本歷史已保留。';
       }
     } finally {
       if (!_disposed && generation == _generation) {
@@ -589,7 +589,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     final text = whisper['text'] as String;
     if (prior != null &&
         (prior.message.fromUserId != from || prior.message.text != text)) {
-      errorText = '私訊事件 ID 與待保存資料衝突；原資料保留。';
+      errorText = '悄悄話事件 ID 與待保存資料衝突；原資料保留。';
       _notify();
       return;
     }
@@ -603,7 +603,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
                       (sum, item) => sum + item.message.text.length,
                     ) >
                 512 * 1024)) {
-      errorText = '私訊待保存暫存已滿；部分收件未保存，請恢復儲存後同步 Twitch 歷史。';
+      errorText = '悄悄話待保存暫存已滿；部分收件未保存，請恢復儲存後同步 Twitch 歷史。';
       _notify();
       return;
     }
@@ -632,8 +632,8 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     } catch (_) {
       if (_current(currentGeneration, owner)) {
         errorText = pendingIncomingCount > 0
-            ? '收到的私訊尚未保存，暫存於記憶體；請恢復儲存後重新載入，退出 App 可能遺失。'
-            : '私訊草稿或歷史儲存失敗，請稍後再試。';
+            ? '收到的悄悄話尚未保存，暫存於記憶體；請恢復儲存後重新載入，退出 App 可能遺失。'
+            : '悄悄話草稿或歷史儲存失敗，請稍後再試。';
         _notify();
       }
     }
@@ -736,7 +736,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
       historyStatus = '已同步 ${peer.displayName} 的一頁歷史；不代表所有對話已同步。';
     } on TimeoutException {
       if (current()) {
-        historyError = '私訊歷史同步逾時，原資料與分頁位置已保留，請重試。';
+        historyError = '悄悄話歷史同步逾時，原資料與分頁位置已保留，請重試。';
       }
     } on TwitchWhisperException catch (error) {
       if (current()) historyError = error.message;
@@ -744,7 +744,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
       if (current()) historyError = error.message;
     } catch (_) {
       if (current()) {
-        historyError = '私訊歷史同步未完成，原資料與分頁位置已保留。';
+        historyError = '悄悄話歷史同步未完成，原資料與分頁位置已保留。';
       }
     } finally {
       if (current()) {
@@ -974,7 +974,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     } on TwitchWhisperException catch (error) {
       if (_current(generation, owner)) emoteError = error.message;
     } catch (_) {
-      if (_current(generation, owner)) emoteError = '官方貼圖暫時無法載入，請重試。';
+      if (_current(generation, owner)) emoteError = '官方表情符號暫時無法載入，請重試。';
     } finally {
       if (_current(generation, owner)) {
         loadingEmotes = false;
@@ -1014,7 +1014,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     } on TwitchWhisperException catch (error) {
       if (canApply()) errorText = error.message;
     } catch (_) {
-      if (canApply()) errorText = '私訊對象資料暫時無法更新；原本對話已保留。';
+      if (canApply()) errorText = '悄悄話對象資料暫時無法更新；原本對話已保留。';
     } finally {
       if (_current(generation, owner)) {
         refreshingProfile = false;
@@ -1044,7 +1044,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     } on TwitchWhisperException catch (error) {
       if (_current(generation, owner)) errorText = error.message;
     } catch (_) {
-      if (_current(generation, owner)) errorText = '私訊資料暫時無法載入；原本歷史已保留。';
+      if (_current(generation, owner)) errorText = '悄悄話資料暫時無法載入；原本歷史已保留。';
     } finally {
       if (_current(generation, owner)) {
         searching = false;
@@ -1070,7 +1070,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
         await _reload(owner, generation);
       } catch (_) {
         if (_current(generation, owner)) {
-          errorText = '私訊草稿或歷史儲存失敗，請稍後再試。';
+          errorText = '悄悄話草稿或歷史儲存失敗，請稍後再試。';
           _notify();
         }
       }
@@ -1106,7 +1106,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
         }
       } catch (_) {
         if (!_disposed && _ownerId == owner) {
-          errorText = '私訊草稿或歷史儲存失敗，請稍後再試。';
+          errorText = '悄悄話草稿或歷史儲存失敗，請稍後再試。';
           _notify();
         }
       }
@@ -1194,7 +1194,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
             ? 'Twitch 已接受本次提交，但本機紀錄或草稿保存未完成；請勿直接重送。'
             : error is TwitchWhisperException
             ? error.message
-            : '私訊送出失敗，請確認授權、電話驗證與 Twitch 限制。';
+            : '悄悄話送出失敗，請確認授權、電話驗證與 Twitch 限制。';
       }
     } finally {
       if (_current(generation, owner)) {
@@ -1204,7 +1204,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
         } catch (_) {
           errorText = acceptedByTwitch
               ? 'Twitch 已接受本次提交，但本機紀錄或草稿保存未完成；請勿直接重送。'
-              : '私訊草稿或歷史儲存失敗，請稍後再試。';
+              : '悄悄話草稿或歷史儲存失敗，請稍後再試。';
         }
         _overlaySubmitted(owner);
         _notify();
@@ -1424,7 +1424,7 @@ class TwitchWhisperInboxController extends ChangeNotifier {
     emoteError = null;
     ++_generation;
     _receiver?.stop();
-    receiveStatus = '私訊收件尚未連線';
+    receiveStatus = '悄悄話收件尚未連線';
     _ownerId = null;
     _locallyOpenedPeerIds.clear();
     _closedComposePeerIds.clear();

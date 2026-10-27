@@ -111,6 +111,7 @@ class TwitchAndroidPipController extends ChangeNotifier {
   Future<dynamic> _handleNativeCall(MethodCall call) async {
     switch (call.method) {
       case 'onAutoPipRequested':
+      case 'onPipTransitionStarted':
         // Auto PiP from onUserLeaveHint must be immediate on Android. We only
         // flip this flag as a best-effort hint; native should not wait for it.
         _setPreparingPictureInPicture(true);
@@ -152,15 +153,19 @@ class TwitchAndroidPipController extends ChangeNotifier {
       _isInPictureInPictureMode = inPictureInPicture;
       changed = true;
     }
-    final stoppedOutsidePip = !started && !inPictureInPicture;
+    if (inPictureInPicture && _isPreparingPictureInPicture) {
+      _isPreparingPictureInPicture = false;
+      _prepareTimeout?.cancel();
+      _prepareTimeout = null;
+      changed = true;
+    }
+    // Activity stop can precede Android's PiP-mode confirmation. Preserve the
+    // transition until confirmation, explicit failure or the safety timeout.
+    final stoppedOutsidePip =
+        !started && !inPictureInPicture && !_isPreparingPictureInPicture;
     if (_stoppedOutsidePictureInPicture != stoppedOutsidePip) {
       _stoppedOutsidePictureInPicture = stoppedOutsidePip;
       changed = true;
-    }
-    if (started) {
-      _setPreparingPictureInPicture(false);
-    } else if (stoppedOutsidePip) {
-      _setPreparingPictureInPicture(false);
     }
     if (changed) notifyListeners();
   }
@@ -169,9 +174,12 @@ class TwitchAndroidPipController extends ChangeNotifier {
     if (_isInPictureInPictureMode == value) return;
     _isInPictureInPictureMode = value;
     if (value) {
+      _isPreparingPictureInPicture = false;
       _prepareTimeout?.cancel();
       _prepareTimeout = null;
     }
+    _stoppedOutsidePictureInPicture =
+        !_isActivityStarted && !value && !_isPreparingPictureInPicture;
     notifyListeners();
   }
 
@@ -182,6 +190,8 @@ class TwitchAndroidPipController extends ChangeNotifier {
     }
 
     _isPreparingPictureInPicture = value;
+    _stoppedOutsidePictureInPicture =
+        !_isActivityStarted && !_isInPictureInPictureMode && !value;
     if (value) {
       _schedulePrepareTimeout();
     } else {

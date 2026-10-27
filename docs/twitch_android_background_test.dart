@@ -276,7 +276,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(TwitchAndroidBackgroundSettingsCard), findsOneWidget);
       expect(find.text('開台通知'), findsOneWidget);
-      expect(find.text('背景私訊'), findsOneWidget);
+      expect(find.text('背景悄悄話'), findsOneWidget);
       expect(find.textContaining('15 分鐘'), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
