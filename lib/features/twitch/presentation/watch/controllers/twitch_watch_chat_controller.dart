@@ -27,6 +27,9 @@ class TwitchWatchChatController extends ChangeNotifier {
   bool _disposed = false;
   int _connectionGeneration = 0;
   Timer? _foregroundReconnectTimer;
+  Timer? _reconnectRetryTimer;
+  TwitchChatRuntime? _observedRuntime;
+  int _reconnectFailures = 0;
   bool _appForeground = true;
   bool _autoReconnectEnabled = false;
   bool _foregroundRefreshPending = false;
@@ -120,6 +123,7 @@ class TwitchWatchChatController extends ChangeNotifier {
     if (_disposed) return;
     _autoReconnectEnabled = true;
     _foregroundRefreshPending = false;
+    _detachRuntimeRecovery();
     _startForegroundReconnectTimer();
     final generation = ++_connectionGeneration;
     bool isCurrent() => !_disposed && generation == _connectionGeneration;
@@ -172,6 +176,8 @@ class TwitchWatchChatController extends ChangeNotifier {
           );
 
       runtime = nextRuntime;
+      _observedRuntime = nextRuntime;
+      nextRuntime.addListener(_onChatConnectionChanged);
       Future<bool> discardChangedIdentity() async {
         final sameIdentity = _sameViewer(identity, identityRevision);
         if (sameIdentity) return false;
@@ -233,6 +239,7 @@ class TwitchWatchChatController extends ChangeNotifier {
     } finally {
       if (isCurrent()) {
         connectingChat = false;
+        _finishReconnectAttempt();
         notifyListeners();
       }
     }
@@ -673,6 +680,7 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   Future<void> disconnect() async {
     _autoReconnectEnabled = false;
+    _detachRuntimeRecovery();
     _foregroundReconnectTimer?.cancel();
     _foregroundReconnectTimer = null;
     await runtime?.disconnect();
@@ -683,10 +691,13 @@ class TwitchWatchChatController extends ChangeNotifier {
     _appForeground = foreground;
     if (!foreground) {
       _foregroundRefreshPending = true;
+      _cancelReconnectRetry();
       _foregroundReconnectTimer?.cancel();
       _foregroundReconnectTimer = null;
       return;
     }
+    _cancelReconnectRetry();
+    _reconnectFailures = 0;
     _startForegroundReconnectTimer();
     await _recoverForegroundChat();
   }
@@ -701,10 +712,69 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   Future<void> _recoverForegroundChat() async {
     if (_disposed || !_appForeground || !_autoReconnectEnabled) return;
+    if (_reconnectRetryTimer != null) return;
     await reconnectAfterNetworkRestored(
       refreshConnection: _foregroundRefreshPending,
       silent: true,
     );
+  }
+
+  void _cancelReconnectRetry() {
+    _reconnectRetryTimer?.cancel();
+    _reconnectRetryTimer = null;
+  }
+
+  void _detachRuntimeRecovery() {
+    _cancelReconnectRetry();
+    _observedRuntime?.removeListener(_onChatConnectionChanged);
+    _observedRuntime = null;
+    _reconnectFailures = 0;
+  }
+
+  void _finishReconnectAttempt() {
+    if (runtime == null) return;
+    if (runtime!.connected) {
+      _reconnectFailures = 0;
+      _cancelReconnectRetry();
+    } else {
+      _reconnectFailures++;
+      _onChatConnectionChanged();
+    }
+  }
+
+  void _onChatConnectionChanged() {
+    final activeRuntime = runtime;
+    if (_disposed ||
+        !_appForeground ||
+        !_autoReconnectEnabled ||
+        activeRuntime == null ||
+        connectingChat ||
+        activeRuntime.connecting) {
+      return;
+    }
+    if (activeRuntime.connected) {
+      _reconnectFailures = 0;
+      _cancelReconnectRetry();
+      return;
+    }
+    if (_reconnectRetryTimer != null ||
+        TwitchViewerSession.forAuth(authService).status ==
+            TwitchViewerStatus.checking) {
+      return;
+    }
+    final seconds = switch (_reconnectFailures) {
+      0 => 0,
+      1 => 2,
+      2 => 4,
+      3 => 8,
+      _ => 15,
+    };
+    // Queue outside the runtime's notification to avoid disposing/rebinding
+    // streams while they are delivering the disconnect event.
+    _reconnectRetryTimer = Timer(Duration(seconds: seconds), () {
+      _reconnectRetryTimer = null;
+      unawaited(_recoverForegroundChat());
+    });
   }
 
   Future<void> reconnectAfterNetworkRestored({
@@ -727,6 +797,7 @@ class TwitchWatchChatController extends ChangeNotifier {
     if (viewer.status == TwitchViewerStatus.checking) {
       return;
     }
+    _cancelReconnectRetry();
     if (refreshConnection) _foregroundRefreshPending = false;
     final sameViewer = viewer.status == TwitchViewerStatus.guest
         ? _connectedToken == null
@@ -764,6 +835,7 @@ class TwitchWatchChatController extends ChangeNotifier {
           generation == _connectionGeneration &&
           identical(runtime, activeRuntime)) {
         connectingChat = false;
+        _finishReconnectAttempt();
         notifyListeners();
       }
     }
@@ -771,6 +843,7 @@ class TwitchWatchChatController extends ChangeNotifier {
 
   Future<void> disposeRuntime() async {
     _connectionGeneration++;
+    _detachRuntimeRecovery();
     sending = false;
     connectingChat = false;
     _connectedToken = null;

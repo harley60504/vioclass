@@ -1,9 +1,12 @@
 // ignore_for_file: avoid_relative_lib_imports
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import '../lib/features/twitch/api/core/twitch_api_client.dart';
 import '../lib/features/twitch/api/auth/twitch_auth_api_service.dart';
 import '../lib/features/twitch/api/chat/twitch_recent_messages_api_service.dart';
+import '../lib/features/twitch/api/chat/twitch_irc_api_service.dart';
+import '../lib/features/twitch/services/chat/twitch_badge_cache_service.dart';
 import '../lib/features/twitch/services/auth/twitch_auth_service.dart';
 import '../lib/features/twitch/services/auth/twitch_viewer_session.dart';
 import '../lib/features/twitch/services/auth/twitch_drops_auth_service.dart';
@@ -49,11 +52,15 @@ class _StartupPort implements TwitchWatchChatPort {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _GuestRuntime implements TwitchChatRuntime {
+class _GuestRuntime extends ChangeNotifier implements TwitchChatRuntime {
   int connects = 0;
   int supplements = 0;
   int disposals = 0;
   bool failConnect = false;
+  @override
+  bool get connected => !failConnect;
+  @override
+  bool get connecting => false;
   @override
   dynamic noSuchMethod(Invocation invocation) {
     if (invocation.memberName == #sendRejections) {
@@ -253,6 +260,63 @@ class _ReconnectRuntime extends _ReadyRuntime {
   }
 }
 
+class _RecoveryTimer implements Timer {
+  final void Function(Timer) callback;
+  final bool periodic;
+  _RecoveryTimer(this.callback, {this.periodic = true});
+  @override
+  bool isActive = true;
+  @override
+  int tick = 0;
+  @override
+  void cancel() => isActive = false;
+  void fire() {
+    if (!isActive) return;
+    tick++;
+    if (!periodic) isActive = false;
+    callback(this);
+  }
+}
+
+class _RecoveryIrc extends TwitchIrcApiService {
+  final events = StreamController<String>.broadcast();
+  int connections = 0;
+  bool failNext = false;
+  Completer<Map<String, String>>? pending;
+
+  @override
+  Stream<String> get rawLines => events.stream;
+
+  @override
+  Future<void> connect({
+    required String channelLogin,
+    String? accessToken,
+    String nick = 'justinfan12345',
+  }) async {
+    connections++;
+  }
+
+  @override
+  Future<Map<String, String>> waitForCurrentUserState({
+    Duration timeout = Duration.zero,
+  }) async {
+    if (failNext) {
+      failNext = false;
+      events.add('DISCONNECTED');
+    }
+    return pending?.future ?? Future.value({});
+  }
+
+  @override
+  Future<void> disconnect() async {}
+
+  @override
+  Future<void> dispose() async {
+    await events.close();
+    await super.dispose();
+  }
+}
+
 class _ForegroundRuntime extends _ReadyRuntime {
   bool ready = true;
   bool failNext = false;
@@ -369,6 +433,157 @@ class _QueuedRewards extends _Engagement {
 }
 
 void main() {
+  for (final dual in [false, true]) {
+    for (final event in ['DISCONNECTED', 'ERROR fixture', 'RECONNECT']) {
+      test('Real runtime auto recovery event=$event dual=$dual', () async {
+        late _RecoveryTimer recoveryTimer;
+        final retries = <_RecoveryTimer>[];
+        final retryDelays = <Duration>[];
+        await runZoned(
+          () async {
+            final client = TwitchApiClient();
+            final readIrc = _RecoveryIrc();
+            final writeIrc = dual ? _RecoveryIrc() : null;
+            final source = writeIrc ?? readIrc;
+            final runtime = TwitchChatRuntime(
+              ircApi: readIrc,
+              writeIrcApi: writeIrc,
+              badgeCache: TwitchBadgeCacheService(),
+            );
+            final startup = _StartupPort();
+            final notices = <String>[];
+            final controller = TwitchWatchChatController(
+              runtimeFactory: ({required authenticated}) => runtime,
+              authService: _GuestAuth(client),
+              dropsAuthService: _ReadyDrops(),
+              authApi: _ReadyValidation(client, []),
+              recentMessagesApi: _Recent(),
+              chatPort: startup,
+              engagementPort: _Engagement(),
+              specialMessagesRuntime: _Special(),
+              channelLogin: () => 'fixture',
+              channelId: () => '7',
+              viewerId: () => null,
+              channelPointsSnapshot: () => null,
+              refreshEngagement: ({bool showSnackOnError = false}) async {},
+              refreshSpecialMessages:
+                  ({bool autoSelectPending = false}) async {},
+              onChannelIdResolved: (_) {},
+              onViewerResolved: (_, _) {},
+              showMessage: notices.add,
+            );
+            await controller.connectChat('fixture');
+            readIrc.handleSocketMessage(
+              '@id=before :viewer!v@v PRIVMSG #fixture :before interruption',
+            );
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(runtime.connected, isTrue);
+            if (event == 'RECONNECT') {
+              source.handleSocketMessage(':tmi.twitch.tv RECONNECT');
+            } else {
+              source.events.add(event);
+            }
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(runtime.connected, isFalse);
+
+            // First automatic retry also drops during startup. It must not be
+            // mistaken for a successful reconnect and stop subsequent retries.
+            source.failNext = true;
+            expect(controller.connectingChat, isFalse);
+            expect(runtime.connecting, isFalse);
+            expect(runtime.channelLogin, 'fixture');
+            expect(retryDelays, [Duration.zero]);
+            retries.last.fire();
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(readIrc.connections, 2);
+            expect(runtime.connected, isFalse);
+            expect(controller.connectingChat, isFalse);
+
+            // Hold the next retry while two further timer ticks occur.
+            for (final seconds in [2, 4, 8, 15]) {
+              expect(retryDelays.last, Duration(seconds: seconds));
+              source.failNext = true;
+              retries.last.fire();
+              await Future<void>.delayed(const Duration(milliseconds: 1));
+              expect(runtime.connected, isFalse);
+            }
+            expect(retryDelays.last, const Duration(seconds: 15));
+            source.pending = Completer<Map<String, String>>();
+            retries.last.fire();
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            recoveryTimer.fire();
+            recoveryTimer.fire();
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(readIrc.connections, 7);
+            source.pending!.complete({});
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(runtime.connected, isTrue);
+            readIrc.handleSocketMessage(
+              '@id=after :viewer!v@v PRIVMSG #fixture :after recovery',
+            );
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(runtime.messages.map((message) => message.id), [
+              'before',
+              'after',
+            ]);
+            recoveryTimer.fire();
+            recoveryTimer.fire();
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(readIrc.connections, 7);
+            // A subsequent outage starts immediately again after success.
+            source.events.add('DISCONNECTED');
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(retryDelays.last, Duration.zero);
+            // Backgrounding cancels that queued dial. Foreground return
+            // recovers immediately instead of waiting for the old delay.
+            await controller.setAppForeground(false);
+            expect(retries.last.isActive, isFalse);
+            retries.last.fire();
+            expect(readIrc.connections, 7);
+            await controller.setAppForeground(true);
+            expect(readIrc.connections, 8);
+            expect(runtime.connected, isTrue);
+            expect(startup.requests, 1);
+            expect(notices, isEmpty);
+            await controller.disconnect();
+            await controller.disposeRuntime();
+            controller.dispose();
+            runtime.dispose();
+            expect(recoveryTimer.isActive, isFalse);
+            recoveryTimer.fire();
+            await Future<void>.delayed(const Duration(milliseconds: 1));
+            expect(readIrc.connections, 8);
+            client.close(force: true);
+          },
+          zoneSpecification: ZoneSpecification(
+            createTimer: (self, parent, zone, delay, callback) {
+              if ([
+                0,
+                2,
+                4,
+                8,
+                15,
+              ].any((seconds) => delay == Duration(seconds: seconds))) {
+                final timer = _RecoveryTimer(
+                  (_) => zone.runGuarded(callback),
+                  periodic: false,
+                );
+                retries.add(timer);
+                retryDelays.add(delay);
+                return timer;
+              }
+              return parent.createTimer(zone, delay, callback);
+            },
+            createPeriodicTimer: (self, parent, zone, period, callback) {
+              expect(period, const Duration(seconds: 15));
+              recoveryTimer = _RecoveryTimer(zone.bindUnaryCallback(callback));
+              return recoveryTimer;
+            },
+          ),
+        );
+      });
+    }
+  }
   for (final guest in [true, false]) {
     testWidgets('Foreground refresh and disconnected-only retry guest=$guest', (
       tester,

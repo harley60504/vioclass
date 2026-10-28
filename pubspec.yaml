@@ -2,7 +2,7 @@ name: vioclass
 description: "VioClass streaming classroom app."
 publish_to: 'none'
 
-version: 2.0.11+37
+version: 2.0.12+38
 
 environment:
   sdk: ^3.11.5

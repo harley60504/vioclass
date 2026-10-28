@@ -56,6 +56,7 @@ class TwitchChatRuntime extends ChangeNotifier {
   StreamSubscription<TwitchChatMessage>? _messageSubscription;
   StreamSubscription<TwitchChatMessage>? _writeMessageSubscription;
   StreamSubscription<String>? _rawSubscription;
+  StreamSubscription<String>? _writeRawSubscription;
 
   String _channelLogin = '';
   String _viewerLogin = '';
@@ -221,34 +222,53 @@ class TwitchChatRuntime extends ChangeNotifier {
       }),
     );
 
+    var connectionInterrupted = false;
+    void markConnectionInterrupted(Object error) {
+      if (generation != _connectionGeneration) return;
+      connectionInterrupted = true;
+      _error = error;
+      _connected = false;
+      notifyListeners();
+    }
+
+    void handleRawLine(String line) {
+      if (generation != _connectionGeneration) return;
+      _rawEventCount += 1;
+      if (line == 'DISCONNECTED' || line.startsWith('ERROR ')) {
+        markConnectionInterrupted(line);
+      }
+    }
+
     _messageSubscription = ircApi.messages.listen(
-      _handleReadConnectionMessage,
+      (message) {
+        if (generation != _connectionGeneration) return;
+        if (message.command == 'RECONNECT') {
+          markConnectionInterrupted('Server requested IRC reconnect');
+        }
+        _handleReadConnectionMessage(message);
+      },
       onError: (Object error, StackTrace stackTrace) {
-        _error = error;
-        _connected = false;
-        notifyListeners();
+        markConnectionInterrupted(error);
       },
     );
 
     if (writeIrcApi != null) {
       _writeMessageSubscription = writeIrcApi!.messages.listen(
-        _handleWriteConnectionMessage,
+        (message) {
+          if (generation != _connectionGeneration) return;
+          if (message.command == 'RECONNECT') {
+            markConnectionInterrupted('Server requested IRC reconnect');
+          }
+          _handleWriteConnectionMessage(message);
+        },
         onError: (Object error, StackTrace stackTrace) {
-          _error = error;
-          _connected = false;
-          notifyListeners();
+          markConnectionInterrupted(error);
         },
       );
+      _writeRawSubscription = writeIrcApi!.rawLines.listen(handleRawLine);
     }
 
-    _rawSubscription = ircApi.rawLines.listen((line) {
-      _rawEventCount += 1;
-      if (line == 'DISCONNECTED' || line.startsWith('ERROR ')) {
-        _connected = false;
-        _error ??= line;
-        notifyListeners();
-      }
-    });
+    _rawSubscription = ircApi.rawLines.listen(handleRawLine);
 
     try {
       await ircApi.connect(
@@ -276,7 +296,9 @@ class TwitchChatRuntime extends ChangeNotifier {
       }
 
       if (generation != _connectionGeneration) return;
-      _connected = true;
+      // A disconnect/error can arrive while waiting for initial USERSTATE.
+      // Keep that failure visible so foreground recovery can retry it.
+      _connected = !connectionInterrupted;
     } catch (e) {
       if (generation != _connectionGeneration) return;
       _error = e;
@@ -519,10 +541,12 @@ class TwitchChatRuntime extends ChangeNotifier {
     await _messageSubscription?.cancel();
     await _writeMessageSubscription?.cancel();
     await _rawSubscription?.cancel();
+    await _writeRawSubscription?.cancel();
 
     _messageSubscription = null;
     _writeMessageSubscription = null;
     _rawSubscription = null;
+    _writeRawSubscription = null;
 
     _clearPendingOutgoingMessages();
 
